@@ -1,0 +1,259 @@
+{
+    "phase_a": {
+        "title_candidates": [
+            "RUBI, LA NOVEDAD BRASILEÑA EN BURRIANA 💞",
+            "RUBI LLEGA PARA SORPRENDER EN BURRIANA",
+            "BRASILEÑA RUBI: PRESENCIA, TRATO Y ENCANTO",
+            "NOVEDAD EN BURRIANA: RUBI 🇧🇷",
+            "RUBI, MADURA BRASILEÑA CON MUCHO POR DESCUBRIR",
+            "UNA BRASILEÑA DIFERENTE HA LLEGADO A BURRIANA",
+            "RUBI TE RECIBE CON UNA SONRISA Y BUEN PLAN ✨",
+            "BURRIANA TIENE NUEVA BRASILEÑA Y SE NOTA",
+            "RUBI: ELEGANCIA LATINA Y TRATO CERCANO",
+            "MADURA BRASILEÑA EN BURRIANA, RECIÉN LLEGADA",
+            "RUBI ES ESA NOVEDAD QUE LLAMA LA ATENCIÓN",
+            "BRASILEÑA, LATINA Y CON PRESENCIA PROPIA",
+            "RUBI EN BURRIANA: PLANES CON BUENA ENERGÍA",
+            "LLEGA RUBI, UNA MADURA BRASILEÑA QUE IMPACTA",
+            "BURRIANA, CONOCE A RUBI HOY 💫",
+            "RUBI NO PASA DESAPERCIBIDA EN BURRIANA",
+            "LATINA BRASILEÑA NUEVA EN LA ZONA",
+            "RUBI: CARÁCTER, ENCANTO Y MUCHA PERSONALIDAD",
+            "UNA NOVEDAD BRASILEÑA PARA QUIENES SABEN ELEGIR",
+            "RUBI, LA BRASILEÑA QUE ESTABAS BUSCANDO"
+        ],
+        "ad_angles": [
+            {
+                "angle": "Presentación de novedad",
+                "hook": "Si te gustan las novedades que se notan desde el primer vistazo, Rubi ya está en Burriana.",
+                "key_phrase": "Brasileña, madura y con una presencia que no deja indiferente.",
+                "tone_note": "Elegante, directo y limpio; ideal para destacar llegada y exclusividad sin lenguaje sexual."
+            },
+            {
+                "angle": "Trato cercano",
+                "hook": "Hay mujeres que entran bien por la mirada, pero se quedan por el trato. Rubi es de esas.",
+                "key_phrase": "Cercana, agradable y con ese punto latino que invita a escribirle.",
+                "tone_note": "Humano y cálido, con foco en conversación y conexión personal."
+            },
+            {
+                "angle": "Perfil brasileño con atractivo comercial",
+                "hook": "Brasileña, madura y con carácter: Rubi reúne justo lo que mucha gente busca.",
+                "key_phrase": "Una latina con personalidad, presencia y ganas de conocer gente nueva.",
+                "tone_note": "Equilibrado y convincente, sin exagerar ni sonar artificial."
+            },
+            {
+                "angle": "Elegancia reservada",
+                "hook": "Si prefieres una compañia con estilo, Rubi encaja desde el primer mensaje.",
+                "key_phrase": "Discreta, agradable y con una forma de estar que transmite seguridad.",
+                "tone_note": "Muy neutro, sobrio y apto para entorno de moderación estricta."
+            },
+            {
+                "angle": "Curiosidad por exclusividad",
+                "hook": "No todas las novedades llaman la atención igual. Rubi sí.",
+                "key_phrase": "Una brasileña distinta, con un toque especial que se nota al hablar con ella.",
+                "tone_note": "Crear curiosidad y sensación de oportunidad sin recurrir a reclamos agresivos."
+            },
+            {
+                "angle": "Latina con presencia",
+                "hook": "Hay latinas que prometen mucho y otras que simplemente destacan. Rubi pertenece al segundo grupo.",
+                "key_phrase": "Presencia, encanto y una energía que hace fácil dar el primer paso.",
+                "tone_note": "Seguro, con ritmo comercial y autoridad suave."
+            },
+            {
+                "angle": "Recién llegada / oportunidad",
+                "hook": "Recién llegada a Burriana y con muchas ganas de conocer gente interesante.",
+                "key_phrase": "Rubi, brasileña, madura y lista para un trato cercano y agradable.",
+                "tone_note": "Usar la idea de novedad como oportunidad inmediata de contacto."
+            },
+            {
+                "angle": "Atracción por imagen y estilo",
+                "hook": "A veces basta con una sola foto para entender que hay algo diferente detrás.",
+                "key_phrase": "Rubi transmite carácter, estilo y ese aire latino que engancha.",
+                "tone_note": "Sugerente pero controlado, centrado en magnetismo y presencia."
+            },
+            {
+                "angle": "Madura segura de sí",
+                "hook": "La seguridad también seduce, y Rubi la lleva por delante.",
+                "key_phrase": "Una madura brasileña que sabe tratar, escuchar y mantener el interés.",
+                "tone_note": "Madurez, confianza y control; menos juvenil, más sólida."
+            },
+            {
+                "angle": "Gancho directo de contacto",
+                "hook": "¿Buscas una brasileña con buena química y conversación fácil? Ya la has encontrado.",
+                "key_phrase": "Rubi te responde con cercanía y con una atención muy de aquí y de allá.",
+                "tone_note": "Directo, comercial y orientado a convertir clic en mensaje."
+            },
+            {
+                "angle": "Sensación de oportunidad limitada",
+                "hook": "Burriana tiene pocas novedades así, y Rubi es una de las que merece la pena ver ahora.",
+                "key_phrase": "Una brasileña nueva, con presencia y con un trato que invita a repetir.",
+                "tone_note": "Urgencia suave, sin urgencia falsa ni lenguaje agresivo."
+            },
+            {
+                "angle": "Latina con encanto natural",
+                "hook": "No hace falta exagerar cuando el encanto se nota solo.",
+                "key_phrase": "Rubi combina dulzura, carácter y ese toque brasileño que despierta interés.",
+                "tone_note": "Natural, fluido y con un cierre que invite claramente a escribir."
+            }
+        ]
+    },
+    "phase_b": {
+        "id": "resp_0218561029e09c410169f3bba6691c8197b021dbff41b1e082",
+        "object": "response",
+        "created_at": 1777580966,
+        "status": "completed",
+        "background": false,
+        "billing": {
+            "payer": "developer"
+        },
+        "completed_at": 1777581004,
+        "error": null,
+        "frequency_penalty": 0,
+        "incomplete_details": null,
+        "instructions": null,
+        "max_output_tokens": null,
+        "max_tool_calls": null,
+        "model": "gpt-5.4-mini-2026-03-17",
+        "moderation": null,
+        "output": [
+            {
+                "id": "msg_0218561029e09c410169f3bba97fa08197b0f55985f35d1fe8",
+                "type": "message",
+                "status": "completed",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "annotations": [],
+                        "logprobs": [],
+                        "text": "{\"tone_used\":\"Equilibrado\",\"pack_angle\":\"Pack de novedad brasileña con presencia, trato cercano y gancho comercial suave, alternando elegancia neutra y sugerencia controlada para captar clic y mensaje.\",\"title_options\":[\"RUBI, LA NOVEDAD BRASILEÑA EN BURRIANA 💞\",\"BRASILEÑA RUBI: PRESENCIA, TRATO Y ENCANTO\",\"NOVEDAD EN BURRIANA: RUBI 🇧🇷\",\"RUBI, MADURA BRASILEÑA CON MUCHO POR DESCUBRIR\",\"UNA BRASILEÑA DIFERENTE HA LLEGADO A BURRIANA\",\"RUBI TE RECIBE CON UNA SONRISA Y BUEN PLAN ✨\",\"RUBI: ELEGANCIA LATINA Y TRATO CERCANO\",\"MADURA BRASILEÑA EN BURRIANA, RECIÉN LLEGADA\",\"RUBI ES ESA NOVEDAD QUE LLAMA LA ATENCIÓN\",\"RUBI NO PASA DESAPERCIBIDA EN BURRIANA\"],\"recommended_order\":[\"slot_1\",\"slot_2\",\"slot_3\",\"slot_4\",\"slot_5\",\"slot_6\",\"slot_7\",\"slot_8\",\"slot_9\",\"slot_10\"],\"publication_notes\":[\"Para destacamos.net, prioriza los slots 1, 2, 4, 5 y 8: tono limpio, elegante y sin palabras de reclamo sexual.\",\"Para loquosex.com, usa sobre todo los slots 3, 6, 7, 9 y 10: más directos, con morbo controlado y llamada a escribir.\",\"Alterna títulos enteros en MAYÚSCULAS con otros más sobrios para evitar sensación de anuncio repetido.\",\"Mantén siempre la idea de NOVEDAD, brasileña, madura y Burriana; es el ancla comercial del pack.\",\"No conviene publicar dos variantes seguidas con el mismo arranque; rota entre curiosidad, trato, exclusividad y oportunidad.\"],\"ads\":[{\"slot\":\"slot_1\",\"focus\":\"Presentación de novedad\",\"short_hook\":\"Si te gustan las novedades que se notan desde el primer vistazo, Rubi ya está en Burriana.\",\"title_neutral\":\"RUBI, LA NOVEDAD BRASILEÑA EN BURRIANA 💞\",\"title_suggestive\":\"RUBI, LA NOVEDAD BRASILEÑA EN BURRIANA 💞\",\"body_neutral\":\"Burriana tiene una nueva cara que merece la pena conocer. Rubi es brasileña, madura y transmite una presencia que se nota nada más verla ✨. Si te gustan las chicas con estilo, cercanía y un punto distinto, aquí tienes una opción que destaca sin esfuerzo. Escríbele y descubre por qué tanta gente se fija en ella.\",\"body_suggestive\":\"Burriana estrena una brasileña que no pasa desapercibida. Rubi es madura, tiene presencia y ese aire de NOVEDAD que despierta curiosidad desde el primer momento ✨. Si buscas algo con más magnetismo y un trato que invite a seguir hablando, ya sabes por dónde empezar. Escríbele y comprueba por ti mismo el efecto Rubi.\"},{\"slot\":\"slot_2\",\"focus\":\"Trato cercano\",\"short_hook\":\"Hay mujeres que entran bien por la mirada, pero se quedan por el trato. Rubi es de esas.\",\"title_neutral\":\"BRASILEÑA RUBI: PRESENCIA, TRATO Y ENCANTO\",\"title_suggestive\":\"BRASILEÑA RUBI: PRESENCIA, TRATO Y ENCANTO\",\"body_neutral\":\"Hay perfiles que llaman la atención y otros que además hacen fácil la conversación. Rubi combina ambas cosas: es brasileña, madura y tiene un trato cercano que invita a escribirle desde el primer mensaje 💬. Si valoras una compañía agradable, con encanto y buena energía, aquí tienes una novedad que encaja muy bien.\",\"body_suggestive\":\"Rubi tiene esa mezcla que engancha: presencia, trato y un punto latino que se nota al hablar con ella 💬. Brasileña, madura y con una forma de conectar que hace que el primer mensaje no cueste nada. Si buscas alguien que responda con cercanía y deje ganas de seguir, esta novedad te va a interesar.\"},{\"slot\":\"slot_3\",\"focus\":\"Perfil brasileño con atractivo comercial\",\"short_hook\":\"Brasileña, madura y con carácter: Rubi reúne justo lo que mucha gente busca.\",\"title_neutral\":\"NOVEDAD EN BURRIANA: RUBI 🇧🇷\",\"title_suggestive\":\"NOVEDAD EN BURRIANA: RUBI 🇧🇷\",\"body_neutral\":\"Rubi llega a Burriana con una propuesta sencilla pero muy efectiva: presencia, personalidad y ganas de conocer gente nueva. Brasileña, madura y con un estilo propio que se aprecia enseguida, es de esas novedades que no necesitan exagerar para destacar. Si te apetece conocerla, escríbele hoy.\",\"body_suggestive\":\"Hay novedades que se notan y Rubi es una de ellas 🇧🇷. Brasileña, madura y con carácter, llega a Burriana con una energía que despierta interés desde el primer vistazo. Si te atrae una latina con personalidad y un punto de misterio bien llevado, no la dejes pasar. Escríbele y entra en contacto.\"},{\"slot\":\"slot_4\",\"focus\":\"Elegancia reservada\",\"short_hook\":\"Si prefieres una compañia con estilo, Rubi encaja desde el primer mensaje.\",\"title_neutral\":\"RUBI, MADURA BRASILEÑA CON MUCHO POR DESCUBRIR\",\"title_suggestive\":\"RUBI, MADURA BRASILEÑA CON MUCHO POR DESCUBRIR\",\"body_neutral\":\"No hace falta levantar la voz para llamar la atención. Rubi apuesta por una elegancia discreta, un trato agradable y una forma de estar que transmite seguridad. Es brasileña, madura y perfecta para quien busca una compañía reservada, cuidada y con clase. Si te encaja ese estilo, escríbele.\",\"body_suggestive\":\"Rubi no necesita exceso para destacar: su forma de estar, su seguridad y su aire brasileño hacen el resto. Es madura, sabe marcar presencia y deja una sensación de confianza muy especial. Si prefieres una mujer con estilo y con algo más que una simple foto, aquí tienes una opción que merece el clic.\"},{\"slot\":\"slot_5\",\"focus\":\"Curiosidad por exclusividad\",\"short_hook\":\"No todas las novedades llaman la atención igual. Rubi sí.\",\"title_neutral\":\"UNA BRASILEÑA DIFERENTE HA LLEGADO A BURRIANA\",\"title_suggestive\":\"UNA BRASILEÑA DIFERENTE HA LLEGADO A BURRIANA\",\"body_neutral\":\"A veces basta con poco para darse cuenta de que una chica tiene algo distinto. Rubi es brasileña, madura y transmite una personalidad que se sale de lo habitual. En Burriana ya empieza a llamar la atención por su forma de ser y por la confianza que proyecta 🙂. Si buscas una novedad con carácter, merece la pena escribirle.\",\"body_suggestive\":\"No todas las brasileñas dejan la misma impresión, y Rubi lo demuestra desde el primer contacto 🙂. Es madura, tiene presencia y ese punto especial que hace que quieras saber un poco más. En Burriana ya está empezando a destacar, así que si te gustan las novedades con algo de misterio y mucho interés, este es tu momento.\"},{\"slot\":\"slot_6\",\"focus\":\"Latina con presencia\",\"short_hook\":\"Hay latinas que prometen mucho y otras que simplemente destacan. Rubi pertenece al segundo grupo.\",\"title_neutral\":\"RUBI TE RECIBE CON UNA SONRISA Y BUEN PLAN ✨\",\"title_suggestive\":\"RUBI TE RECIBE CON UNA SONRISA Y BUEN PLAN ✨\",\"body_neutral\":\"Si lo que quieres es una chica con buena presencia y conversación fácil, Rubi encaja sin complicaciones. Brasileña, madura y con una energía agradable, transmite ese equilibrio entre cercanía y estilo que hace más fácil escribirle ✨. Es una novedad pensada para quien valora el trato y la naturalidad.\",\"body_suggestive\":\"Rubi combina simpatía, presencia y un punto latino que entra muy bien desde el principio ✨. Es brasileña, madura y sabe cómo hacer que la conversación fluya sin forzar nada. Si buscas una mujer con gancho, con trato agradable y con ese aire de novedad que invita a probar, ya la tienes delante.\"},{\"slot\":\"slot_7\",\"focus\":\"Recién llegada / oportunidad\",\"short_hook\":\"Recién llegada a Burriana y con muchas ganas de conocer gente interesante.\",\"title_neutral\":\"RUBI: ELEGANCIA LATINA Y TRATO CERCANO\",\"title_suggestive\":\"RUBI: ELEGANCIA LATINA Y TRATO CERCANO\",\"body_neutral\":\"Recién llegada y con ganas de empezar bien en Burriana, Rubi ofrece justo lo que mucha gente busca: cercanía, buena educación y una presencia que se recuerda. Es brasileña, madura y tiene ese equilibrio entre elegancia y calidez que hace que merezca la pena conocerla. Si te apetece escribir a una novedad con encanto, aquí la tienes.\",\"body_suggestive\":\"Rubi acaba de llegar y ya tiene ese punto de oportunidad que gusta a quienes no dejan pasar las novedades. Brasileña, madura y con elegancia latina, ofrece un trato cercano y una conversación que invita a seguir hablando 😉. Si buscas una opción nueva en Burriana con presencia y chispa, escríbele ahora.\"},{\"slot\":\"slot_8\",\"focus\":\"Atracción por imagen y estilo\",\"short_hook\":\"A veces basta con una sola foto para entender que hay algo diferente detrás.\",\"title_neutral\":\"MADURA BRASILEÑA EN BURRIANA, RECIÉN LLEGADA\",\"title_suggestive\":\"RUBI ES ESA NOVEDAD QUE LLAMA LA ATENCIÓN\",\"body_neutral\":\"Hay perfiles que se entienden enseguida: presencia, estilo y una forma de mirar que lo dice todo sin necesidad de más. Rubi es brasileña, madura y llega a Burriana con una imagen muy cuidada y un encanto natural que no pasa desapercibido. Si te gusta descubrir chicas que suman desde el primer vistazo, escríbele.\",\"body_suggestive\":\"Rubi tiene ese tipo de presencia que hace que la mirada se quede un segundo más de lo normal. Brasileña, madura y con estilo propio, llega a Burriana como una novedad que despierta interés de inmediato. Si te atraen las chicas que destacan sin hacer ruido, esta te va a enganchar.\"},{\"slot\":\"slot_9\",\"focus\":\"Madura segura de sí\",\"short_hook\":\"La seguridad también seduce, y Rubi la lleva por delante.\",\"title_neutral\":\"BURRIANA TIENE NUEVA BRASILEÑA Y SE NOTA\",\"title_suggestive\":\"LLEGA RUBI, UNA MADURA BRASILEÑA QUE IMPACTA\",\"body_neutral\":\"Rubi transmite seguridad, naturalidad y esa madurez que hace fácil confiar en ella. Es brasileña, está en Burriana y llega con una forma de ser serena, agradable y muy directa en el trato. Si valoras las mujeres que saben estar y saben responder, esta novedad encaja contigo.\",\"body_suggestive\":\"Cuando una mujer tiene seguridad, se nota. Rubi llega como una madura brasileña con presencia, carácter y un punto de atracción que no se finge 😉. En Burriana ya empieza a destacar, así que si te apetecen las novedades que realmente dejan huella, no tardes en escribirle.\"},{\"slot\":\"slot_10\",\"focus\":\"Gancho directo de contacto\",\"short_hook\":\"¿Buscas una brasileña con buena química y conversación fácil? Ya la has encontrado.\",\"title_neutral\":\"RUBI NO PASA DESAPERCIBIDA EN BURRIANA\",\"title_suggestive\":\"RUBI, LA BRASILEÑA QUE ESTABAS BUSCANDO\",\"body_neutral\":\"Si te gustan las mujeres con presencia, trato agradable y una conversación que fluye, Rubi es una opción muy a tener en cuenta. Brasileña, madura y recién llegada a Burriana, reúne justo lo que convierte una visita en un mensaje. Escríbele y comprueba si encaja contigo.\",\"body_suggestive\":\"Rubi no está aquí para pasar de largo: es brasileña, madura y tiene el tipo de encanto que hace que quieras escribir antes de pensarlo demasiado. Burriana le sienta bien y ella sabe responder con cercanía, presencia y un toque de morbo controlado 😏. Si buscas una novedad que invite al contacto, ya la encontraste.\"}]}"
+                    }
+                ],
+                "phase": "final_answer",
+                "role": "assistant"
+            }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": "publicista:copy_pack:gpt-5.4-mini",
+        "prompt_cache_retention": "24h",
+        "reasoning": {
+            "effort": "none",
+            "summary": null
+        },
+        "safety_identifier": null,
+        "service_tier": "flex",
+        "store": false,
+        "temperature": 1,
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "description": null,
+                "name": "publicista_copy_pack",
+                "schema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "tone_used",
+                        "pack_angle",
+                        "title_options",
+                        "ads",
+                        "publication_notes",
+                        "recommended_order"
+                    ],
+                    "properties": {
+                        "tone_used": {
+                            "type": "string"
+                        },
+                        "pack_angle": {
+                            "type": "string"
+                        },
+                        "title_options": {
+                            "type": "array",
+                            "minItems": 10,
+                            "maxItems": 10,
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "recommended_order": {
+                            "type": "array",
+                            "minItems": 10,
+                            "maxItems": 10,
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "publication_notes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "ads": {
+                            "type": "array",
+                            "minItems": 10,
+                            "maxItems": 10,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                    "slot",
+                                    "focus",
+                                    "short_hook",
+                                    "title_neutral",
+                                    "title_suggestive",
+                                    "body_neutral",
+                                    "body_suggestive"
+                                ],
+                                "properties": {
+                                    "slot": {
+                                        "type": "string"
+                                    },
+                                    "focus": {
+                                        "type": "string"
+                                    },
+                                    "short_hook": {
+                                        "type": "string"
+                                    },
+                                    "title_neutral": {
+                                        "type": "string"
+                                    },
+                                    "title_suggestive": {
+                                        "type": "string"
+                                    },
+                                    "body_neutral": {
+                                        "type": "string"
+                                    },
+                                    "body_suggestive": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "strict": true
+            },
+            "verbosity": "medium"
+        },
+        "tool_choice": "auto",
+        "tools": [],
+        "top_logprobs": 0,
+        "top_p": 0.98,
+        "truncation": "disabled",
+        "usage": {
+            "input_tokens": 4763,
+            "input_tokens_details": {
+                "cached_tokens": 0
+            },
+            "output_tokens": 2683,
+            "output_tokens_details": {
+                "reasoning_tokens": 0
+            },
+            "total_tokens": 7446
+        },
+        "user": null,
+        "metadata": []
+    }
+}

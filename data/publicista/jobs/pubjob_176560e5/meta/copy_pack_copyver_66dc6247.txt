@@ -1,0 +1,112 @@
+PACK PUBLICISTA
+Trabajo: monica1
+Clienta: Monica
+Fecha: 2026-04-17 00:44:13
+Tono: Equilibrado
+Enfoque: Presentación de Monica, colombiana en Burriana, combinando elegancia, cercanía y un punto de curiosidad para lograr contacto.
+
+IMÁGENES FINALES
+- final_01: data/publicista/jobs/pubjob_176560e5/finals/final_01_square.jpg
+- final_02: data/publicista/jobs/pubjob_176560e5/finals/final_02_square.jpg
+- final_03: data/publicista/jobs/pubjob_176560e5/finals/final_03_square.jpg
+- final_04: data/publicista/jobs/pubjob_176560e5/finals/final_04_square.jpg
+
+TÍTULOS
+- Monica, la colombiana de plaza NUEVA
+- burriana tiene NUEVA compañía 💫
+- La colombiana que te apetece conocer
+- Monica en burriana, trato cercano y ELEGANTE
+- UNA PRESENCIA QUE NO PASA DESAPERCIBIDA
+- Colombiana en la zona, ESCRÍBEME 💌
+- monica no deja indiferente 🔥
+- NUEVA EN BURRIANA, CON GANAS DE CONOCERTE
+- Monica, cercanía, estilo y DISCRECIÓN
+- La colombiana que llama la atención
+
+ANUNCIOS
+--- 1 ---
+FOCUS: Presentación elegante y cercana
+HOOK: HOLA, SOY MONICA Y YA ESTOY POR BURRIANA 💫
+TÍTULO NEUTRO: Monica, la colombiana de plaza NUEVA
+TÍTULO SUGERENTE: Monica, la colombiana de plaza NUEVA
+TEXTO NEUTRO: Hola, soy Monica, la colombiana de plaza nueva. Estoy por Burriana y me gusta presentarme con un trato CERCANO, discreto y agradable 😊. Si valoras una conversación fácil y una compañía con buena presencia, ESCRÍBEME y hablamos con calma.
+TEXTO SUGERENTE: Hola, soy Monica, la colombiana de plaza nueva. Estoy por Burriana y me gusta dejar una primera impresión que invite a escribir 💫. Soy cercana, discreta y con una forma de tratar que engancha desde el primer mensaje. Si te apetece conocerme, ESCRÍBEME por privado.
+
+--- 2 ---
+FOCUS: La colombiana de plaza nueva
+HOOK: SI HAS OÍDO HABLAR DE LA COLOMBIANA DE PLAZA NUEVA, SOY YO 😉
+TÍTULO NEUTRO: Monica en burriana, trato cercano y ELEGANTE
+TÍTULO SUGERENTE: Colombiana en la zona, ESCRÍBEME 💌
+TEXTO NEUTRO: SI HAS OÍDO HABLAR DE LA COLOMBIANA DE PLAZA NUEVA, SOY YO 😉. Me gusta cuidar cada detalle del trato y hacer que todo resulte natural, cómodo y elegante. Si buscas una compañía agradable en Burriana, puedes escribirme y ver si encajamos.
+TEXTO SUGERENTE: Si has oído hablar de la colombiana de plaza nueva, soy yo 😉. Me gusta cuidar el detalle, despertar curiosidad y dejar ganas de repetir. En Burriana estoy para quien valora una atención cercana y un contacto sin vueltas. ESCRÍBEME y lo vemos por privado.
+
+--- 3 ---
+FOCUS: Novedad en la zona
+HOOK: LLEGUÉ HACE POCO Y YA ESTOY RECIBIENDO MENSAJES 😘
+TÍTULO NEUTRO: burriana tiene NUEVA compañía 💫
+TÍTULO SUGERENTE: NUEVA EN BURRIANA, CON GANAS DE CONOCERTE
+TEXTO NEUTRO: LLEGUÉ HACE POCO Y YA ESTOY RECIBIENDO MENSAJES 😊. Si te apetece una compañía distinta, cercana y con buena conversación, aquí me tienes. Soy Monica, colombiana, y me encanta un trato sencillo, respetuoso y con buena energía.
+TEXTO SUGERENTE: Llegué hace poco y la respuesta está siendo muy buena 😘. Si te apetece una compañía distinta, con ganas de agradar y crear buena química desde el primer mensaje, ESCRÍBEME. Soy Monica, colombiana, y estoy en Burriana para quien sabe valorar lo nuevo.
+
+--- 4 ---
+FOCUS: Cita con presencia
+HOOK: NO HACE FALTA MUCHO PARA NOTAR CUANDO ALGUIEN TIENE PRESENCIA ✨
+TÍTULO NEUTRO: UNA PRESENCIA QUE NO PASA DESAPERCIBIDA
+TÍTULO SUGERENTE: Monica, cercanía, estilo y DISCRECIÓN
+TEXTO NEUTRO: No hace falta mucho para notar cuando alguien tiene presencia ✨. Soy una mujer colombiana, elegante y esbelta, con una forma muy agradable de tratar y de hacerte sentir cómodo desde el primer momento. Si buscas algo con clase, ESCRÍBEME.
+TEXTO SUGERENTE: No hace falta mucho para notar cuando alguien tiene presencia ✨. Monica combina estilo, DISCRECIÓN y un punto de magnetismo que no se olvida fácil. Si te gustan las mujeres que saben estar y saben gustar, aquí tienes una buena razón para escribir.
+
+--- 5 ---
+FOCUS: Contacto directo y sin rodeos
+HOOK: SI TE GUSTO, NO LO DEJES PARA LUEGO 💌
+TÍTULO NEUTRO: Colombiana en la zona, ESCRÍBEME 💌
+TÍTULO SUGERENTE: monica no deja indiferente 🔥
+TEXTO NEUTRO: SI TE GUSTO, NO LO DEJES PARA LUEGO 💌. Me escribes y vemos si encajamos para una cita agradable, sin complicaciones y con buen ambiente. Soy Monica, colombiana en Burriana, y me gustan los mensajes claros.
+TEXTO SUGERENTE: Si te gusto, no lo dejes para luego 💌. Hay personas que entran en el radar y no pasan desapercibidas, y yo soy una de ellas 🔥. ESCRÍBEME si quieres concretar sin perder tiempo y con un trato que invite a repetir.
+
+--- 6 ---
+FOCUS: Trato cálido y confianza
+HOOK: HAY CONVERSACIONES QUE EMPIEZAN BIEN DESDE EL PRIMER HOLA 🙂
+TÍTULO NEUTRO: Monica, DISPONIBLE y muy agradable
+TÍTULO SUGERENTE: TU MEJOR CONVERSACIÓN EMPIEZA AQUÍ
+TEXTO NEUTRO: HAY CONVERSACIONES QUE EMPIEZAN BIEN DESDE EL PRIMER HOLA 🙂. Soy cercana, educada y de trato fácil, ideal si buscas algo cómodo, agradable y sin rigidez. En Burriana estoy para quien quiera hablar con naturalidad y quedar bien desde el principio.
+TEXTO SUGERENTE: HAY CONVERSACIONES QUE EMPIEZAN BIEN DESDE EL PRIMER HOLA 😉. Si buscas química, conversación y una cita con buen ambiente, aquí me tienes. Soy Monica, y me gusta que todo fluya con naturalidad y deje ganas de seguir hablando.
+
+--- 7 ---
+FOCUS: Exclusividad local
+HOOK: BURRIANA NO SE CRUZA TODOS LOS DÍAS CON ALGUIEN ASÍ 💫
+TÍTULO NEUTRO: La chica colombiana que estaba faltando
+TÍTULO SUGERENTE: La colombiana que llama la atención
+TEXTO NEUTRO: BURRIANA NO SE CRUZA TODOS LOS DÍAS CON ALGUIEN ASÍ ✨. Soy una colombiana con estilo propio, con una forma de estar cercana y una atención que se nota. Si valoras algo diferente de verdad, este puede ser el momento de escribir.
+TEXTO SUGERENTE: Burriana no se cruza todos los días con alguien así ✨. Soy esa colombiana que llama la atención sin esfuerzo y deja curiosidad desde el primer vistazo. Si te apetece descubrir por qué destacan tanto de mí, ESCRÍBEME.
+
+--- 8 ---
+FOCUS: Deseo de conocer
+HOOK: ¿TE APETECE DESCUBRIR POR QUÉ TANTOS ME ESCRIBEN? 🔥
+TÍTULO NEUTRO: HOY puedes conocer a monica ✨
+TÍTULO SUGERENTE: si te apetece algo especial, ESCRÍBEME
+TEXTO NEUTRO: ¿TE APETECE DESCUBRIR POR QUÉ TANTOS ME ESCRIBEN? ✨ Tengo una forma de estar natural, dulce y muy atenta, pensada para que te sientas a gusto desde el principio. Si te gusta la buena compañía, ya sabes dónde encontrarme.
+TEXTO SUGERENTE: ¿Te apetece descubrir por qué tantos me escriben? 🔥 Tengo una forma de estar que mezcla dulzura, atención y un punto de misterio que invita a más. Si buscas algo especial en Burriana, ESCRÍBEME y te respondo por privado.
+
+--- 9 ---
+FOCUS: Elegancia latina
+HOOK: HAY LATINAS QUE DESTACAN SIN HACER RUIDO 🌹
+TÍTULO NEUTRO: conmigo se nota la diferencia
+TÍTULO SUGERENTE: La colombiana que te apetece conocer
+TEXTO NEUTRO: HAY LATINAS QUE DESTACAN SIN HACER RUIDO 🌹. Monica combina dulzura, estilo y una presencia que invita a escribirle con confianza. Si te gusta la elegancia con un trato amable, aquí tienes una opción que encaja muy bien.
+TEXTO SUGERENTE: Hay latinas que destacan sin hacer ruido 🌹. Monica tiene ese punto de encanto colombiano que se nota desde el primer mensaje y deja ganas de conocerla mejor. Si te apetece una conexión con estilo, ESCRÍBEME.
+
+--- 10 ---
+FOCUS: Respuesta rápida y disponibilidad
+HOOK: ESTOY ACTIVA Y RESPONDO RÁPIDO, ASÍ DE SIMPLE 📲
+TÍTULO NEUTRO: burriana tiene NUEVA compañía 💫
+TÍTULO SUGERENTE: Monica en burriana, trato cercano y ELEGANTE
+TEXTO NEUTRO: Estoy activa y respondo rápido, así de simple 📲. Si quieres concretar sin vueltas, ESCRÍBEME y lo hablamos por privado. Me gusta la comunicación clara, el trato amable y dejar todo bien organizado desde el principio.
+TEXTO SUGERENTE: Estoy activa y respondo rápido, así de simple 📲. Si quieres concretar sin vueltas, ESCRÍBEME y lo hablamos por privado. Soy Monica, colombiana en Burriana, y me gusta que el contacto sea ágil, cercano y con buena sintonía.
+
+NOTAS DE PUBLICACIÓN
+- En destacamos.net prioriza las variantes neutrales, especialmente las que hablan de cercanía, elegancia, discreción y novedad; evita cualquier palabra de reclamo sexual.
+- En loquosex.com usa las versiones sugerentes con más gancho, pero sin caer en explicitud: mejor curiosidad, disponibilidad y química.
+- Alterna títulos en MAYÚSCULAS con otros de estilo frase para que el feed no se vea repetitivo ni automatizado.
+- Mantén siempre el foco local en Burriana y el apodo comercial de la clienta para reforzar reconocimiento y memorabilidad.
+- Usa los anuncios más directos como cierre de rotación y los más elegantes como apertura para mejorar CTR y percepción de calidad.

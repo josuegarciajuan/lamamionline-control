@@ -1,0 +1,305 @@
+{
+    "id": "copyver_73bd1c1d",
+    "created_at": "2026-04-30 23:40:45",
+    "model": "gpt-5.4-mini",
+    "generation_phases": 2,
+    "request_id": "req_8acc89246582492690b151530b1f922c",
+    "http_code": 200,
+    "tone": "equilibrado",
+    "pack_angle": "Novedad de Burriana con aire del este, trato complaciente y presencia de mujer madura que combina elegancia, cercanía y un punto de deseo de contacto.",
+    "title_options": [
+        "KATIA, LA NOVEDAD QUE ESTÁ DANDO QUE HABLAR EN BURIANA",
+        "Katia | NUEVA en buriana y con trato exquisito",
+        "Katia en buriana: presencia, estilo y buen gusto",
+        "NOVEDAD en buriana: katia ya está DISPONIBLE",
+        "Katia, una mujer completa y con mucha clase",
+        "Rusia en buriana: katia llega para no pasar desapercibida",
+        "Katia: trato dulce, mirada inteligente y mucho encanto",
+        "Katia, una opción diferente para quien busca algo mejor",
+        "si te gustan las mujeres con presencia, katia es para ti",
+        "Katia de rusia, RECIÉN LLEGADA y muy complaciente"
+    ],
+    "title_candidates": [
+        "KATIA, LA NOVEDAD QUE ESTÁ DANDO QUE HABLAR EN BURIANA",
+        "KATIA | NUEVA EN BURIANA Y CON TRATO EXQUISITO",
+        "KATIA, DISPUESTA Y MUY CERCANA PARA QUIEN SABE ELEGIR",
+        "LA NOVEDAD DE RUSIA QUE TODOS ESTÁN MIRANDO",
+        "KATIA EN BURIANA: PRESENCIA, ESTILO Y BUEN GUSTO",
+        "NOVEDAD EN BURIANA: KATIA YA ESTÁ DISPONIBLE",
+        "KATIA, UNA MUJER COMPLETA Y CON MUCHA CLASE",
+        "RUSIA EN BURIANA: KATIA LLEGA PARA NO PASAR DESAPERCIBIDA",
+        "KATIA: TRATO DULCE, MIRADA INTELIGENTE Y MUCHO ENCANTO",
+        "DESCUBRE A KATIA, LA NUEVA CARA EN BURIANA",
+        "KATIA. NUEVA. ELEGANTE. MUY BIEN ARMADA.",
+        "BUEN GUSTO Y NOVEDAD: KATIA EN BURIANA",
+        "KATIA, UNA OPCIÓN DIFERENTE PARA QUIEN BUSCA ALGO MEJOR",
+        "SI TE GUSTAN LAS MUJERES CON PRESENCIA, KATIA ES PARA TI",
+        "KATIA DE RUSIA, RECIÉN LLEGADA Y MUY COMPLACIENTE",
+        "NOVEDAD DEL ESTE EN BURIANA: KATIA",
+        "KATIA, DETALLE, COMPAÑÍA Y UN TOQUE MUY ESPECIAL",
+        "LA MÁS COMENTADA DE BURIANA: KATIA",
+        "KATIA ESTÁ AQUÍ Y NO VIENE A PASAR INADVERTIDA",
+        "COMPLACIENCIA, PRESENCIA Y NOVEDAD: KATIA"
+    ],
+    "ads": [
+        {
+            "slot": "slot 1",
+            "focus": "Novedad de impacto",
+            "short_hook": "SI TE GUSTAN LAS NOVEDADES QUE NO DURAN MUCHO, KATIA PUEDE SER JUSTO LO QUE ESTABAS BUSCANDO. ✨",
+            "title_neutral": "KATIA, LA NOVEDAD QUE ESTÁ DANDO QUE HABLAR EN BURIANA",
+            "title_suggestive": "katia, la NOVEDAD que todos quieren ver en buriana",
+            "body_neutral": "Katia acaba de llegar a BURIANA y ya está despertando interés. Tiene ese punto de mujer completa que se nota en el trato, en la forma de presentarse y en la facilidad para conectar desde el primer mensaje. Si valoras la DISCRECIÓN, la educación y una atención muy cuidada, aquí tienes una opción que merece la pena descubrir. Escríbele y comprueba por qué está llamando tanto la atención. 📩",
+            "body_suggestive": "Katia ha llegado a BURIANA con fuerza y no está pasando desapercibida. Tiene ese aire de novedad que engancha, un trato complaciente y una presencia que invita a escribir sin pensarlo demasiado. Si te apetece una chica NUEVA, cercana y con ganas de agradar, esta puede ser la ocasión. Mándale un mensaje y descubre por qué tanta gente la está mirando. 😉"
+        },
+        {
+            "slot": "slot 2",
+            "focus": "Origen del este, valor diferencial",
+            "short_hook": "HAY CHICAS QUE LLEGAN Y PASAN… Y OTRAS, COMO KATIA, QUE LLAMAN LA ATENCIÓN DESDE EL PRIMER VISTAZO. 📍",
+            "title_neutral": "Katia | NUEVA en buriana y con trato exquisito",
+            "title_suggestive": "la NOVEDAD de rusia que está llamando la atención",
+            "body_neutral": "Katia aporta ese valor distinto que no se encuentra todos los días. Su llegada desde el ESTE le da un aire internacional muy atractivo, pero lo que más destaca es su forma de tratar: educada, atenta y muy agradable. En BURIANA ya empieza a comentarse por su DISCRECIÓN y su presencia cuidada. Si buscas algo diferente, aquí tienes una opción sólida para escribirle. 🤍",
+            "body_suggestive": "HAY MUJERES QUE TIENEN ALGO ESPECIAL DESDE EL PRIMER VISTAZO, Y KATIA ES UNA DE ELLAS. Llega de RUSIA con ese encanto del este que despierta curiosidad y con una forma de estar muy complaciente. En BURIANA ya está empezando a destacar por su trato y por la sensación de novedad real. Si te gustan las chicas con ese punto distinto, escríbele y descúbrelo tú mismo. ✨"
+        },
+        {
+            "slot": "slot 3",
+            "focus": "Elegancia reservada",
+            "short_hook": "PARA QUIENES PREFIEREN EL BUEN GUSTO ANTES QUE EL RUIDO, KATIA ENCAJA A LA PRIMERA. 🤍",
+            "title_neutral": "Katia en buriana: presencia, estilo y buen gusto",
+            "title_suggestive": "katia en buriana: elegancia que engancha",
+            "body_neutral": "Katia es de esas mujeres que no necesitan hacer ruido para destacar. Tiene presencia, sabe estar y transmite una elegancia reservada que encaja muy bien con quien busca DISCRECIÓN y trato cuidado. En BURIANA se presenta como una novedad distinta, con una imagen muy pulida y una forma de atender que deja buena impresión. Si valoras el estilo por encima de todo, conviene hablar con ella. 💬",
+            "body_suggestive": "KATIA COMBINA ELEGANCIA CON UN PUNTO DE MAGNETISMO QUE SE NOTA NADA MÁS VERLA. No va de excesos, va de presencia, de saber estar y de ese encanto que hace que te quedes mirando un poco más. En BURIANA se está dejando ver como una novedad con clase, y eso siempre llama. Si quieres una chica que cuide el trato y tenga un aura especial, escríbele. 🤍"
+        },
+        {
+            "slot": "slot 4",
+            "focus": "Trato cercano y agradable",
+            "short_hook": "A VECES NO BUSCAS MÁS COMPLICACIONES: SOLO UNA MUJER AMABLE, CERCANA Y QUE SEPA ESTAR. 🤍",
+            "title_neutral": "Katia: trato dulce, mirada inteligente y mucho encanto",
+            "title_suggestive": "KATIA, MUY CERCANA Y CON GANAS DE AGRADAR",
+            "body_neutral": "LO QUE HACE DIFERENTE A KATIA NO ES SOLO SU PRESENCIA, SINO LA MANERA EN QUE TRATA A QUIEN LE ESCRIBE. Es cercana, amable y transmite una comodidad que se agradece desde el principio. Si te apetece hablar con una mujer educada, complaciente y con una actitud muy agradable, aquí tienes una novedad en BURIANA que merece atención. Déjale un mensaje y te responderá. 📱",
+            "body_suggestive": "KATIA TIENE ESE PUNTO DE CERCANÍA QUE HACE QUE TODO RESULTE MÁS FÁCIL. Es complaciente, atenta y sabe crear una conversación agradable sin forzar nada. En BURIANA está empezando a llamar la atención precisamente por eso: por su forma de tratar, por su encanto y por lo bien que hace sentir. Si buscas una chica que sepa estar y que responda con ganas, escríbele ya. 😉"
+        },
+        {
+            "slot": "slot 5",
+            "focus": "Mujer completa",
+            "short_hook": "NO TODO ES APARIENCIA: CUANDO UNA CHICA ES COMPLETA, SE NOTA EN CADA DETALLE. 💬 💬",
+            "title_neutral": "Katia, una mujer completa y con mucha clase",
+            "title_suggestive": "Katia, completa y muy difícil de ignorar",
+            "body_neutral": "KATIA REÚNE VARIOS DE ESOS DETALLES QUE CONVIERTEN UNA VISITA EN UNA BUENA ELECCIÓN: PRESENCIA, SIMPATÍA, EDUCACIÓN Y UNA FORMA DE RELACIONARSE QUE TRANSMITE CONFIANZA. Es una mujer completa, de esas que encajan tanto por la imagen como por la actitud. En BURIANA llega como novedad con clase y con un perfil que invita a descubrirla con calma. Si buscas calidad en el trato, aquí la tienes. ✨",
+            "body_suggestive": "HAY MUJERES QUE SOLO GUSTAN POR FUERA, Y OTRAS QUE CONVENCEN POR TODO LO QUE TRANSMITEN. Katia entra en ese segundo grupo: presencia, actitud, cercanía y una forma de conectar que hace que quieras escribir. En BURIANA se presenta como una opción muy completa, con ese punto de clase que marca diferencias. Si quieres una novedad que de verdad merezca la pena, no la dejes escapar. 🔥"
+        },
+        {
+            "slot": "slot 6",
+            "focus": "Complaciente y atenta",
+            "short_hook": "SI VALORAS A UNA MUJER QUE SABE ESCUCHAR Y ADAPTARSE, AQUÍ TIENES UNA OPCIÓN MUY INTERESANTE. 🌟",
+            "title_neutral": "Katia de rusia, RECIÉN LLEGADA y muy complaciente",
+            "title_suggestive": "Katia de rusia, dispuesta y muy complaciente",
+            "body_neutral": "KATIA LLEGA DESDE RUSIA CON UNA PROPUESTA SENCILLA DE ENTENDER: BUEN TRATO, ATENCIÓN PERSONALIZADA Y GANAS DE AGRADAR. Es complaciente, cercana y muy pendiente de que la conversación fluya con naturalidad. En BURIANA aparece como una novedad que destaca por su forma de estar, sin complicaciones y con un estilo muy agradable. Si te gusta que te atiendan bien, escríbele. 📩",
+            "body_suggestive": "La primera impresión de Katia deja claro que sabe lo que hace: escucha, responde y se adapta con facilidad. Esa actitud complaciente, unida a su origen del este y a su presencia, la convierte en una novedad muy tentadora en BURIANA. Si te apetece una chica NUEVA, agradable y dispuesta a darte buen trato desde el principio, esta es una buena ocasión. Mándale un mensaje. 😉"
+        },
+        {
+            "slot": "slot 7",
+            "focus": "Presencia milf adulta",
+            "short_hook": "HAY UNA MADUREZ QUE NO SE IMPROVISA, Y ESO SE NOTA CUANDO KATIA ENTRA EN ESCENA. 🔥",
+            "title_neutral": "si te gustan las mujeres con presencia, katia es para ti",
+            "title_suggestive": "Katia, milf caliente y muy bien puesta",
+            "body_neutral": "Katia transmite esa seguridad propia de una mujer madura que sabe estar. Tiene presencia, una figura cuidada y un estilo que LLAMA LA ATENCIÓN sin necesidad de exagerar nada. En BURIANA se presenta como una novedad con ese punto adulto que muchos valoran de verdad. Si prefieres mujeres con personalidad y trato serio, merece la pena escribirle. 🤍",
+            "body_suggestive": "KATIA TIENE EL ATRACTIVO DE UNA MUJER MADURA QUE NO NECESITA PRESENTACIÓN. Su presencia, su forma de mirar y ese aire de seguridad la convierten en una MILF muy llamativa dentro de la oferta de BURIANA. Si buscas algo más adulto, con más fondo y con un punto de morbo controlado, aquí tienes una chica que encaja muy bien. Escríbele y comprueba por qué llama tanto la atención. 🔥"
+        },
+        {
+            "slot": "slot 8",
+            "focus": "Disponibilidad y respuesta rápida",
+            "short_hook": "SI NO QUIERES PERDER TIEMPO, KATIA ES DE LAS QUE CONTESTAN CLARO Y DIRECTO. ✨",
+            "title_neutral": "NOVEDAD en buriana: katia ya está DISPONIBLE",
+            "title_suggestive": "Katia ya está DISPONIBLE y responde rápido",
+            "body_neutral": "KATIA ESTÁ DISPONIBLE EN BURIANA Y LISTA PARA CONOCER A QUIEN VALORE UN TRATO EDUCADO Y UNA ATENCIÓN BIEN LLEVADA. Su propuesta es clara: cercanía, buen gusto y comunicación sencilla desde el primer contacto. Si quieres evitar vueltas y hablar con una mujer que responde con naturalidad, esta novedad puede interesarte. Escríbele y pregunta sin compromiso. 📱",
+            "body_suggestive": "Cuando una chica NUEVA responde rápido y deja las cosas claras, se agradece. Katia está disponible en BURIANA y viene con ganas de hablar con hombres que sepan apreciar un trato agradable y directo. Tiene ese punto de novedad que hace que muchos quieran escribir cuanto antes. Si quieres comprobarlo tú mismo, mándale un mensaje AHORA. ✨"
+        },
+        {
+            "slot": "slot 9",
+            "focus": "Curiosidad por recomendación",
+            "short_hook": "NO TODO EL MUNDO APARECE COMO NOVEDAD… PERO KATIA YA ESTÁ DESPERTANDO INTERÉS. 😉",
+            "title_neutral": "la más comentada de buriana: katia",
+            "title_suggestive": "Katia ya está dando que hablar en buriana",
+            "body_neutral": "Katia empieza a generar interés en BURIANA porque tiene algo que se recuerda: una presencia elegante, un trato agradable y una forma de relacionarse muy natural. Esa mezcla hace que no pase inadvertida y que muchos quieran saber un poco más. Si te gustan las novedades que despiertan curiosidad desde el principio, aquí tienes una para escribir HOY mismo. 🤍",
+            "body_suggestive": "Hay anuncios que pasan sin ruido y otros que empiezan a comentarse enseguida. Katia pertenece a este segundo grupo: NUEVA, diferente y con una energía que hace que te entren ganas de escribir. En BURIANA ya está levantando interés por su forma de tratar y por ese punto de encanto que engancha. Si quieres ver por qué hablan de ella, no te quedes fuera. 😉"
+        },
+        {
+            "slot": "slot 10",
+            "focus": "Exclusividad local",
+            "short_hook": "En BURIANA no siempre aparece alguien que combine estilo, DISCRECIÓN y buena energía. 💫 💫",
+            "title_neutral": "Katia, una opción diferente para quien busca algo mejor",
+            "title_suggestive": "Katia está aquí y no viene a pasar inadvertida",
+            "body_neutral": "En BURIANA no es común encontrar una novedad que combine tan bien estilo, DISCRECIÓN y una forma de estar tan cuidada. Katia llega con una propuesta distinta, pensada para quien busca algo más personal y con más clase. Su trato complaciente y su presencia hacen que merezca la pena leerle un mensaje. Si te apetece probar algo mejor, esta puede ser tu opción. ✨",
+            "body_suggestive": "Katia ha llegado a BURIANA con una idea clara: no pasar desapercibida. Tiene presencia, un punto internacional muy atractivo y una forma de agradar que encaja con quien busca algo diferente. Si te gustan las opciones exclusivas, con una chica NUEVA y con ganas de conectar, aquí tienes una oportunidad interesante. Escríbele y descubre por qué destaca. 🔥"
+        }
+    ],
+    "publication_notes": [
+        "En destacamos.net usa preferentemente las variantes neutrales: lenguaje elegante, discreto y sin palabras de reclamo sexual ni términos agresivos.",
+        "En loquosex.com funcionan mejor las variantes sugerentes con más gancho, pero manteniendo el texto limpio y sin explicitud.",
+        "Alterna títulos en MAYÚSCULAS totales con otros de estilo mixto para evitar que los anuncios parezcan plantillas repetidas.",
+        "Mantén el foco en novedad, origen del este, trato complaciente y presencia de mujer madura; son los ejes que mejor sostienen el clic.",
+        "Evita saturar con emojis: uno por anuncio es suficiente, máximo dos, siempre con función comercial o de cercanía."
+    ],
+    "recommended_order": [
+        "slot 1",
+        "slot 2",
+        "slot 3",
+        "slot 4",
+        "slot 5",
+        "slot 6",
+        "slot 7",
+        "slot 8",
+        "slot 9",
+        "slot 10"
+    ],
+    "raw_response_path": "data/publicista/jobs/pubjob_5079cec5/meta/copy_pack_copyver_73bd1c1d_raw.json",
+    "parsed_json_path": "data/publicista/jobs/pubjob_5079cec5/meta/copy_pack_copyver_73bd1c1d.json",
+    "export_txt_path": "data/publicista/jobs/pubjob_5079cec5/meta/copy_pack_copyver_73bd1c1d.txt",
+    "export_json_path": "data/publicista/jobs/pubjob_5079cec5/meta/copy_pack_current.json",
+    "validation": {
+        "titles_check": [
+            {
+                "index": 0,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 1,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 2,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 3,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 4,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 5,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 6,
+                "ok_destacamos": true,
+                "ok_loquosex": false,
+                "issues": [
+                    "Título sugerente usa 'milf caliente', contiene término prohibido en la variante sugerente ('caliente')."
+                ]
+            },
+            {
+                "index": 7,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 8,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 9,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            }
+        ],
+        "ads_check": [
+            {
+                "slot": "slot 1",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "slot 2",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "slot 3",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "slot 4",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "slot 5",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "slot 6",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "slot 7",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": false,
+                "suggestive_issues": [
+                    "Contiene 'caliente', término prohibido para la variante sugerente.",
+                    "Usa 'milf', que aunque no está listado explícitamente puede considerarse carga sexual explícita o vulgaridad elevada según las reglas del portal."
+                ]
+            },
+            {
+                "slot": "slot 8",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "slot 9",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "slot 10",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            }
+        ]
+    },
+    "source_summary": "Mantén una mujer adulta de complexión esbelta con cintura marcada, cabello rubio miel ondulado y rostro alargado-ovalado, sin necesidad de replicar rasgos exactos.",
+    "reference_source_site": "destacamos+loquosex",
+    "reference_source_label": "destacamos.net + loquosex.com",
+    "reference_source_url": "https://www.destacamos.net/1/id/desc/recent_ads.html",
+    "reference_examples_count": 25
+}

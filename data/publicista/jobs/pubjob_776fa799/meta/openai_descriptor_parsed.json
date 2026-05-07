@@ -1,0 +1,51 @@
+{
+    "adult_appearing": true,
+    "framing": "medio-corto, recortada desde debajo del mentón hasta la cadera/parte alta de las piernas; el rostro no se ve",
+    "skin_tone": "piel clara a media con subtono cálido/bronceado por la luz solar",
+    "hair_color": "no visible",
+    "hair_texture": "no visible",
+    "hair_length": "no visible",
+    "body_build": "complexión grande y robusta, de presencia corporal fuerte",
+    "body_curves": "pecho muy grande y prominente; busto muy marcado; caderas visibles y anchas; cintura menos definida que el busto y las caderas; silueta general curvilínea y voluminosa",
+    "face_shape": "no visible",
+    "eyes": "no visibles",
+    "lips": "no visibles",
+    "nose": "no visible",
+    "eyebrows": "no visibles",
+    "makeup": "no discernible en el rostro; no se aprecia maquillaje facial",
+    "outfit_summary": "top negro ajustado con arneses/argollas y mangas de red; falda negra con estampado vegetal en tonos claros",
+    "dominant_colors": [
+        "negro",
+        "beige",
+        "blanco",
+        "rojo",
+        "rosa"
+    ],
+    "accessories": [
+        "collar tipo choker negro con argolla",
+        "arneses metálicos/argollas en el pecho",
+        "vaso de plástico"
+    ],
+    "pose_summary": "de pie, torso orientado a cámara, un brazo relajado a un lado y la otra mano sosteniendo un vaso",
+    "expression": "no visible",
+    "background_summary": "exterior en suelo de tierra o grava, con un automóvil rojo detrás y parte de otro vehículo gris a un lado",
+    "lighting_summary": "luz cálida de atardecer/sol bajo, con sombras suaves y tono dorado sobre la piel y la ropa",
+    "distinguishing_features": [
+        "piel clara a media con tono cálido",
+        "complexión robusta",
+        "busto muy grande y prominente",
+        "caderas anchas",
+        "silueta curvilínea y voluminosa"
+    ],
+    "similarity_guidance": "Mantén una figura adulta de complexión robusta y muy curvilínea, con busto prominente, caderas amplias y tono de piel cálido, sin depender de rasgos faciales específicos.",
+    "risk_notes": [
+        "El rostro no está visible, por lo que no es posible describir rasgos faciales reales",
+        "El cabello no aparece en la imagen",
+        "Parte de la tonalidad de piel puede estar influida por la iluminación cálida"
+    ],
+    "quality_notes": [
+        "Imagen recortada que limita la visibilidad del rostro y el cabello",
+        "La iluminación solar cálida altera ligeramente el color percibido de la piel y la ropa",
+        "No se distinguen con precisión ojos, nariz, labios ni cejas"
+    ]
+}

@@ -1,0 +1,14 @@
+{
+    "id": "lamamibot",
+    "nombre_bot": "LamamiBot",
+    "estado": "",
+    "telefonos_ids": [],
+    "clientas_ids": [],
+    "girlsconf_json_path": "",
+    "girlsconf_base_url": "",
+    "last_sync_at": "",
+    "last_sync_summary": "",
+    "generated_assets": [],
+    "created_at": "",
+    "updated_at": ""
+}

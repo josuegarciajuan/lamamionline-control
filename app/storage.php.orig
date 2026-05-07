@@ -1,0 +1,669 @@
+<?php
+
+function bootstrap_storage() {
+    if (!is_dir(DATA_PATH)) {
+        mkdir(DATA_PATH, 0775, true);
+    }
+
+    $defaultUsers = array(
+        array(
+            'id' => 'usr_admin',
+            'username' => 'nuria',
+            'password' => 'josue',
+            'name' => 'Nuria'
+        )
+    );
+
+    $defaults = array(
+        'users.json' => $defaultUsers,
+        'clientes.json' => array(),
+        'bots.json' => array(),
+        'lamamibot.json' => array(
+            'id' => 'lamamibot',
+            'nombre_bot' => 'LamamiBot',
+            'estado' => '',
+            'telefonos_ids' => array(),
+            'clientas_ids' => array(),
+            'girlsconf_json_path' => '',
+            'girlsconf_base_url' => '',
+            'last_sync_at' => '',
+            'last_sync_summary' => '',
+            'generated_assets' => array(),
+            'created_at' => '',
+            'updated_at' => ''
+        ),
+        'publicista_jobs.json' => array(),
+        'publicista_templates.json' => array(),
+        'leads.json' => array(),
+        'interesadas.json' => array(),
+        'casawasap_contactos.json' => array(),
+        'casawasap_pagos.json' => array(),
+        'jostal_interesadas.json' => array(),
+        'jostal_clientas.json' => array(),
+        'jostal_leads.json' => array(),
+        'jostal_ventas.json' => array(),
+        'gastos.json' => array(),
+        'anuncios.json' => array(),
+        'telefonos.json' => array(),
+        'agenda.json' => array(),
+        'avisos.json' => array(),
+        'avisos_runs.json' => array(),
+        'voice_commands_log.json' => array(),
+        'voice_pending_actions.json' => array(),
+        'settings.json' => array(
+            'lead_default_price' => 10,
+            'brand' => 'LaMami CRM',
+            'voice_ai_model' => 'gpt-5.1',
+            'whitelist_ips' => array(
+                '84.125.78.95',
+                '79.116.229.72'
+            )
+        )
+    );
+
+    foreach ($defaults as $file => $content) {
+        $path = DATA_PATH . '/' . $file;
+        if (!file_exists($path)) {
+            file_put_contents($path, json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        }
+    }
+
+    publicista_ensure_base_dirs();
+}
+
+function storage_read($file) {
+    $path = DATA_PATH . '/' . $file;
+    if (!file_exists($path)) return array();
+    $raw = file_get_contents($path);
+    $data = json_decode($raw, true);
+    return is_array($data) ? $data : array();
+}
+
+function storage_write($file, $data) {
+    $path = DATA_PATH . '/' . $file;
+    file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+}
+
+function storage_find_by_id($file, $id) {
+    $rows = storage_read($file);
+    foreach ($rows as $row) {
+        if (isset($row['id']) && $row['id'] === $id) {
+            return $row;
+        }
+    }
+    return null;
+}
+
+function storage_upsert($file, $row) {
+    $rows = storage_read($file);
+    $updated = false;
+    foreach ($rows as $i => $item) {
+        if (isset($item['id']) && $item['id'] === $row['id']) {
+            $rows[$i] = array_merge($item, $row);
+            $updated = true;
+            break;
+        }
+    }
+    if (!$updated) {
+        $rows[] = $row;
+    }
+    storage_write($file, array_values($rows));
+}
+
+function storage_delete($file, $id) {
+    $rows = storage_read($file);
+    $out = array();
+    foreach ($rows as $row) {
+        if (!isset($row['id']) || $row['id'] !== $id) {
+            $out[] = $row;
+        }
+    }
+    storage_write($file, array_values($out));
+}
+
+function publicista_root_dir() {
+    return DATA_PATH . '/publicista';
+}
+
+function publicista_jobs_root_dir() {
+    return publicista_root_dir() . '/jobs';
+}
+
+function publicista_templates_root_dir() {
+    return publicista_root_dir() . '/templates';
+}
+
+function publicista_ensure_dir($path) {
+    if (is_dir($path)) return true;
+    return @mkdir($path, 0775, true) || is_dir($path);
+}
+
+function publicista_ensure_base_dirs() {
+    $dirs = array(
+        publicista_root_dir(),
+        publicista_jobs_root_dir(),
+        publicista_templates_root_dir(),
+    );
+
+    foreach ($dirs as $dir) {
+        publicista_ensure_dir($dir);
+    }
+}
+
+function publicista_build_job_asset_dirs($id) {
+    $id = trim((string)$id);
+    $baseRel = 'data/publicista/jobs/' . $id;
+
+    return array(
+        'job_root' => $baseRel,
+        'originals_dir' => $baseRel . '/original',
+        'candidates_dir' => $baseRel . '/candidates',
+        'finals_dir' => $baseRel . '/finals',
+        'meta_dir' => $baseRel . '/meta',
+        'logs_dir' => $baseRel . '/logs',
+    );
+}
+
+function publicista_job_fs_paths($id) {
+    $id = trim((string)$id);
+    $base = publicista_jobs_root_dir() . '/' . $id;
+
+    return array(
+        'job_root' => $base,
+        'originals_dir' => $base . '/original',
+        'candidates_dir' => $base . '/candidates',
+        'finals_dir' => $base . '/finals',
+        'meta_dir' => $base . '/meta',
+        'logs_dir' => $base . '/logs',
+    );
+}
+
+function publicista_ensure_job_dirs($id) {
+    publicista_ensure_base_dirs();
+    $paths = publicista_job_fs_paths($id);
+    foreach ($paths as $path) {
+        if (!publicista_ensure_dir($path)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function publicista_remove_dir_recursive($dir) {
+    $dir = trim((string)$dir);
+    if ($dir === '' || !file_exists($dir)) return true;
+    if (!is_dir($dir)) return @unlink($dir);
+
+    $items = @scandir($dir);
+    if ($items === false) return false;
+
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') continue;
+        $path = $dir . '/' . $item;
+        if (is_dir($path)) {
+            if (!publicista_remove_dir_recursive($path)) return false;
+        } else {
+            if (!@unlink($path)) return false;
+        }
+    }
+
+    return @rmdir($dir);
+}
+
+function publicista_job_defaults($id = '') {
+    $id = trim((string)$id);
+    if ($id === '') {
+        $id = generate_id('pubjob');
+    }
+
+    return array(
+        'id' => $id,
+        'clienta_id' => '',
+        'clienta_nombre_snapshot' => '',
+        'nombre_trabajo' => '',
+        'estado' => 'draft',
+        'notas' => '',
+        'physical_notes' => '',
+        'services_snapshot' => '',
+        'tarifas_snapshot' => '',
+        'localidad_snapshot' => '',
+        'provincia_snapshot' => '',
+        'source_image' => array(
+            'original_filename' => '',
+            'stored_path' => '',
+            'mime_type' => '',
+            'size_bytes' => 0,
+            'width' => 0,
+            'height' => 0,
+            'uploaded_at' => '',
+        ),
+        'asset_dirs' => publicista_build_job_asset_dirs($id),
+        'models' => array(
+            'descriptor' => '',
+            'image' => '',
+        ),
+        'processing' => array(
+            'last_action' => '',
+            'last_started_at' => '',
+            'last_finished_at' => '',
+            'last_error' => '',
+            'last_error_at' => '',
+            'last_openai_request_id' => '',
+            'last_openai_http_code' => 0,
+        ),
+        'local_assets' => array(
+            'analysis_json_path' => '',
+            'prepared_square_path' => '',
+            'face_blur_path' => '',
+            'preview_path' => '',
+            'prepared_at' => '',
+            'worker_command' => '',
+            'worker_result' => array(),
+        ),
+        'descriptor' => array(
+            'model' => '',
+            'request_id' => '',
+            'http_code' => 0,
+            'raw_response_path' => '',
+            'parsed_json_path' => '',
+            'summary' => '',
+            'data' => array(),
+        ),
+        'prompt_master' => array(
+            'built_at' => '',
+            'text' => '',
+            'variants' => array(),
+            'path' => '',
+        ),
+        'pipeline' => array(
+            'run_id' => '',
+            'started_at' => '',
+            'finished_at' => '',
+            'status' => '',
+            'summary' => '',
+            'mode' => 'max_saving',
+            'stage' => '',
+            'selected_candidate_ids' => array(),
+            'final_candidate_ids' => array(),
+            'total_generated' => 0,
+            'total_selected' => 0,
+            'batch' => array(
+                'image_batch_id' => '',
+                'input_file_id' => '',
+                'output_file_id' => '',
+                'error_file_id' => '',
+                'status' => '',
+                'submitted_at' => '',
+                'last_checked_at' => '',
+                'completed_at' => '',
+                'custom_ids' => array(),
+                'result_jsonl_path' => '',
+                'errors_jsonl_path' => '',
+            ),
+        ),
+        'workflow' => array(
+            'restrictions_text' => '',
+            'restriction_flags' => array(),
+            'auto_regenerate' => 0,
+            'pack_final' => 0,
+            'pack_finalized_at' => '',
+            'pack_final_note' => '',
+        ),
+        'copy_pack' => array(
+            'desired_tone' => 'equilibrado',
+            'examples_base' => '',
+            'current_version_id' => '',
+            'current_summary' => '',
+            'current_export_text' => '',
+            'current_export_txt_path' => '',
+            'current_export_json_path' => '',
+            'generated_at' => '',
+            'last_error' => '',
+            'last_error_at' => '',
+            'retry_count' => 0,
+            'versions' => array(),
+        ),
+        'costs' => array(
+            'response_calls_count' => 0,
+            'image_generations_count' => 0,
+            'batch_jobs_count' => 0,
+            'input_tokens' => 0,
+            'output_tokens' => 0,
+            'cached_input_tokens' => 0,
+            'estimated_usd_responses' => 0,
+            'estimated_usd_images' => 0,
+            'estimated_usd_total' => 0,
+            'last_breakdown' => array(),
+            'last_cost_update_at' => '',
+        ),
+        'candidates' => array(),
+        'final_images' => array(),
+        'created_at' => '',
+        'updated_at' => '',
+    );
+}
+
+function publicista_normalize_status($status) {
+    $status = trim((string)$status);
+    if ($status === 'configured') {
+        $status = 'needs_review';
+    }
+    $allowed = array_keys(publicista_job_status_options());
+    return in_array($status, $allowed, true) ? $status : 'draft';
+}
+
+function publicista_jobs_get() {
+    $rows = storage_read('publicista_jobs.json');
+    $out = array();
+
+    foreach ($rows as $row) {
+        if (!is_array($row)) continue;
+        $defaults = publicista_job_defaults(isset($row['id']) ? $row['id'] : '');
+        $merged = array_merge($defaults, $row);
+        $merged['estado'] = publicista_normalize_status($merged['estado']);
+        $merged['asset_dirs'] = publicista_build_job_asset_dirs($merged['id']);
+        $out[] = $merged;
+    }
+
+    return sort_desc_by_key($out, 'updated_at');
+}
+
+function publicista_job_get($id) {
+    $id = trim((string)$id);
+    if ($id === '') return null;
+
+    foreach (publicista_jobs_get() as $row) {
+        if (($row['id'] ?? '') === $id) {
+            return $row;
+        }
+    }
+
+    return null;
+}
+
+function publicista_job_save($row) {
+    $row = is_array($row) ? $row : array();
+    $id = trim((string)($row['id'] ?? ''));
+    $existing = $id !== '' ? publicista_job_get($id) : null;
+
+    if ($id === '') {
+        $id = generate_id('pubjob');
+    }
+
+    $base = publicista_job_defaults($id);
+    $merged = array_merge($base, $existing ?: array(), $row);
+    $merged['id'] = $id;
+    $merged['estado'] = publicista_normalize_status($merged['estado'] ?? 'draft');
+    $merged['asset_dirs'] = publicista_build_job_asset_dirs($id);
+
+    if (!isset($merged['source_image']) || !is_array($merged['source_image'])) {
+        $merged['source_image'] = $base['source_image'];
+    } else {
+        $merged['source_image'] = array_merge($base['source_image'], $merged['source_image']);
+    }
+
+    if (!isset($merged['models']) || !is_array($merged['models'])) {
+        $merged['models'] = $base['models'];
+    } else {
+        $merged['models'] = array_merge($base['models'], $merged['models']);
+    }
+
+    if (!isset($merged['processing']) || !is_array($merged['processing'])) {
+        $merged['processing'] = $base['processing'];
+    } else {
+        $merged['processing'] = array_merge($base['processing'], $merged['processing']);
+    }
+
+    if (!isset($merged['local_assets']) || !is_array($merged['local_assets'])) {
+        $merged['local_assets'] = $base['local_assets'];
+    } else {
+        $merged['local_assets'] = array_merge($base['local_assets'], $merged['local_assets']);
+    }
+
+    if (!isset($merged['descriptor']) || !is_array($merged['descriptor'])) {
+        $merged['descriptor'] = $base['descriptor'];
+    } else {
+        $merged['descriptor'] = array_merge($base['descriptor'], $merged['descriptor']);
+    }
+
+    if (!isset($merged['prompt_master']) || !is_array($merged['prompt_master'])) {
+        $merged['prompt_master'] = $base['prompt_master'];
+    } else {
+        $merged['prompt_master'] = array_merge($base['prompt_master'], $merged['prompt_master']);
+    }
+
+    if (!isset($merged['pipeline']) || !is_array($merged['pipeline'])) {
+        $merged['pipeline'] = $base['pipeline'];
+    } else {
+        $merged['pipeline'] = array_merge($base['pipeline'], $merged['pipeline']);
+    }
+    if (!isset($merged['pipeline']['batch']) || !is_array($merged['pipeline']['batch'])) {
+        $merged['pipeline']['batch'] = $base['pipeline']['batch'];
+    } else {
+        $merged['pipeline']['batch'] = array_merge($base['pipeline']['batch'], $merged['pipeline']['batch']);
+    }
+
+    if (!isset($merged['workflow']) || !is_array($merged['workflow'])) {
+        $merged['workflow'] = $base['workflow'];
+    } else {
+        $merged['workflow'] = array_merge($base['workflow'], $merged['workflow']);
+    }
+    $merged['workflow']['restriction_flags'] = publicista_normalize_restriction_flags(isset($merged['workflow']['restriction_flags']) ? $merged['workflow']['restriction_flags'] : array());
+    $merged['workflow']['auto_regenerate'] = !empty($merged['workflow']['auto_regenerate']) ? 1 : 0;
+    $merged['workflow']['pack_final'] = !empty($merged['workflow']['pack_final']) ? 1 : 0;
+
+    if (!isset($merged['copy_pack']) || !is_array($merged['copy_pack'])) {
+        $merged['copy_pack'] = $base['copy_pack'];
+    } else {
+        $merged['copy_pack'] = array_merge($base['copy_pack'], $merged['copy_pack']);
+    }
+    $merged['copy_pack']['desired_tone'] = trim((string)($merged['copy_pack']['desired_tone'] ?? 'equilibrado'));
+    if ($merged['copy_pack']['desired_tone'] === '') {
+        $merged['copy_pack']['desired_tone'] = 'equilibrado';
+    }
+    if (!isset($merged['copy_pack']['versions']) || !is_array($merged['copy_pack']['versions'])) {
+        $merged['copy_pack']['versions'] = array();
+    }
+    $merged['copy_pack']['retry_count'] = (int)($merged['copy_pack']['retry_count'] ?? 0);
+
+    if (!isset($merged['costs']) || !is_array($merged['costs'])) {
+        $merged['costs'] = $base['costs'];
+    } else {
+        $merged['costs'] = array_merge($base['costs'], $merged['costs']);
+    }
+    if (!isset($merged['costs']['last_breakdown']) || !is_array($merged['costs']['last_breakdown'])) {
+        $merged['costs']['last_breakdown'] = array();
+    }
+    $merged['costs']['batch_jobs_count'] = (int)($merged['costs']['batch_jobs_count'] ?? 0);
+
+    if (!isset($merged['candidates']) || !is_array($merged['candidates'])) {
+        $merged['candidates'] = $base['candidates'];
+    }
+
+    if (!isset($merged['final_images']) || !is_array($merged['final_images'])) {
+        $merged['final_images'] = $base['final_images'];
+    }
+
+    if (trim((string)($merged['created_at'] ?? '')) === '') {
+        $merged['created_at'] = now_datetime();
+    }
+    $merged['updated_at'] = now_datetime();
+
+    if (!publicista_ensure_job_dirs($id)) {
+        return array(false, 'No se pudieron crear las carpetas base del trabajo Publicista.');
+    }
+
+    storage_upsert('publicista_jobs.json', $merged);
+    return array(true, $merged);
+}
+
+function publicista_job_delete($id) {
+    $id = trim((string)$id);
+    if ($id === '') return array(false, 'ID de trabajo vacío.');
+
+    storage_delete('publicista_jobs.json', $id);
+    $paths = publicista_job_fs_paths($id);
+    if (!publicista_remove_dir_recursive($paths['job_root'])) {
+        return array(false, 'Trabajo eliminado del JSON, pero no se pudo borrar su carpeta.');
+    }
+
+    return array(true, 'Trabajo eliminado.');
+}
+
+function publicista_jobs_for_clienta($clientaId) {
+    $clientaId = trim((string)$clientaId);
+    $out = array();
+    foreach (publicista_jobs_get() as $row) {
+        if (($row['clienta_id'] ?? '') === $clientaId) {
+            $out[] = $row;
+        }
+    }
+    return $out;
+}
+
+function clientes_index() {
+    $items = storage_read('clientes.json');
+    $idx = array();
+    foreach ($items as $item) {
+        $idx[$item['id']] = $item;
+    }
+    return $idx;
+}
+
+function bots_index() {
+    $items = storage_read('bots.json');
+    $idx = array();
+    foreach ($items as $item) {
+        $idx[$item['id']] = $item;
+    }
+    return $idx;
+}
+
+function settings_get() {
+    return storage_read('settings.json');
+}
+
+function get_active_clientas() {
+    $items = storage_read('clientes.json');
+    $out = array();
+    foreach ($items as $item) {
+        if (isset($item['estado']) && $item['estado'] === 'alta') {
+            $out[] = $item;
+        }
+    }
+    return $out;
+}
+
+function get_clienta_current_bot($clientaId) {
+    $bots = storage_read('bots.json');
+    foreach ($bots as $bot) {
+        if (isset($bot['cliente_id']) && $bot['cliente_id'] === $clientaId) {
+            return $bot;
+        }
+    }
+    return null;
+}
+
+function get_leads_for_clienta($clientaId) {
+    $items = storage_read('leads.json');
+    $out = array();
+    foreach ($items as $item) {
+        if (isset($item['cliente_id']) && $item['cliente_id'] === $clientaId) {
+            $out[] = $item;
+        }
+    }
+    return $out;
+}
+
+function get_leads_for_bot($botId) {
+    $items = storage_read('leads.json');
+    $out = array();
+    foreach ($items as $item) {
+        if (isset($item['bot_id']) && $item['bot_id'] === $botId) {
+            $out[] = $item;
+        }
+    }
+    return $out;
+}
+
+function lamamibot_defaults() {
+    return array(
+        'id' => 'lamamibot',
+        'nombre_bot' => 'LamamiBot',
+        'estado' => '',
+        'telefonos_ids' => array(),
+        'clientas_ids' => array(),
+        'girlsconf_json_path' => '',
+        'girlsconf_base_url' => '',
+        'last_sync_at' => '',
+        'last_sync_summary' => '',
+        'generated_assets' => array(),
+        'created_at' => '',
+        'updated_at' => ''
+    );
+}
+
+function lamamibot_get() {
+    $raw = storage_read('lamamibot.json');
+    if (!is_array($raw)) {
+        $raw = array();
+    }
+
+    $row = array_merge(lamamibot_defaults(), $raw);
+
+    if (!isset($row['telefonos_ids']) || !is_array($row['telefonos_ids'])) {
+        $row['telefonos_ids'] = array();
+    }
+    if (!isset($row['clientas_ids']) || !is_array($row['clientas_ids'])) {
+        $row['clientas_ids'] = array();
+    }
+
+    if (!isset($row['generated_assets']) || !is_array($row['generated_assets'])) {
+        $row['generated_assets'] = array();
+    }
+
+    $row['generated_assets'] = lamamibot_clean_generated_assets($row['generated_assets']);
+
+    return $row;
+}
+
+function lamamibot_save($row) {
+    $existing = lamamibot_get();
+    $merged = array_merge($existing, is_array($row) ? $row : array());
+
+    $merged['id'] = 'lamamibot';
+
+    $telefonosIds = array();
+    foreach ((array)($merged['telefonos_ids'] ?? array()) as $id) {
+        $id = trim((string)$id);
+        if ($id === '') continue;
+        if (!in_array($id, $telefonosIds, true)) {
+            $telefonosIds[] = $id;
+        }
+    }
+
+    $clientasIds = array();
+    foreach ((array)($merged['clientas_ids'] ?? array()) as $id) {
+        $id = trim((string)$id);
+        if ($id === '') continue;
+        if (!in_array($id, $clientasIds, true)) {
+            $clientasIds[] = $id;
+        }
+    }
+
+    $merged['telefonos_ids'] = $telefonosIds;
+    $merged['clientas_ids'] = $clientasIds;
+
+    if (!isset($merged['generated_assets']) || !is_array($merged['generated_assets'])) {
+        $merged['generated_assets'] = array();
+    }
+
+    $merged['generated_assets'] = lamamibot_clean_generated_assets($merged['generated_assets']);
+
+    if (trim((string)($merged['created_at'] ?? '')) === '') {
+        $merged['created_at'] = now_datetime();
+    }
+    $merged['updated_at'] = now_datetime();
+
+    storage_write('lamamibot.json', $merged);
+}

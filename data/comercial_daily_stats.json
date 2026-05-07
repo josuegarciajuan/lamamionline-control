@@ -1,0 +1,89 @@
+{
+    "_autoregulation": {
+        "last_global_slowdown_at": "2026-05-06 11:25:44",
+        "last_global_slowdown_line_id": "tf_de558a13"
+    },
+    "_reply_alerts": {
+        "dedupe": {
+            "thread:comthread_95764188|reason:reply_after_auto_followup": 1777914918,
+            "thread:comthread_b05881e9|reason:reply_after_auto_followup": 1778016597,
+            "thread:comthread_7ff2bd80|reason:reply_after_auto_followup": 1778062978,
+            "thread:comthread_5ea43a8c|reason:reply_after_auto_followup": 1778065150,
+            "thread:comthread_525e56a8|reason:reply_after_auto_followup": 1778082707,
+            "thread:comthread_71e6af6d|reason:reply_after_auto_followup": 1778097978,
+            "thread:comthread_c9978efe|reason:reply_after_auto_followup": 1778149108
+        },
+        "updated_at": "2026-05-07 12:18:28"
+    },
+    "2026-05-04": {
+        "reply_alerts": {
+            "emitted_total": 1,
+            "suppressed_total": 11,
+            "suppressed_by_mode": {
+                "dedupe_window": 1,
+                "non_high_value": 10
+            },
+            "digest_by_reason": {
+                "reply_after_auto_followup": 1,
+                "generic_reply": 8,
+                "keyword_vale": 1,
+                "keyword_ok": 1
+            }
+        }
+    },
+    "2026-05-05": {
+        "reply_alerts": {
+            "suppressed_total": 40,
+            "suppressed_by_mode": {
+                "non_high_value": 33,
+                "dedupe_window": 7
+            },
+            "digest_by_reason": {
+                "generic_reply": 24,
+                "intent_short_affirmative": 2,
+                "keyword_si": 3,
+                "keyword_como": 2,
+                "intent_precio": 1,
+                "keyword_ok": 1,
+                "reply_after_auto_followup": 7
+            },
+            "emitted_total": 1
+        }
+    },
+    "2026-05-06": {
+        "reply_alerts": {
+            "suppressed_total": 37,
+            "suppressed_by_mode": {
+                "non_high_value": 22,
+                "dedupe_window": 15
+            },
+            "digest_by_reason": {
+                "intent_info": 2,
+                "generic_reply": 12,
+                "intent_mas_info": 2,
+                "reply_after_auto_followup": 15,
+                "keyword_si": 2,
+                "intent_short_affirmative": 1,
+                "intent_precio": 2,
+                "keyword_como": 1
+            },
+            "emitted_total": 6
+        }
+    },
+    "2026-05-07": {
+        "reply_alerts": {
+            "suppressed_total": 13,
+            "suppressed_by_mode": {
+                "non_high_value": 3,
+                "dedupe_window": 10
+            },
+            "digest_by_reason": {
+                "generic_reply": 1,
+                "intent_como_funciona": 1,
+                "reply_after_auto_followup": 10,
+                "keyword_si": 1
+            },
+            "emitted_total": 4
+        }
+    }
+}

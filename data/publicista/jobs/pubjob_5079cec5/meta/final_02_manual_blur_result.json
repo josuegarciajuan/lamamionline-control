@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "input_path": "/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_5079cec5/finals/final_02_square.jpg",
+  "manual_blur": true,
+  "bx": 0.253228,
+  "by": 0.078333,
+  "bw": 0.134864,
+  "bh": 0.183333,
+  "intensity": 20.0,
+  "bx_px": 259,
+  "by_px": 80,
+  "bw_px": 138,
+  "bh_px": 187,
+  "output_face_blur": "/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_5079cec5/finals/final_02_manual_blur.jpg",
+  "output_preview": "/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_5079cec5/finals/final_02_manual_blur_preview.jpg"
+}

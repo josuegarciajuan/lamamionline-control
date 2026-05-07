@@ -1,0 +1,12 @@
+{
+    "ok": true,
+    "exit_code": 0,
+    "stdout": "{\"ok\": true, \"error\": \"\", \"image_path\": \"/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_8ec9c437/candidates/pollo_batch_01.png\", \"image_url\": \"https://videocdn.pollo.ai/web-cdn/pollo/production/cml44ltvu0lq2soxrv2swm5qe/ori/1777923172783-6a557782-7ceb-4de0-95a0-9839c1b2263a.png?type=download&quality=high&format=original\", \"generation_id\": \"87923346\", \"images\": [{\"index\": 1, \"path\": \"/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_8ec9c437/candidates/pollo_batch_01.png\", \"url\": \"https://videocdn.pollo.ai/web-cdn/pollo/production/cml44ltvu0lq2soxrv2swm5qe/ori/1777923172783-6a557782-7ceb-4de0-95a0-9839c1b2263a.png?type=download&quality=high&format=original\", \"size_bytes\": 1767542, \"ext\": \"png\"}, {\"index\": 2, \"path\": \"/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_8ec9c437/candidates/pollo_batch_02.png\", \"url\": \"https://videocdn.pollo.ai/web-cdn/pollo/production/cml44ltvu0lq2soxrv2swm5qe/ori/1777923171514-db14236b-d47c-4ad6-8c84-8fff28210cbc.png?type=download&quality=high&format=original\", \"size_bytes\": 1490716, \"ext\": \"png\"}, {\"index\": 3, \"path\": \"/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_8ec9c437/candidates/pollo_batch_03.png\", \"url\": \"https://videocdn.pollo.ai/web-cdn/pollo/production/cml44ltvu0lq2soxrv2swm5qe/ori/1777923172386-7998994c-c311-4206-a603-9220da040618.png?type=download&quality=high&format=original\", \"size_bytes\": 1675783, \"ext\": \"png\"}, {\"index\": 4, \"path\": \"/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_8ec9c437/candidates/pollo_batch_04.png\", \"url\": \"https://videocdn.pollo.ai/web-cdn/pollo/production/cml44ltvu0lq2soxrv2swm5qe/ori/1777923171530-d2c39b97-52e8-40a3-98c8-444130e00380.png?type=download&quality=high&format=original\", \"size_bytes\": 1477119, \"ext\": \"png\"}], \"backend\": \"curl-cffi\", \"prompt_length\": 1828, \"requested_num_outputs\": 4, \"image_count\": 4}",
+    "stderr": "",
+    "model": "pollo-image-v2",
+    "prompt_length": 1828,
+    "prompt_compacted": 1,
+    "prompt_method": "gpt_summary",
+    "prompt_guard_applied": 1,
+    "num_outputs": 4
+}

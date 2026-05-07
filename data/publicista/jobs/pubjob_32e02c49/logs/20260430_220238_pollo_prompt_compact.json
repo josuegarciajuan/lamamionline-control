@@ -1,0 +1,105 @@
+{
+    "ok": true,
+    "endpoint": "/v1/responses",
+    "http_code": 200,
+    "request_id": "req_11d6135a82ab40f294cf3cfa52b73e4a",
+    "decoded": {
+        "id": "resp_0fd035c247ac95400169f3b5549c048190bfeeadecee4f1e1f",
+        "object": "response",
+        "created_at": 1777579348,
+        "status": "completed",
+        "background": false,
+        "billing": {
+            "payer": "developer"
+        },
+        "completed_at": 1777579357,
+        "error": null,
+        "frequency_penalty": 0,
+        "incomplete_details": null,
+        "instructions": null,
+        "max_output_tokens": null,
+        "max_tool_calls": null,
+        "model": "gpt-5.4-mini-2026-03-17",
+        "moderation": null,
+        "output": [
+            {
+                "id": "msg_0fd035c247ac95400169f3b558b3508190a45baf601a5640fc",
+                "type": "message",
+                "status": "completed",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "annotations": [],
+                        "logprobs": [],
+                        "text": "{\"prompt\":\"Una sola mujer adulta de piel morena profunda con subtono cálido, cabello negro muy largo ondulado a rizado suave por debajo del pecho, complexión delgada a atlética con cintura marcada, piernas fuertes y caderas moderadamente anchas, silueta de reloj de arena suave, rostro ovalado de rasgos suaves, labios de grosor medio, cejas oscuras medianas, apariencia general coherente y natural. Lleva un vestido corto elegante, entallado y favorecedor, con tejido opaco de calidad, textura visible, costuras limpias, paneles definidos y acabado premium; look adulto, glamuroso y editorial, sexy y llamativo pero totalmente vestido, sin lencería visible, sin transparencias íntimas, sin desnudo ni erotismo explícito. Paleta sofisticada con contraste tonal visible y detalles refinados, evitando ropa monótona o sosa. Pose femenina, segura, fotogénica y natural, con postura atractiva sin rigidez, expresión viva. Interior elegante y luminoso, real y vivido, fondo limpio y agradable, nunca fondo liso de estudio genérico. Luz suave, equilibrada y realista con sombras coherentes. Fotografía hiperrealista, nítida, comercial y editorial, con buen detalle en piel, pelo, ropa y entorno. Encuadre vertical o cuadrado favorecedor. Evitar pose rígida, expresión apagada, manos deformes, dedos extra, proporciones irreales, texto, watermark, collage, dibujos, CGI, desnudo, lencería, transparencias íntimas y acto sexual.\"}"
+                    }
+                ],
+                "phase": "final_answer",
+                "role": "assistant"
+            }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": "publicista:pollo_prompt_compact:gpt-5.4-mini",
+        "prompt_cache_retention": "24h",
+        "reasoning": {
+            "effort": "none",
+            "summary": null
+        },
+        "safety_identifier": null,
+        "service_tier": "flex",
+        "store": false,
+        "temperature": 1,
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "description": null,
+                "name": "publicista_pollo_prompt_compact",
+                "schema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "prompt"
+                    ],
+                    "properties": {
+                        "prompt": {
+                            "type": "string",
+                            "maxLength": 1920
+                        }
+                    }
+                },
+                "strict": true
+            },
+            "verbosity": "medium"
+        },
+        "tool_choice": "auto",
+        "tools": [],
+        "top_logprobs": 0,
+        "top_p": 0.98,
+        "truncation": "disabled",
+        "usage": {
+            "input_tokens": 1097,
+            "input_tokens_details": {
+                "cached_tokens": 0
+            },
+            "output_tokens": 343,
+            "output_tokens_details": {
+                "reasoning_tokens": 0
+            },
+            "total_tokens": 1440
+        },
+        "user": null,
+        "metadata": []
+    },
+    "raw_body": "{\n  \"id\": \"resp_0fd035c247ac95400169f3b5549c048190bfeeadecee4f1e1f\",\n  \"object\": \"response\",\n  \"created_at\": 1777579348,\n  \"status\": \"completed\",\n  \"background\": false,\n  \"billing\": {\n    \"payer\": \"developer\"\n  },\n  \"completed_at\": 1777579357,\n  \"error\": null,\n  \"frequency_penalty\": 0.0,\n  \"incomplete_details\": null,\n  \"instructions\": null,\n  \"max_output_tokens\": null,\n  \"max_tool_calls\": null,\n  \"model\": \"gpt-5.4-mini-2026-03-17\",\n  \"moderation\": null,\n  \"output\": [\n    {\n      \"id\": \"msg_0fd035c247ac95400169f3b558b3508190a45baf601a5640fc\",\n      \"type\": \"message\",\n      \"status\": \"completed\",\n      \"content\": [\n        {\n          \"type\": \"output_text\",\n          \"annotations\": [],\n          \"logprobs\": [],\n          \"text\": \"{\\\"prompt\\\":\\\"Una sola mujer adulta de piel morena profunda con subtono c\\u00e1lido, cabello negro muy largo ondulado a rizado suave por debajo del pecho, complexi\\u00f3n delgada a atl\\u00e9tica con cintura marcada, piernas fuertes y caderas moderadamente anchas, silueta de reloj de arena suave, rostro ovalado de rasgos suaves, labios de grosor medio, cejas oscuras medianas, apariencia general coherente y natural. Lleva un vestido corto elegante, entallado y favorecedor, con tejido opaco de calidad, textura visible, costuras limpias, paneles definidos y acabado premium; look adulto, glamuroso y editorial, sexy y llamativo pero totalmente vestido, sin lencer\\u00eda visible, sin transparencias \\u00edntimas, sin desnudo ni erotismo expl\\u00edcito. Paleta sofisticada con contraste tonal visible y detalles refinados, evitando ropa mon\\u00f3tona o sosa. Pose femenina, segura, fotog\\u00e9nica y natural, con postura atractiva sin rigidez, expresi\\u00f3n viva. Interior elegante y luminoso, real y vivido, fondo limpio y agradable, nunca fondo liso de estudio gen\\u00e9rico. Luz suave, equilibrada y realista con sombras coherentes. Fotograf\\u00eda hiperrealista, n\\u00edtida, comercial y editorial, con buen detalle en piel, pelo, ropa y entorno. Encuadre vertical o cuadrado favorecedor. Evitar pose r\\u00edgida, expresi\\u00f3n apagada, manos deformes, dedos extra, proporciones irreales, texto, watermark, collage, dibujos, CGI, desnudo, lencer\\u00eda, transparencias \\u00edntimas y acto sexual.\\\"}\"\n        }\n      ],\n      \"phase\": \"final_answer\",\n      \"role\": \"assistant\"\n    }\n  ],\n  \"parallel_tool_calls\": true,\n  \"presence_penalty\": 0.0,\n  \"previous_response_id\": null,\n  \"prompt_cache_key\": \"publicista:pollo_prompt_compact:gpt-5.4-mini\",\n  \"prompt_cache_retention\": \"24h\",\n  \"reasoning\": {\n    \"effort\": \"none\",\n    \"summary\": null\n  },\n  \"safety_identifier\": null,\n  \"service_tier\": \"flex\",\n  \"store\": false,\n  \"temperature\": 1.0,\n  \"text\": {\n    \"format\": {\n      \"type\": \"json_schema\",\n      \"description\": null,\n      \"name\": \"publicista_pollo_prompt_compact\",\n      \"schema\": {\n        \"type\": \"object\",\n        \"additionalProperties\": false,\n        \"required\": [\n          \"prompt\"\n        ],\n        \"properties\": {\n          \"prompt\": {\n            \"type\": \"string\",\n            \"maxLength\": 1920\n          }\n        }\n      },\n      \"strict\": true\n    },\n    \"verbosity\": \"medium\"\n  },\n  \"tool_choice\": \"auto\",\n  \"tools\": [],\n  \"top_logprobs\": 0,\n  \"top_p\": 0.98,\n  \"truncation\": \"disabled\",\n  \"usage\": {\n    \"input_tokens\": 1097,\n    \"input_tokens_details\": {\n      \"cached_tokens\": 0\n    },\n    \"output_tokens\": 343,\n    \"output_tokens_details\": {\n      \"reasoning_tokens\": 0\n    },\n    \"total_tokens\": 1440\n  },\n  \"user\": null,\n  \"metadata\": {}\n}",
+    "error": "",
+    "used_model": "gpt-5.4-mini",
+    "service_tier": "flex",
+    "attempts": 1,
+    "retry_history": [],
+    "original_length": 3472,
+    "target_chars": 1920,
+    "model_name": "pollo-image-v2",
+    "forced": 0
+}

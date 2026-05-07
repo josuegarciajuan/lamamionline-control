@@ -1,0 +1,16 @@
+{
+    "ts": "2026-04-30 22:08:02",
+    "phase": "descriptor_pipeline",
+    "retry": {
+        "attempt": 2,
+        "max_attempts": 5,
+        "http_code": 429,
+        "request_id": "req_69d67c7dcefb47e49ed7a52f3a3e3997",
+        "curl_error": "",
+        "error": "We're currently processing too many requests — please try again later.",
+        "retry_after_raw": "",
+        "retry_after_sec": 0,
+        "backoff_sec": 1.348,
+        "wait_sec": 1.348
+    }
+}

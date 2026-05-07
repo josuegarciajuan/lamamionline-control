@@ -1,0 +1,112 @@
+PACK PUBLICISTA
+Trabajo: Brasileña
+Clienta: Brasileña Estrella
+Fecha: 2026-04-17 00:50:06
+Tono: Equilibrado
+Enfoque: Brasileña recién llegada a Burriana con enfoque de novedad, trato cercano y elegancia discreta, alternando versión neutra para portal exigente y versión sugerente para captar más clic y conversación.
+
+IMÁGENES FINALES
+- final_01: data/publicista/jobs/pubjob_a5bc016e/finals/final_01_square.jpg
+- final_02: data/publicista/jobs/pubjob_a5bc016e/finals/final_02_square.jpg
+- final_03: data/publicista/jobs/pubjob_a5bc016e/finals/final_03_square.jpg
+- final_04: data/publicista/jobs/pubjob_a5bc016e/finals/final_04_square.jpg
+
+TÍTULOS
+- cielo, RECIÉN LLEGADA a buriana ✨
+- BRASILEÑA EN BURIANA, DISPONIBLE AHORA
+- Buriana tiene una NUEVA cara... cielo 💫
+- CIELO: ELEGANCIA BRASILEÑA EN TU ZONA
+- Una brasileña diferente ha llegado a buriana
+- NUEVA en buriana, muy buena presencia
+- CIELO, TRATO CERCANO Y PRESENCIA ESPECIAL
+- BRASILEÑA DISCRETA Y MUY ATRACTIVA EN BURIANA
+- Si te gusta lo EXCLUSIVO, es para ti
+- Cielo está aquí... y no pasa desapercibida
+
+ANUNCIOS
+--- SLOT_1 ---
+FOCUS: Novedad absoluta
+HOOK: ACABA DE LLEGAR A BURIANA Y YA ESTÁ DESPERTANDO MIRADAS ✨
+TÍTULO NEUTRO: cielo, RECIÉN LLEGADA a buriana ✨
+TÍTULO SUGERENTE: BRASILEÑA EN BURIANA, DISPONIBLE AHORA
+TEXTO NEUTRO: Burriana estrena presencia con Cielo, una brasileña que llega con una forma de estar muy agradable y una imagen impecable. Si te gustan los perfiles que transmiten cercanía, DISCRECIÓN y buen gusto, aquí tienes una opción que merece la pena descubrir. Escríbele y conoce su lado más natural 😉
+TEXTO SUGERENTE: CIELO ACABA DE ATERRIZAR EN BURIANA Y YA ESTÁ LLAMANDO LA ATENCIÓN POR SU FORMA DE PRESENTARSE: CERCANA, SEGURA Y CON ESE PUNTO QUE INVITA A ESCRIBIRLE. Si buscas una brasileña que combine presencia y una conversación que enganche desde el primer mensaje, esta puede ser la tuya. Mándale un mensaje y descúbrela 💫
+
+--- SLOT_2 ---
+FOCUS: Elegancia discreta
+HOOK: HAY PERFILES QUE NO HACEN RUIDO, PERO SE NOTAN DESDE EL PRIMER VISTAZO. 📍
+TÍTULO NEUTRO: CIELO: ELEGANCIA BRASILEÑA EN TU ZONA
+TÍTULO SUGERENTE: Cielo está aquí... y no pasa desapercibida
+TEXTO NEUTRO: HAY MUJERES QUE DESTACAN POR LA FORMA EN QUE SE PRESENTAN, Y CIELO ES UNA DE ELLAS. Brasileña, elegante y con una presencia muy cuidada, transmite confianza desde el primer momento. Ideal para quien valora un trato discreto, agradable y con estilo. Si te encaja, escríbele 👌
+TEXTO SUGERENTE: NO HACE FALTA EXAGERAR PARA VER QUE CIELO TIENE ALGO ESPECIAL. Su forma de estar, su estilo y esa elegancia natural hacen que no pase desapercibida en Burriana. Si te atraen las brasileñas con clase y con una vibra que engancha, aquí tienes una oportunidad muy interesante. Escríbele y deja que te sorprenda 😉
+
+--- SLOT_3 ---
+FOCUS: Exclusividad
+HOOK: NO APARECE TODOS LOS DÍAS ALGUIEN CON ESTA MEZCLA DE ESTILO Y PERSONALIDAD 💫
+TÍTULO NEUTRO: Si te gusta lo EXCLUSIVO, es para ti
+TÍTULO SUGERENTE: Una brasileña diferente ha llegado a buriana
+TEXTO NEUTRO: CIELO NO ES UN PERFIL MÁS: TRANSMITE DISTINCIÓN, BUEN TRATO Y UNA IMAGEN QUE SE SALE DE LO HABITUAL. Si buscas algo más cuidado, más personal y con una presencia realmente especial, merece que le eches un vistazo. Envíale un mensaje y comprueba por qué llama tanto la atención ✨
+TEXTO SUGERENTE: Hay perfiles que se notan desde lejos, y Cielo es uno de ellos. Brasileña, con un aire exclusivo y una manera de conectar que despierta curiosidad al momento. Si te gusta lo distinto, lo que no se ve todos los días y lo que invita a volver a escribir, esta es una gran elección. Escríbele AHORA 👀
+
+--- SLOT_4 ---
+FOCUS: Contacto directo
+HOOK: SI TE GUSTA HABLAR CON ALGUIEN CERCANA Y CON BUENA VIBRA, AQUÍ LA TIENES 😉
+TÍTULO NEUTRO: CIELO, TRATO CERCANO Y PRESENCIA ESPECIAL
+TÍTULO SUGERENTE: Cielo en buriana: mensaje y descúbreme 😉
+TEXTO NEUTRO: CIELO OFRECE UNA ATENCIÓN CERCANA, AMABLE Y MUY NATURAL, PENSADA PARA QUIENES VALORAN EL BUEN AMBIENTE Y LA COMUNICACIÓN FÁCIL. Brasileña, con presencia y una forma de tratar que transmite confianza, es de esas personas con las que da gusto escribir. Si te apetece conocerla, mándale un mensaje 💬
+TEXTO SUGERENTE: LO SUYO ES EL TRATO DIRECTO, LA BUENA VIBRA Y ESA CONEXIÓN QUE EMPIEZA EN EL CHAT. Cielo, brasileña en Burriana, tiene una manera de hablar y de presentarse que invita a seguir la conversación. Si te gustan los perfiles que responden con naturalidad y dejan ganas de más, escríbele ya 😉
+
+--- SLOT_5 ---
+FOCUS: Curiosidad de portal
+HOOK: A VECES UNA NOVEDAD CAMBIA POR COMPLETO LO QUE ESPERABAS ENCONTRAR 👀
+TÍTULO NEUTRO: Buriana tiene una NUEVA cara... cielo 💫
+TÍTULO SUGERENTE: buriana, HOY hay algo nuevo 👀
+TEXTO NEUTRO: Burriana suma una presencia nueva que no tarda en llamar la atención. Cielo, brasileña, llega con una imagen muy cuidada y un trato reservado que encaja con quienes buscan algo elegante y distinto. Si te intriga conocerla, AHORA es buen momento para escribirle. ✨
+TEXTO SUGERENTE: HOY Burriana tiene algo nuevo que merece tu atención. Cielo llega con una energía que despierta curiosidad, una presencia muy atractiva y una forma de entrar en conversación que engancha rápido. Si te gustan las novedades que se notan desde el primer vistazo, escríbele y compruébalo por ti mismo ✨
+
+--- SLOT_6 ---
+FOCUS: Trato premium
+HOOK: PARA QUIEN BUSCA ALGO MÁS CUIDADO, MÁS AGRADABLE Y CON MEJOR PRESENCIA. 📍
+TÍTULO NEUTRO: NUEVA en buriana, muy buena presencia
+TÍTULO SUGERENTE: Cielo: detalles que enganchan
+TEXTO NEUTRO: Si valoras la buena presencia, el trato correcto y una atención con tacto, Cielo encaja muy bien. Brasileña, recién llegada a Burriana, combina DISCRECIÓN, estilo y una manera de estar que transmite calidad. Escríbele si buscas una opción más cuidada y agradable. 📍
+TEXTO SUGERENTE: CIELO TIENE ESE TIPO DE PRESENCIA QUE NO NECESITA PRESENTACIONES LARGAS. Brasileña, elegante y con pequeños detalles que suman mucho, consigue enganchar desde el primer momento. Si te gustan los perfiles con clase y con un punto de misterio bien llevado, aquí hay mucho que descubrir. Mándale un mensaje 💫
+
+--- SLOT_7 ---
+FOCUS: Cercanía humana
+HOOK: LO QUE MÁS ENGANCHA NO SIEMPRE ES LO EVIDENTE: MUCHAS VECES ES LA FORMA DE ESTAR 💕
+TÍTULO NEUTRO: BRASILEÑA DISCRETA Y MUY ATRACTIVA EN BURIANA
+TÍTULO SUGERENTE: BRASILEÑA, SIMPÁTICA Y MUY BIEN PRESENTADA
+TEXTO NEUTRO: CIELO DESTACA POR SU FORMA DE ESTAR: CERCANA, AMABLE Y FÁCIL DE TRATAR. Brasileña en Burriana, transmite una mezcla muy equilibrada de simpatía y buena presencia, ideal para quien quiere un contacto agradable y sin complicaciones. Si eso es lo tuyo, ya sabes por dónde empezar 😉
+TEXTO SUGERENTE: NO TODO ES APARIENCIA: CIELO TAMBIÉN GANA POR LA FORMA EN QUE CONECTA. Brasileña, simpática y con una presentación muy cuidada, deja una impresión muy buena desde el primer mensaje. Si te atraen las chicas con trato fácil y una vibra que invita a seguir hablando, escríbele 💕
+
+--- SLOT_8 ---
+FOCUS: Recién llegada con impulso
+HOOK: NUEVA EN LA ZONA, CON AGENDA ABIERTA Y MUCHAS GANAS DE EMPEZAR BIEN. 🤍
+TÍTULO NEUTRO: Una brasileña diferente ha llegado a buriana
+TÍTULO SUGERENTE: CIELO LLEGA CON GANAS DE CONOCERTE
+TEXTO NEUTRO: Si estabas esperando una brasileña nueva en Burriana, Cielo puede ser justo lo que te faltaba ver HOY. Llega con ganas de conocer gente educada, con un trato tranquilo y una presencia que se nota. No dejes pasar la ocasión y escríbele antes de que se llene la agenda ✨
+TEXTO SUGERENTE: Cielo aterriza en Burriana con ganas de empezar fuerte y de conocer a gente que valore una conversación que fluya. Brasileña, con actitud y muy buena presencia, es de esas novedades que despiertan interés enseguida. Si te apetece descubrirla antes que nadie, escríbele AHORA 👀
+
+--- SLOT_9 ---
+FOCUS: Perfil que destaca
+HOOK: NO ES UNA MÁS: TIENE PRESENCIA, ESTILO Y UNA MANERA DE PRESENTARSE QUE ENTRA SOLA. ✨
+TÍTULO NEUTRO: ELEGANTE, CERCANA Y CON MUCHA CLASE
+TÍTULO SUGERENTE: NO ES UNA MÁS... Y SE NOTA DESDE EL PRIMER MENSAJE
+TEXTO NEUTRO: CIELO REÚNE JUSTO ESA COMBINACIÓN QUE FUNCIONA: ELEGANCIA, CERCANÍA Y UNA PRESENCIA QUE SUMA. Brasileña en Burriana, ofrece una imagen cuidada y una forma de tratar que resulta muy agradable. Si buscas un perfil con clase y buena impresión, aquí tienes una candidata muy interesante. ✨
+TEXTO SUGERENTE: HAY PERFILES QUE DESTACAN SIN ESFUERZO, Y CIELO ES UNO DE ELLOS. Su estilo, su presencia y la forma en que se presenta hacen que quieras escribirle al momento. Brasileña, distinta y con mucho gancho, es ideal si te gustan las chicas que dejan huella desde el primer mensaje. Mándale un hola 😉
+
+--- SLOT_10 ---
+FOCUS: Aire de oportunidad
+HOOK: HOY puede ser de esos días en los que descubres justo lo que te faltaba. 📍
+TÍTULO NEUTRO: BRASILEÑA EN BURIANA, DISPONIBLE AHORA
+TÍTULO SUGERENTE: BURIANA SUMA UNA BRASILEÑA MUY ESPECIAL
+TEXTO NEUTRO: HOY puede ser el momento perfecto para conocer a Cielo. Brasileña, recién llegada a Burriana y con una presencia que invita a fijarse, es una opción ideal para quien busca algo nuevo, elegante y bien presentado. Si te gusta descubrir perfiles con encanto, escríbele ahora. 📍
+TEXTO SUGERENTE: A veces aparece justo lo que estabas buscando sin saberlo. Cielo, brasileña en Burriana, suma ese punto especial que convierte una simple visita en algo más interesante. Si te atraen las novedades con clase y personalidad, no lo dejes pasar y escríbele HOY 💫
+
+NOTAS DE PUBLICACIÓN
+- Usar la variante neutra en destacamos.net: tono elegante, reservado y sin palabras de reclamo sexual.
+- Reservar la variante sugerente para loquosex.com, manteniendo el lenguaje directo pero sin explicitar actos ni vulgaridades.
+- Alternar títulos de novedad con títulos premium para evitar saturación y mejorar el CTR en publicación múltiple.
+- Mantener siempre la referencia a Burriana y la nacionalidad brasileña para coherencia de ficha y relevancia local.
+- No repetir el mismo cierre en varios anuncios: variar entre invitación a escribir, descubrirla o concretar por mensaje.

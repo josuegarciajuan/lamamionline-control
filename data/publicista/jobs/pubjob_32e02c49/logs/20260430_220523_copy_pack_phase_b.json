@@ -1,0 +1,184 @@
+{
+    "ok": true,
+    "endpoint": "/v1/responses",
+    "http_code": 200,
+    "request_id": "req_d8069154192b48ba8481a33a6312f107",
+    "decoded": {
+        "id": "resp_018f61ba30c890130169f3b5cfd110819e98cb03557504416e",
+        "object": "response",
+        "created_at": 1777579471,
+        "status": "completed",
+        "background": false,
+        "billing": {
+            "payer": "developer"
+        },
+        "completed_at": 1777579523,
+        "error": null,
+        "frequency_penalty": 0,
+        "incomplete_details": null,
+        "instructions": null,
+        "max_output_tokens": null,
+        "max_tool_calls": null,
+        "model": "gpt-5.4-mini-2026-03-17",
+        "moderation": null,
+        "output": [
+            {
+                "id": "msg_018f61ba30c890130169f3b5d4cdb8819eb3bb2f1fe80da677",
+                "type": "message",
+                "status": "completed",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "annotations": [],
+                        "logprobs": [],
+                        "text": "{\"tone_used\":\"equilibrado\",\"pack_angle\":\"Rubi se presenta en Burriana con un pack versátil que combina elegancia, cercanía, novedad local y un punto sugerente controlado para maximizar clics y mensajes.\",\"title_options\":[\"RUBI, LA NOVEDAD DE BURIANA\",\"Rubi: discreción, encanto y buena energía\",\"Rubi para quien valora el buen trato\",\"BURIANA TIENE NUEVA SONRISA\",\"Rubi, una opción que merece la pena conocer\",\"Rubi: contacto fácil, trato agradable\",\"Rubi, distinta desde el primer mensaje\",\"NUEVA RUBI EN BURIANA ❤️\",\"RUBI BRASILERA EN BURIANA\",\"Rubi, recién llegada y con mucho por ofrecer\"],\"recommended_order\":[\"slot1\",\"slot2\",\"slot3\",\"slot4\",\"slot5\",\"slot6\",\"slot7\",\"slot8\",\"slot9\",\"slot10\"],\"publication_notes\":[\"En destacamos.net prioriza las versiones neutras: elegantes, discretas y sin palabras de reclamo sexual.\",\"En loquosex.com funciona mejor alternar una neutra con una sugerente para evitar sensación de repetición.\",\"Mueve los títulos entre MAYÚSCULAS totales y formato frase para testear qué estilo genera más apertura.\",\"Mantén la nacionalidad brasileña como gancho secundario, no como único mensaje del anuncio.\",\"Evita sobrecargar con emojis: uno bien colocado suele rendir mejor que varios seguidos.\"],\"ads\":[{\"slot\":\"slot1\",\"focus\":\"Novedad local\",\"short_hook\":\"Si buscas algo nuevo en Burriana, aquí tienes una opción que destaca desde el primer vistazo.\",\"title_neutral\":\"RUBI, LA NOVEDAD DE BURIANA\",\"title_suggestive\":\"NUEVA RUBI EN BURIANA ❤️\",\"body_neutral\":\"Burriana suma una cara nueva con una presencia que no pasa desapercibida. Rubi llega con un estilo cuidado, trato cercano y esa sensación de perfil bien presentado que invita a escribir. Si valoras la naturalidad y la buena impresión desde el primer mensaje, aquí tienes una opción que encaja muy bien. Escríbeme y hablamos con calma 🙂\",\"body_suggestive\":\"Burriana tiene una NUEVA protagonista y se llama Rubi. Brasileña, cercana y con una forma de presentarse que engancha desde el primer vistazo. Si te gustan los perfiles que mezclan simpatía, presencia y un punto de interés, este nombre te va a sonar rápido. Dale al mensaje y descubre por qué llama tanto la atención ❤️\"},{\"slot\":\"slot2\",\"focus\":\"Elegancia reservada\",\"short_hook\":\"Hay perfiles que llaman la atención sin necesidad de decir demasiado, y Rubi es uno de ellos.\",\"title_neutral\":\"Rubi: discreción, encanto y buena energía\",\"title_suggestive\":\"Rubi, presencia elegante y trato cuidado\",\"body_neutral\":\"Hay formas de presentarse que transmiten confianza al instante, y Rubi juega justo en esa línea. Una propuesta discreta, elegante y con una energía agradable que facilita el primer contacto. Ideal para quien busca algo fino, sin ruido y con buena sensación desde el principio. Si te apetece conocerla, puedes escribirle cuando quieras ✨\",\"body_suggestive\":\"Rubi no necesita exceso para destacar. Tiene presencia, sabe cuidar los detalles y deja esa impresión de chica que invita a seguir descubriendo. Para quien valora lo reservado pero con chispa, este perfil encaja muy bien. Si te apetece una conversación con intención, escríbele y deja que te sorprenda ✨\"},{\"slot\":\"slot3\",\"focus\":\"Contacto fácil\",\"short_hook\":\"A veces lo que más funciona es lo sencillo: escribir, hablar y dejarse llevar por un buen trato.\",\"title_neutral\":\"Rubi: contacto fácil, trato agradable\",\"title_suggestive\":\"Rubi te escribe si buscas algo distinto\",\"body_neutral\":\"Lo simple a veces funciona mejor que cualquier complicación: un mensaje, una charla agradable y una atención cercana. Rubi transmite justo eso, facilidad para conectar y un trato que hace cómodo dar el primer paso. Si buscas un perfil accesible y con buena disposición, aquí lo tienes. Escríbele sin vueltas y empieza por una conversación tranquila 🙂\",\"body_suggestive\":\"Si te gusta que todo arranque fácil, Rubi encaja contigo. Responde con naturalidad, sabe crear buen ambiente y tiene ese punto que hace que el chat avance solo. Nada forzado, nada raro: solo una chica con la que apetece escribir. Mándale un mensaje y compruébalo por ti mismo 🙂\"},{\"slot\":\"slot4\",\"focus\":\"Exótica y natural\",\"short_hook\":\"La mezcla de dulzura, carácter y acento brasileño hace que Rubi no pase desapercibida.\",\"title_neutral\":\"Rubi, distinta desde el primer mensaje\",\"title_suggestive\":\"UNA CHICA BRASILEÑA QUE LLAMA LA ATENCIÓN\",\"body_neutral\":\"Rubi aporta ese toque diferente que se nota desde el primer contacto. Brasileña, natural y con una forma de comunicar que resulta muy agradable. Sin excesos ni artificios, pero con personalidad suficiente para destacar entre lo habitual. Si te atrae lo auténtico, este perfil merece un mensaje. Escríbele y conoce su estilo 🌷\",\"body_suggestive\":\"Brasileña, con carácter y una manera de conectar que no deja indiferente: así se presenta Rubi. Tiene ese encanto latino que entra fácil y un aire distinto que despierta curiosidad de inmediato. Si te gustan los perfiles con personalidad, aquí hay material para empezar bien la conversación. Dale al mensaje y mira hasta dónde llega la conexión 🌷\"},{\"slot\":\"slot5\",\"focus\":\"Curiosidad visual\",\"short_hook\":\"Hay miradas que no explican todo, pero sí dejan claro que merece la pena entrar a ver más.\",\"title_neutral\":\"Rubi, una opción que merece la pena conocer\",\"title_suggestive\":\"RUBI: UNA CHICA QUE ENGANCHA\",\"body_neutral\":\"A veces un perfil destaca sin necesidad de hacer demasiado ruido. Rubi transmite presencia, buen gusto y una imagen de confianza que invita a detenerse y escribir. Es de esas propuestas que ganan puntos cuanto más las miras. Si buscas algo que merezca la pena conocer, aquí lo tienes. Envíale un mensaje y saca tus propias conclusiones 🙂\",\"body_suggestive\":\"Hay perfiles que no se entienden del todo en una sola mirada, y por eso enganchan más. Rubi tiene esa mezcla de presencia, estilo y curiosidad que deja ganas de saber más. No necesita venderse de más para llamar la atención. Si te apetece descubrir un perfil con chispa, escríbele ya 🙂\"},{\"slot\":\"slot6\",\"focus\":\"Trato cercano\",\"short_hook\":\"Si te apetece una chica amable, cercana y con buena conversación, Rubi puede sorprenderte.\",\"title_neutral\":\"Rubi para quien valora el buen trato\",\"title_suggestive\":\"Rubi, recién llegada y con mucho por ofrecer\",\"body_neutral\":\"Cuando el trato importa, se nota enseguida. Rubi apuesta por una forma de presentarse amable, cercana y fácil de llevar, de esas que hacen que todo fluya mejor desde el principio. Si valoras la conversación, la educación y una atención cuidada, este perfil puede encajarte muy bien. Escríbele y descubre su forma de estar contigo ✨\",\"body_suggestive\":\"Rubi es de esas chicas que hacen que el trato se sienta fácil desde el minuto uno. Cercana, atenta y con una actitud que invita a seguir conversando. Si te atrae una presencia amable pero con fondo, aquí tienes una buena candidata. Escríbele y deja que la charla marque el ritmo ✨\"},{\"slot\":\"slot7\",\"focus\":\"Exclusividad suave\",\"short_hook\":\"No todo el mundo busca lo mismo, y precisamente por eso este perfil encaja tan bien.\",\"title_neutral\":\"Rubi, distinta desde el primer mensaje\",\"title_suggestive\":\"Rubi, para escribir sin pensarlo demasiado\",\"body_neutral\":\"No todos los perfiles transmiten la misma impresión, y Rubi tiene ese algo que la hace diferente. Una propuesta con estilo propio, trato agradable y una forma de conectar que no suena repetida. Si te apetece probar algo con personalidad, puede ser una elección muy acertada. Escríbele y comprueba por qué destaca 🖤\",\"body_suggestive\":\"Hay chicas que te hacen pensar ‘esta es distinta’ antes incluso de empezar a hablar, y Rubi entra justo en esa categoría. Tiene personalidad, buena presencia y una forma de presentarse que deja huella. Si buscas salir de lo de siempre, aquí tienes una opción que da ganas de escribir. Hazlo sin pensarlo demasiado 🖤\"},{\"slot\":\"slot8\",\"focus\":\"Directo con gancho\",\"short_hook\":\"La ficha es clara: Rubi está en Burriana y viene a llamar la atención.\",\"title_neutral\":\"Burriana estrena a RUBI\",\"title_suggestive\":\"RUBI BRASILERA EN BURIANA\",\"body_neutral\":\"Burriana incorpora a Rubi, una chica que combina presencia, simpatía y una presentación muy cuidada. Es un perfil pensado para quien quiere escribir a alguien que transmite buen gusto y cercanía desde el primer momento. Directa, clara y fácil de entender: así da mejor resultado. Si te interesa, escríbele y sal de dudas 🙂\",\"body_suggestive\":\"Burriana ya tiene a Rubi, y no tarda nada en llamar la atención. Brasileña, con encanto y con una forma de presentarse que funciona desde el primer vistazo. Si te gustan los perfiles directos y con presencia, aquí tienes una opción que entra sola. Escríbele y mira qué te responde 🙂\"},{\"slot\":\"slot9\",\"focus\":\"Sensual controlado\",\"short_hook\":\"Sin hacer ruido, Rubi consigue despertar interés con una energía muy especial.\",\"title_neutral\":\"Rubi, cerca de ti en Burriana\",\"title_suggestive\":\"Rubi, encanto latino con un punto muy sugerente\",\"body_neutral\":\"A veces lo que más funciona es una presencia que se siente cercana y, a la vez, distinta. Rubi reúne ese equilibrio entre naturalidad, elegancia y una energía que despierta interés sin necesidad de exagerar. Si te gustan los perfiles con tacto y buena impresión, este puede ser el tuyo. Escríbele y conoce su forma de estar ✨\",\"body_suggestive\":\"Rubi tiene ese punto de encanto latino que se nota desde el primer contacto. Sin pasarse, sin forzar, pero dejando claro que hay algo más detrás de su presentación. Ese equilibrio entre dulzura, seguridad y presencia es justo lo que engancha. Si quieres comprobarlo, escríbele ya ✨\"},{\"slot\":\"slot10\",\"focus\":\"Para quien busca algo distinto\",\"short_hook\":\"Si te cansan los perfiles idénticos, Rubi tiene justo ese punto distinto que se nota.\",\"title_neutral\":\"Rubi, para quien valora el buen trato\",\"title_suggestive\":\"Rubi, recién llegada y con mucho por ofrecer\",\"body_neutral\":\"Cuando todo empieza a parecer igual, un perfil distinto se agradece. Rubi llega con una forma de presentarse más personal, cercana y fácil de recordar. No busca hacer ruido: busca gustar por cómo transmite. Si te apetece salir de lo típico, aquí tienes una opción que merece atención. Escríbele y conoce su manera de conectar 🙂\",\"body_suggestive\":\"Si ya estás cansado de ver siempre la misma propuesta, Rubi te cambia un poco el ritmo. Tiene personalidad, cercanía y ese aire de chica que sabe llamar la atención sin exagerar. Un perfil que se queda en la cabeza y da ganas de escribir. Prueba a hablarle y verás por qué 🙂\"}]}"
+                    }
+                ],
+                "phase": "final_answer",
+                "role": "assistant"
+            }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": "publicista:copy_pack:gpt-5.4-mini",
+        "prompt_cache_retention": "24h",
+        "reasoning": {
+            "effort": "none",
+            "summary": null
+        },
+        "safety_identifier": null,
+        "service_tier": "flex",
+        "store": false,
+        "temperature": 1,
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "description": null,
+                "name": "publicista_copy_pack",
+                "schema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "tone_used",
+                        "pack_angle",
+                        "title_options",
+                        "ads",
+                        "publication_notes",
+                        "recommended_order"
+                    ],
+                    "properties": {
+                        "tone_used": {
+                            "type": "string"
+                        },
+                        "pack_angle": {
+                            "type": "string"
+                        },
+                        "title_options": {
+                            "type": "array",
+                            "minItems": 10,
+                            "maxItems": 10,
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "recommended_order": {
+                            "type": "array",
+                            "minItems": 10,
+                            "maxItems": 10,
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "publication_notes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "ads": {
+                            "type": "array",
+                            "minItems": 10,
+                            "maxItems": 10,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                    "slot",
+                                    "focus",
+                                    "short_hook",
+                                    "title_neutral",
+                                    "title_suggestive",
+                                    "body_neutral",
+                                    "body_suggestive"
+                                ],
+                                "properties": {
+                                    "slot": {
+                                        "type": "string"
+                                    },
+                                    "focus": {
+                                        "type": "string"
+                                    },
+                                    "short_hook": {
+                                        "type": "string"
+                                    },
+                                    "title_neutral": {
+                                        "type": "string"
+                                    },
+                                    "title_suggestive": {
+                                        "type": "string"
+                                    },
+                                    "body_neutral": {
+                                        "type": "string"
+                                    },
+                                    "body_suggestive": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "strict": true
+            },
+            "verbosity": "medium"
+        },
+        "tool_choice": "auto",
+        "tools": [],
+        "top_logprobs": 0,
+        "top_p": 0.98,
+        "truncation": "disabled",
+        "usage": {
+            "input_tokens": 4692,
+            "input_tokens_details": {
+                "cached_tokens": 0
+            },
+            "output_tokens": 2477,
+            "output_tokens_details": {
+                "reasoning_tokens": 0
+            },
+            "total_tokens": 7169
+        },
+        "user": null,
+        "metadata": []
+    },
+    "raw_body": "{\n  \"id\": \"resp_018f61ba30c890130169f3b5cfd110819e98cb03557504416e\",\n  \"object\": \"response\",\n  \"created_at\": 1777579471,\n  \"status\": \"completed\",\n  \"background\": false,\n  \"billing\": {\n    \"payer\": \"developer\"\n  },\n  \"completed_at\": 1777579523,\n  \"error\": null,\n  \"frequency_penalty\": 0.0,\n  \"incomplete_details\": null,\n  \"instructions\": null,\n  \"max_output_tokens\": null,\n  \"max_tool_calls\": null,\n  \"model\": \"gpt-5.4-mini-2026-03-17\",\n  \"moderation\": null,\n  \"output\": [\n    {\n      \"id\": \"msg_018f61ba30c890130169f3b5d4cdb8819eb3bb2f1fe80da677\",\n      \"type\": \"message\",\n      \"status\": \"completed\",\n      \"content\": [\n        {\n          \"type\": \"output_text\",\n          \"annotations\": [],\n          \"logprobs\": [],\n          \"text\": \"{\\\"tone_used\\\":\\\"equilibrado\\\",\\\"pack_angle\\\":\\\"Rubi se presenta en Burriana con un pack vers\\u00e1til que combina elegancia, cercan\\u00eda, novedad local y un punto sugerente controlado para maximizar clics y mensajes.\\\",\\\"title_options\\\":[\\\"RUBI, LA NOVEDAD DE BURIANA\\\",\\\"Rubi: discreci\\u00f3n, encanto y buena energ\\u00eda\\\",\\\"Rubi para quien valora el buen trato\\\",\\\"BURIANA TIENE NUEVA SONRISA\\\",\\\"Rubi, una opci\\u00f3n que merece la pena conocer\\\",\\\"Rubi: contacto f\\u00e1cil, trato agradable\\\",\\\"Rubi, distinta desde el primer mensaje\\\",\\\"NUEVA RUBI EN BURIANA \\u2764\\ufe0f\\\",\\\"RUBI BRASILERA EN BURIANA\\\",\\\"Rubi, reci\\u00e9n llegada y con mucho por ofrecer\\\"],\\\"recommended_order\\\":[\\\"slot1\\\",\\\"slot2\\\",\\\"slot3\\\",\\\"slot4\\\",\\\"slot5\\\",\\\"slot6\\\",\\\"slot7\\\",\\\"slot8\\\",\\\"slot9\\\",\\\"slot10\\\"],\\\"publication_notes\\\":[\\\"En destacamos.net prioriza las versiones neutras: elegantes, discretas y sin palabras de reclamo sexual.\\\",\\\"En loquosex.com funciona mejor alternar una neutra con una sugerente para evitar sensaci\\u00f3n de repetici\\u00f3n.\\\",\\\"Mueve los t\\u00edtulos entre MAY\\u00daSCULAS totales y formato frase para testear qu\\u00e9 estilo genera m\\u00e1s apertura.\\\",\\\"Mant\\u00e9n la nacionalidad brasile\\u00f1a como gancho secundario, no como \\u00fanico mensaje del anuncio.\\\",\\\"Evita sobrecargar con emojis: uno bien colocado suele rendir mejor que varios seguidos.\\\"],\\\"ads\\\":[{\\\"slot\\\":\\\"slot1\\\",\\\"focus\\\":\\\"Novedad local\\\",\\\"short_hook\\\":\\\"Si buscas algo nuevo en Burriana, aqu\\u00ed tienes una opci\\u00f3n que destaca desde el primer vistazo.\\\",\\\"title_neutral\\\":\\\"RUBI, LA NOVEDAD DE BURIANA\\\",\\\"title_suggestive\\\":\\\"NUEVA RUBI EN BURIANA \\u2764\\ufe0f\\\",\\\"body_neutral\\\":\\\"Burriana suma una cara nueva con una presencia que no pasa desapercibida. Rubi llega con un estilo cuidado, trato cercano y esa sensaci\\u00f3n de perfil bien presentado que invita a escribir. Si valoras la naturalidad y la buena impresi\\u00f3n desde el primer mensaje, aqu\\u00ed tienes una opci\\u00f3n que encaja muy bien. Escr\\u00edbeme y hablamos con calma \\ud83d\\ude42\\\",\\\"body_suggestive\\\":\\\"Burriana tiene una NUEVA protagonista y se llama Rubi. Brasile\\u00f1a, cercana y con una forma de presentarse que engancha desde el primer vistazo. Si te gustan los perfiles que mezclan simpat\\u00eda, presencia y un punto de inter\\u00e9s, este nombre te va a sonar r\\u00e1pido. Dale al mensaje y descubre por qu\\u00e9 llama tanto la atenci\\u00f3n \\u2764\\ufe0f\\\"},{\\\"slot\\\":\\\"slot2\\\",\\\"focus\\\":\\\"Elegancia reservada\\\",\\\"short_hook\\\":\\\"Hay perfiles que llaman la atenci\\u00f3n sin necesidad de decir demasiado, y Rubi es uno de ellos.\\\",\\\"title_neutral\\\":\\\"Rubi: discreci\\u00f3n, encanto y buena energ\\u00eda\\\",\\\"title_suggestive\\\":\\\"Rubi, presencia elegante y trato cuidado\\\",\\\"body_neutral\\\":\\\"Hay formas de presentarse que transmiten confianza al instante, y Rubi juega justo en esa l\\u00ednea. Una propuesta discreta, elegante y con una energ\\u00eda agradable que facilita el primer contacto. Ideal para quien busca algo fino, sin ruido y con buena sensaci\\u00f3n desde el principio. Si te apetece conocerla, puedes escribirle cuando quieras \\u2728\\\",\\\"body_suggestive\\\":\\\"Rubi no necesita exceso para destacar. Tiene presencia, sabe cuidar los detalles y deja esa impresi\\u00f3n de chica que invita a seguir descubriendo. Para quien valora lo reservado pero con chispa, este perfil encaja muy bien. Si te apetece una conversaci\\u00f3n con intenci\\u00f3n, escr\\u00edbele y deja que te sorprenda \\u2728\\\"},{\\\"slot\\\":\\\"slot3\\\",\\\"focus\\\":\\\"Contacto f\\u00e1cil\\\",\\\"short_hook\\\":\\\"A veces lo que m\\u00e1s funciona es lo sencillo: escribir, hablar y dejarse llevar por un buen trato.\\\",\\\"title_neutral\\\":\\\"Rubi: contacto f\\u00e1cil, trato agradable\\\",\\\"title_suggestive\\\":\\\"Rubi te escribe si buscas algo distinto\\\",\\\"body_neutral\\\":\\\"Lo simple a veces funciona mejor que cualquier complicaci\\u00f3n: un mensaje, una charla agradable y una atenci\\u00f3n cercana. Rubi transmite justo eso, facilidad para conectar y un trato que hace c\\u00f3modo dar el primer paso. Si buscas un perfil accesible y con buena disposici\\u00f3n, aqu\\u00ed lo tienes. Escr\\u00edbele sin vueltas y empieza por una conversaci\\u00f3n tranquila \\ud83d\\ude42\\\",\\\"body_suggestive\\\":\\\"Si te gusta que todo arranque f\\u00e1cil, Rubi encaja contigo. Responde con naturalidad, sabe crear buen ambiente y tiene ese punto que hace que el chat avance solo. Nada forzado, nada raro: solo una chica con la que apetece escribir. M\\u00e1ndale un mensaje y compru\\u00e9balo por ti mismo \\ud83d\\ude42\\\"},{\\\"slot\\\":\\\"slot4\\\",\\\"focus\\\":\\\"Ex\\u00f3tica y natural\\\",\\\"short_hook\\\":\\\"La mezcla de dulzura, car\\u00e1cter y acento brasile\\u00f1o hace que Rubi no pase desapercibida.\\\",\\\"title_neutral\\\":\\\"Rubi, distinta desde el primer mensaje\\\",\\\"title_suggestive\\\":\\\"UNA CHICA BRASILE\\u00d1A QUE LLAMA LA ATENCI\\u00d3N\\\",\\\"body_neutral\\\":\\\"Rubi aporta ese toque diferente que se nota desde el primer contacto. Brasile\\u00f1a, natural y con una forma de comunicar que resulta muy agradable. Sin excesos ni artificios, pero con personalidad suficiente para destacar entre lo habitual. Si te atrae lo aut\\u00e9ntico, este perfil merece un mensaje. Escr\\u00edbele y conoce su estilo \\ud83c\\udf37\\\",\\\"body_suggestive\\\":\\\"Brasile\\u00f1a, con car\\u00e1cter y una manera de conectar que no deja indiferente: as\\u00ed se presenta Rubi. Tiene ese encanto latino que entra f\\u00e1cil y un aire distinto que despierta curiosidad de inmediato. Si te gustan los perfiles con personalidad, aqu\\u00ed hay material para empezar bien la conversaci\\u00f3n. Dale al mensaje y mira hasta d\\u00f3nde llega la conexi\\u00f3n \\ud83c\\udf37\\\"},{\\\"slot\\\":\\\"slot5\\\",\\\"focus\\\":\\\"Curiosidad visual\\\",\\\"short_hook\\\":\\\"Hay miradas que no explican todo, pero s\\u00ed dejan claro que merece la pena entrar a ver m\\u00e1s.\\\",\\\"title_neutral\\\":\\\"Rubi, una opci\\u00f3n que merece la pena conocer\\\",\\\"title_suggestive\\\":\\\"RUBI: UNA CHICA QUE ENGANCHA\\\",\\\"body_neutral\\\":\\\"A veces un perfil destaca sin necesidad de hacer demasiado ruido. Rubi transmite presencia, buen gusto y una imagen de confianza que invita a detenerse y escribir. Es de esas propuestas que ganan puntos cuanto m\\u00e1s las miras. Si buscas algo que merezca la pena conocer, aqu\\u00ed lo tienes. Env\\u00edale un mensaje y saca tus propias conclusiones \\ud83d\\ude42\\\",\\\"body_suggestive\\\":\\\"Hay perfiles que no se entienden del todo en una sola mirada, y por eso enganchan m\\u00e1s. Rubi tiene esa mezcla de presencia, estilo y curiosidad que deja ganas de saber m\\u00e1s. No necesita venderse de m\\u00e1s para llamar la atenci\\u00f3n. Si te apetece descubrir un perfil con chispa, escr\\u00edbele ya \\ud83d\\ude42\\\"},{\\\"slot\\\":\\\"slot6\\\",\\\"focus\\\":\\\"Trato cercano\\\",\\\"short_hook\\\":\\\"Si te apetece una chica amable, cercana y con buena conversaci\\u00f3n, Rubi puede sorprenderte.\\\",\\\"title_neutral\\\":\\\"Rubi para quien valora el buen trato\\\",\\\"title_suggestive\\\":\\\"Rubi, reci\\u00e9n llegada y con mucho por ofrecer\\\",\\\"body_neutral\\\":\\\"Cuando el trato importa, se nota enseguida. Rubi apuesta por una forma de presentarse amable, cercana y f\\u00e1cil de llevar, de esas que hacen que todo fluya mejor desde el principio. Si valoras la conversaci\\u00f3n, la educaci\\u00f3n y una atenci\\u00f3n cuidada, este perfil puede encajarte muy bien. Escr\\u00edbele y descubre su forma de estar contigo \\u2728\\\",\\\"body_suggestive\\\":\\\"Rubi es de esas chicas que hacen que el trato se sienta f\\u00e1cil desde el minuto uno. Cercana, atenta y con una actitud que invita a seguir conversando. Si te atrae una presencia amable pero con fondo, aqu\\u00ed tienes una buena candidata. Escr\\u00edbele y deja que la charla marque el ritmo \\u2728\\\"},{\\\"slot\\\":\\\"slot7\\\",\\\"focus\\\":\\\"Exclusividad suave\\\",\\\"short_hook\\\":\\\"No todo el mundo busca lo mismo, y precisamente por eso este perfil encaja tan bien.\\\",\\\"title_neutral\\\":\\\"Rubi, distinta desde el primer mensaje\\\",\\\"title_suggestive\\\":\\\"Rubi, para escribir sin pensarlo demasiado\\\",\\\"body_neutral\\\":\\\"No todos los perfiles transmiten la misma impresi\\u00f3n, y Rubi tiene ese algo que la hace diferente. Una propuesta con estilo propio, trato agradable y una forma de conectar que no suena repetida. Si te apetece probar algo con personalidad, puede ser una elecci\\u00f3n muy acertada. Escr\\u00edbele y comprueba por qu\\u00e9 destaca \\ud83d\\udda4\\\",\\\"body_suggestive\\\":\\\"Hay chicas que te hacen pensar \\u2018esta es distinta\\u2019 antes incluso de empezar a hablar, y Rubi entra justo en esa categor\\u00eda. Tiene personalidad, buena presencia y una forma de presentarse que deja huella. Si buscas salir de lo de siempre, aqu\\u00ed tienes una opci\\u00f3n que da ganas de escribir. Hazlo sin pensarlo demasiado \\ud83d\\udda4\\\"},{\\\"slot\\\":\\\"slot8\\\",\\\"focus\\\":\\\"Directo con gancho\\\",\\\"short_hook\\\":\\\"La ficha es clara: Rubi est\\u00e1 en Burriana y viene a llamar la atenci\\u00f3n.\\\",\\\"title_neutral\\\":\\\"Burriana estrena a RUBI\\\",\\\"title_suggestive\\\":\\\"RUBI BRASILERA EN BURIANA\\\",\\\"body_neutral\\\":\\\"Burriana incorpora a Rubi, una chica que combina presencia, simpat\\u00eda y una presentaci\\u00f3n muy cuidada. Es un perfil pensado para quien quiere escribir a alguien que transmite buen gusto y cercan\\u00eda desde el primer momento. Directa, clara y f\\u00e1cil de entender: as\\u00ed da mejor resultado. Si te interesa, escr\\u00edbele y sal de dudas \\ud83d\\ude42\\\",\\\"body_suggestive\\\":\\\"Burriana ya tiene a Rubi, y no tarda nada en llamar la atenci\\u00f3n. Brasile\\u00f1a, con encanto y con una forma de presentarse que funciona desde el primer vistazo. Si te gustan los perfiles directos y con presencia, aqu\\u00ed tienes una opci\\u00f3n que entra sola. Escr\\u00edbele y mira qu\\u00e9 te responde \\ud83d\\ude42\\\"},{\\\"slot\\\":\\\"slot9\\\",\\\"focus\\\":\\\"Sensual controlado\\\",\\\"short_hook\\\":\\\"Sin hacer ruido, Rubi consigue despertar inter\\u00e9s con una energ\\u00eda muy especial.\\\",\\\"title_neutral\\\":\\\"Rubi, cerca de ti en Burriana\\\",\\\"title_suggestive\\\":\\\"Rubi, encanto latino con un punto muy sugerente\\\",\\\"body_neutral\\\":\\\"A veces lo que m\\u00e1s funciona es una presencia que se siente cercana y, a la vez, distinta. Rubi re\\u00fane ese equilibrio entre naturalidad, elegancia y una energ\\u00eda que despierta inter\\u00e9s sin necesidad de exagerar. Si te gustan los perfiles con tacto y buena impresi\\u00f3n, este puede ser el tuyo. Escr\\u00edbele y conoce su forma de estar \\u2728\\\",\\\"body_suggestive\\\":\\\"Rubi tiene ese punto de encanto latino que se nota desde el primer contacto. Sin pasarse, sin forzar, pero dejando claro que hay algo m\\u00e1s detr\\u00e1s de su presentaci\\u00f3n. Ese equilibrio entre dulzura, seguridad y presencia es justo lo que engancha. Si quieres comprobarlo, escr\\u00edbele ya \\u2728\\\"},{\\\"slot\\\":\\\"slot10\\\",\\\"focus\\\":\\\"Para quien busca algo distinto\\\",\\\"short_hook\\\":\\\"Si te cansan los perfiles id\\u00e9nticos, Rubi tiene justo ese punto distinto que se nota.\\\",\\\"title_neutral\\\":\\\"Rubi, para quien valora el buen trato\\\",\\\"title_suggestive\\\":\\\"Rubi, reci\\u00e9n llegada y con mucho por ofrecer\\\",\\\"body_neutral\\\":\\\"Cuando todo empieza a parecer igual, un perfil distinto se agradece. Rubi llega con una forma de presentarse m\\u00e1s personal, cercana y f\\u00e1cil de recordar. No busca hacer ruido: busca gustar por c\\u00f3mo transmite. Si te apetece salir de lo t\\u00edpico, aqu\\u00ed tienes una opci\\u00f3n que merece atenci\\u00f3n. Escr\\u00edbele y conoce su manera de conectar \\ud83d\\ude42\\\",\\\"body_suggestive\\\":\\\"Si ya est\\u00e1s cansado de ver siempre la misma propuesta, Rubi te cambia un poco el ritmo. Tiene personalidad, cercan\\u00eda y ese aire de chica que sabe llamar la atenci\\u00f3n sin exagerar. Un perfil que se queda en la cabeza y da ganas de escribir. Prueba a hablarle y ver\\u00e1s por qu\\u00e9 \\ud83d\\ude42\\\"}]}\"\n        }\n      ],\n      \"phase\": \"final_answer\",\n      \"role\": \"assistant\"\n    }\n  ],\n  \"parallel_tool_calls\": true,\n  \"presence_penalty\": 0.0,\n  \"previous_response_id\": null,\n  \"prompt_cache_key\": \"publicista:copy_pack:gpt-5.4-mini\",\n  \"prompt_cache_retention\": \"24h\",\n  \"reasoning\": {\n    \"effort\": \"none\",\n    \"summary\": null\n  },\n  \"safety_identifier\": null,\n  \"service_tier\": \"flex\",\n  \"store\": false,\n  \"temperature\": 1.0,\n  \"text\": {\n    \"format\": {\n      \"type\": \"json_schema\",\n      \"description\": null,\n      \"name\": \"publicista_copy_pack\",\n      \"schema\": {\n        \"type\": \"object\",\n        \"additionalProperties\": false,\n        \"required\": [\n          \"tone_used\",\n          \"pack_angle\",\n          \"title_options\",\n          \"ads\",\n          \"publication_notes\",\n          \"recommended_order\"\n        ],\n        \"properties\": {\n          \"tone_used\": {\n            \"type\": \"string\"\n          },\n          \"pack_angle\": {\n            \"type\": \"string\"\n          },\n          \"title_options\": {\n            \"type\": \"array\",\n            \"minItems\": 10,\n            \"maxItems\": 10,\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          \"recommended_order\": {\n            \"type\": \"array\",\n            \"minItems\": 10,\n            \"maxItems\": 10,\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          \"publication_notes\": {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          \"ads\": {\n            \"type\": \"array\",\n            \"minItems\": 10,\n            \"maxItems\": 10,\n            \"items\": {\n              \"type\": \"object\",\n              \"additionalProperties\": false,\n              \"required\": [\n                \"slot\",\n                \"focus\",\n                \"short_hook\",\n                \"title_neutral\",\n                \"title_suggestive\",\n                \"body_neutral\",\n                \"body_suggestive\"\n              ],\n              \"properties\": {\n                \"slot\": {\n                  \"type\": \"string\"\n                },\n                \"focus\": {\n                  \"type\": \"string\"\n                },\n                \"short_hook\": {\n                  \"type\": \"string\"\n                },\n                \"title_neutral\": {\n                  \"type\": \"string\"\n                },\n                \"title_suggestive\": {\n                  \"type\": \"string\"\n                },\n                \"body_neutral\": {\n                  \"type\": \"string\"\n                },\n                \"body_suggestive\": {\n                  \"type\": \"string\"\n                }\n              }\n            }\n          }\n        }\n      },\n      \"strict\": true\n    },\n    \"verbosity\": \"medium\"\n  },\n  \"tool_choice\": \"auto\",\n  \"tools\": [],\n  \"top_logprobs\": 0,\n  \"top_p\": 0.98,\n  \"truncation\": \"disabled\",\n  \"usage\": {\n    \"input_tokens\": 4692,\n    \"input_tokens_details\": {\n      \"cached_tokens\": 0\n    },\n    \"output_tokens\": 2477,\n    \"output_tokens_details\": {\n      \"reasoning_tokens\": 0\n    },\n    \"total_tokens\": 7169\n  },\n  \"user\": null,\n  \"metadata\": {}\n}",
+    "error": "",
+    "used_model": "gpt-5.4-mini",
+    "service_tier": "flex",
+    "attempts": 2,
+    "retry_history": [
+        {
+            "attempt": 1,
+            "max_attempts": 5,
+            "http_code": 429,
+            "request_id": "req_6a6bffde667a45f699eea20d82bf45fd",
+            "curl_error": "",
+            "error": "We're currently processing too many requests — please try again later.",
+            "retry_after_raw": "",
+            "retry_after_sec": 0,
+            "backoff_sec": 0.724,
+            "wait_sec": 0.724
+        }
+    ]
+}

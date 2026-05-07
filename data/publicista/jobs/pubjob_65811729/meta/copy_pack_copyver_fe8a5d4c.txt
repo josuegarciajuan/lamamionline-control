@@ -1,0 +1,112 @@
+PACK PUBLICISTA
+Trabajo: elsa1
+Clienta: Negra-ELSA
+Fecha: 2026-04-17 00:58:28
+Tono: Equilibrado
+Enfoque: Pack centrado en novedad local, trato cercano y presencia elegante, con dos niveles de intensidad: versión neutra para portales discretos y versión sugerente para captar más clic y respuesta.
+
+IMÁGENES FINALES
+- final_01: data/publicista/jobs/pubjob_65811729/finals/final_01_square.jpg
+- final_02: data/publicista/jobs/pubjob_65811729/finals/final_02_square.jpg
+- final_03: data/publicista/jobs/pubjob_65811729/finals/final_03_square.jpg
+- final_04: data/publicista/jobs/pubjob_65811729/finals/final_04_square.jpg
+
+TÍTULOS
+- yara en buriana: presencia que no pasa desapercibida
+- Yara, DISPONIBLE en burriana para quien sabe elegir
+- Burriana tiene NOVEDAD y se llama yara ✨
+- UNA SONRISA QUE INVITA A ESCRIBIR 💬
+- YARA: ELEGANTE, CERCA Y CON MUY BUENA ENERGÍA
+- si buscas algo diferente, aquí está yara
+- YARA EN BURRIANA | TRATO CERCANO Y ESTILO
+- YARA NO ES UNA MÁS: DESCÚBRELO
+- UNA CHICA CON CLASE Y MUCHO ENCANTO
+- si te gusta el buen trato, ya la has encontrado
+
+ANUNCIOS
+--- SLOT_1 ---
+FOCUS: Novedad local
+HOOK: SI ESTÁS POR BURRIANA, YARA ES DE ESAS NOVEDADES QUE LLAMAN LA ATENCIÓN DESDE EL PRIMER VISTAZO. ✨
+TÍTULO NEUTRO: Burriana tiene NOVEDAD y se llama yara ✨
+TÍTULO SUGERENTE: Yara en burriana: presencia que no pasa desapercibida
+TEXTO NEUTRO: SI ESTÁS POR BURRIANA Y TE APETECE ALGO DISTINTO, AQUÍ TIENES UNA PROPUESTA QUE DESTACA SIN HACER RUIDO. Yara transmite PRESENCIA, cercanía y ese estilo que hace fácil empezar conversación. 💬 Una opción nueva en la zona, con buen trato y ganas de caer bien desde el primer mensaje.
+TEXTO SUGERENTE: SI ESTÁS POR BURRIANA, YARA ES DE ESAS NOVEDADES QUE LLAMAN LA ATENCIÓN DESDE EL PRIMER VISTAZO. Tiene presencia, estilo y un punto de misterio que invita a escribir. 😉 Disponible en la zona, con trato cercano y esa chispa que hace que el primer mensaje ya merezca la pena.
+
+--- SLOT_2 ---
+FOCUS: Elegancia discreta
+HOOK: NO HACE FALTA HACER RUIDO PARA DESTACAR: YARA TRANSMITE PRESENCIA, CLASE Y UNA ENERGÍA MUY AGRADABLE. 📍
+TÍTULO NEUTRO: UNA CHICA CON CLASE Y MUCHO ENCANTO
+TÍTULO SUGERENTE: Yara, DISPONIBLE en burriana para quien sabe elegir
+TEXTO NEUTRO: NO HACE FALTA HACER RUIDO PARA DESTACAR: YARA TRANSMITE PRESENCIA, EDUCACIÓN Y UNA ENERGÍA MUY AGRADABLE. Es de esas chicas que dan buena impresión desde el principio y dejan ganas de seguir hablando. ✨ Una opción elegante, cercana y con buen gusto.
+TEXTO SUGERENTE: NO TODO EL MUNDO LLAMA LA ATENCIÓN IGUAL. Yara transmite CLASE, presencia y una energía que encaja con quien busca algo con más estilo. 💫 Disponible en Burriana para quien sabe elegir y valora un trato cuidado, con ese punto de magnetismo que se nota al instante.
+
+--- SLOT_3 ---
+FOCUS: Curiosidad por personalidad
+HOOK: HAY PERFILES QUE SE VEN Y OTROS QUE TE HACEN QUERER ESCRIBIR. Yara juega en esa segunda liga. 💫
+TÍTULO NEUTRO: UNA SONRISA QUE INVITA A ESCRIBIR 💬
+TÍTULO SUGERENTE: YARA NO ES UNA MÁS: DESCÚBRELO
+TEXTO NEUTRO: HAY PERFILES QUE SIMPLEMENTE SE VEN Y OTROS QUE TE DEJAN CON GANAS DE SABER MÁS. Yara entra en ese segundo grupo: natural, cercana y con una forma de conectar que hace muy fácil iniciar conversación. 💬 Si te gusta la chispa auténtica, aquí tienes una buena razón para escribir.
+TEXTO SUGERENTE: HAY PERFILES QUE PASAN Y OTROS QUE SE QUEDAN EN LA MENTE. Yara juega en esa segunda liga: una sonrisa que invita a acercarte y una presencia que despierta curiosidad desde el primer momento. 😘 No es una más, y eso se nota en cuanto la descubres.
+
+--- SLOT_4 ---
+FOCUS: Trato cercano
+HOOK: SI VALORAS EL BUEN TRATO, AQUÍ TIENES UNA OPCIÓN QUE ENCAJA MUY BIEN. 🤍
+TÍTULO NEUTRO: YARA: ELEGANTE, CERCA Y CON MUY BUENA ENERGÍA
+TÍTULO SUGERENTE: si te gusta el buen trato, ya la has encontrado
+TEXTO NEUTRO: SI VALORAS EL BUEN TRATO, AQUÍ TIENES UNA OPCIÓN QUE ENCAJA MUY BIEN. Yara destaca por su forma de hablar, por su cercanía y por esa calidez que hace que todo resulte cómodo desde el primer mensaje. 🤍 Una presencia agradable, educada y fácil de encajar.
+TEXTO SUGERENTE: SI TE GUSTA EL BUEN TRATO, YA TIENES MUCHO ADELANTADO. Yara conecta por su cercanía, por su naturalidad y por esa energía que hace que escribirle sea fácil y apetecible. 💬 Una chica con buen fondo, encanto y una forma de atender que suma desde el minuto uno.
+
+--- SLOT_5 ---
+FOCUS: Sugerente controlado
+HOOK: HAY MIRADAS QUE INVITAN A QUEDARSE UN POCO MÁS. Yara tiene justo ese efecto. ✨
+TÍTULO NEUTRO: YARA EN BURRIANA | TRATO CERCANO Y ESTILO
+TÍTULO SUGERENTE: HOY APETECE CONOCER A YARA 😘
+TEXTO NEUTRO: HAY PERSONAS QUE ENTRAN POR LA MIRADA Y OTRAS POR LA FORMA DE MOVERSE; YARA REÚNE AMBAS COSAS CON NATURALIDAD. Sin exagerar, transmite una presencia muy atractiva y un estilo cuidado que invita a escribir. ✨ Si te apetece algo con clase y un punto de magnetismo, puede ser el momento.
+TEXTO SUGERENTE: HAY MIRADAS QUE INVITAN A QUEDARSE UN POCO MÁS, Y YARA TIENE JUSTO ESE EFECTO. 😘 En Burriana deja una impresión clara: presencia, estilo y un punto sugerente que despierta curiosidad al momento. Si te apetece conocer a alguien que engancha sin esfuerzo, aquí la tienes.
+
+--- SLOT_6 ---
+FOCUS: Exclusividad cercana
+HOOK: NO SIEMPRE APARECE ALGUIEN QUE COMBINE CERCANÍA, ESTILO Y UNA IMAGEN TAN CUIDADA. 📍
+TÍTULO NEUTRO: si buscas algo diferente, aquí está yara
+TÍTULO SUGERENTE: Lo que te puede ofrecer yara te va a sorprender
+TEXTO NEUTRO: NO SIEMPRE APARECE ALGUIEN QUE COMBINE CERCANÍA, ESTILO Y UNA IMAGEN TAN CUIDADA. Yara tiene ese punto diferente que se agradece: buena presencia, trato agradable y una forma de estar que hace que quieras repetir mensaje. ✨
+TEXTO SUGERENTE: SI BUSCAS ALGO DIFERENTE, AQUÍ ESTÁ YARA. Tiene presencia, personalidad y un estilo que sorprende más cuanto más la miras. 😉 No es una propuesta cualquiera: destaca por cómo se presenta y por la sensación de que escribirle puede ser un acierto.
+
+--- SLOT_7 ---
+FOCUS: Contacto fácil
+HOOK: A VECES LO MEJOR ES SIMPLEMENTE DAR EL PASO Y ESCRIBIR. Con Yara, el primer mensaje ya suma. 💫
+TÍTULO NEUTRO: YARA EN BURRIANA | TRATO CERCANO Y ESTILO
+TÍTULO SUGERENTE: YARA, EL TIPO DE CHICA QUE DA GANAS DE ESCRIBIR
+TEXTO NEUTRO: A VECES LO MEJOR ES SIMPLEMENTE DAR EL PASO Y ESCRIBIR. Con Yara, el primer mensaje ya suma porque responde a esa idea de trato fácil, conversación fluida y atención agradable. 💬 Si te gusta que todo resulte natural desde el principio, esta es una buena opción.
+TEXTO SUGERENTE: HAY CHICAS QUE TE HACEN PENSAR EN ESCRIBIR ANTES INCLUSO DE TERMINAR DE VERLAS. Yara tiene ese efecto: cercanía, estilo y una presencia que invita a romper el hielo. 💬 Con ella, el primer mensaje no cuesta y la conversación promete desde el inicio.
+
+--- SLOT_8 ---
+FOCUS: Encanto femenino
+HOOK: TIENE ESE ENCANTO QUE NO NECESITA PRESENTACIÓN LARGA: SE NOTA, SE SIENTE Y LLAMA LA ATENCIÓN. 🤍
+TÍTULO NEUTRO: CERCANA, ALEGRE Y CON MUCHO ARTE: YARA
+TÍTULO SUGERENTE: UNA CHICA CON CLASE Y MUCHO ENCANTO
+TEXTO NEUTRO: YARA TIENE ESE ENCANTO QUE NO NECESITA PRESENTACIÓN LARGA: SE NOTA, SE SIENTE Y LLAMA LA ATENCIÓN. Su forma de estar transmite seguridad, simpatía y una energía muy agradable. ✨ Una presencia femenina que entra fácil y deja buena impresión.
+TEXTO SUGERENTE: TIENE ESE ENCANTO QUE NO NECESITA PRESENTACIÓN LARGA: SE NOTA, SE SIENTE Y LLAMA LA ATENCIÓN. Yara mezcla seguridad, simpatía y una forma de estar que resulta muy atractiva. 😘 Si te gustan las chicas con arte, presencia y un punto de magnetismo, aquí la tienes.
+
+--- SLOT_9 ---
+FOCUS: Versión premium humana
+HOOK: SI QUIERES ALGUIEN QUE NO PAREZCA UNA COPIA MÁS, YARA SE NOTA DIFERENTE DESDE EL PRINCIPIO. ✨
+TÍTULO NEUTRO: yara entra por la mirada y convence al hablar
+TÍTULO SUGERENTE: Burriana tiene a yara, y eso se nota
+TEXTO NEUTRO: SI QUIERES ALGUIEN QUE NO PAREZCA UNA COPIA MÁS, YARA SE NOTA DIFERENTE DESDE EL PRINCIPIO. Tiene personalidad, buena energía y un trato de verdad, de esos que hacen que la experiencia de escribir resulte fácil y agradable. 💬 Una propuesta con presencia y autenticidad.
+TEXTO SUGERENTE: BURRIANA TIENE A YARA, Y ESO SE NOTA. Entra por la mirada, engancha por la presencia y convence cuando empieza a hablar. 😉 Si te apetece algo con personalidad, buena energía y una forma de conectar que no se olvida, merece la pena escribirle.
+
+--- SLOT_10 ---
+FOCUS: Gancho por cercanía emocional
+HOOK: NO TODO VA DE APARIENCIA: TAMBIÉN IMPORTA CÓMO TE HACEN SENTIR AL ESCRIBIRLES. 📍
+TÍTULO NEUTRO: si te gusta el buen trato, ya la has encontrado
+TÍTULO SUGERENTE: Un plan diferente HOY en burriana
+TEXTO NEUTRO: NO TODO VA DE APARIENCIA: TAMBIÉN IMPORTA CÓMO TE HACEN SENTIR AL ESCRIBIR. Yara destaca por su forma de tratar, por su naturalidad y por lo fácil que resulta conectar con ella. 🤍 Si buscas una conversación cómoda y un ambiente agradable, aquí encaja muy bien.
+TEXTO SUGERENTE: No todo va de apariencia: también importa la sensación que deja alguien al escribirle. Yara tiene esa mezcla de cercanía, atractivo y naturalidad que convierte un mensaje cualquiera en un plan diferente. ✨ Si HOY te apetece salir de lo típico en Burriana, ya sabes por dónde empezar.
+
+NOTAS DE PUBLICACIÓN
+- Usa las variantes neutras en destacamos.net: mejor los títulos elegantes, sin palabras de reclamo explícitas y con enfoque en presencia, trato y discreción.
+- Reserva las variantes sugerentes para loquosex.com, donde funcionan mejor los ganchos de curiosidad, el punto de morbo suave y los cierres más directos.
+- Alterna títulos en MAYÚSCULAS con otros más limpios o mixtos para que no parezcan clonados y mejorar el CTR en varias publicaciones simultáneas.
+- Mantén siempre el foco en Burriana y en el nombre Yara para reforzar recordación local; evita añadir datos no confirmados.
+- No repitas demasiado las mismas fórmulas de apertura: combina novedad, cercanía, exclusividad y llamado a escribir para que cada anuncio parezca independiente.

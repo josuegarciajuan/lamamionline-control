@@ -1,0 +1,280 @@
+[
+    {
+        "id": "int_3ddd2a20",
+        "telefono": "622185691",
+        "observaciones": "Interesada en la mami, no tiene cuenta bancaria, explicarle lo de moneygram. \r\nTambien le interesa plaza.\r\nMe acaba de escribir otra vez (13:54 12-3-26), esta muy intersada quiere la llamada ya\r\n\r\nqe al final quiere plaza, vendra de plaza este sabado",
+        "movil_origen": "dulce",
+        "estado": "descartada",
+        "cliente_id": "",
+        "updated_at": "2026-03-12 17:54:55",
+        "created_at": "2026-03-12 09:48:55"
+    },
+    {
+        "id": "int_9618c448",
+        "telefono": "613180076",
+        "observaciones": "Son las 2 Brasileñas amigas de Bilbao. el telefono de la otra es:\r\n613931032",
+        "movil_origen": "Dulce",
+        "estado": "convertida",
+        "cliente_id": "cli_75d6ca96",
+        "updated_at": "2026-03-12 13:35:15",
+        "created_at": "2026-03-12 13:34:12",
+        "convertida_at": "2026-03-12 13:35:15"
+    },
+    {
+        "id": "int_43bcc4d7",
+        "telefono": "641815506",
+        "observaciones": "Acaba de pagar publicidad por una semana,hemos quedado en hablar el lunes ,\r\n\r\n16\/3 le he mandado mas info a ver si cnt",
+        "movil_origen": "",
+        "estado": "atendida",
+        "cliente_id": "",
+        "updated_at": "2026-03-16 22:57:38",
+        "created_at": "2026-03-12 13:41:52"
+    },
+    {
+        "id": "int_5f883774",
+        "telefono": "610356414",
+        "observaciones": "Mulatita 22 años hace todos los servicios menos griego.24 horas disponible.",
+        "movil_origen": "617128183",
+        "estado": "convertida",
+        "cliente_id": "cli_6e3d17e7",
+        "updated_at": "2026-03-12 17:59:25",
+        "created_at": "2026-03-12 16:35:52",
+        "convertida_at": "2026-03-12 17:59:25"
+    },
+    {
+        "id": "int_1e838f99",
+        "telefono": "624791950",
+        "observaciones": "interesada. Es la que te he mandado un audio y le he explicado por uq eno le pongo en loquosex, ella no paga por publi paga por el servicio\r\nhemos quedao en hablar mañana dia 12\/3",
+        "movil_origen": "dulce",
+        "estado": "descartada",
+        "cliente_id": "",
+        "updated_at": "2026-03-16 22:51:04",
+        "created_at": "2026-03-12 17:44:30"
+    },
+    {
+        "id": "int_674b309f",
+        "telefono": "622699262",
+        "observaciones": "ha enviado dede el formulario de contacto de la web, es de reus, ha dicho que en un rato manda el comprobante de bixum\r\n\r\n16\/3 le he mandado mas info a ver si cnt",
+        "movil_origen": "",
+        "estado": "descartada",
+        "cliente_id": "",
+        "updated_at": "2026-03-19 12:43:48",
+        "created_at": "2026-03-13 12:24:05"
+    },
+    {
+        "id": "int_d407aa63",
+        "telefono": "684747839",
+        "observaciones": "dede el form de contaco de la web, le he mendado info a mano en vez de llamada pero de momento no conbtesta, tambien le e pasado el bizum a ver si cuela\r\n\r\n16\/3 le he mandado mas info a ver si cnt",
+        "movil_origen": "",
+        "estado": "descartada",
+        "cliente_id": "",
+        "updated_at": "2026-03-19 12:44:12",
+        "created_at": "2026-03-13 12:24:54"
+    },
+    {
+        "id": "int_c0740e4f",
+        "telefono": "617128183",
+        "observaciones": "ESla negra de barna,",
+        "movil_origen": "",
+        "estado": "descartada",
+        "cliente_id": "",
+        "updated_at": "2026-03-16 22:53:12",
+        "created_at": "2026-03-13 14:23:04"
+    },
+    {
+        "id": "int_15d792ec",
+        "telefono": "624791950",
+        "observaciones": "Ya la informe! A la espera de que pase info .y haga bizzum\r\n\r\n16\/3 le he mandado mas info a ver si cnt",
+        "movil_origen": "",
+        "estado": "descartada",
+        "cliente_id": "",
+        "updated_at": "2026-03-19 12:44:37",
+        "created_at": "2026-03-13 17:41:36"
+    },
+    {
+        "id": "int_50c500b4",
+        "telefono": "643610738",
+        "observaciones": "Me ha pasado toda su información,tapar bien todos los tatuajes, mañana quiere empezar.primero tiene que hacer bizzum",
+        "movil_origen": "",
+        "estado": "convertida",
+        "cliente_id": "cli_81c3bd5c",
+        "updated_at": "2026-03-16 15:22:53",
+        "created_at": "2026-03-15 21:07:20",
+        "convertida_at": "2026-03-16 15:22:53"
+    },
+    {
+        "id": "int_ecd7e653",
+        "telefono": "603983567",
+        "observaciones": "interesda, me da otro telefono para contactarnos. Ya me ha pasado todos los datos, voy a crear los anuncios. 604394162\r\nLorena\r\n\r\nYa le he pasado los anuncios creados, falta queme pase el bizum",
+        "movil_origen": "josue",
+        "estado": "convertida",
+        "cliente_id": "cli_3ac01af5",
+        "updated_at": "2026-03-17 18:29:46",
+        "created_at": "2026-03-17 12:34:53",
+        "convertida_at": "2026-03-17 18:29:46"
+    },
+    {
+        "id": "int_1682a670",
+        "telefono": "632424703",
+        "observaciones": "esta intersda, se lo esta pensado",
+        "movil_origen": "josue",
+        "estado": "descartada",
+        "cliente_id": "",
+        "updated_at": "2026-03-19 12:45:37",
+        "created_at": "2026-03-17 18:13:54"
+    },
+    {
+        "id": "int_7fbb57d6",
+        "telefono": "654464023",
+        "observaciones": "Soy yo para hacer pruebas",
+        "movil_origen": "josue",
+        "estado": "convertida",
+        "cliente_id": "cli_992f03ec",
+        "updated_at": "2026-03-17 23:21:27",
+        "created_at": "2026-03-17 23:20:32",
+        "convertida_at": "2026-03-17 23:21:27"
+    },
+    {
+        "id": "int_8f0bcba2",
+        "telefono": "637931656",
+        "observaciones": "nicole de palma de mallorca",
+        "movil_origen": "nuria",
+        "estado": "atendida",
+        "cliente_id": "",
+        "updated_at": "2026-03-18 15:02:53",
+        "created_at": "2026-03-18 14:53:30"
+    },
+    {
+        "id": "int_08aea404",
+        "telefono": "661629375",
+        "observaciones": "intersada, he quedado que me pase la info le monto anuncios gratis y luego bizum. No ha psado nada.\r\nHoy 23\/3 13:14 Me vuelve a hablar que quiere enviar los datos",
+        "movil_origen": "josue",
+        "estado": "atendida",
+        "cliente_id": "",
+        "updated_at": "2026-03-23 13:14:57",
+        "created_at": "2026-03-18 21:09:58"
+    },
+    {
+        "id": "int_7a76e012",
+        "telefono": "623567367",
+        "observaciones": "ES a negra que ya habia, Ana",
+        "movil_origen": "nuria",
+        "estado": "descartada",
+        "cliente_id": "",
+        "updated_at": "2026-03-21 23:47:44",
+        "created_at": "2026-03-20 21:58:43"
+    },
+    {
+        "id": "int_3e9abe05",
+        "telefono": "631032939",
+        "observaciones": "ya me ha dicnho que lo quiere a la espera de sus datos",
+        "movil_origen": "josue",
+        "estado": "descartada",
+        "cliente_id": "",
+        "updated_at": "2026-03-24 00:00:30",
+        "created_at": "2026-03-20 23:40:51"
+    },
+    {
+        "id": "int_bf1e242b",
+        "telefono": "655409279",
+        "observaciones": "interesda de ibiza tiene 2 direcciones, parece bastante interesada, a ver que tal",
+        "movil_origen": "josue",
+        "estado": "atendida",
+        "cliente_id": "",
+        "updated_at": "2026-03-24 00:03:41",
+        "created_at": "2026-03-23 13:24:45"
+    },
+    {
+        "id": "int_d313d0d8",
+        "telefono": "642108692",
+        "observaciones": "quiere la mami, va a buscar el banco para hacer ingreso",
+        "movil_origen": "josue",
+        "estado": "atendida",
+        "cliente_id": "",
+        "updated_at": "2026-03-24 00:05:26",
+        "created_at": "2026-03-23 18:32:30"
+    },
+    {
+        "id": "int_a8bcea8c",
+        "telefono": "613296788",
+        "observaciones": "interesada pero no tiene dinero para el alta",
+        "movil_origen": "josue",
+        "estado": "atendida",
+        "cliente_id": "",
+        "updated_at": "2026-03-24 00:07:20",
+        "created_at": "2026-03-23 20:04:17"
+    },
+    {
+        "id": "int_d43db35e",
+        "telefono": "663555497",
+        "observaciones": "dijo que lo queria, le he pedido los datos para montar los anuncios y no ha contestado",
+        "movil_origen": "josue",
+        "estado": "atendida",
+        "cliente_id": "",
+        "updated_at": "2026-03-24 00:08:49",
+        "created_at": "2026-03-23 22:05:32"
+    },
+    {
+        "id": "int_eca6126c",
+        "telefono": "627923438",
+        "observaciones": "interesada",
+        "movil_origen": "josue",
+        "estado": "nueva",
+        "cliente_id": "",
+        "updated_at": "2026-03-26 13:04:40",
+        "created_at": "2026-03-26 13:04:40"
+    },
+    {
+        "id": "int_44bae54d",
+        "telefono": "+34 627 92 34 38",
+        "observaciones": "Nueva queire pagar MoneyGram",
+        "movil_origen": "Josué",
+        "estado": "nueva",
+        "cliente_id": "",
+        "updated_at": "2026-03-27 00:39:52",
+        "created_at": "2026-03-27 00:39:52"
+    },
+    {
+        "id": "int_1d3ddb9d",
+        "telefono": "+34 602 73 06 55",
+        "observaciones": "Déjame hacer un poco más de plata y hablamos",
+        "movil_origen": "Josue",
+        "estado": "convertida",
+        "cliente_id": "cli_c081e79d",
+        "updated_at": "2026-03-27 16:01:33",
+        "created_at": "2026-03-27 00:56:25",
+        "convertida_at": "2026-03-27 16:01:33"
+    },
+    {
+        "id": "int_84ba3b83",
+        "telefono": "+34 663 11 56 28",
+        "observaciones": "Es nueva creo que izo bizum pero no ya dicho nada",
+        "movil_origen": "",
+        "estado": "convertida",
+        "cliente_id": "cli_b773850b",
+        "updated_at": "2026-04-04 18:06:24",
+        "created_at": "2026-04-04 16:33:13",
+        "convertida_at": "2026-04-04 18:06:24"
+    },
+    {
+        "id": "int_6757f26b",
+        "telefono": "637102154",
+        "observaciones": "quiere la mami pero cuando vuelva a trabajar",
+        "movil_origen": "jostal nuria",
+        "estado": "nueva",
+        "cliente_id": "",
+        "updated_at": "2026-04-08 13:43:05",
+        "created_at": "2026-04-08 13:43:05"
+    },
+    {
+        "id": "int_aae51da3",
+        "telefono": "642108692",
+        "observaciones": "solo masajes arabe",
+        "movil_origen": "dulce",
+        "estado": "convertida",
+        "cliente_id": "cli_3a4e01af",
+        "updated_at": "2026-04-15 10:26:15",
+        "created_at": "2026-04-15 10:25:26",
+        "convertida_at": "2026-04-15 10:26:15"
+    }
+]

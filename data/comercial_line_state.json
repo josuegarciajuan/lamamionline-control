@@ -1,0 +1,962 @@
+[
+    {
+        "line_id": "tf_f858291d",
+        "status": "active",
+        "health_status": "unknown",
+        "health_http_code": 0,
+        "health_error": "",
+        "health_session_status": "",
+        "last_health_check_at": "",
+        "last_health_ok_at": "",
+        "last_health_failure_at": "",
+        "effective_power_factor": 0.45,
+        "adaptive_power_factor": 0.45,
+        "consecutive_failures": 0,
+        "last_http_code": 0,
+        "last_error": "",
+        "last_success_at": "",
+        "last_failure_at": "",
+        "stable_since_at": "",
+        "last_ban_at": "",
+        "last_power_raise_at": "",
+        "last_power_drop_at": "2026-05-05 21:30:44",
+        "cooldown_until": "",
+        "rolling_window": [],
+        "updated_at": "2026-05-07 14:15:01"
+    },
+    {
+        "line_id": "tf_de558a13",
+        "status": "active",
+        "health_status": "up",
+        "health_http_code": 201,
+        "health_error": "",
+        "health_session_status": "WORKING",
+        "last_health_check_at": "2026-05-07 13:45:41",
+        "last_health_ok_at": "2026-05-07 13:45:41",
+        "last_health_failure_at": "2026-05-05 21:30:44",
+        "effective_power_factor": 0.45,
+        "adaptive_power_factor": 0.45,
+        "consecutive_failures": 0,
+        "last_http_code": 201,
+        "last_error": "",
+        "last_success_at": "2026-05-07 13:45:41",
+        "last_failure_at": "2026-05-05 21:30:44",
+        "stable_since_at": "2026-05-05 23:21:16",
+        "last_ban_at": "2026-05-05 21:30:44",
+        "last_power_raise_at": "2026-05-04 21:31:17",
+        "last_power_drop_at": "2026-05-05 21:30:44",
+        "cooldown_until": "",
+        "rolling_window": [
+            {
+                "ts": "2026-05-07 10:16:15",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 10:17:16",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 10:20:21",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 10:55:01",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 11:37:20",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 11:44:16",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 11:46:11",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 12:59:20",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 13:45:21",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 13:45:41",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            }
+        ],
+        "updated_at": "2026-05-07 14:15:01"
+    },
+    {
+        "line_id": "tf_72a74c54",
+        "status": "active",
+        "health_status": "up",
+        "health_http_code": 200,
+        "health_error": "",
+        "health_session_status": "WORKING",
+        "last_health_check_at": "2026-05-07 14:15:01",
+        "last_health_ok_at": "2026-05-07 14:15:01",
+        "last_health_failure_at": "2026-04-20 10:02:01",
+        "effective_power_factor": 0.45,
+        "adaptive_power_factor": 0.45,
+        "consecutive_failures": 0,
+        "last_http_code": 201,
+        "last_error": "",
+        "last_success_at": "2026-05-04 16:41:22",
+        "last_failure_at": "",
+        "stable_since_at": "2026-04-05 00:26:18",
+        "last_ban_at": "",
+        "last_power_raise_at": "2026-05-03 00:01:47",
+        "last_power_drop_at": "2026-05-05 21:30:44",
+        "cooldown_until": "",
+        "rolling_window": [
+            {
+                "ts": "2026-04-30 22:06:19",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-30 22:23:17",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-30 23:02:05",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-30 23:20:13",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-30 23:27:06",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-02 22:20:06",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-03 00:01:47",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 00:02:12",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 16:41:10",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 16:41:22",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            }
+        ],
+        "updated_at": "2026-05-07 14:15:01"
+    },
+    {
+        "line_id": "tf_6d59126d",
+        "status": "active",
+        "health_status": "up",
+        "health_http_code": 200,
+        "health_error": "",
+        "health_session_status": "WORKING",
+        "last_health_check_at": "2026-05-07 13:45:02",
+        "last_health_ok_at": "2026-05-07 13:45:02",
+        "last_health_failure_at": "2026-05-05 21:00:02",
+        "effective_power_factor": 0.53,
+        "adaptive_power_factor": 0.53,
+        "consecutive_failures": 0,
+        "last_http_code": 201,
+        "last_error": "",
+        "last_success_at": "2026-05-07 10:44:14",
+        "last_failure_at": "",
+        "stable_since_at": "2026-04-04 17:41:07",
+        "last_ban_at": "",
+        "last_power_raise_at": "2026-05-07 10:44:14",
+        "last_power_drop_at": "2026-05-05 21:30:44",
+        "cooldown_until": "",
+        "rolling_window": [
+            {
+                "ts": "2026-04-30 23:51:09",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-02 00:01:05",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-02 09:38:04",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-03 09:01:19",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 09:01:16",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 09:01:29",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 14:59:13",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 16:30:06",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 17:01:24",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 10:44:14",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            }
+        ],
+        "updated_at": "2026-05-07 14:15:01"
+    },
+    {
+        "line_id": "tf_da0c60a9",
+        "status": "active",
+        "health_status": "down",
+        "health_http_code": 0,
+        "health_error": "Failed to connect to 100.117.92.74 port 3002 after 50 ms: Connection refused",
+        "health_session_status": "",
+        "last_health_check_at": "2026-05-07 14:15:01",
+        "last_health_ok_at": "",
+        "last_health_failure_at": "2026-05-07 14:15:01",
+        "effective_power_factor": 0.45,
+        "adaptive_power_factor": 0.45,
+        "consecutive_failures": 0,
+        "last_http_code": 0,
+        "last_error": "",
+        "last_success_at": "",
+        "last_failure_at": "",
+        "stable_since_at": "",
+        "last_ban_at": "",
+        "last_power_raise_at": "",
+        "last_power_drop_at": "2026-05-05 21:30:44",
+        "cooldown_until": "",
+        "rolling_window": [],
+        "updated_at": "2026-05-07 14:15:01"
+    },
+    {
+        "line_id": "tf_12b1277e",
+        "status": "active",
+        "health_status": "down",
+        "health_http_code": 0,
+        "health_error": "Failed to connect to 100.117.92.74 port 3003 after 43 ms: Connection refused",
+        "health_session_status": "",
+        "last_health_check_at": "2026-05-07 14:15:01",
+        "last_health_ok_at": "",
+        "last_health_failure_at": "2026-05-07 14:15:01",
+        "effective_power_factor": 0.45,
+        "adaptive_power_factor": 0.45,
+        "consecutive_failures": 0,
+        "last_http_code": 0,
+        "last_error": "",
+        "last_success_at": "",
+        "last_failure_at": "",
+        "stable_since_at": "",
+        "last_ban_at": "",
+        "last_power_raise_at": "",
+        "last_power_drop_at": "2026-05-05 21:30:44",
+        "cooldown_until": "",
+        "rolling_window": [],
+        "updated_at": "2026-05-07 14:15:01"
+    },
+    {
+        "line_id": "tf_8ec882d5",
+        "status": "active",
+        "health_status": "down",
+        "health_http_code": 200,
+        "health_error": "La sesión WAHA está en estado FAILED.",
+        "health_session_status": "FAILED",
+        "last_health_check_at": "2026-05-07 14:15:01",
+        "last_health_ok_at": "2026-04-20 09:00:47",
+        "last_health_failure_at": "2026-05-07 14:15:01",
+        "effective_power_factor": 0.45,
+        "adaptive_power_factor": 0.45,
+        "consecutive_failures": 0,
+        "last_http_code": 201,
+        "last_error": "",
+        "last_success_at": "2026-04-20 09:00:47",
+        "last_failure_at": "2026-04-15 14:09:49",
+        "stable_since_at": "2026-04-16 10:04:16",
+        "last_ban_at": "2026-04-15 14:09:49",
+        "last_power_raise_at": "2026-04-20 09:00:47",
+        "last_power_drop_at": "2026-05-05 21:30:44",
+        "cooldown_until": "",
+        "rolling_window": [
+            {
+                "ts": "2026-04-14 18:00:14",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-15 06:00:15",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-15 09:00:24",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-15 10:25:16",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-15 13:56:29",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-15 14:09:49",
+                "ok": 0,
+                "http_code": 0,
+                "error": "Operation timed out after 30001 milliseconds with 0 bytes received"
+            },
+            {
+                "ts": "2026-04-16 10:04:16",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-18 00:00:14",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-19 00:00:14",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-20 09:00:47",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            }
+        ],
+        "updated_at": "2026-05-07 14:15:01"
+    },
+    {
+        "line_id": "tf_f500d7c3",
+        "status": "active",
+        "health_status": "up",
+        "health_http_code": 201,
+        "health_error": "",
+        "health_session_status": "WORKING",
+        "last_health_check_at": "2026-05-07 13:39:18",
+        "last_health_ok_at": "2026-05-07 13:39:18",
+        "last_health_failure_at": "2026-04-20 09:36:47",
+        "effective_power_factor": 0.46,
+        "adaptive_power_factor": 0.46,
+        "consecutive_failures": 0,
+        "last_http_code": 201,
+        "last_error": "",
+        "last_success_at": "2026-05-07 13:39:18",
+        "last_failure_at": "2026-04-20 09:36:47",
+        "stable_since_at": "2026-04-20 10:52:20",
+        "last_ban_at": "2026-04-20 09:36:47",
+        "last_power_raise_at": "2026-05-05 11:35:21",
+        "last_power_drop_at": "2026-05-05 21:30:44",
+        "cooldown_until": "",
+        "rolling_window": [
+            {
+                "ts": "2026-05-06 22:41:18",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-06 22:43:15",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 08:00:34",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 09:00:17",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 10:07:18",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 10:29:19",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 11:39:20",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 12:15:19",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 12:39:18",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-07 13:39:18",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            }
+        ],
+        "updated_at": "2026-05-07 14:15:01"
+    },
+    {
+        "line_id": "tf_137f2a68",
+        "status": "active",
+        "health_status": "up",
+        "health_http_code": 200,
+        "health_error": "",
+        "health_session_status": "WORKING",
+        "last_health_check_at": "2026-05-07 13:16:10",
+        "last_health_ok_at": "2026-05-07 13:16:10",
+        "last_health_failure_at": "",
+        "effective_power_factor": 0.45,
+        "adaptive_power_factor": 0.45,
+        "consecutive_failures": 0,
+        "last_http_code": 201,
+        "last_error": "",
+        "last_success_at": "2026-05-04 16:38:12",
+        "last_failure_at": "",
+        "stable_since_at": "2026-04-04 18:07:11",
+        "last_ban_at": "",
+        "last_power_raise_at": "2026-05-04 14:38:19",
+        "last_power_drop_at": "2026-05-05 21:30:44",
+        "cooldown_until": "",
+        "rolling_window": [
+            {
+                "ts": "2026-04-30 12:00:21",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-30 14:00:19",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-30 22:31:16",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-30 23:04:10",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-30 23:32:07",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-30 23:41:08",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-02 00:21:10",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 14:38:19",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 16:35:08",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 16:38:12",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            }
+        ],
+        "updated_at": "2026-05-07 14:15:01"
+    },
+    {
+        "line_id": "tf_e0bc1085",
+        "status": "active",
+        "health_status": "up",
+        "health_http_code": 200,
+        "health_error": "",
+        "health_session_status": "WORKING",
+        "last_health_check_at": "2026-05-07 13:19:01",
+        "last_health_ok_at": "2026-05-07 13:19:01",
+        "last_health_failure_at": "2026-04-20 10:01:02",
+        "effective_power_factor": 0.45,
+        "adaptive_power_factor": 0.45,
+        "consecutive_failures": 0,
+        "last_http_code": 201,
+        "last_error": "",
+        "last_success_at": "2026-05-04 10:09:23",
+        "last_failure_at": "",
+        "stable_since_at": "2026-04-04 22:49:18",
+        "last_ban_at": "",
+        "last_power_raise_at": "2026-05-03 16:56:20",
+        "last_power_drop_at": "2026-05-05 21:30:44",
+        "cooldown_until": "",
+        "rolling_window": [
+            {
+                "ts": "2026-04-30 21:24:12",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-30 22:59:05",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-30 22:59:30",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-30 23:26:05",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-30 23:52:08",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-03 16:56:20",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-03 20:01:05",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-03 21:30:05",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 01:01:06",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 10:09:23",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            }
+        ],
+        "updated_at": "2026-05-07 14:15:01"
+    },
+    {
+        "line_id": "tf_5ebfef80",
+        "status": "active",
+        "health_status": "down",
+        "health_http_code": 200,
+        "health_error": "La sesión WAHA está en estado FAILED.",
+        "health_session_status": "FAILED",
+        "last_health_check_at": "2026-05-07 13:19:02",
+        "last_health_ok_at": "2026-04-22 14:42:17",
+        "last_health_failure_at": "2026-05-07 13:19:02",
+        "effective_power_factor": 0.45,
+        "adaptive_power_factor": 0.45,
+        "consecutive_failures": 0,
+        "last_http_code": 201,
+        "last_error": "",
+        "last_success_at": "2026-04-22 14:42:17",
+        "last_failure_at": "2026-04-20 09:37:02",
+        "stable_since_at": "2026-04-20 10:58:15",
+        "last_ban_at": "2026-04-20 09:37:02",
+        "last_power_raise_at": "2026-04-17 10:11:19",
+        "last_power_drop_at": "2026-05-05 21:30:44",
+        "cooldown_until": "",
+        "rolling_window": [
+            {
+                "ts": "2026-04-21 20:28:16",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-21 20:50:20",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-21 22:08:15",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-22 08:00:18",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-22 10:08:17",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-22 11:08:17",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-22 11:31:16",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-22 13:17:17",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-22 14:13:18",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-22 14:42:17",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            }
+        ],
+        "updated_at": "2026-05-07 14:15:01"
+    },
+    {
+        "line_id": "tf_dd48cac3",
+        "status": "active",
+        "health_status": "up",
+        "health_http_code": 200,
+        "health_error": "",
+        "health_session_status": "WORKING",
+        "last_health_check_at": "2026-05-07 13:21:01",
+        "last_health_ok_at": "2026-05-07 13:21:01",
+        "last_health_failure_at": "2026-05-05 16:00:01",
+        "effective_power_factor": 0.45,
+        "adaptive_power_factor": 0.45,
+        "consecutive_failures": 0,
+        "last_http_code": 201,
+        "last_error": "",
+        "last_success_at": "2026-04-27 20:00:58",
+        "last_failure_at": "",
+        "stable_since_at": "2026-04-04 18:07:30",
+        "last_ban_at": "",
+        "last_power_raise_at": "2026-04-27 04:01:00",
+        "last_power_drop_at": "2026-05-05 21:30:44",
+        "cooldown_until": "",
+        "rolling_window": [
+            {
+                "ts": "2026-04-24 05:00:57",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-24 09:01:04",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-25 00:00:55",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-25 12:34:54",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-26 17:06:03",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-27 04:01:00",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-27 09:01:11",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-27 13:00:59",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-27 19:00:58",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-04-27 20:00:58",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            }
+        ],
+        "updated_at": "2026-05-07 14:15:01"
+    },
+    {
+        "line_id": "tf_80940a4e",
+        "status": "active",
+        "health_status": "up",
+        "health_http_code": 200,
+        "health_error": "",
+        "health_session_status": "WORKING",
+        "last_health_check_at": "2026-05-07 13:23:01",
+        "last_health_ok_at": "2026-05-07 13:23:01",
+        "last_health_failure_at": "2026-04-20 10:01:02",
+        "effective_power_factor": 0.45,
+        "adaptive_power_factor": 0.45,
+        "consecutive_failures": 0,
+        "last_http_code": 201,
+        "last_error": "",
+        "last_success_at": "2026-05-04 16:58:10",
+        "last_failure_at": "",
+        "stable_since_at": "2026-04-04 12:13:19",
+        "last_ban_at": "",
+        "last_power_raise_at": "2026-05-03 17:01:07",
+        "last_power_drop_at": "2026-05-05 21:30:44",
+        "cooldown_until": "",
+        "rolling_window": [
+            {
+                "ts": "2026-05-02 16:58:08",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-03 17:01:07",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-03 18:01:06",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 00:01:58",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 10:09:12",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 13:37:12",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 16:37:09",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 16:38:29",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 16:50:07",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            },
+            {
+                "ts": "2026-05-04 16:58:10",
+                "ok": 1,
+                "http_code": 201,
+                "error": ""
+            }
+        ],
+        "updated_at": "2026-05-07 14:15:01"
+    },
+    {
+        "line_id": "tf_c47966d2",
+        "status": "active",
+        "health_status": "unknown",
+        "health_http_code": 0,
+        "health_error": "",
+        "health_session_status": "",
+        "last_health_check_at": "",
+        "last_health_ok_at": "",
+        "last_health_failure_at": "",
+        "effective_power_factor": 0.45,
+        "adaptive_power_factor": 0.45,
+        "consecutive_failures": 0,
+        "last_http_code": 0,
+        "last_error": "",
+        "last_success_at": "",
+        "last_failure_at": "",
+        "stable_since_at": "",
+        "last_ban_at": "",
+        "last_power_raise_at": "",
+        "last_power_drop_at": "2026-05-05 21:30:44",
+        "cooldown_until": "",
+        "rolling_window": [],
+        "updated_at": "2026-05-07 14:15:01"
+    }
+]

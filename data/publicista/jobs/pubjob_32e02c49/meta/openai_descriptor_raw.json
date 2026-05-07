@@ -1,0 +1,199 @@
+{
+    "id": "resp_01eb93338554249e0169f3b53ee5bc8193a95ac8b86ac44857",
+    "object": "response",
+    "created_at": 1777579326,
+    "status": "completed",
+    "background": false,
+    "billing": {
+        "payer": "developer"
+    },
+    "completed_at": 1777579347,
+    "error": null,
+    "frequency_penalty": 0,
+    "incomplete_details": null,
+    "instructions": null,
+    "max_output_tokens": null,
+    "max_tool_calls": null,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "moderation": null,
+    "output": [
+        {
+            "id": "msg_01eb93338554249e0169f3b54973888193b1076fc68b183e71",
+            "type": "message",
+            "status": "completed",
+            "content": [
+                {
+                    "type": "output_text",
+                    "annotations": [],
+                    "logprobs": [],
+                    "text": "{\"adult_appearing\":true,\"framing\":\"cuerpo entero, vista frontal, tomada en exterior a nivel bajo/ligeramente contrapicado\",\"skin_tone\":\"piel morena profunda con subtono cálido\",\"hair_color\":\"negro\",\"hair_texture\":\"ondulado a rizado suave\",\"hair_length\":\"muy largo, por debajo del pecho\",\"body_build\":\"complexión delgada a atlética, con cintura marcada y piernas fuertes\",\"body_curves\":\"pecho pequeño a mediano; caderas moderadamente anchas; cintura claramente estrecha en relación con la cadera; silueta de reloj de arena suave con presencia corporal definida\",\"face_shape\":\"rostro ovalado con contornos suaves\",\"eyes\":\"ojos no visibles con detalle por la cobertura del rostro; aparentan ser de tamaño medio\",\"lips\":\"labios de grosor medio\",\"nose\":\"nariz de tamaño medio, perfil recto aparente\",\"eyebrows\":\"cejas oscuras, de grosor medio\",\"makeup\":\"maquillaje no claramente visible; aspecto general natural\",\"outfit_summary\":\"bikini de dos piezas multicolor con estampado llamativo; prenda ligera abierta o pareo estampado sujeto a los lados\",\"dominant_colors\":[\"azul\",\"turquesa\",\"amarillo\",\"rojo\",\"rosa\",\"negro\"],\"accessories\":[\"tobillera/pulsera roja en la muñeca\",\"pieza decorativa colgante en el abdomen\",\"posible adorno en el cabello\"],\"pose_summary\":\"de pie sobre el agua, una mano levantada a la frente para cubrirse del sol y la otra relajada hacia abajo\",\"expression\":\"no legible por la cobertura del rostro; postura segura y relajada\",\"background_summary\":\"playa o litoral con mar bajo, horizonte visible y cielo despejado de intenso azul con nubes bajas en la distancia\",\"lighting_summary\":\"luz solar directa y fuerte, con sombras marcadas y colores muy saturados\",\"distinguishing_features\":[\"piel morena profunda\",\"cabello negro muy largo\",\"silueta delgada con cintura definida\",\"piernas largas y firmes\",\"caderas moderadamente marcadas\",\"labios de grosor medio\"],\"similarity_guidance\":\"Mantén una mujer de piel morena profunda, cabello negro muy largo, silueta delgada con cintura marcada y rasgos faciales suaves y proporciones naturales.\",\"risk_notes\":[\"el rostro está parcialmente cubierto, por lo que varios rasgos faciales no pueden determinarse con precisión\",\"algunas proporciones corporales pueden variar por la pose y el ángulo de cámara\"],\"quality_notes\":[\"imagen nítida en el cuerpo y el entorno\",\"la cobertura facial limita la lectura precisa de ojos, nariz y expresión\",\"colores del vestuario y fondo muy saturados por la iluminación solar intensa\"]}"
+                }
+            ],
+            "phase": "final_answer",
+            "role": "assistant"
+        }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0,
+    "previous_response_id": null,
+    "prompt_cache_key": "publicista:descriptor:gpt-5.4-mini",
+    "prompt_cache_retention": "24h",
+    "reasoning": {
+        "effort": "none",
+        "summary": null
+    },
+    "safety_identifier": null,
+    "service_tier": "flex",
+    "store": false,
+    "temperature": 1,
+    "text": {
+        "format": {
+            "type": "json_schema",
+            "description": null,
+            "name": "publicista_source_descriptor",
+            "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "adult_appearing",
+                    "framing",
+                    "skin_tone",
+                    "hair_color",
+                    "hair_texture",
+                    "hair_length",
+                    "body_build",
+                    "body_curves",
+                    "face_shape",
+                    "eyes",
+                    "lips",
+                    "nose",
+                    "eyebrows",
+                    "makeup",
+                    "outfit_summary",
+                    "dominant_colors",
+                    "accessories",
+                    "pose_summary",
+                    "expression",
+                    "background_summary",
+                    "lighting_summary",
+                    "distinguishing_features",
+                    "similarity_guidance",
+                    "risk_notes",
+                    "quality_notes"
+                ],
+                "properties": {
+                    "adult_appearing": {
+                        "type": "boolean"
+                    },
+                    "framing": {
+                        "type": "string"
+                    },
+                    "skin_tone": {
+                        "type": "string"
+                    },
+                    "hair_color": {
+                        "type": "string"
+                    },
+                    "hair_texture": {
+                        "type": "string"
+                    },
+                    "hair_length": {
+                        "type": "string"
+                    },
+                    "body_build": {
+                        "type": "string"
+                    },
+                    "body_curves": {
+                        "type": "string"
+                    },
+                    "face_shape": {
+                        "type": "string"
+                    },
+                    "eyes": {
+                        "type": "string"
+                    },
+                    "lips": {
+                        "type": "string"
+                    },
+                    "nose": {
+                        "type": "string"
+                    },
+                    "eyebrows": {
+                        "type": "string"
+                    },
+                    "makeup": {
+                        "type": "string"
+                    },
+                    "outfit_summary": {
+                        "type": "string"
+                    },
+                    "dominant_colors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "accessories": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "pose_summary": {
+                        "type": "string"
+                    },
+                    "expression": {
+                        "type": "string"
+                    },
+                    "background_summary": {
+                        "type": "string"
+                    },
+                    "lighting_summary": {
+                        "type": "string"
+                    },
+                    "distinguishing_features": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "similarity_guidance": {
+                        "type": "string"
+                    },
+                    "risk_notes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "quality_notes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "strict": true
+        },
+        "verbosity": "medium"
+    },
+    "tool_choice": "auto",
+    "tools": [],
+    "top_logprobs": 0,
+    "top_p": 0.98,
+    "truncation": "disabled",
+    "usage": {
+        "input_tokens": 2496,
+        "input_tokens_details": {
+            "cached_tokens": 0
+        },
+        "output_tokens": 586,
+        "output_tokens_details": {
+            "reasoning_tokens": 0
+        },
+        "total_tokens": 3082
+    },
+    "user": null,
+    "metadata": []
+}

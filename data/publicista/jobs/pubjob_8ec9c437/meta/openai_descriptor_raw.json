@@ -1,0 +1,199 @@
+{
+    "id": "resp_0f6b284bccff22cc0169f8f4214ed881a0a2f38f395bb2789a",
+    "object": "response",
+    "created_at": 1777923105,
+    "status": "completed",
+    "background": false,
+    "billing": {
+        "payer": "developer"
+    },
+    "completed_at": 1777923109,
+    "error": null,
+    "frequency_penalty": 0,
+    "incomplete_details": null,
+    "instructions": null,
+    "max_output_tokens": null,
+    "max_tool_calls": null,
+    "model": "gpt-5.4-mini-2026-03-17",
+    "moderation": null,
+    "output": [
+        {
+            "id": "msg_0f6b284bccff22cc0169f8f421d8e081a0b300a6df5e6cf6d5",
+            "type": "message",
+            "status": "completed",
+            "content": [
+                {
+                    "type": "output_text",
+                    "annotations": [],
+                    "logprobs": [],
+                    "text": "{\"adult_appearing\":true,\"framing\":\"primerísimo primer plano / close-up recortado del rostro, cuello y parte superior del pecho\",\"skin_tone\":\"piel clara a clara-media con matiz cálido/rosado\",\"hair_color\":\"castaño oscuro\",\"hair_texture\":\"liso a ligeramente ondulado\",\"hair_length\":\"largo, cae por ambos lados del rostro\",\"body_build\":\"complexión normal a algo curvilínea, de presencia corporal media\",\"body_curves\":\"pecho visible de tamaño mediano a grande; escote pronunciado; caderas no visibles por el encuadre; cuello y parte superior del torso con apariencia suave y femenina; silueta general sugerida curvilínea en la zona superior\",\"face_shape\":\"rostro ovalado a ligeramente redondeado, con mejillas llenas\",\"eyes\":\"ojos medianos, oscuros, de forma almendrada y parcialmente entornados por el ángulo de la foto\",\"lips\":\"labios de tamaño medio a llenos, especialmente el labio inferior, con contorno suave\",\"nose\":\"nariz mediana, recta, con puente poco prominente y punta redondeada\",\"eyebrows\":\"cejas oscuras, de grosor medio, más bien rectas con leve arco\",\"makeup\":\"maquillaje muy sutil o poco visible; apariencia natural\",\"outfit_summary\":\"camisa o chaqueta de mezclilla clara abierta sobre un top con encaje color beige/crema\",\"dominant_colors\":[\"marrón\",\"castaño oscuro\",\"azul claro\",\"beige/crema\",\"rosado\",\"negro\"],\"accessories\":[\"collar fino con colgante\",\"anillo en la mano\",\"posible esmalte de uñas rosado\"],\"pose_summary\":\"rostro inclinado hacia arriba, boca entreabierta, una mano levantada cerca de los labios con un dedo apoyado\",\"expression\":\"expresión relajada, algo provocadora o pensativa\",\"background_summary\":\"interior neutro y poco definido, con una pared clara y líneas de azulejo o rejilla visibles\",\"lighting_summary\":\"iluminación cálida y suave, con contraste moderado y algo de grano en la imagen\",\"distinguishing_features\":[\"piel clara con subtono cálido\",\"cabello castaño oscuro largo y liso/ligeramente ondulado\",\"rostro ovalado-redondeado con mejillas llenas\",\"ojos oscuros almendrados\",\"labios medianos a llenos\",\"nariz recta de tamaño medio\",\"cejas oscuras de grosor medio\",\"escote pronunciado y parte superior del torso curvilínea\"],\"similarity_guidance\":\"Mantén una mujer adulta de rasgos suaves, piel clara cálida, cabello largo castaño oscuro, rostro ovalado-redondeado y labios llenos, con una presencia corporal superior curvilínea.\",\"risk_notes\":[\"La imagen está muy recortada y no permite evaluar con precisión la complexión completa ni la forma total del cuerpo.\",\"Parte del rostro está oculto por el ángulo, la mano y el encuadre, lo que limita detalles finos.\"],\"quality_notes\":[\"Foto de resolución moderada con algo de ruido/grano.\",\"El primer plano y la pose dificultan ver orejas, mandíbula completa y proporciones corporales completas.\"]}"
+                }
+            ],
+            "phase": "final_answer",
+            "role": "assistant"
+        }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0,
+    "previous_response_id": null,
+    "prompt_cache_key": "publicista:descriptor:gpt-5.4-mini",
+    "prompt_cache_retention": "24h",
+    "reasoning": {
+        "effort": "none",
+        "summary": null
+    },
+    "safety_identifier": null,
+    "service_tier": "flex",
+    "store": false,
+    "temperature": 1,
+    "text": {
+        "format": {
+            "type": "json_schema",
+            "description": null,
+            "name": "publicista_source_descriptor",
+            "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "adult_appearing",
+                    "framing",
+                    "skin_tone",
+                    "hair_color",
+                    "hair_texture",
+                    "hair_length",
+                    "body_build",
+                    "body_curves",
+                    "face_shape",
+                    "eyes",
+                    "lips",
+                    "nose",
+                    "eyebrows",
+                    "makeup",
+                    "outfit_summary",
+                    "dominant_colors",
+                    "accessories",
+                    "pose_summary",
+                    "expression",
+                    "background_summary",
+                    "lighting_summary",
+                    "distinguishing_features",
+                    "similarity_guidance",
+                    "risk_notes",
+                    "quality_notes"
+                ],
+                "properties": {
+                    "adult_appearing": {
+                        "type": "boolean"
+                    },
+                    "framing": {
+                        "type": "string"
+                    },
+                    "skin_tone": {
+                        "type": "string"
+                    },
+                    "hair_color": {
+                        "type": "string"
+                    },
+                    "hair_texture": {
+                        "type": "string"
+                    },
+                    "hair_length": {
+                        "type": "string"
+                    },
+                    "body_build": {
+                        "type": "string"
+                    },
+                    "body_curves": {
+                        "type": "string"
+                    },
+                    "face_shape": {
+                        "type": "string"
+                    },
+                    "eyes": {
+                        "type": "string"
+                    },
+                    "lips": {
+                        "type": "string"
+                    },
+                    "nose": {
+                        "type": "string"
+                    },
+                    "eyebrows": {
+                        "type": "string"
+                    },
+                    "makeup": {
+                        "type": "string"
+                    },
+                    "outfit_summary": {
+                        "type": "string"
+                    },
+                    "dominant_colors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "accessories": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "pose_summary": {
+                        "type": "string"
+                    },
+                    "expression": {
+                        "type": "string"
+                    },
+                    "background_summary": {
+                        "type": "string"
+                    },
+                    "lighting_summary": {
+                        "type": "string"
+                    },
+                    "distinguishing_features": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "similarity_guidance": {
+                        "type": "string"
+                    },
+                    "risk_notes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "quality_notes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "strict": true
+        },
+        "verbosity": "medium"
+    },
+    "tool_choice": "auto",
+    "tools": [],
+    "top_logprobs": 0,
+    "top_p": 0.98,
+    "truncation": "disabled",
+    "usage": {
+        "input_tokens": 2966,
+        "input_tokens_details": {
+            "cached_tokens": 2304
+        },
+        "output_tokens": 698,
+        "output_tokens_details": {
+            "reasoning_tokens": 0
+        },
+        "total_tokens": 3664
+    },
+    "user": null,
+    "metadata": []
+}

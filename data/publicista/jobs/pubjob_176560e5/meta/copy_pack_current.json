@@ -1,0 +1,312 @@
+{
+    "id": "copyver_66dc6247",
+    "created_at": "2026-04-17 00:44:13",
+    "model": "gpt-5.4-mini",
+    "generation_phases": 2,
+    "request_id": "req_d7386d62eb55497aac92e662b7b0317c",
+    "http_code": 200,
+    "tone": "equilibrado",
+    "pack_angle": "Presentación de Monica, colombiana en Burriana, combinando elegancia, cercanía y un punto de curiosidad para lograr contacto.",
+    "title_options": [
+        "Monica, la colombiana de plaza NUEVA",
+        "burriana tiene NUEVA compañía 💫",
+        "La colombiana que te apetece conocer",
+        "Monica en burriana, trato cercano y ELEGANTE",
+        "UNA PRESENCIA QUE NO PASA DESAPERCIBIDA",
+        "Colombiana en la zona, ESCRÍBEME 💌",
+        "monica no deja indiferente 🔥",
+        "NUEVA EN BURRIANA, CON GANAS DE CONOCERTE",
+        "Monica, cercanía, estilo y DISCRECIÓN",
+        "La colombiana que llama la atención"
+    ],
+    "title_candidates": [
+        "MONICA, LA COLOMBIANA DE PLAZA NUEVA",
+        "BURRIANA TIENE NUEVA COMPAÑÍA 💫",
+        "LA COLOMBIANA QUE TE APETECE CONOCER",
+        "MONICA EN BURRIANA, TRATO CERCANO Y ELEGANTE",
+        "UNA PRESENCIA QUE NO PASA DESAPERCIBIDA",
+        "COLOMBIANA EN LA ZONA, ESCRÍBEME 💌",
+        "MONICA, DISPONIBLE Y MUY AGRADABLE",
+        "HOY PUEDES CONOCER A MONICA ✨",
+        "LA CHICA COLOMBIANA QUE ESTABA FALTANDO",
+        "Burriana, tengo plan para ti",
+        "CONMIGO SE NOTA LA DIFERENCIA",
+        "Monica, una cita con buen ambiente",
+        "COLOMBIANA CON ENCANTO Y BUENA ONDA",
+        "Aquí está la colombiana de plaza nueva",
+        "MONICA NO DEJA INDIFERENTE 🔥",
+        "Tu mejor conversación empieza aquí",
+        "NUEVA EN BURRIANA, CON GANAS DE CONOCERTE",
+        "Monica, cercanía, estilo y discreción",
+        "SI TE APETECE ALGO ESPECIAL, ESCRÍBEME",
+        "La colombiana que llama la atención"
+    ],
+    "ads": [
+        {
+            "slot": "1",
+            "focus": "Presentación elegante y cercana",
+            "short_hook": "HOLA, SOY MONICA Y YA ESTOY POR BURRIANA 💫",
+            "title_neutral": "Monica, la colombiana de plaza NUEVA",
+            "title_suggestive": "Monica, la colombiana de plaza NUEVA",
+            "body_neutral": "Hola, soy Monica, la colombiana de plaza nueva. Estoy por Burriana y me gusta presentarme con un trato CERCANO, discreto y agradable 😊. Si valoras una conversación fácil y una compañía con buena presencia, ESCRÍBEME y hablamos con calma.",
+            "body_suggestive": "Hola, soy Monica, la colombiana de plaza nueva. Estoy por Burriana y me gusta dejar una primera impresión que invite a escribir 💫. Soy cercana, discreta y con una forma de tratar que engancha desde el primer mensaje. Si te apetece conocerme, ESCRÍBEME por privado."
+        },
+        {
+            "slot": "2",
+            "focus": "La colombiana de plaza nueva",
+            "short_hook": "SI HAS OÍDO HABLAR DE LA COLOMBIANA DE PLAZA NUEVA, SOY YO 😉",
+            "title_neutral": "Monica en burriana, trato cercano y ELEGANTE",
+            "title_suggestive": "Colombiana en la zona, ESCRÍBEME 💌",
+            "body_neutral": "SI HAS OÍDO HABLAR DE LA COLOMBIANA DE PLAZA NUEVA, SOY YO 😉. Me gusta cuidar cada detalle del trato y hacer que todo resulte natural, cómodo y elegante. Si buscas una compañía agradable en Burriana, puedes escribirme y ver si encajamos.",
+            "body_suggestive": "Si has oído hablar de la colombiana de plaza nueva, soy yo 😉. Me gusta cuidar el detalle, despertar curiosidad y dejar ganas de repetir. En Burriana estoy para quien valora una atención cercana y un contacto sin vueltas. ESCRÍBEME y lo vemos por privado."
+        },
+        {
+            "slot": "3",
+            "focus": "Novedad en la zona",
+            "short_hook": "LLEGUÉ HACE POCO Y YA ESTOY RECIBIENDO MENSAJES 😘",
+            "title_neutral": "burriana tiene NUEVA compañía 💫",
+            "title_suggestive": "NUEVA EN BURRIANA, CON GANAS DE CONOCERTE",
+            "body_neutral": "LLEGUÉ HACE POCO Y YA ESTOY RECIBIENDO MENSAJES 😊. Si te apetece una compañía distinta, cercana y con buena conversación, aquí me tienes. Soy Monica, colombiana, y me encanta un trato sencillo, respetuoso y con buena energía.",
+            "body_suggestive": "Llegué hace poco y la respuesta está siendo muy buena 😘. Si te apetece una compañía distinta, con ganas de agradar y crear buena química desde el primer mensaje, ESCRÍBEME. Soy Monica, colombiana, y estoy en Burriana para quien sabe valorar lo nuevo."
+        },
+        {
+            "slot": "4",
+            "focus": "Cita con presencia",
+            "short_hook": "NO HACE FALTA MUCHO PARA NOTAR CUANDO ALGUIEN TIENE PRESENCIA ✨",
+            "title_neutral": "UNA PRESENCIA QUE NO PASA DESAPERCIBIDA",
+            "title_suggestive": "Monica, cercanía, estilo y DISCRECIÓN",
+            "body_neutral": "No hace falta mucho para notar cuando alguien tiene presencia ✨. Soy una mujer colombiana, elegante y esbelta, con una forma muy agradable de tratar y de hacerte sentir cómodo desde el primer momento. Si buscas algo con clase, ESCRÍBEME.",
+            "body_suggestive": "No hace falta mucho para notar cuando alguien tiene presencia ✨. Monica combina estilo, DISCRECIÓN y un punto de magnetismo que no se olvida fácil. Si te gustan las mujeres que saben estar y saben gustar, aquí tienes una buena razón para escribir."
+        },
+        {
+            "slot": "5",
+            "focus": "Contacto directo y sin rodeos",
+            "short_hook": "SI TE GUSTO, NO LO DEJES PARA LUEGO 💌",
+            "title_neutral": "Colombiana en la zona, ESCRÍBEME 💌",
+            "title_suggestive": "monica no deja indiferente 🔥",
+            "body_neutral": "SI TE GUSTO, NO LO DEJES PARA LUEGO 💌. Me escribes y vemos si encajamos para una cita agradable, sin complicaciones y con buen ambiente. Soy Monica, colombiana en Burriana, y me gustan los mensajes claros.",
+            "body_suggestive": "Si te gusto, no lo dejes para luego 💌. Hay personas que entran en el radar y no pasan desapercibidas, y yo soy una de ellas 🔥. ESCRÍBEME si quieres concretar sin perder tiempo y con un trato que invite a repetir."
+        },
+        {
+            "slot": "6",
+            "focus": "Trato cálido y confianza",
+            "short_hook": "HAY CONVERSACIONES QUE EMPIEZAN BIEN DESDE EL PRIMER HOLA 🙂",
+            "title_neutral": "Monica, DISPONIBLE y muy agradable",
+            "title_suggestive": "TU MEJOR CONVERSACIÓN EMPIEZA AQUÍ",
+            "body_neutral": "HAY CONVERSACIONES QUE EMPIEZAN BIEN DESDE EL PRIMER HOLA 🙂. Soy cercana, educada y de trato fácil, ideal si buscas algo cómodo, agradable y sin rigidez. En Burriana estoy para quien quiera hablar con naturalidad y quedar bien desde el principio.",
+            "body_suggestive": "HAY CONVERSACIONES QUE EMPIEZAN BIEN DESDE EL PRIMER HOLA 😉. Si buscas química, conversación y una cita con buen ambiente, aquí me tienes. Soy Monica, y me gusta que todo fluya con naturalidad y deje ganas de seguir hablando."
+        },
+        {
+            "slot": "7",
+            "focus": "Exclusividad local",
+            "short_hook": "BURRIANA NO SE CRUZA TODOS LOS DÍAS CON ALGUIEN ASÍ 💫",
+            "title_neutral": "La chica colombiana que estaba faltando",
+            "title_suggestive": "La colombiana que llama la atención",
+            "body_neutral": "BURRIANA NO SE CRUZA TODOS LOS DÍAS CON ALGUIEN ASÍ ✨. Soy una colombiana con estilo propio, con una forma de estar cercana y una atención que se nota. Si valoras algo diferente de verdad, este puede ser el momento de escribir.",
+            "body_suggestive": "Burriana no se cruza todos los días con alguien así ✨. Soy esa colombiana que llama la atención sin esfuerzo y deja curiosidad desde el primer vistazo. Si te apetece descubrir por qué destacan tanto de mí, ESCRÍBEME."
+        },
+        {
+            "slot": "8",
+            "focus": "Deseo de conocer",
+            "short_hook": "¿TE APETECE DESCUBRIR POR QUÉ TANTOS ME ESCRIBEN? 🔥",
+            "title_neutral": "HOY puedes conocer a monica ✨",
+            "title_suggestive": "si te apetece algo especial, ESCRÍBEME",
+            "body_neutral": "¿TE APETECE DESCUBRIR POR QUÉ TANTOS ME ESCRIBEN? ✨ Tengo una forma de estar natural, dulce y muy atenta, pensada para que te sientas a gusto desde el principio. Si te gusta la buena compañía, ya sabes dónde encontrarme.",
+            "body_suggestive": "¿Te apetece descubrir por qué tantos me escriben? 🔥 Tengo una forma de estar que mezcla dulzura, atención y un punto de misterio que invita a más. Si buscas algo especial en Burriana, ESCRÍBEME y te respondo por privado."
+        },
+        {
+            "slot": "9",
+            "focus": "Elegancia latina",
+            "short_hook": "HAY LATINAS QUE DESTACAN SIN HACER RUIDO 🌹",
+            "title_neutral": "conmigo se nota la diferencia",
+            "title_suggestive": "La colombiana que te apetece conocer",
+            "body_neutral": "HAY LATINAS QUE DESTACAN SIN HACER RUIDO 🌹. Monica combina dulzura, estilo y una presencia que invita a escribirle con confianza. Si te gusta la elegancia con un trato amable, aquí tienes una opción que encaja muy bien.",
+            "body_suggestive": "Hay latinas que destacan sin hacer ruido 🌹. Monica tiene ese punto de encanto colombiano que se nota desde el primer mensaje y deja ganas de conocerla mejor. Si te apetece una conexión con estilo, ESCRÍBEME."
+        },
+        {
+            "slot": "10",
+            "focus": "Respuesta rápida y disponibilidad",
+            "short_hook": "ESTOY ACTIVA Y RESPONDO RÁPIDO, ASÍ DE SIMPLE 📲",
+            "title_neutral": "burriana tiene NUEVA compañía 💫",
+            "title_suggestive": "Monica en burriana, trato cercano y ELEGANTE",
+            "body_neutral": "Estoy activa y respondo rápido, así de simple 📲. Si quieres concretar sin vueltas, ESCRÍBEME y lo hablamos por privado. Me gusta la comunicación clara, el trato amable y dejar todo bien organizado desde el principio.",
+            "body_suggestive": "Estoy activa y respondo rápido, así de simple 📲. Si quieres concretar sin vueltas, ESCRÍBEME y lo hablamos por privado. Soy Monica, colombiana en Burriana, y me gusta que el contacto sea ágil, cercano y con buena sintonía."
+        }
+    ],
+    "publication_notes": [
+        "En destacamos.net prioriza las variantes neutrales, especialmente las que hablan de cercanía, elegancia, discreción y novedad; evita cualquier palabra de reclamo sexual.",
+        "En loquosex.com usa las versiones sugerentes con más gancho, pero sin caer en explicitud: mejor curiosidad, disponibilidad y química.",
+        "Alterna títulos en MAYÚSCULAS con otros de estilo frase para que el feed no se vea repetitivo ni automatizado.",
+        "Mantén siempre el foco local en Burriana y el apodo comercial de la clienta para reforzar reconocimiento y memorabilidad.",
+        "Usa los anuncios más directos como cierre de rotación y los más elegantes como apertura para mejorar CTR y percepción de calidad."
+    ],
+    "recommended_order": [
+        "MONICA, LA COLOMBIANA DE PLAZA NUEVA",
+        "MONICA EN BURRIANA, TRATO CERCANO Y ELEGANTE",
+        "BURRIANA TIENE NUEVA COMPAÑÍA 💫",
+        "NUEVA EN BURRIANA, CON GANAS DE CONOCERTE",
+        "COLOMBIANA EN LA ZONA, ESCRÍBEME 💌",
+        "UNA PRESENCIA QUE NO PASA DESAPERCIBIDA",
+        "La colombiana que llama la atención",
+        "Monica, cercanía, estilo y discreción",
+        "MONICA NO DEJA INDIFERENTE 🔥",
+        "LA COLOMBIANA QUE TE APETECE CONOCER"
+    ],
+    "raw_response_path": "data/publicista/jobs/pubjob_176560e5/meta/copy_pack_copyver_66dc6247_raw.json",
+    "parsed_json_path": "data/publicista/jobs/pubjob_176560e5/meta/copy_pack_copyver_66dc6247.json",
+    "export_txt_path": "data/publicista/jobs/pubjob_176560e5/meta/copy_pack_copyver_66dc6247.txt",
+    "export_json_path": "",
+    "validation": {
+        "titles_check": [
+            {
+                "index": 0,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 1,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 2,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 3,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 4,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 5,
+                "ok_destacamos": false,
+                "ok_loquosex": true,
+                "issues": [
+                    "destacamos.net: reclamo vacío/imperativo comercial 'ESCRÍBEME' en el título, tono menos reservado de lo recomendado."
+                ]
+            },
+            {
+                "index": 6,
+                "ok_destacamos": false,
+                "ok_loquosex": true,
+                "issues": [
+                    "destacamos.net: presencia de 🔥 implica carga sexual/inapropiada para la variante neutra."
+                ]
+            },
+            {
+                "index": 7,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 8,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 9,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            }
+        ],
+        "ads_check": [
+            {
+                "slot": "1",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "2",
+                "neutral_ok": false,
+                "neutral_issues": [
+                    "Destaca en mayúsculas 'SI HAS OÍDO HABLAR DE LA COLOMBIANA DE PLAZA NUEVA, SOY YO 😉.', tono poco reservado para destacamos.net."
+                ],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "3",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "4",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "5",
+                "neutral_ok": false,
+                "neutral_issues": [
+                    "'SI TE GUSTO, NO LO DEJES PARA LUEGO 💌.' es un reclamo directo y poco elegante para la variante neutra."
+                ],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "6",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "7",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "8",
+                "neutral_ok": false,
+                "neutral_issues": [
+                    "'¿TE APETECE DESCUBRIR POR QUÉ TANTOS ME ESCRIBEN? ✨' se acerca a un reclamo comercial demasiado promocional para destacamos.net."
+                ],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "9",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "10",
+                "neutral_ok": false,
+                "neutral_issues": [
+                    "'ESTOY ACTIVA Y RESPONDO RÁPIDO' y 'ESCRÍBEME' resultan demasiado directos/promocionales para el tono reservado de destacamos.net."
+                ],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            }
+        ]
+    },
+    "source_summary": "Mantén una mujer adulta de silueta esbelta y elegante, con piel cálida, cabello largo liso castaño claro y rostro ovalado de rasgos suaves y proporcionados.",
+    "reference_source_site": "destacamos+loquosex",
+    "reference_source_label": "destacamos.net + loquosex.com",
+    "reference_source_url": "https://www.destacamos.net/1/id/desc/recent_ads.html",
+    "reference_examples_count": 25
+}

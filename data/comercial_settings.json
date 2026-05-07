@@ -1,0 +1,22 @@
+{
+    "waha_host": "http:\/\/100.117.92.74",
+    "waha_api_key": "local321",
+    "waha_session": "default",
+    "typing_pre_min_sec": 1,
+    "typing_pre_max_sec": 3,
+    "typing_min_sec": 2,
+    "typing_max_sec": 12,
+    "typing_jitter_sec": 2,
+    "curl_timeout_sec": "30",
+    "global_daily_target": 72,
+    "ban_fail_streak_warning": "3",
+    "ban_fail_streak_pause": "5",
+    "ban_fail_ratio_warning": "0.6",
+    "ban_fail_ratio_pause": "0.8",
+    "ban_window_size": "10",
+    "cooldown_minutes_warning": "60",
+    "cooldown_minutes_pause": "1440",
+    "auto_followup_enabled": 1,
+    "auto_pause_enabled": 1,
+    "notify_only_after_second_reply": 1
+}

@@ -1,0 +1,130 @@
+{
+    "ok": true,
+    "endpoint": "/v1/responses",
+    "http_code": 200,
+    "request_id": "req_f97a8299686f4810ae43143e69003fa7",
+    "decoded": {
+        "id": "resp_08ec33709df2afa70169f3c7641e4081979b317106ad15efdf",
+        "object": "response",
+        "created_at": 1777583972,
+        "status": "completed",
+        "background": false,
+        "billing": {
+            "payer": "developer"
+        },
+        "completed_at": 1777583978,
+        "error": null,
+        "frequency_penalty": 0,
+        "incomplete_details": null,
+        "instructions": null,
+        "max_output_tokens": null,
+        "max_tool_calls": null,
+        "model": "gpt-5.4-mini-2026-03-17",
+        "moderation": null,
+        "output": [
+            {
+                "id": "msg_08ec33709df2afa70169f3c765dadc8197b8ba94ff15bea1a7",
+                "type": "message",
+                "status": "completed",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "annotations": [],
+                        "logprobs": [],
+                        "text": "{\"prompt\":\"Una sola mujer adulta, rubia rumana, piel clara a clara-media con subtono cálido, cabello rubio oscuro/miel ondulado y algo voluminoso, longitud media hasta los hombros o un poco más, rostro alargado-ovalado, complexión normal a delgada pero algo más rellenita, cintura marcada, silueta suave con pecho mediano y caderas moderadamente marcadas, aspecto maduro tipo milf pero elegante. Lleva un vestido corto elegante, entallado y favorecedor, tejido opaco de calidad con textura visible, costuras limpias, paneles definidos y acabado premium; look adulto, glamouroso, femenino y llamativo, con paleta sofisticada y contraste visual, sin lencería, sin desnudo, sin transparencias y sin ropa interior visible. Pose femenina, segura, fotogénica y natural, expresión atractiva y viva, postura favorecedora; puede ser selfie realista o foto tipo selfie frente al espejo con ángulo natural de móvil, sin primerísimo plano extremo. Interior elegante y luminoso, fondo limpio pero real y vivido, coherente, nunca fondo liso de estudio genérico; habitación/apartamento/hotel interior refinado con ambiente cálido. Luz suave, equilibrada y realista, sombras coherentes. Fotografía hiperrealista, nítida, comercial y editorial, con buen detalle en piel, pelo, ropa y fondo. Mantener la mujer adulta de complexión esbelta con cintura marcada y cabello rubio miel ondulado; evitar tatuajes visibles, gafas, joyería llamativa, pose rígida, brazos muertos, manos deformes, dedos extra, proporciones irreales, texto, watermark, collage, dibujos o CGI.\"}"
+                    }
+                ],
+                "phase": "final_answer",
+                "role": "assistant"
+            }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": "publicista:pollo_prompt_compact:gpt-5.4-mini",
+        "prompt_cache_retention": "24h",
+        "reasoning": {
+            "effort": "none",
+            "summary": null
+        },
+        "safety_identifier": null,
+        "service_tier": "flex",
+        "store": false,
+        "temperature": 1,
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "description": null,
+                "name": "publicista_pollo_prompt_compact",
+                "schema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "prompt"
+                    ],
+                    "properties": {
+                        "prompt": {
+                            "type": "string",
+                            "maxLength": 1920
+                        }
+                    }
+                },
+                "strict": true
+            },
+            "verbosity": "medium"
+        },
+        "tool_choice": "auto",
+        "tools": [],
+        "top_logprobs": 0,
+        "top_p": 0.98,
+        "truncation": "disabled",
+        "usage": {
+            "input_tokens": 1343,
+            "input_tokens_details": {
+                "cached_tokens": 0
+            },
+            "output_tokens": 374,
+            "output_tokens_details": {
+                "reasoning_tokens": 0
+            },
+            "total_tokens": 1717
+        },
+        "user": null,
+        "metadata": []
+    },
+    "raw_body": "{\n  \"id\": \"resp_08ec33709df2afa70169f3c7641e4081979b317106ad15efdf\",\n  \"object\": \"response\",\n  \"created_at\": 1777583972,\n  \"status\": \"completed\",\n  \"background\": false,\n  \"billing\": {\n    \"payer\": \"developer\"\n  },\n  \"completed_at\": 1777583978,\n  \"error\": null,\n  \"frequency_penalty\": 0.0,\n  \"incomplete_details\": null,\n  \"instructions\": null,\n  \"max_output_tokens\": null,\n  \"max_tool_calls\": null,\n  \"model\": \"gpt-5.4-mini-2026-03-17\",\n  \"moderation\": null,\n  \"output\": [\n    {\n      \"id\": \"msg_08ec33709df2afa70169f3c765dadc8197b8ba94ff15bea1a7\",\n      \"type\": \"message\",\n      \"status\": \"completed\",\n      \"content\": [\n        {\n          \"type\": \"output_text\",\n          \"annotations\": [],\n          \"logprobs\": [],\n          \"text\": \"{\\\"prompt\\\":\\\"Una sola mujer adulta, rubia rumana, piel clara a clara-media con subtono c\\u00e1lido, cabello rubio oscuro/miel ondulado y algo voluminoso, longitud media hasta los hombros o un poco m\\u00e1s, rostro alargado-ovalado, complexi\\u00f3n normal a delgada pero algo m\\u00e1s rellenita, cintura marcada, silueta suave con pecho mediano y caderas moderadamente marcadas, aspecto maduro tipo milf pero elegante. Lleva un vestido corto elegante, entallado y favorecedor, tejido opaco de calidad con textura visible, costuras limpias, paneles definidos y acabado premium; look adulto, glamouroso, femenino y llamativo, con paleta sofisticada y contraste visual, sin lencer\\u00eda, sin desnudo, sin transparencias y sin ropa interior visible. Pose femenina, segura, fotog\\u00e9nica y natural, expresi\\u00f3n atractiva y viva, postura favorecedora; puede ser selfie realista o foto tipo selfie frente al espejo con \\u00e1ngulo natural de m\\u00f3vil, sin primer\\u00edsimo plano extremo. Interior elegante y luminoso, fondo limpio pero real y vivido, coherente, nunca fondo liso de estudio gen\\u00e9rico; habitaci\\u00f3n/apartamento/hotel interior refinado con ambiente c\\u00e1lido. Luz suave, equilibrada y realista, sombras coherentes. Fotograf\\u00eda hiperrealista, n\\u00edtida, comercial y editorial, con buen detalle en piel, pelo, ropa y fondo. Mantener la mujer adulta de complexi\\u00f3n esbelta con cintura marcada y cabello rubio miel ondulado; evitar tatuajes visibles, gafas, joyer\\u00eda llamativa, pose r\\u00edgida, brazos muertos, manos deformes, dedos extra, proporciones irreales, texto, watermark, collage, dibujos o CGI.\\\"}\"\n        }\n      ],\n      \"phase\": \"final_answer\",\n      \"role\": \"assistant\"\n    }\n  ],\n  \"parallel_tool_calls\": true,\n  \"presence_penalty\": 0.0,\n  \"previous_response_id\": null,\n  \"prompt_cache_key\": \"publicista:pollo_prompt_compact:gpt-5.4-mini\",\n  \"prompt_cache_retention\": \"24h\",\n  \"reasoning\": {\n    \"effort\": \"none\",\n    \"summary\": null\n  },\n  \"safety_identifier\": null,\n  \"service_tier\": \"flex\",\n  \"store\": false,\n  \"temperature\": 1.0,\n  \"text\": {\n    \"format\": {\n      \"type\": \"json_schema\",\n      \"description\": null,\n      \"name\": \"publicista_pollo_prompt_compact\",\n      \"schema\": {\n        \"type\": \"object\",\n        \"additionalProperties\": false,\n        \"required\": [\n          \"prompt\"\n        ],\n        \"properties\": {\n          \"prompt\": {\n            \"type\": \"string\",\n            \"maxLength\": 1920\n          }\n        }\n      },\n      \"strict\": true\n    },\n    \"verbosity\": \"medium\"\n  },\n  \"tool_choice\": \"auto\",\n  \"tools\": [],\n  \"top_logprobs\": 0,\n  \"top_p\": 0.98,\n  \"truncation\": \"disabled\",\n  \"usage\": {\n    \"input_tokens\": 1343,\n    \"input_tokens_details\": {\n      \"cached_tokens\": 0\n    },\n    \"output_tokens\": 374,\n    \"output_tokens_details\": {\n      \"reasoning_tokens\": 0\n    },\n    \"total_tokens\": 1717\n  },\n  \"user\": null,\n  \"metadata\": {}\n}",
+    "error": "",
+    "used_model": "gpt-5.4-mini",
+    "service_tier": "flex",
+    "attempts": 3,
+    "retry_history": [
+        {
+            "attempt": 1,
+            "max_attempts": 5,
+            "http_code": 429,
+            "request_id": "req_3912df2e198c405dafb371cd1da99fb6",
+            "curl_error": "",
+            "error": "We're currently processing too many requests — please try again later.",
+            "retry_after_raw": "",
+            "retry_after_sec": 0,
+            "backoff_sec": 0.54,
+            "wait_sec": 0.54
+        },
+        {
+            "attempt": 2,
+            "max_attempts": 5,
+            "http_code": 429,
+            "request_id": "req_f60bc9d743c349408537e3afb69e2ab4",
+            "curl_error": "",
+            "error": "We're currently processing too many requests — please try again later.",
+            "retry_after_raw": "",
+            "retry_after_sec": 0,
+            "backoff_sec": 1.317,
+            "wait_sec": 1.317
+        }
+    ],
+    "original_length": 4398,
+    "target_chars": 1920,
+    "model_name": "pollo-image-v2",
+    "forced": 0
+}

@@ -1,0 +1,168 @@
+{
+    "ok": true,
+    "endpoint": "/v1/responses",
+    "http_code": 200,
+    "request_id": "req_1878de97dc804c81a265ed647e3c350f",
+    "decoded": {
+        "id": "resp_0907391b35c130b20169e1698b002c81a3b5cecab16f395c69",
+        "object": "response",
+        "created_at": 1776380299,
+        "status": "completed",
+        "background": false,
+        "billing": {
+            "payer": "developer"
+        },
+        "completed_at": 1776380308,
+        "error": null,
+        "frequency_penalty": 0,
+        "incomplete_details": null,
+        "instructions": null,
+        "max_output_tokens": null,
+        "max_tool_calls": null,
+        "model": "gpt-5.4-mini-2026-03-17",
+        "output": [
+            {
+                "id": "msg_0907391b35c130b20169e1698b5b6481a3bd85ef38621cd1fa",
+                "type": "message",
+                "status": "completed",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "annotations": [],
+                        "logprobs": [],
+                        "text": "{\"tone_used\":\"Equilibrado\",\"pack_angle\":\"Pack centrado en novedad local, trato cercano y presencia elegante, con dos niveles de intensidad: versión neutra para portales discretos y versión sugerente para captar más clic y respuesta.\",\"title_options\":[\"YARA EN BURIANA: PRESENCIA QUE NO PASA DESAPERCIBIDA\",\"YARA, DISPONIBLE EN BURRIANA PARA QUIEN SABE ELEGIR\",\"BURRIANA TIENE NOVEDAD Y SE LLAMA YARA ✨\",\"UNA SONRISA QUE INVITA A ESCRIBIR 💬\",\"YARA: ELEGANTE, CERCA Y CON MUY BUENA ENERGÍA\",\"SI BUSCAS ALGO DIFERENTE, AQUÍ ESTÁ YARA\",\"YARA EN BURRIANA | TRATO CERCANO Y ESTILO\",\"YARA NO ES UNA MÁS: DESCÚBRELO\",\"UNA CHICA CON CLASE Y MUCHO ENCANTO\",\"SI TE GUSTA EL BUEN TRATO, YA LA HAS ENCONTRADO\"],\"recommended_order\":[\"slot_1\",\"slot_2\",\"slot_3\",\"slot_4\",\"slot_5\",\"slot_6\",\"slot_7\",\"slot_8\",\"slot_9\",\"slot_10\"],\"publication_notes\":[\"Usa las variantes neutras en destacamos.net: mejor los títulos elegantes, sin palabras de reclamo explícitas y con enfoque en presencia, trato y discreción.\",\"Reserva las variantes sugerentes para loquosex.com, donde funcionan mejor los ganchos de curiosidad, el punto de morbo suave y los cierres más directos.\",\"Alterna títulos en MAYÚSCULAS con otros más limpios o mixtos para que no parezcan clonados y mejorar el CTR en varias publicaciones simultáneas.\",\"Mantén siempre el foco en Burriana y en el nombre Yara para reforzar recordación local; evita añadir datos no confirmados.\",\"No repitas demasiado las mismas fórmulas de apertura: combina novedad, cercanía, exclusividad y llamado a escribir para que cada anuncio parezca independiente.\"],\"ads\":[{\"slot\":\"slot_1\",\"focus\":\"Novedad local\",\"short_hook\":\"Si estás por Burriana, Yara es de esas novedades que llaman la atención desde el primer vistazo.\",\"title_neutral\":\"BURRIANA TIENE NOVEDAD Y SE LLAMA YARA ✨\",\"title_suggestive\":\"YARA EN BURRIANA: PRESENCIA QUE NO PASA DESAPERCIBIDA\",\"body_neutral\":\"Si estás por Burriana y te apetece algo distinto, aquí tienes una propuesta que destaca sin hacer ruido. Yara transmite PRESENCIA, cercanía y ese estilo que hace fácil empezar conversación. 💬 Una opción nueva en la zona, con buen trato y ganas de caer bien desde el primer mensaje.\",\"body_suggestive\":\"Si estás por Burriana, Yara es de esas novedades que llaman la atención desde el primer vistazo. Tiene presencia, estilo y un punto de misterio que invita a escribir. 😉 Disponible en la zona, con trato cercano y esa chispa que hace que el primer mensaje ya merezca la pena.\"},{\"slot\":\"slot_2\",\"focus\":\"Elegancia discreta\",\"short_hook\":\"No hace falta hacer ruido para destacar: Yara transmite presencia, clase y una energía muy agradable.\",\"title_neutral\":\"UNA CHICA CON CLASE Y MUCHO ENCANTO\",\"title_suggestive\":\"YARA, DISPONIBLE EN BURRIANA PARA QUIEN SABE ELEGIR\",\"body_neutral\":\"No hace falta hacer ruido para destacar: Yara transmite presencia, educación y una energía muy agradable. Es de esas chicas que dan buena impresión desde el principio y dejan ganas de seguir hablando. ✨ Una opción elegante, cercana y con buen gusto.\",\"body_suggestive\":\"No todo el mundo llama la atención igual. Yara transmite CLASE, presencia y una energía que encaja con quien busca algo con más estilo. 💫 Disponible en Burriana para quien sabe elegir y valora un trato cuidado, con ese punto de magnetismo que se nota al instante.\"},{\"slot\":\"slot_3\",\"focus\":\"Curiosidad por personalidad\",\"short_hook\":\"Hay perfiles que se ven y otros que te hacen querer escribir. Yara juega en esa segunda liga.\",\"title_neutral\":\"UNA SONRISA QUE INVITA A ESCRIBIR 💬\",\"title_suggestive\":\"YARA NO ES UNA MÁS: DESCÚBRELO\",\"body_neutral\":\"Hay perfiles que simplemente se ven y otros que te dejan con ganas de saber más. Yara entra en ese segundo grupo: natural, cercana y con una forma de conectar que hace muy fácil iniciar conversación. 💬 Si te gusta la chispa auténtica, aquí tienes una buena razón para escribir.\",\"body_suggestive\":\"Hay perfiles que pasan y otros que se quedan en la mente. Yara juega en esa segunda liga: una sonrisa que invita a acercarte y una presencia que despierta curiosidad desde el primer momento. 😘 No es una más, y eso se nota en cuanto la descubres.\"},{\"slot\":\"slot_4\",\"focus\":\"Trato cercano\",\"short_hook\":\"Si valoras el buen trato, aquí tienes una opción que encaja muy bien.\",\"title_neutral\":\"YARA: ELEGANTE, CERCA Y CON MUY BUENA ENERGÍA\",\"title_suggestive\":\"SI TE GUSTA EL BUEN TRATO, YA LA HAS ENCONTRADO\",\"body_neutral\":\"Si valoras el buen trato, aquí tienes una opción que encaja muy bien. Yara destaca por su forma de hablar, por su cercanía y por esa calidez que hace que todo resulte cómodo desde el primer mensaje. 🤍 Una presencia agradable, educada y fácil de encajar.\",\"body_suggestive\":\"Si te gusta el buen trato, ya tienes mucho adelantado. Yara conecta por su cercanía, por su naturalidad y por esa energía que hace que escribirle sea fácil y apetecible. 💬 Una chica con buen fondo, encanto y una forma de atender que suma desde el minuto uno.\"},{\"slot\":\"slot_5\",\"focus\":\"Sugerente controlado\",\"short_hook\":\"Hay miradas que invitan a quedarse un poco más. Yara tiene justo ese efecto.\",\"title_neutral\":\"YARA EN BURRIANA | TRATO CERCANO Y ESTILO\",\"title_suggestive\":\"HOY APETECE CONOCER A YARA 😘\",\"body_neutral\":\"Hay personas que entran por la mirada y otras por la forma de moverse; Yara reúne ambas cosas con naturalidad. Sin exagerar, transmite una presencia muy atractiva y un estilo cuidado que invita a escribir. ✨ Si te apetece algo con clase y un punto de magnetismo, puede ser el momento.\",\"body_suggestive\":\"Hay miradas que invitan a quedarse un poco más, y Yara tiene justo ese efecto. 😘 En Burriana deja una impresión clara: presencia, estilo y un punto sugerente que despierta curiosidad al momento. Si te apetece conocer a alguien que engancha sin esfuerzo, aquí la tienes.\"},{\"slot\":\"slot_6\",\"focus\":\"Exclusividad cercana\",\"short_hook\":\"No siempre aparece alguien que combine cercanía, estilo y una imagen tan cuidada.\",\"title_neutral\":\"SI BUSCAS ALGO DIFERENTE, AQUÍ ESTÁ YARA\",\"title_suggestive\":\"LO QUE TE PUEDE OFRECER YARA TE VA A SORPRENDER\",\"body_neutral\":\"No siempre aparece alguien que combine cercanía, estilo y una imagen tan cuidada. Yara tiene ese punto diferente que se agradece: buena presencia, trato agradable y una forma de estar que hace que quieras repetir mensaje. ✨\",\"body_suggestive\":\"Si buscas algo diferente, aquí está Yara. Tiene presencia, personalidad y un estilo que sorprende más cuanto más la miras. 😉 No es una propuesta cualquiera: destaca por cómo se presenta y por la sensación de que escribirle puede ser un acierto.\"},{\"slot\":\"slot_7\",\"focus\":\"Contacto fácil\",\"short_hook\":\"A veces lo mejor es simplemente dar el paso y escribir. Con Yara, el primer mensaje ya suma.\",\"title_neutral\":\"YARA EN BURRIANA | TRATO CERCANO Y ESTILO\",\"title_suggestive\":\"YARA, EL TIPO DE CHICA QUE DA GANAS DE ESCRIBIR\",\"body_neutral\":\"A veces lo mejor es simplemente dar el paso y escribir. Con Yara, el primer mensaje ya suma porque responde a esa idea de trato fácil, conversación fluida y atención agradable. 💬 Si te gusta que todo resulte natural desde el principio, esta es una buena opción.\",\"body_suggestive\":\"Hay chicas que te hacen pensar en escribir antes incluso de terminar de verlas. Yara tiene ese efecto: cercanía, estilo y una presencia que invita a romper el hielo. 💬 Con ella, el primer mensaje no cuesta y la conversación promete desde el inicio.\"},{\"slot\":\"slot_8\",\"focus\":\"Encanto femenino\",\"short_hook\":\"Tiene ese encanto que no necesita presentación larga: se nota, se siente y llama la atención.\",\"title_neutral\":\"CERCANA, ALEGRE Y CON MUCHO ARTE: YARA\",\"title_suggestive\":\"UNA CHICA CON CLASE Y MUCHO ENCANTO\",\"body_neutral\":\"Yara tiene ese encanto que no necesita presentación larga: se nota, se siente y llama la atención. Su forma de estar transmite seguridad, simpatía y una energía muy agradable. ✨ Una presencia femenina que entra fácil y deja buena impresión.\",\"body_suggestive\":\"Tiene ese encanto que no necesita presentación larga: se nota, se siente y llama la atención. Yara mezcla seguridad, simpatía y una forma de estar que resulta muy atractiva. 😘 Si te gustan las chicas con arte, presencia y un punto de magnetismo, aquí la tienes.\"},{\"slot\":\"slot_9\",\"focus\":\"Versión premium humana\",\"short_hook\":\"Si quieres alguien que no parezca una copia más, Yara se nota diferente desde el principio.\",\"title_neutral\":\"YARA ENTRA POR LA MIRADA Y CONVENCE AL HABLAR\",\"title_suggestive\":\"BURRIANA TIENE A YARA, Y ESO SE NOTA\",\"body_neutral\":\"Si quieres alguien que no parezca una copia más, Yara se nota diferente desde el principio. Tiene personalidad, buena energía y un trato de verdad, de esos que hacen que la experiencia de escribir resulte fácil y agradable. 💬 Una propuesta con presencia y autenticidad.\",\"body_suggestive\":\"Burriana tiene a Yara, y eso se nota. Entra por la mirada, engancha por la presencia y convence cuando empieza a hablar. 😉 Si te apetece algo con personalidad, buena energía y una forma de conectar que no se olvida, merece la pena escribirle.\"},{\"slot\":\"slot_10\",\"focus\":\"Gancho por cercanía emocional\",\"short_hook\":\"No todo va de apariencia: también importa cómo te hacen sentir al escribirles.\",\"title_neutral\":\"SI TE GUSTA EL BUEN TRATO, YA LA HAS ENCONTRADO\",\"title_suggestive\":\"UN PLAN DIFERENTE HOY EN BURRIANA\",\"body_neutral\":\"No todo va de apariencia: también importa cómo te hacen sentir al escribir. Yara destaca por su forma de tratar, por su naturalidad y por lo fácil que resulta conectar con ella. 🤍 Si buscas una conversación cómoda y un ambiente agradable, aquí encaja muy bien.\",\"body_suggestive\":\"No todo va de apariencia: también importa la sensación que deja alguien al escribirle. Yara tiene esa mezcla de cercanía, atractivo y naturalidad que convierte un mensaje cualquiera en un plan diferente. ✨ Si hoy te apetece salir de lo típico en Burriana, ya sabes por dónde empezar.\"}]}"
+                    }
+                ],
+                "phase": "final_answer",
+                "role": "assistant"
+            }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": "publicista:copy_pack:gpt-5.4-mini",
+        "prompt_cache_retention": "24h",
+        "reasoning": {
+            "effort": "none",
+            "summary": null
+        },
+        "safety_identifier": null,
+        "service_tier": "flex",
+        "store": false,
+        "temperature": 1,
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "description": null,
+                "name": "publicista_copy_pack",
+                "schema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "tone_used",
+                        "pack_angle",
+                        "title_options",
+                        "ads",
+                        "publication_notes",
+                        "recommended_order"
+                    ],
+                    "properties": {
+                        "tone_used": {
+                            "type": "string"
+                        },
+                        "pack_angle": {
+                            "type": "string"
+                        },
+                        "title_options": {
+                            "type": "array",
+                            "minItems": 10,
+                            "maxItems": 10,
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "recommended_order": {
+                            "type": "array",
+                            "minItems": 10,
+                            "maxItems": 10,
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "publication_notes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "ads": {
+                            "type": "array",
+                            "minItems": 10,
+                            "maxItems": 10,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                    "slot",
+                                    "focus",
+                                    "short_hook",
+                                    "title_neutral",
+                                    "title_suggestive",
+                                    "body_neutral",
+                                    "body_suggestive"
+                                ],
+                                "properties": {
+                                    "slot": {
+                                        "type": "string"
+                                    },
+                                    "focus": {
+                                        "type": "string"
+                                    },
+                                    "short_hook": {
+                                        "type": "string"
+                                    },
+                                    "title_neutral": {
+                                        "type": "string"
+                                    },
+                                    "title_suggestive": {
+                                        "type": "string"
+                                    },
+                                    "body_neutral": {
+                                        "type": "string"
+                                    },
+                                    "body_suggestive": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "strict": true
+            },
+            "verbosity": "medium"
+        },
+        "tool_choice": "auto",
+        "tools": [],
+        "top_logprobs": 0,
+        "top_p": 0.98,
+        "truncation": "disabled",
+        "usage": {
+            "input_tokens": 4910,
+            "input_tokens_details": {
+                "cached_tokens": 0
+            },
+            "output_tokens": 2467,
+            "output_tokens_details": {
+                "reasoning_tokens": 0
+            },
+            "total_tokens": 7377
+        },
+        "user": null,
+        "metadata": []
+    },
+    "raw_body": "{\n  \"id\": \"resp_0907391b35c130b20169e1698b002c81a3b5cecab16f395c69\",\n  \"object\": \"response\",\n  \"created_at\": 1776380299,\n  \"status\": \"completed\",\n  \"background\": false,\n  \"billing\": {\n    \"payer\": \"developer\"\n  },\n  \"completed_at\": 1776380308,\n  \"error\": null,\n  \"frequency_penalty\": 0.0,\n  \"incomplete_details\": null,\n  \"instructions\": null,\n  \"max_output_tokens\": null,\n  \"max_tool_calls\": null,\n  \"model\": \"gpt-5.4-mini-2026-03-17\",\n  \"output\": [\n    {\n      \"id\": \"msg_0907391b35c130b20169e1698b5b6481a3bd85ef38621cd1fa\",\n      \"type\": \"message\",\n      \"status\": \"completed\",\n      \"content\": [\n        {\n          \"type\": \"output_text\",\n          \"annotations\": [],\n          \"logprobs\": [],\n          \"text\": \"{\\\"tone_used\\\":\\\"Equilibrado\\\",\\\"pack_angle\\\":\\\"Pack centrado en novedad local, trato cercano y presencia elegante, con dos niveles de intensidad: versi\\u00f3n neutra para portales discretos y versi\\u00f3n sugerente para captar m\\u00e1s clic y respuesta.\\\",\\\"title_options\\\":[\\\"YARA EN BURIANA: PRESENCIA QUE NO PASA DESAPERCIBIDA\\\",\\\"YARA, DISPONIBLE EN BURRIANA PARA QUIEN SABE ELEGIR\\\",\\\"BURRIANA TIENE NOVEDAD Y SE LLAMA YARA \\u2728\\\",\\\"UNA SONRISA QUE INVITA A ESCRIBIR \\ud83d\\udcac\\\",\\\"YARA: ELEGANTE, CERCA Y CON MUY BUENA ENERG\\u00cdA\\\",\\\"SI BUSCAS ALGO DIFERENTE, AQU\\u00cd EST\\u00c1 YARA\\\",\\\"YARA EN BURRIANA | TRATO CERCANO Y ESTILO\\\",\\\"YARA NO ES UNA M\\u00c1S: DESC\\u00daBRELO\\\",\\\"UNA CHICA CON CLASE Y MUCHO ENCANTO\\\",\\\"SI TE GUSTA EL BUEN TRATO, YA LA HAS ENCONTRADO\\\"],\\\"recommended_order\\\":[\\\"slot_1\\\",\\\"slot_2\\\",\\\"slot_3\\\",\\\"slot_4\\\",\\\"slot_5\\\",\\\"slot_6\\\",\\\"slot_7\\\",\\\"slot_8\\\",\\\"slot_9\\\",\\\"slot_10\\\"],\\\"publication_notes\\\":[\\\"Usa las variantes neutras en destacamos.net: mejor los t\\u00edtulos elegantes, sin palabras de reclamo expl\\u00edcitas y con enfoque en presencia, trato y discreci\\u00f3n.\\\",\\\"Reserva las variantes sugerentes para loquosex.com, donde funcionan mejor los ganchos de curiosidad, el punto de morbo suave y los cierres m\\u00e1s directos.\\\",\\\"Alterna t\\u00edtulos en MAY\\u00daSCULAS con otros m\\u00e1s limpios o mixtos para que no parezcan clonados y mejorar el CTR en varias publicaciones simult\\u00e1neas.\\\",\\\"Mant\\u00e9n siempre el foco en Burriana y en el nombre Yara para reforzar recordaci\\u00f3n local; evita a\\u00f1adir datos no confirmados.\\\",\\\"No repitas demasiado las mismas f\\u00f3rmulas de apertura: combina novedad, cercan\\u00eda, exclusividad y llamado a escribir para que cada anuncio parezca independiente.\\\"],\\\"ads\\\":[{\\\"slot\\\":\\\"slot_1\\\",\\\"focus\\\":\\\"Novedad local\\\",\\\"short_hook\\\":\\\"Si est\\u00e1s por Burriana, Yara es de esas novedades que llaman la atenci\\u00f3n desde el primer vistazo.\\\",\\\"title_neutral\\\":\\\"BURRIANA TIENE NOVEDAD Y SE LLAMA YARA \\u2728\\\",\\\"title_suggestive\\\":\\\"YARA EN BURRIANA: PRESENCIA QUE NO PASA DESAPERCIBIDA\\\",\\\"body_neutral\\\":\\\"Si est\\u00e1s por Burriana y te apetece algo distinto, aqu\\u00ed tienes una propuesta que destaca sin hacer ruido. Yara transmite PRESENCIA, cercan\\u00eda y ese estilo que hace f\\u00e1cil empezar conversaci\\u00f3n. \\ud83d\\udcac Una opci\\u00f3n nueva en la zona, con buen trato y ganas de caer bien desde el primer mensaje.\\\",\\\"body_suggestive\\\":\\\"Si est\\u00e1s por Burriana, Yara es de esas novedades que llaman la atenci\\u00f3n desde el primer vistazo. Tiene presencia, estilo y un punto de misterio que invita a escribir. \\ud83d\\ude09 Disponible en la zona, con trato cercano y esa chispa que hace que el primer mensaje ya merezca la pena.\\\"},{\\\"slot\\\":\\\"slot_2\\\",\\\"focus\\\":\\\"Elegancia discreta\\\",\\\"short_hook\\\":\\\"No hace falta hacer ruido para destacar: Yara transmite presencia, clase y una energ\\u00eda muy agradable.\\\",\\\"title_neutral\\\":\\\"UNA CHICA CON CLASE Y MUCHO ENCANTO\\\",\\\"title_suggestive\\\":\\\"YARA, DISPONIBLE EN BURRIANA PARA QUIEN SABE ELEGIR\\\",\\\"body_neutral\\\":\\\"No hace falta hacer ruido para destacar: Yara transmite presencia, educaci\\u00f3n y una energ\\u00eda muy agradable. Es de esas chicas que dan buena impresi\\u00f3n desde el principio y dejan ganas de seguir hablando. \\u2728 Una opci\\u00f3n elegante, cercana y con buen gusto.\\\",\\\"body_suggestive\\\":\\\"No todo el mundo llama la atenci\\u00f3n igual. Yara transmite CLASE, presencia y una energ\\u00eda que encaja con quien busca algo con m\\u00e1s estilo. \\ud83d\\udcab Disponible en Burriana para quien sabe elegir y valora un trato cuidado, con ese punto de magnetismo que se nota al instante.\\\"},{\\\"slot\\\":\\\"slot_3\\\",\\\"focus\\\":\\\"Curiosidad por personalidad\\\",\\\"short_hook\\\":\\\"Hay perfiles que se ven y otros que te hacen querer escribir. Yara juega en esa segunda liga.\\\",\\\"title_neutral\\\":\\\"UNA SONRISA QUE INVITA A ESCRIBIR \\ud83d\\udcac\\\",\\\"title_suggestive\\\":\\\"YARA NO ES UNA M\\u00c1S: DESC\\u00daBRELO\\\",\\\"body_neutral\\\":\\\"Hay perfiles que simplemente se ven y otros que te dejan con ganas de saber m\\u00e1s. Yara entra en ese segundo grupo: natural, cercana y con una forma de conectar que hace muy f\\u00e1cil iniciar conversaci\\u00f3n. \\ud83d\\udcac Si te gusta la chispa aut\\u00e9ntica, aqu\\u00ed tienes una buena raz\\u00f3n para escribir.\\\",\\\"body_suggestive\\\":\\\"Hay perfiles que pasan y otros que se quedan en la mente. Yara juega en esa segunda liga: una sonrisa que invita a acercarte y una presencia que despierta curiosidad desde el primer momento. \\ud83d\\ude18 No es una m\\u00e1s, y eso se nota en cuanto la descubres.\\\"},{\\\"slot\\\":\\\"slot_4\\\",\\\"focus\\\":\\\"Trato cercano\\\",\\\"short_hook\\\":\\\"Si valoras el buen trato, aqu\\u00ed tienes una opci\\u00f3n que encaja muy bien.\\\",\\\"title_neutral\\\":\\\"YARA: ELEGANTE, CERCA Y CON MUY BUENA ENERG\\u00cdA\\\",\\\"title_suggestive\\\":\\\"SI TE GUSTA EL BUEN TRATO, YA LA HAS ENCONTRADO\\\",\\\"body_neutral\\\":\\\"Si valoras el buen trato, aqu\\u00ed tienes una opci\\u00f3n que encaja muy bien. Yara destaca por su forma de hablar, por su cercan\\u00eda y por esa calidez que hace que todo resulte c\\u00f3modo desde el primer mensaje. \\ud83e\\udd0d Una presencia agradable, educada y f\\u00e1cil de encajar.\\\",\\\"body_suggestive\\\":\\\"Si te gusta el buen trato, ya tienes mucho adelantado. Yara conecta por su cercan\\u00eda, por su naturalidad y por esa energ\\u00eda que hace que escribirle sea f\\u00e1cil y apetecible. \\ud83d\\udcac Una chica con buen fondo, encanto y una forma de atender que suma desde el minuto uno.\\\"},{\\\"slot\\\":\\\"slot_5\\\",\\\"focus\\\":\\\"Sugerente controlado\\\",\\\"short_hook\\\":\\\"Hay miradas que invitan a quedarse un poco m\\u00e1s. Yara tiene justo ese efecto.\\\",\\\"title_neutral\\\":\\\"YARA EN BURRIANA | TRATO CERCANO Y ESTILO\\\",\\\"title_suggestive\\\":\\\"HOY APETECE CONOCER A YARA \\ud83d\\ude18\\\",\\\"body_neutral\\\":\\\"Hay personas que entran por la mirada y otras por la forma de moverse; Yara re\\u00fane ambas cosas con naturalidad. Sin exagerar, transmite una presencia muy atractiva y un estilo cuidado que invita a escribir. \\u2728 Si te apetece algo con clase y un punto de magnetismo, puede ser el momento.\\\",\\\"body_suggestive\\\":\\\"Hay miradas que invitan a quedarse un poco m\\u00e1s, y Yara tiene justo ese efecto. \\ud83d\\ude18 En Burriana deja una impresi\\u00f3n clara: presencia, estilo y un punto sugerente que despierta curiosidad al momento. Si te apetece conocer a alguien que engancha sin esfuerzo, aqu\\u00ed la tienes.\\\"},{\\\"slot\\\":\\\"slot_6\\\",\\\"focus\\\":\\\"Exclusividad cercana\\\",\\\"short_hook\\\":\\\"No siempre aparece alguien que combine cercan\\u00eda, estilo y una imagen tan cuidada.\\\",\\\"title_neutral\\\":\\\"SI BUSCAS ALGO DIFERENTE, AQU\\u00cd EST\\u00c1 YARA\\\",\\\"title_suggestive\\\":\\\"LO QUE TE PUEDE OFRECER YARA TE VA A SORPRENDER\\\",\\\"body_neutral\\\":\\\"No siempre aparece alguien que combine cercan\\u00eda, estilo y una imagen tan cuidada. Yara tiene ese punto diferente que se agradece: buena presencia, trato agradable y una forma de estar que hace que quieras repetir mensaje. \\u2728\\\",\\\"body_suggestive\\\":\\\"Si buscas algo diferente, aqu\\u00ed est\\u00e1 Yara. Tiene presencia, personalidad y un estilo que sorprende m\\u00e1s cuanto m\\u00e1s la miras. \\ud83d\\ude09 No es una propuesta cualquiera: destaca por c\\u00f3mo se presenta y por la sensaci\\u00f3n de que escribirle puede ser un acierto.\\\"},{\\\"slot\\\":\\\"slot_7\\\",\\\"focus\\\":\\\"Contacto f\\u00e1cil\\\",\\\"short_hook\\\":\\\"A veces lo mejor es simplemente dar el paso y escribir. Con Yara, el primer mensaje ya suma.\\\",\\\"title_neutral\\\":\\\"YARA EN BURRIANA | TRATO CERCANO Y ESTILO\\\",\\\"title_suggestive\\\":\\\"YARA, EL TIPO DE CHICA QUE DA GANAS DE ESCRIBIR\\\",\\\"body_neutral\\\":\\\"A veces lo mejor es simplemente dar el paso y escribir. Con Yara, el primer mensaje ya suma porque responde a esa idea de trato f\\u00e1cil, conversaci\\u00f3n fluida y atenci\\u00f3n agradable. \\ud83d\\udcac Si te gusta que todo resulte natural desde el principio, esta es una buena opci\\u00f3n.\\\",\\\"body_suggestive\\\":\\\"Hay chicas que te hacen pensar en escribir antes incluso de terminar de verlas. Yara tiene ese efecto: cercan\\u00eda, estilo y una presencia que invita a romper el hielo. \\ud83d\\udcac Con ella, el primer mensaje no cuesta y la conversaci\\u00f3n promete desde el inicio.\\\"},{\\\"slot\\\":\\\"slot_8\\\",\\\"focus\\\":\\\"Encanto femenino\\\",\\\"short_hook\\\":\\\"Tiene ese encanto que no necesita presentaci\\u00f3n larga: se nota, se siente y llama la atenci\\u00f3n.\\\",\\\"title_neutral\\\":\\\"CERCANA, ALEGRE Y CON MUCHO ARTE: YARA\\\",\\\"title_suggestive\\\":\\\"UNA CHICA CON CLASE Y MUCHO ENCANTO\\\",\\\"body_neutral\\\":\\\"Yara tiene ese encanto que no necesita presentaci\\u00f3n larga: se nota, se siente y llama la atenci\\u00f3n. Su forma de estar transmite seguridad, simpat\\u00eda y una energ\\u00eda muy agradable. \\u2728 Una presencia femenina que entra f\\u00e1cil y deja buena impresi\\u00f3n.\\\",\\\"body_suggestive\\\":\\\"Tiene ese encanto que no necesita presentaci\\u00f3n larga: se nota, se siente y llama la atenci\\u00f3n. Yara mezcla seguridad, simpat\\u00eda y una forma de estar que resulta muy atractiva. \\ud83d\\ude18 Si te gustan las chicas con arte, presencia y un punto de magnetismo, aqu\\u00ed la tienes.\\\"},{\\\"slot\\\":\\\"slot_9\\\",\\\"focus\\\":\\\"Versi\\u00f3n premium humana\\\",\\\"short_hook\\\":\\\"Si quieres alguien que no parezca una copia m\\u00e1s, Yara se nota diferente desde el principio.\\\",\\\"title_neutral\\\":\\\"YARA ENTRA POR LA MIRADA Y CONVENCE AL HABLAR\\\",\\\"title_suggestive\\\":\\\"BURRIANA TIENE A YARA, Y ESO SE NOTA\\\",\\\"body_neutral\\\":\\\"Si quieres alguien que no parezca una copia m\\u00e1s, Yara se nota diferente desde el principio. Tiene personalidad, buena energ\\u00eda y un trato de verdad, de esos que hacen que la experiencia de escribir resulte f\\u00e1cil y agradable. \\ud83d\\udcac Una propuesta con presencia y autenticidad.\\\",\\\"body_suggestive\\\":\\\"Burriana tiene a Yara, y eso se nota. Entra por la mirada, engancha por la presencia y convence cuando empieza a hablar. \\ud83d\\ude09 Si te apetece algo con personalidad, buena energ\\u00eda y una forma de conectar que no se olvida, merece la pena escribirle.\\\"},{\\\"slot\\\":\\\"slot_10\\\",\\\"focus\\\":\\\"Gancho por cercan\\u00eda emocional\\\",\\\"short_hook\\\":\\\"No todo va de apariencia: tambi\\u00e9n importa c\\u00f3mo te hacen sentir al escribirles.\\\",\\\"title_neutral\\\":\\\"SI TE GUSTA EL BUEN TRATO, YA LA HAS ENCONTRADO\\\",\\\"title_suggestive\\\":\\\"UN PLAN DIFERENTE HOY EN BURRIANA\\\",\\\"body_neutral\\\":\\\"No todo va de apariencia: tambi\\u00e9n importa c\\u00f3mo te hacen sentir al escribir. Yara destaca por su forma de tratar, por su naturalidad y por lo f\\u00e1cil que resulta conectar con ella. \\ud83e\\udd0d Si buscas una conversaci\\u00f3n c\\u00f3moda y un ambiente agradable, aqu\\u00ed encaja muy bien.\\\",\\\"body_suggestive\\\":\\\"No todo va de apariencia: tambi\\u00e9n importa la sensaci\\u00f3n que deja alguien al escribirle. Yara tiene esa mezcla de cercan\\u00eda, atractivo y naturalidad que convierte un mensaje cualquiera en un plan diferente. \\u2728 Si hoy te apetece salir de lo t\\u00edpico en Burriana, ya sabes por d\\u00f3nde empezar.\\\"}]}\"\n        }\n      ],\n      \"phase\": \"final_answer\",\n      \"role\": \"assistant\"\n    }\n  ],\n  \"parallel_tool_calls\": true,\n  \"presence_penalty\": 0.0,\n  \"previous_response_id\": null,\n  \"prompt_cache_key\": \"publicista:copy_pack:gpt-5.4-mini\",\n  \"prompt_cache_retention\": \"24h\",\n  \"reasoning\": {\n    \"effort\": \"none\",\n    \"summary\": null\n  },\n  \"safety_identifier\": null,\n  \"service_tier\": \"flex\",\n  \"store\": false,\n  \"temperature\": 1.0,\n  \"text\": {\n    \"format\": {\n      \"type\": \"json_schema\",\n      \"description\": null,\n      \"name\": \"publicista_copy_pack\",\n      \"schema\": {\n        \"type\": \"object\",\n        \"additionalProperties\": false,\n        \"required\": [\n          \"tone_used\",\n          \"pack_angle\",\n          \"title_options\",\n          \"ads\",\n          \"publication_notes\",\n          \"recommended_order\"\n        ],\n        \"properties\": {\n          \"tone_used\": {\n            \"type\": \"string\"\n          },\n          \"pack_angle\": {\n            \"type\": \"string\"\n          },\n          \"title_options\": {\n            \"type\": \"array\",\n            \"minItems\": 10,\n            \"maxItems\": 10,\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          \"recommended_order\": {\n            \"type\": \"array\",\n            \"minItems\": 10,\n            \"maxItems\": 10,\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          \"publication_notes\": {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          \"ads\": {\n            \"type\": \"array\",\n            \"minItems\": 10,\n            \"maxItems\": 10,\n            \"items\": {\n              \"type\": \"object\",\n              \"additionalProperties\": false,\n              \"required\": [\n                \"slot\",\n                \"focus\",\n                \"short_hook\",\n                \"title_neutral\",\n                \"title_suggestive\",\n                \"body_neutral\",\n                \"body_suggestive\"\n              ],\n              \"properties\": {\n                \"slot\": {\n                  \"type\": \"string\"\n                },\n                \"focus\": {\n                  \"type\": \"string\"\n                },\n                \"short_hook\": {\n                  \"type\": \"string\"\n                },\n                \"title_neutral\": {\n                  \"type\": \"string\"\n                },\n                \"title_suggestive\": {\n                  \"type\": \"string\"\n                },\n                \"body_neutral\": {\n                  \"type\": \"string\"\n                },\n                \"body_suggestive\": {\n                  \"type\": \"string\"\n                }\n              }\n            }\n          }\n        }\n      },\n      \"strict\": true\n    },\n    \"verbosity\": \"medium\"\n  },\n  \"tool_choice\": \"auto\",\n  \"tools\": [],\n  \"top_logprobs\": 0,\n  \"top_p\": 0.98,\n  \"truncation\": \"disabled\",\n  \"usage\": {\n    \"input_tokens\": 4910,\n    \"input_tokens_details\": {\n      \"cached_tokens\": 0\n    },\n    \"output_tokens\": 2467,\n    \"output_tokens_details\": {\n      \"reasoning_tokens\": 0\n    },\n    \"total_tokens\": 7377\n  },\n  \"user\": null,\n  \"metadata\": {}\n}",
+    "error": "",
+    "used_model": "gpt-5.4-mini",
+    "service_tier": "flex"
+}

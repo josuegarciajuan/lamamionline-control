@@ -1,0 +1,1749 @@
+<?php
+
+function handle_post_actions() {
+    $action = request_post('action');
+
+    if ($action === 'login') {
+        $user = trim(request_post('username'));
+        $pass = (string)request_post('password');
+        if (login_user($user, $pass)) {
+            set_flash('ok', 'Bienvenida al sistema.');
+            redirect_to('index.php?page=dashboard');
+        }
+        set_flash('error', 'Usuario o contraseña incorrectos.');
+        redirect_to('index.php?page=login');
+    }
+
+    if (!is_logged_in()) {
+        if ($action === 'voice_command') {
+            voice_json_response(voice_build_response(array(
+                'ok' => false,
+                'stage' => 'error',
+                'message' => 'La sesión no está activa.',
+                'errors' => array('auth_required'),
+            )));
+        }
+        redirect_to('index.php?page=login');
+    }
+
+    switch ($action) {
+        case 'save_interesada':
+            action_save_interesada();
+            break;
+        case 'delete_interesada':
+            action_delete_generic('interesadas.json', 'Interesada eliminada.', lamami_tab_url('interesadas'));
+            break;
+        case 'set_interesada_estado':
+            action_set_interesada_estado();
+            break;
+        case 'convert_interesada':
+            action_convert_interesada();
+            break;
+        case 'save_clienta':
+            action_save_clienta();
+            break;
+        case 'baja_clienta':
+            action_baja_clienta();
+            break;
+        case 'alta_clienta':
+            action_alta_clienta();
+            break;
+        case 'save_bot':
+            action_save_bot();
+            break;
+        case 'delete_bot':
+            action_delete_generic('bots.json', 'Bot eliminado.', 'index.php?page=bots');
+            break;
+        case 'set_bot_runtime_mode':
+            action_set_bot_runtime_mode();
+            break;
+        case 'set_dashboard_external_bot_runtime_mode':
+            action_set_dashboard_external_bot_runtime_mode();
+            break;
+        case 'quick_lead':
+            action_quick_lead();
+            break;
+        case 'delete_lead':
+            action_delete_lead();
+            break;
+        case 'generate_bot_assets':
+            action_generate_bot_assets();
+            break;
+        case 'save_josue_text':
+            action_save_josue_text();
+            break;
+        case 'save_casawasap_contacto':
+            action_save_casawasap_contacto();
+            break;
+        case 'convert_casawasap_cliente':
+            action_convert_casawasap_cliente();
+            break;
+        case 'casawasap_add_pago':
+            action_casawasap_add_pago();
+            break;
+        case 'delete_casawasap_pago':
+            action_delete_casawasap_pago();
+            break;
+        case 'save_jostal_interesada':
+            action_save_jostal_interesada();
+            break;
+        case 'convert_jostal_clienta':
+            action_convert_jostal_clienta();
+            break;
+        case 'save_jostal_clienta':
+            action_save_jostal_clienta();
+            break;
+        case 'jostal_add_lead':
+            action_jostal_add_lead();
+            break;
+        case 'jostal_add_venta':
+            action_jostal_add_venta();
+            break;
+        case 'add_gasto':
+            action_add_gasto();
+            break;
+        case 'delete_gasto':
+            action_delete_gasto();
+            break;
+
+        case 'set_casawasap_estado':
+            action_set_casawasap_estado();
+            break;
+        case 'baja_casawasap_cliente':
+            action_baja_casawasap_cliente();
+            break;
+        case 'alta_casawasap_cliente':
+            action_alta_casawasap_cliente();
+            break;
+
+        case 'discard_jostal_interesada':
+            action_discard_jostal_interesada();
+            break;
+        case 'reactivate_jostal_interesada':
+            action_reactivate_jostal_interesada();
+            break;
+        case 'jostal_salida_casa':
+            action_jostal_salida_casa();
+            break;
+        case 'jostal_reactivar_casa':
+            action_jostal_reactivar_casa();
+            break;
+
+        case 'unlock_josue_anuncios':
+            action_unlock_josue_anuncios();
+            break;
+        case 'save_anuncio':
+            action_save_anuncio();
+            break;
+        case 'delete_anuncio':
+            action_delete_anuncio();
+            break;
+
+        case 'unlock_josue_anuncios':
+            action_unlock_josue_anuncios();
+            break;
+        case 'save_anuncio':
+            action_save_anuncio();
+            break;
+        case 'delete_anuncio':
+            action_delete_anuncio();
+            break;
+        case 'save_telefono':
+            action_save_telefono();
+            break;
+        case 'delete_telefono':
+            action_delete_telefono();
+            break;
+        case 'save_sendtaxs_state':
+            action_save_sendtaxs_state();
+            break;
+        case 'dismiss_aviso':
+            action_dismiss_aviso();
+            break;
+        case 'save_agenda':
+            action_save_agenda();
+            break;
+        case 'delete_agenda':
+            action_delete_agenda();
+            break;
+        case 'create_manual_aviso':
+            action_create_manual_aviso();
+            break;
+        case 'delete_planned_aviso':
+            action_delete_planned_aviso();
+            break;
+
+        case 'save_configm':
+            action_save_configm();
+            break;
+        case 'save_access_config':
+            action_save_access_config();
+            break;
+        case 'save_voice_ai_config':
+            action_save_voice_ai_config();
+            break;
+
+        case 'save_lamamibot':
+            action_save_lamamibot();
+            break;
+
+        case 'generate_lamamibot_assets':
+            action_generate_lamamibot_assets();
+            break;
+        case 'set_lamamibot_runtime_mode':
+            action_set_lamamibot_runtime_mode();
+            break;
+
+        case 'create_publicista_job':
+            action_create_publicista_job();
+            break;
+        case 'save_publicista_job':
+            action_save_publicista_job();
+            break;
+        case 'delete_publicista_job':
+            action_delete_publicista_job();
+            break;
+        case 'prepare_publicista_job_engine':
+            action_prepare_publicista_job_engine();
+            break;
+        case 'run_publicista_image_pipeline':
+            action_run_publicista_image_pipeline();
+            break;
+        case 'regenerate_publicista_candidate':
+            action_regenerate_publicista_candidate();
+            break;
+        case 'refresh_publicista_final_local':
+            action_refresh_publicista_final_local();
+            break;
+        case 'mark_publicista_pack_definitive':
+            action_mark_publicista_pack_definitive();
+            break;
+        case 'generate_publicista_copy_pack':
+            action_generate_publicista_copy_pack();
+            break;
+        case 'duplicate_publicista_job':
+            action_duplicate_publicista_job();
+            break;
+        case 'voice_command':
+            action_voice_command();
+            break;
+    }
+}
+
+function action_create_publicista_job() {
+    $clientaId = trim((string)request_post('clienta_id'));
+    $clienta = $clientaId !== '' ? storage_find_by_id('clientes.json', $clientaId) : null;
+
+    if (!$clienta) {
+        set_flash('error', 'Selecciona una clienta válida para crear el trabajo de Publicista.');
+        redirect_to(publicista_tab_url());
+    }
+
+    $clientaNombre = trim((string)($clienta['nombre'] ?? 'Clienta'));
+    $nombreTrabajo = trim((string)request_post('nombre_trabajo'));
+    if ($nombreTrabajo === '') {
+        $nombreTrabajo = 'Pack ' . $clientaNombre . ' ' . date('Y-m-d');
+    }
+
+    $restrictionFlags = publicista_normalize_restriction_flags(request_post('restriction_flags', array()));
+    $autoRegenerate = !empty($_POST['auto_regenerate']) ? 1 : 0;
+    $job = publicista_job_defaults();
+    $job['clienta_id'] = trim((string)($clienta['id'] ?? ''));
+    $job['clienta_nombre_snapshot'] = $clientaNombre;
+    $job['nombre_trabajo'] = $nombreTrabajo;
+    $job['estado'] = 'draft';
+    $job['notas'] = trim((string)request_post('notas'));
+    $job['physical_notes'] = trim((string)request_post('physical_notes'));
+    $job['services_snapshot'] = trim((string)request_post('services_snapshot', $clienta['servicios'] ?? ''));
+    $job['tarifas_snapshot'] = trim((string)request_post('tarifas_snapshot', $clienta['tarifas'] ?? ''));
+    $job['localidad_snapshot'] = trim((string)request_post('localidad_snapshot', $clienta['localidad'] ?? ''));
+    $job['provincia_snapshot'] = trim((string)request_post('provincia_snapshot', $clienta['provincia'] ?? ''));
+    $job['workflow'] = array_merge(isset($job['workflow']) && is_array($job['workflow']) ? $job['workflow'] : array(), array(
+        'restrictions_text' => trim((string)request_post('restrictions_text')),
+        'restriction_flags' => $restrictionFlags,
+        'auto_regenerate' => $autoRegenerate,
+        'pack_final' => 0,
+        'pack_finalized_at' => '',
+        'pack_final_note' => '',
+    ));
+    $job['copy_pack'] = array_merge(isset($job['copy_pack']) && is_array($job['copy_pack']) ? $job['copy_pack'] : array(), array(
+        'desired_tone' => trim((string)request_post('copy_tone', 'equilibrado')),
+        'examples_base' => trim((string)request_post('copy_examples_base')),
+    ));
+
+    list($ok, $result) = publicista_job_save($job);
+    if (!$ok) {
+        set_flash('error', is_string($result) ? $result : 'No se pudo crear el trabajo de Publicista.');
+        redirect_to(publicista_tab_url());
+    }
+
+    $savedJob = is_array($result) ? $result : publicista_job_get($job['id']);
+    $mode = trim((string)request_post('create_mode', 'draft'));
+    $uploadedFile = isset($_FILES['source_image']) && is_array($_FILES['source_image']) ? $_FILES['source_image'] : null;
+
+    if ($mode === 'generate') {
+        if (!$uploadedFile || (int)($uploadedFile['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            set_flash('error', 'Para crear y generar necesitas subir una imagen original.');
+            redirect_to(publicista_tab_url(array('job' => $savedJob['id'])));
+        }
+
+        list($okPipeline, $pipelineResult) = publicista_run_image_pipeline($savedJob['id'], $uploadedFile);
+        if (!$okPipeline) {
+            set_flash('error', is_string($pipelineResult) ? $pipelineResult : 'Se creó el trabajo, pero falló la generación inicial.');
+            redirect_to(publicista_tab_url(array('job' => $savedJob['id'])));
+        }
+
+        $summary = trim((string)($pipelineResult['pipeline']['summary'] ?? ''));
+        set_flash('ok', $summary !== '' ? $summary : 'Trabajo creado y pipeline lanzado correctamente.');
+        redirect_to(publicista_tab_url(array('job' => $savedJob['id'])));
+    }
+
+    set_flash('ok', 'Trabajo de Publicista creado. Ya tienes la estructura base lista para este pack.');
+    redirect_to(publicista_tab_url(array('job' => $savedJob['id'])));
+}
+
+function action_save_publicista_job() {
+    $id = trim((string)request_post('id'));
+    $existing = publicista_job_get($id);
+
+    if (!$existing) {
+        set_flash('error', 'No se encontró el trabajo de Publicista.');
+        redirect_to(publicista_tab_url());
+    }
+
+    $clientaId = trim((string)request_post('clienta_id'));
+    $clienta = $clientaId !== '' ? storage_find_by_id('clientes.json', $clientaId) : null;
+    if (!$clienta) {
+        set_flash('error', 'Selecciona una clienta válida.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
+    $row = $existing;
+    $row['clienta_id'] = trim((string)($clienta['id'] ?? ''));
+    $row['clienta_nombre_snapshot'] = trim((string)($clienta['nombre'] ?? ''));
+    $row['nombre_trabajo'] = trim((string)request_post('nombre_trabajo'));
+    $row['estado'] = trim((string)request_post('estado', $existing['estado'] ?? 'draft'));
+    $row['notas'] = trim((string)request_post('notas'));
+    $row['physical_notes'] = trim((string)request_post('physical_notes'));
+    $row['services_snapshot'] = trim((string)request_post('services_snapshot'));
+    $row['tarifas_snapshot'] = trim((string)request_post('tarifas_snapshot'));
+    $row['localidad_snapshot'] = trim((string)request_post('localidad_snapshot'));
+    $row['provincia_snapshot'] = trim((string)request_post('provincia_snapshot'));
+    $row['workflow'] = array_merge(isset($existing['workflow']) && is_array($existing['workflow']) ? $existing['workflow'] : array(), array(
+        'restrictions_text' => trim((string)request_post('restrictions_text')),
+        'restriction_flags' => publicista_normalize_restriction_flags(request_post('restriction_flags', array())),
+        'auto_regenerate' => !empty($_POST['auto_regenerate']) ? 1 : 0,
+    ));
+    $row['copy_pack'] = array_merge(isset($existing['copy_pack']) && is_array($existing['copy_pack']) ? $existing['copy_pack'] : array(), array(
+        'desired_tone' => trim((string)request_post('copy_tone', 'equilibrado')),
+        'examples_base' => trim((string)request_post('copy_examples_base')),
+    ));
+
+    list($ok, $result) = publicista_job_save($row);
+    if (!$ok) {
+        set_flash('error', is_string($result) ? $result : 'No se pudo guardar el trabajo de Publicista.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
+    set_flash('ok', 'Trabajo de Publicista guardado.');
+    redirect_to(publicista_tab_url(array('job' => $id)));
+}
+
+function action_delete_publicista_job() {
+    $id = trim((string)request_post('id'));
+    list($ok, $message) = publicista_job_delete($id);
+
+    set_flash($ok ? 'ok' : 'error', $message);
+    redirect_to(publicista_tab_url());
+}
+
+
+function action_prepare_publicista_job_engine() {
+    $id = trim((string)request_post('id'));
+    $job = publicista_job_get($id);
+    if (!$job) {
+        set_flash('error', 'No se encontró el trabajo de Publicista.');
+        redirect_to(publicista_tab_url());
+    }
+
+    $uploadedFile = isset($_FILES['source_image']) && is_array($_FILES['source_image']) ? $_FILES['source_image'] : null;
+    list($ok, $result) = publicista_prepare_job_engine($id, $uploadedFile);
+
+    if (!$ok) {
+        set_flash('error', is_string($result) ? $result : 'No se pudo preparar el motor técnico del trabajo.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
+    set_flash('ok', 'Origen preparado: imagen guardada, preview local creada y descriptor OpenAI generado.');
+    redirect_to(publicista_tab_url(array('job' => $id)));
+}
+
+
+function action_run_publicista_image_pipeline() {
+    $id = trim((string)request_post('id'));
+    $uploadedFile = isset($_FILES['source_image']) ? $_FILES['source_image'] : null;
+
+    list($ok, $result) = publicista_run_image_pipeline($id, $uploadedFile);
+    if (!$ok) {
+        set_flash('error', is_string($result) ? $result : 'No se pudo completar el pipeline de imágenes de Publicista.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
+    $summary = trim((string)($result['pipeline']['summary'] ?? ''));
+    set_flash('ok', $summary !== '' ? $summary : 'Pipeline de imágenes completado.');
+    redirect_to(publicista_tab_url(array('job' => $id)));
+}
+
+
+function action_regenerate_publicista_candidate() {
+    $id = trim((string)request_post('id'));
+    $candidateId = trim((string)request_post('candidate_id'));
+    list($ok, $result) = publicista_regenerate_candidate($id, $candidateId);
+    if (!$ok) {
+        set_flash('error', is_string($result) ? $result : 'No se pudo regenerar la candidata.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+    set_flash('ok', 'Candidata regenerada y finales recompuestos.');
+    redirect_to(publicista_tab_url(array('job' => $id)));
+}
+
+function action_refresh_publicista_final_local() {
+    $id = trim((string)request_post('id'));
+    $finalId = trim((string)request_post('final_id'));
+    $mode = trim((string)request_post('mode', 'refresh'));
+    list($ok, $result) = publicista_refresh_final_local_assets($id, $finalId, $mode);
+    if (!$ok) {
+        set_flash('error', is_string($result) ? $result : 'No se pudo refrescar la imagen final.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+    $msg = $mode === 'reframe' ? 'Formato 1:1 rehecho y pack recompuesto.' : 'Blur reaplicado y pack recompuesto.';
+    set_flash('ok', $msg);
+    redirect_to(publicista_tab_url(array('job' => $id)));
+}
+
+function action_mark_publicista_pack_definitive() {
+    $id = trim((string)request_post('id'));
+    list($ok, $result) = publicista_mark_pack_definitive($id);
+    if (!$ok) {
+        set_flash('error', is_string($result) ? $result : 'No se pudo marcar el pack como definitivo.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+    set_flash('ok', 'Pack marcado como definitivo.');
+    redirect_to(publicista_tab_url(array('job' => $id)));
+}
+
+function action_generate_publicista_copy_pack() {
+    $id = trim((string)request_post('id'));
+    list($ok, $result) = publicista_generate_copy_pack($id, true);
+    if (!$ok) {
+        set_flash('error', is_string($result) ? $result : 'No se pudo generar el pack de títulos y textos.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+    set_flash('ok', 'Pack de títulos y textos generado.');
+    redirect_to(publicista_tab_url(array('job' => $id)));
+}
+
+function action_duplicate_publicista_job() {
+    $id = trim((string)request_post('id'));
+    list($ok, $result) = publicista_duplicate_job($id);
+    if (!$ok) {
+        set_flash('error', is_string($result) ? $result : 'No se pudo duplicar el trabajo de Publicista.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+    $newId = is_array($result) ? trim((string)($result['id'] ?? '')) : '';
+    set_flash('ok', 'Trabajo duplicado como base.');
+    redirect_to(publicista_tab_url(array('job' => $newId !== '' ? $newId : $id)));
+}
+
+function action_voice_command() {
+    $commandText = trim((string)request_post('voice_command_text'));
+    $contextJson = trim((string)request_post('voice_context_json'));
+    $context = array();
+    $interaction = array(
+        'pending_token' => trim((string)request_post('voice_pending_token')),
+        'followup_action' => trim((string)request_post('voice_followup_action')),
+        'followup_value' => trim((string)request_post('voice_followup_value')),
+    );
+
+    if ($contextJson !== '') {
+        $decoded = json_decode($contextJson, true);
+        if (is_array($decoded)) {
+            $context = $decoded;
+        }
+    }
+
+    $response = voice_handle_command($commandText, $context, $interaction);
+    voice_json_response($response);
+}
+
+function action_delete_generic($file, $message, $redirect) {
+    $id = request_post('id');
+    if ($id !== '') {
+        storage_delete($file, $id);
+    }
+    set_flash('ok', $message);
+    redirect_to($redirect);
+}
+
+function action_save_interesada() {
+    $id = request_post('id');
+    if ($id === '') $id = generate_id('int');
+
+    $existing = storage_find_by_id('interesadas.json', $id);
+
+    $row = array(
+        'id' => $id,
+        'telefono' => trim(request_post('telefono')),
+        'observaciones' => trim(request_post('observaciones')),
+        'movil_origen' => trim(request_post('movil_origen')),
+        'estado' => trim(request_post('estado', 'nueva')),
+        'cliente_id' => trim(request_post('cliente_id')),
+        'updated_at' => now_datetime()
+    );
+
+    if ($existing && isset($existing['created_at'])) {
+        $row['created_at'] = $existing['created_at'];
+    } else {
+        $row['created_at'] = now_datetime();
+    }
+
+    if ($existing && isset($existing['convertida_at'])) {
+        $row['convertida_at'] = $existing['convertida_at'];
+    }
+
+    storage_upsert('interesadas.json', $row);
+    set_flash('ok', 'Interesada guardada correctamente.');
+    //redirect_to('index.php?page=interesadas');
+    redirect_to(lamami_tab_url('interesadas'));
+}
+
+function action_set_interesada_estado() {
+    $id = request_post('id');
+    $estado = trim(request_post('estado'));
+    $row = storage_find_by_id('interesadas.json', $id);
+
+    if (!$row) {
+        set_flash('error', 'Interesada no encontrada.');
+        redirect_to(lamami_tab_url('interesadas'));
+    }
+
+    $row['estado'] = $estado;
+    $row['updated_at'] = now_datetime();
+    storage_upsert('interesadas.json', $row);
+
+    $fb = interesada_state_feedback($estado);
+    set_flash($fb[0], $fb[1], $fb[2]);
+    redirect_to(lamami_tab_url('clientas'));
+}
+
+function action_convert_interesada() {
+    $interesadaId = request_post('interesada_id');
+    $interesada = storage_find_by_id('interesadas.json', $interesadaId);
+
+    if (!$interesada) {
+        set_flash('error', 'No se encontró la interesada.');
+        redirect_to('index.php?page=interesadas');
+    }
+
+    $clienteId = generate_id('cli');
+    $cliente = array(
+        'id' => $clienteId,
+        'nombre' => trim(request_post('nombre')),
+        'telefono' => trim(request_post('telefono')),
+        'localidad' => trim(request_post('localidad')),
+        'provincia' => trim(request_post('provincia')),
+        'fecha_alta' => request_post('fecha_alta', business_today_date()),
+        'precio_alta' => to_float(request_post('precio_alta'), 0),
+        'modo_pago' => trim(request_post('modo_pago')),
+        'notas' => trim(request_post('notas')),
+        'estado' => 'alta',
+        'created_at' => now_datetime(),
+        'updated_at' => now_datetime(),
+        'source_interesada_id' => $interesadaId
+    );
+
+    storage_upsert('clientes.json', $cliente);
+
+    $interesadas = storage_read('interesadas.json');
+    foreach ($interesadas as $i => $item) {
+        if (isset($item['id']) && $item['id'] === $interesadaId) {
+            $interesadas[$i]['estado'] = 'convertida';
+            $interesadas[$i]['cliente_id'] = $clienteId;
+            $interesadas[$i]['convertida_at'] = now_datetime();
+            $interesadas[$i]['updated_at'] = now_datetime();
+            break;
+        }
+    }
+    storage_write('interesadas.json', $interesadas);
+
+    set_flash('ok', '¡Excelente! Interesada convertida en clienta.', 'celebrate');
+    redirect_to('index.php?page=clientas');
+}
+
+function action_save_clienta() {
+    $id = request_post('id');
+    $existing = storage_find_by_id('clientes.json', $id);
+
+    if (!$existing) {
+        set_flash('error', 'No se puede crear una clienta directamente. Debe venir de una interesada.');
+        redirect_to(lamami_tab_url('interesadas'));
+    }
+
+    $row = array(
+        'id' => $id,
+        'nombre' => trim(request_post('nombre')),
+        'telefono' => trim(request_post('telefono')),
+        'localidad' => trim(request_post('localidad')),
+        'provincia' => trim(request_post('provincia')),
+        'fecha_alta' => request_post('fecha_alta', $existing['fecha_alta']),
+        'precio_alta' => to_float(request_post('precio_alta'), $existing['precio_alta']),
+        'modo_pago' => trim(request_post('modo_pago')),
+        'notas' => trim(request_post('notas')),
+        'estado' => trim(request_post('estado', $existing['estado'])),
+        'ubicacion_maps' => trim(request_post('ubicacion_maps')),
+        'zona' => trim(request_post('zona')),
+        'servicios' => trim(request_post('servicios')),
+        'tarifas' => trim(request_post('tarifas')),
+        'updated_at' => now_datetime()
+    );
+
+    $row['created_at'] = isset($existing['created_at']) ? $existing['created_at'] : now_datetime();
+    $row['source_interesada_id'] = isset($existing['source_interesada_id']) ? $existing['source_interesada_id'] : '';
+    if (isset($existing['fecha_baja'])) $row['fecha_baja'] = $existing['fecha_baja'];
+
+    storage_upsert('clientes.json', $row);
+    set_flash('ok', 'Clienta actualizada.');
+    redirect_to(lamami_tab_url('clientas', array('edit' => $id)));
+}
+
+function action_baja_clienta() {
+    $id = request_post('id');
+    $existing = storage_find_by_id('clientes.json', $id);
+    if (!$existing) {
+        set_flash('error', 'Clienta no encontrada.');
+        redirect_to(lamami_tab_url('clientas'));
+    }
+
+    if (clienta_has_linked_bot($id)) {
+        set_flash('error', 'No se puede dar de baja mientras tenga un bot vinculado.');
+        redirect_to(lamami_tab_url('clientas', array('edit' => $id)));
+    }
+
+    $existing['estado'] = 'baja';
+    $existing['fecha_baja'] = request_post('fecha_baja', business_today_date());
+    $existing['updated_at'] = now_datetime();
+    storage_upsert('clientes.json', $existing);
+    set_flash('ok', 'Clienta dada de baja.');
+    redirect_to(lamami_tab_url('clientas', array('edit' => $id)));
+}
+
+function action_alta_clienta() {
+    $id = request_post('id');
+    $existing = storage_find_by_id('clientes.json', $id);
+    if (!$existing) {
+        set_flash('error', 'Clienta no encontrada.');
+        redirect_to(lamami_tab_url('clientas'));
+    }
+    $existing['estado'] = 'alta';
+    $existing['updated_at'] = now_datetime();
+    storage_upsert('clientes.json', $existing);
+    set_flash('ok', 'Clienta reactivada.');
+    redirect_to(lamami_tab_url('clientas', array('edit' => $id)));
+}
+
+function action_save_bot() {
+    $id = request_post('id');
+    if ($id === '') $id = generate_id('bot');
+
+    $row = array(
+        'id' => $id,
+        'nombre_bot' => trim(request_post('nombre_bot')),
+        'telefono_bot' => trim(request_post('telefono_bot')),
+        'waha_port' => trim(request_post('waha_port')),
+        'cliente_id' => trim(request_post('cliente_id')),
+        'server_ip' => trim(request_post('server_ip', '100.113.76.93')),
+        'bot_mode' => trim(request_post('bot_mode', 'multiple')),
+        'ubicacion_maps' => trim(request_post('ubicacion_maps')),
+        'zona' => trim(request_post('zona')),
+        'servicios' => trim(request_post('servicios')),
+        'tarifas' => trim(request_post('tarifas')),
+        'estado' => trim(request_post('estado')),
+        'updated_at' => now_datetime()
+    );
+
+    $existing = storage_find_by_id('bots.json', $id);
+    if ($existing) {
+        if (!isset($row['server_ip']) || $row['server_ip'] === '') {
+            $row['server_ip'] = $existing['server_ip'] ?? '100.113.76.93';
+        }
+        if (!isset($row['bot_mode']) || $row['bot_mode'] === '') {
+            $row['bot_mode'] = $existing['bot_mode'] ?? 'multiple';
+        }
+    }
+    if ($existing && isset($existing['created_at'])) {
+        $row['created_at'] = $existing['created_at'];
+    } else {
+        $row['created_at'] = now_datetime();
+    }
+
+    storage_upsert('bots.json', $row);
+    set_flash('ok', 'Bot guardado correctamente.');
+    redirect_to('index.php?page=bots&edit=' . urlencode($id));
+}
+
+function action_save_lamamibot() {
+    $telefonosRows = storage_read('telefonos.json');
+    $telefonosIdx = array();
+    foreach ($telefonosRows as $row) {
+        $id = trim((string)($row['id'] ?? ''));
+        if ($id !== '') {
+            $telefonosIdx[$id] = $row;
+        }
+    }
+
+    $clientasRows = get_active_clientas();
+    $clientasIdx = array();
+    foreach ($clientasRows as $row) {
+        $id = trim((string)($row['id'] ?? ''));
+        if ($id !== '') {
+            $clientasIdx[$id] = $row;
+        }
+    }
+
+    $telefonosIdsRaw = isset($_POST['telefonos_ids']) && is_array($_POST['telefonos_ids'])
+        ? $_POST['telefonos_ids']
+        : array();
+
+    $clientasIdsRaw = isset($_POST['clientas_ids']) && is_array($_POST['clientas_ids'])
+        ? $_POST['clientas_ids']
+        : array();
+
+    $telefonosIds = array();
+    foreach ($telefonosIdsRaw as $id) {
+        $id = trim((string)$id);
+        if ($id === '') continue;
+        if (!isset($telefonosIdx[$id])) continue;
+        if (!in_array($id, $telefonosIds, true)) {
+            $telefonosIds[] = $id;
+        }
+    }
+
+    $clientasIds = array();
+    foreach ($clientasIdsRaw as $id) {
+        $id = trim((string)$id);
+        if ($id === '') continue;
+        if (!isset($clientasIdx[$id])) continue;
+        if (!in_array($id, $clientasIds, true)) {
+            $clientasIds[] = $id;
+        }
+    }
+
+    $nombreBot = trim(request_post('nombre_bot', 'LamamiBot'));
+    if ($nombreBot === '') {
+        $nombreBot = 'LamamiBot';
+    }
+
+    $estado = trim(request_post('estado'));
+
+    $cfg = array_merge(lamamibot_get(), array(
+        'nombre_bot' => $nombreBot,
+        'estado' => $estado,
+        'telefonos_ids' => $telefonosIds,
+        'clientas_ids' => $clientasIds,
+        'girlsconf_json_path' => lamamibot_girlsconf_json_path(),
+        'girlsconf_base_url' => lamamibot_girlsconf_base_url(),
+    ));
+
+    $sync = lamamibot_sync_girlsconf($clientasIds);
+    $syncSummary = lamamibot_build_sync_summary($telefonosIds, $clientasIds, $sync);
+
+    $cfg['last_sync_at'] = now_datetime();
+    $cfg['last_sync_summary'] = $syncSummary;
+
+    $genOk = false;
+    $genResult = null;
+
+    if (!empty($sync['ok'])) {
+        list($genOk, $genResult) = lamamibot_generate_bot_bundle($cfg);
+        if ($genOk) {
+            $cfg['generated_assets'] = $genResult;
+        }
+    }
+
+    lamamibot_save($cfg);
+
+    if (empty($sync['ok'])) {
+        set_flash(
+            'error',
+            'LamamiBot guardado, pero la sincronización con girlsconf_lamamidef falló: ' . ($sync['message'] ?? 'Error desconocido.')
+        );
+        redirect_to(lamami_tab_url('lamamibot'));
+    }
+
+    if (!$genOk) {
+        set_flash(
+            'error',
+            $syncSummary . ' · La configuración se guardó, pero no se pudo regenerar el JSON del bot: ' . (is_string($genResult) ? $genResult : 'Error desconocido.')
+        );
+        redirect_to(lamami_tab_url('lamamibot'));
+    }
+
+    $msg = $syncSummary . ' · ' . ($genResult['summary'] ?? 'JSON del bot regenerado.');
+    if (!empty($genResult['warnings']) && is_array($genResult['warnings'])) {
+        $msg .= ' · Avisos: ' . implode(' | ', $genResult['warnings']);
+    }
+
+    set_flash('ok', $msg);
+    redirect_to(lamami_tab_url('lamamibot'));
+}
+
+function action_generate_lamamibot_assets() {
+    $cfg = lamamibot_get();
+
+    list($ok, $result) = lamamibot_generate_bot_bundle($cfg);
+
+    if (!$ok) {
+        set_flash('error', 'No se pudo regenerar el JSON de LamamiBot: ' . $result);
+        redirect_to(lamami_tab_url('lamamibot'));
+    }
+
+    $cfg['generated_assets'] = $result;
+    lamamibot_save($cfg);
+
+    $msg = $result['summary'] ?? 'JSON del bot regenerado.';
+    if (!empty($result['warnings']) && is_array($result['warnings'])) {
+        $msg .= ' · Avisos: ' . implode(' | ', $result['warnings']);
+    }
+
+    set_flash('ok', $msg);
+    redirect_to(lamami_tab_url('lamamibot'));
+}
+
+function action_set_lamamibot_runtime_mode() {
+    $mode = strtolower(trim(request_post('mode')));
+    if ($mode !== 'start' && $mode !== 'stop') {
+        set_flash('error', 'Modo no válido. Usa start o stop.');
+        redirect_to(lamami_tab_url('lamamibot'));
+    }
+
+    $cfg = lamamibot_get();
+    $runtimeBot = array(
+        'nombre_bot' => function_exists('lamamibot_bot_slug') ? lamamibot_bot_slug($cfg) : (string)($cfg['nombre_bot'] ?? 'lamamibot'),
+        'generated_assets' => is_array($cfg['generated_assets'] ?? null) ? $cfg['generated_assets'] : array(),
+    );
+
+    list($ok, $written, $errors) = bot_runtime_set_mode($runtimeBot, $mode);
+
+    if (!$ok) {
+        set_flash('error', 'No se pudo cambiar el estado runtime de LamamiBot. ' . implode(' | ', $errors));
+        redirect_to(lamami_tab_url('lamamibot'));
+    }
+
+    $label = ($mode === 'start') ? 'encendido' : 'apagado';
+    $msg = 'LamamiBot ' . $label . ' correctamente.';
+    if (!empty($written)) {
+        $msg .= ' Mode file actualizado en: ' . implode(' | ', $written);
+    }
+
+    set_flash('ok', $msg);
+    redirect_to(lamami_tab_url('lamamibot'));
+}
+
+function build_lead_row($id, $clientaId, $fechaHora, $precioLead, $observaciones) {
+    $clientas = clientes_index();
+    if (!isset($clientas[$clientaId])) {
+        return array(false, 'Clienta no encontrada.');
+    }
+
+    $clienta = $clientas[$clientaId];
+    $bot = get_clienta_current_bot($clientaId);
+
+    if (!$bot) {
+        return array(false, 'Esta clienta no tiene bot vinculado. No se puede registrar el lead.');
+    }
+
+    return array(true, array(
+        'id' => $id,
+        'cliente_id' => $clientaId,
+        'cliente_nombre' => isset($clienta['nombre']) ? $clienta['nombre'] : '',
+        'bot_id' => isset($bot['id']) ? $bot['id'] : '',
+        'bot_nombre' => isset($bot['nombre_bot']) ? $bot['nombre_bot'] : '',
+        'fecha_hora' => $fechaHora,
+        'precio_lead' => $precioLead,
+        'observaciones' => $observaciones,
+        'updated_at' => now_datetime()
+    ));
+}
+
+function action_quick_lead() {
+    $settings = settings_get();
+    $defaultPrice = isset($settings['lead_default_price']) ? $settings['lead_default_price'] : 10;
+    $id = generate_id('lead');
+    $clientaId = trim(request_post('cliente_id'));
+
+    list($ok, $result) = build_lead_row(
+        $id,
+        $clientaId,
+        request_post('fecha_hora', today_datetime_local()),
+        request_post('precio_lead') === '' ? (float)$defaultPrice : to_float(request_post('precio_lead')),
+        trim(request_post('observaciones'))
+    );
+
+    if (!$ok) {
+        set_flash('error', $result);
+        redirect_to(lamami_tab_url('clientas', array('edit' => $clientaId)));
+    }
+
+    $row = $result;
+    $row['created_at'] = now_datetime();
+
+    storage_upsert('leads.json', $row);
+    set_flash('ok', lead_success_message($row['precio_lead']), 'money');
+    redirect_to(lamami_tab_url('clientas', array('edit' => $clientaId)));
+}
+
+function action_delete_lead() {
+    $id = request_post('id');
+    $clientaId = request_post('clienta_id');
+    if ($id !== '') {
+        storage_delete('leads.json', $id);
+    }
+    set_flash('ok', 'Lead eliminado.');
+    redirect_to(lamami_tab_url('clientas', array('edit' => $clientaId)));
+}
+function action_generate_bot_assets() {
+    $id = trim(request_post('id'));
+    if ($id === '') {
+        set_flash('error', 'Falta el ID del bot.');
+        redirect_to('index.php?page=bots');
+    }
+
+    $bot = storage_find_by_id('bots.json', $id);
+    if (!$bot) {
+        set_flash('error', 'Bot no encontrado.');
+        redirect_to('index.php?page=bots');
+    }
+
+    $clienteId = trim((string)($bot['cliente_id'] ?? ''));
+    if ($clienteId === '') {
+        set_flash('error', 'Este bot no tiene clienta vinculada.');
+        redirect_to('index.php?page=bots&edit=' . urlencode($id));
+    }
+
+    $clienta = storage_find_by_id('clientes.json', $clienteId);
+    if (!$clienta) {
+        set_flash('error', 'La clienta vinculada no existe.');
+        redirect_to('index.php?page=bots&edit=' . urlencode($id));
+    }
+
+    list($ok, $result) = lamami_generate_bot_bundle($bot, $clienta);
+
+    if (!$ok) {
+        set_flash('error', $result);
+        redirect_to('index.php?page=bots&edit=' . urlencode($id));
+    }
+
+    $bot['generated_assets'] = $result;
+    $bot['updated_at'] = now_datetime();
+
+    storage_upsert('bots.json', $bot);
+
+    set_flash('ok', 'Pack del bot generado correctamente.');
+    redirect_to('index.php?page=bots&edit=' . urlencode($id));
+}
+
+
+function action_set_bot_runtime_mode() {
+    $id = trim(request_post('id'));
+    $mode = trim(request_post('mode', 'start'));
+    $redirect = trim(request_post('redirect', 'index.php?page=bots'));
+
+    if ($id === '') {
+        set_flash('error', 'Falta el ID del bot.');
+        redirect_to($redirect);
+    }
+
+    $bot = storage_find_by_id('bots.json', $id);
+    if (!$bot) {
+        set_flash('error', 'No se encontró el bot.');
+        redirect_to($redirect);
+    }
+
+    list($ok, $written, $errors) = bot_runtime_set_mode($bot, $mode);
+    if (!$ok) {
+        $hint = ' Revisa permisos/propietario del fichero .bot_mode y de la carpeta /srv/n8n_data. Si el archivo lo creó n8n con otro dueño, este código ya intenta recrearlo, pero si la carpeta no es escribible por PHP habrá que corregir permisos una sola vez en el servidor.';
+        set_flash('error', 'No se pudo cambiar el estado runtime del bot. ' . implode(' | ', $errors) . $hint);
+        redirect_to($redirect);
+    }
+
+    $label = strtolower($mode) === 'stop' ? 'apagado' : 'encendido';
+    set_flash('ok', 'Bot ' . ($bot['nombre_bot'] ?? 'sin nombre') . ' ' . $label . ' correctamente.');
+    redirect_to($redirect);
+}
+
+function action_set_dashboard_external_bot_runtime_mode() {
+    $mode = trim(request_post('mode', 'start'));
+    $redirect = trim(request_post('redirect', 'index.php?page=dashboard'));
+    $bot = dashboard_external_bot_virtual();
+
+    list($ok, $written, $errors) = bot_runtime_set_mode($bot, $mode);
+    if (!$ok) {
+        $hint = ' Revisa permisos/propietario del fichero .bot_mode y de la carpeta /srv/n8n_data. Si el archivo lo creó n8n con otro dueño, este código ya intenta recrearlo, pero si la carpeta no es escribible por PHP habrá que corregir permisos una sola vez en el servidor.';
+        set_flash('error', 'No se pudo cambiar el estado runtime del bot externo. ' . implode(' | ', $errors) . $hint);
+        redirect_to($redirect);
+    }
+
+    $label = strtolower($mode) === 'stop' ? 'apagado' : 'encendido';
+    set_flash('ok', 'Bot externo ' . $label . ' correctamente.');
+    redirect_to($redirect);
+}
+
+function action_save_josue_text() {
+    $tab = trim(request_post('tab'));
+    $allowed = array('publias', 'captacion', 'notas', 'waha');
+
+    if (!in_array($tab, $allowed, true)) {
+        set_flash('error', 'Subsección no válida.');
+        redirect_to('index.php?page=josue');
+    }
+
+    $text = trim(request_post('text'));
+    $settings = storage_read('settings.json');
+    $settings[$tab . '_text'] = $text;
+    $settings['updated_at'] = now_datetime();
+    storage_write('settings.json', $settings);
+
+    set_flash('ok', 'Texto guardado correctamente.');
+    redirect_to('index.php?page=josue&tab=' . urlencode($tab));
+}
+
+function action_save_configm() {
+    $settings = storage_read('settings.json');
+    $defaults = is_file(BASE_PATH . '/avisos_config.php') ? (require BASE_PATH . '/avisos_config.php') : array();
+
+    $config = array();
+
+    foreach ($defaults as $key => $defaultValue) {
+        if ($key === 'whatsapp_sender_key') {
+            continue;
+        }
+        if ($key === 'whatsapp_target_phones') {
+            continue;
+        }
+
+        $raw = request_post($key, $defaultValue);
+
+        if (is_int($defaultValue)) {
+            $config[$key] = (int)$raw;
+        } elseif (is_float($defaultValue)) {
+            $config[$key] = (float)str_replace(',', '.', (string)$raw);
+        } else {
+            $config[$key] = is_string($raw) ? trim($raw) : $raw;
+        }
+    }
+
+    $senderKey = trim((string)request_post('whatsapp_sender_key', 'dulce_oficina'));
+    $presets = avisos_sender_presets();
+    if (!isset($presets[$senderKey])) {
+        $senderKey = 'dulce_oficina';
+    }
+
+    $targetPhones = trim((string)request_post('whatsapp_target_phones', "654464023\n641993776"));
+
+    $config['whatsapp_sender_key'] = $senderKey;
+    $config['whatsapp_target_phones'] = $targetPhones;
+
+    $settings['avisos_config'] = $config;
+    $settings['updated_at'] = now_datetime();
+
+    storage_write('settings.json', $settings);
+
+    set_flash('ok', 'Configuración guardada correctamente.');
+    redirect_to('index.php?page=josue&tab=configm');
+}
+
+
+function action_save_access_config() {
+    $settings = storage_read('settings.json');
+    $raw = trim((string)request_post('whitelist_ips', "84.125.78.95
+79.116.229.72"));
+    $ips = preg_split('/[
+,;]+/', $raw);
+    $clean = array();
+
+    foreach ((array)$ips as $ip) {
+        $ip = trim((string)$ip);
+        if ($ip === '') continue;
+        if (!filter_var($ip, FILTER_VALIDATE_IP)) continue;
+        $clean[$ip] = $ip;
+    }
+
+    if (empty($clean)) {
+        $clean['84.125.78.95'] = '84.125.78.95';
+        $clean['79.116.229.72'] = '79.116.229.72';
+    }
+
+    $settings['whitelist_ips'] = array_values($clean);
+    $settings['updated_at'] = now_datetime();
+    storage_write('settings.json', $settings);
+
+    set_flash('ok', 'Whitelist de IPs guardada correctamente.');
+    redirect_to('index.php?page=josue&tab=config');
+}
+
+function action_save_voice_ai_config() {
+    $settings = storage_read('settings.json');
+
+    $apiKey = trim((string)request_post('voice_ai_api_key'));
+    $model = trim((string)request_post('voice_ai_model'));
+
+    if ($apiKey === '') {
+        $apiKey = voice_ai_default_api_key();
+    }
+    if ($model === '') {
+        $model = 'gpt-5.1';
+    }
+
+    $settings['voice_ai_api_key'] = $apiKey;
+    $settings['voice_ai_model'] = $model;
+    $settings['updated_at'] = now_datetime();
+    storage_write('settings.json', $settings);
+
+    if ($apiKey === '') {
+        set_flash('error', 'Configuración guardada, pero no se detectó ninguna API key por defecto en la plantilla del bot.');
+    } else {
+        set_flash('ok', 'Configuración de IA de voz guardada correctamente.');
+    }
+
+    redirect_to('index.php?page=josue&tab=config');
+}
+
+function action_save_casawasap_contacto() {
+    $id = trim(request_post('id'));
+    if ($id === '') $id = generate_id('casa');
+
+    $existing = storage_find_by_id('casawasap_contactos.json', $id);
+
+    $row = array(
+        'id' => $id,
+        'telefono' => trim(request_post('telefono')),
+        'notas' => trim(request_post('notas')),
+        'quien_lo_trae' => trim(request_post('quien_lo_trae')),
+        'estado' => $existing && isset($existing['estado']) ? $existing['estado'] : 'interesado',
+        'updated_at' => now_datetime()
+    );
+
+    if ($existing && isset($existing['nombre'])) $row['nombre'] = $existing['nombre'];
+    if ($existing && isset($existing['precio'])) $row['precio'] = $existing['precio'];
+    if ($existing && isset($existing['cliente_at'])) $row['cliente_at'] = $existing['cliente_at'];
+    if ($existing && isset($existing['periodicidad_cobro'])) $row['periodicidad_cobro'] = $existing['periodicidad_cobro'];
+
+    $row['created_at'] = ($existing && isset($existing['created_at'])) ? $existing['created_at'] : now_datetime();
+
+    storage_upsert('casawasap_contactos.json', $row);
+    set_flash('ok', 'Contacto de Casawasap guardado.');
+    redirect_to('index.php?page=casawasap&edit=' . urlencode($id));
+}
+
+function action_convert_casawasap_cliente() {
+    $id = trim(request_post('id'));
+    $existing = storage_find_by_id('casawasap_contactos.json', $id);
+
+    if (!$existing) {
+        set_flash('error', 'Interesado no encontrado.');
+        redirect_to('index.php?page=casawasap');
+    }
+
+    $existing['estado'] = 'cliente';
+    $existing['nombre'] = trim(request_post('nombre'));
+    $existing['precio'] = to_float(request_post('precio'), 0);
+    $existing['periodicidad_cobro'] = trim(request_post('periodicidad_cobro', 'semanal'));
+    $existing['cliente_at'] = isset($existing['cliente_at']) ? $existing['cliente_at'] : now_datetime();
+    $existing['updated_at'] = now_datetime();
+
+    storage_upsert('casawasap_contactos.json', $existing);
+    set_flash('ok', 'Interesado convertido en cliente de Casawasap.', 'celebrate');
+    redirect_to('index.php?page=casawasap&edit=' . urlencode($id));
+}
+
+function action_casawasap_add_pago() {
+    $clienteId = trim(request_post('cliente_id'));
+    $cliente = storage_find_by_id('casawasap_contactos.json', $clienteId);
+
+    if (!$cliente || !isset($cliente['estado']) || $cliente['estado'] !== 'cliente') {
+        set_flash('error', 'Cliente de Casawasap no encontrado.');
+        redirect_to('index.php?page=casawasap');
+    }
+
+    $row = array(
+        'id' => generate_id('cpago'),
+        'cliente_id' => $clienteId,
+        'cliente_nombre' => isset($cliente['nombre']) ? $cliente['nombre'] : '',
+        'fecha_hora' => request_post('fecha_hora', today_datetime_local()),
+        'importe' => to_float(request_post('importe'), 0),
+        'observaciones' => trim(request_post('observaciones')),
+        'created_at' => now_datetime(),
+        'updated_at' => now_datetime()
+    );
+
+    storage_upsert('casawasap_pagos.json', $row);
+    set_flash('ok', 'Pago registrado: +' . euro($row['importe']), 'money');
+    redirect_to('index.php?page=casawasap&edit=' . urlencode($clienteId));
+}
+
+function action_delete_casawasap_pago() {
+    $id = trim(request_post('id'));
+    $clienteId = trim(request_post('cliente_id'));
+
+    if ($id !== '') {
+        storage_delete('casawasap_pagos.json', $id);
+    }
+
+    set_flash('ok', 'Pago eliminado.');
+    redirect_to('index.php?page=casawasap&edit=' . urlencode($clienteId));
+}
+
+
+function action_save_jostal_interesada() {
+    $id = trim(request_post('id'));
+    if ($id === '') $id = generate_id('jint');
+
+    $existing = storage_find_by_id('jostal_interesadas.json', $id);
+
+    $row = array(
+        'id' => $id,
+        'telefono' => trim(request_post('telefono')),
+        'observaciones' => trim(request_post('observaciones')),
+        'interesada_en' => trim(request_post('interesada_en')),
+        'fecha' => request_post('fecha', business_today_date()),
+        'updated_at' => now_datetime()
+    );
+
+    $row['estado'] = ($existing && isset($existing['estado'])) ? $existing['estado'] : 'nueva';
+    $row['created_at'] = ($existing && isset($existing['created_at'])) ? $existing['created_at'] : now_datetime();
+    if ($existing && isset($existing['clienta_id'])) $row['clienta_id'] = $existing['clienta_id'];
+
+    storage_upsert('jostal_interesadas.json', $row);
+    set_flash('ok', 'Interesada de Jostal guardada.');
+    redirect_to('index.php?page=jostal&tab=interesadas&edit=' . urlencode($id));
+}
+
+function action_convert_jostal_clienta() {
+    $interesadaId = trim(request_post('interesada_id'));
+    $interesada = storage_find_by_id('jostal_interesadas.json', $interesadaId);
+
+    if (!$interesada) {
+        set_flash('error', 'Interesada de Jostal no encontrada.');
+        redirect_to('index.php?page=jostal&tab=interesadas');
+    }
+
+    $clientaId = isset($interesada['clienta_id']) && $interesada['clienta_id'] !== '' ? $interesada['clienta_id'] : generate_id('jcli');
+
+    $firstArrival = trim(request_post('first_arrival_date', business_today_date()));
+
+    $clienta = array(
+        'id' => $clientaId,
+        'telefono' => isset($interesada['telefono']) ? $interesada['telefono'] : '',
+        'observaciones' => isset($interesada['observaciones']) ? $interesada['observaciones'] : '',
+        'modo' => trim(request_post('modo')),
+        'nombre' => trim(request_post('nombre')),
+        'created_at' => now_datetime(),
+        'updated_at' => now_datetime(),
+        'source_interesada_id' => $interesadaId,
+        'periodos_estancia' => array(
+            array(
+                'entrada' => $firstArrival,
+                'salida' => ''
+            )
+        )
+    );
+
+    $existingClienta = storage_find_by_id('jostal_clientas.json', $clientaId);
+    if ($existingClienta && isset($existingClienta['created_at'])) {
+        $clienta['created_at'] = $existingClienta['created_at'];
+    }
+
+    storage_upsert('jostal_clientas.json', $clienta);
+
+    $interesada['estado'] = 'convertida';
+    $interesada['convertida_at'] = now_datetime();
+    $interesada['clienta_id'] = $clientaId;
+    $interesada['updated_at'] = now_datetime();
+    storage_upsert('jostal_interesadas.json', $interesada);
+
+    set_flash('ok', 'Interesada convertida en clienta de Jostal.', 'celebrate');
+    redirect_to('index.php?page=jostal&tab=clientas&edit=' . urlencode($clientaId));
+}
+
+function action_save_jostal_clienta() {
+    $id = trim(request_post('id'));
+    $existing = $id !== '' ? storage_find_by_id('jostal_clientas.json', $id) : null;
+    $sourceInteresadaId = trim(request_post('source_interesada_id'));
+
+    if (!$existing && $sourceInteresadaId === '') {
+        set_flash('error', 'No se puede crear una clienta de Jostal directamente.');
+        redirect_to('index.php?page=jostal&tab=interesadas');
+    }
+
+    if (!$existing) {
+        $interesada = storage_find_by_id('jostal_interesadas.json', $sourceInteresadaId);
+        if (!$interesada) {
+            set_flash('error', 'Interesada de Jostal no encontrada.');
+            redirect_to('index.php?page=jostal&tab=interesadas');
+        }
+
+        if (($interesada['estado'] ?? '') === 'convertida' && !empty($interesada['clienta_id'])) {
+            redirect_to('index.php?page=jostal&tab=clientas&edit=' . urlencode($interesada['clienta_id']));
+        }
+
+        $id = !empty($interesada['clienta_id']) ? $interesada['clienta_id'] : generate_id('jcli');
+        $firstArrival = trim(request_post('first_arrival_date', business_today_date()));
+
+        $row = array(
+            'id' => $id,
+            'telefono' => trim(request_post('telefono')),
+            'observaciones' => trim(request_post('observaciones')),
+            'modo' => trim(request_post('modo')),
+            'nombre' => trim(request_post('nombre')),
+            'updated_at' => now_datetime(),
+            'created_at' => now_datetime(),
+            'source_interesada_id' => $sourceInteresadaId,
+            'periodos_estancia' => array(
+                array(
+                    'entrada' => $firstArrival,
+                    'salida' => ''
+                )
+            )
+        );
+
+        storage_upsert('jostal_clientas.json', $row);
+
+        $interesada['estado'] = 'convertida';
+        $interesada['convertida_at'] = now_datetime();
+        $interesada['clienta_id'] = $id;
+        $interesada['updated_at'] = now_datetime();
+        storage_upsert('jostal_interesadas.json', $interesada);
+
+        set_flash('ok', 'Interesada convertida en clienta de Jostal.', 'celebrate');
+        redirect_to('index.php?page=jostal&tab=clientas&edit=' . urlencode($id));
+    }
+
+    $row = array(
+        'id' => $id,
+        'telefono' => trim(request_post('telefono')),
+        'observaciones' => trim(request_post('observaciones')),
+        'modo' => trim(request_post('modo')),
+        'nombre' => trim(request_post('nombre')),
+        'updated_at' => now_datetime(),
+        'created_at' => isset($existing['created_at']) ? $existing['created_at'] : now_datetime(),
+        'source_interesada_id' => isset($existing['source_interesada_id']) ? $existing['source_interesada_id'] : '',
+        'periodos_estancia' => isset($existing['periodos_estancia']) && is_array($existing['periodos_estancia'])
+            ? $existing['periodos_estancia']
+            : array()
+    );
+
+    storage_upsert('jostal_clientas.json', $row);
+    set_flash('ok', 'Clienta de Jostal actualizada.');
+    redirect_to('index.php?page=jostal&tab=clientas&edit=' . urlencode($id));
+}
+
+function action_jostal_add_lead() {
+    $clientaId = trim(request_post('clienta_id'));
+    $clienta = storage_find_by_id('jostal_clientas.json', $clientaId);
+
+    if (!$clienta) {
+        set_flash('error', 'Clienta de Jostal no encontrada.');
+        redirect_to('index.php?page=jostal&tab=clientas');
+    }
+
+    $leadCreatedAt = trim(request_post('created_at'));
+    if ($leadCreatedAt === '') {
+        $leadCreatedAt = now_datetime();
+    } else {
+        $leadCreatedAt = str_replace('T', ' ', $leadCreatedAt);
+        if (strlen($leadCreatedAt) === 16) {
+            $leadCreatedAt .= ':00';
+        }
+    }
+
+    $row = array(
+        'id' => generate_id('jlead'),
+        'clienta_id' => $clientaId,
+        'clienta_nombre' => isset($clienta['nombre']) ? $clienta['nombre'] : '',
+        'precio' => to_float(request_post('precio'), 0),
+        'observacion' => trim(request_post('observacion')),
+        'created_at' => $leadCreatedAt,
+        'updated_at' => now_datetime()
+    );
+
+    storage_upsert('jostal_leads.json', $row);
+    set_flash('ok', 'Lead Jostal registrado: +' . euro($row['precio']), 'money');
+    redirect_to('index.php?page=jostal&tab=clientas&edit=' . urlencode($clientaId));
+}
+
+function action_jostal_add_venta() {
+    $row = array(
+        'id' => generate_id('jventa'),
+        'descripcion' => trim(request_post('descripcion')),
+        'precio' => to_float(request_post('precio'), 0),
+        'created_at' => now_datetime(),
+        'updated_at' => now_datetime()
+    );
+
+    storage_upsert('jostal_ventas.json', $row);
+    set_flash('ok', 'Venta Jostal registrada: +' . euro($row['precio']), 'money');
+    redirect_to('index.php?page=jostal&tab=ventas');
+}
+
+function action_add_gasto() {
+    $createdAt = trim(request_post('created_at'));
+    if ($createdAt === '') {
+        $createdAt = now_datetime();
+    } else {
+        $createdAt = str_replace('T', ' ', $createdAt);
+        if (strlen($createdAt) === 16) {
+            $createdAt .= ':00';
+        }
+    }
+
+    $row = array(
+        'id' => generate_id('gasto'),
+        'cantidad' => to_float(request_post('cantidad'), 0),
+        'descripcion' => trim(request_post('descripcion')),
+        'created_at' => $createdAt,
+        'updated_at' => now_datetime()
+    );
+
+    storage_upsert('gastos.json', $row);
+    set_flash('ok', 'Gasto registrado: -' . euro($row['cantidad']), 'sadmoney');
+    redirect_to('index.php?page=gastos');
+}
+
+
+function action_delete_gasto() {
+    $id = trim(request_post('id'));
+    if ($id !== '') {
+        storage_delete('gastos.json', $id);
+    }
+    set_flash('ok', 'Gasto eliminado definitivamente.');
+    redirect_to('index.php?page=gastos');
+}
+
+function action_set_casawasap_estado() {
+    $id = trim(request_post('id'));
+    $estado = trim(request_post('estado'));
+    $row = storage_find_by_id('casawasap_contactos.json', $id);
+
+    if (!$row) {
+        set_flash('error', 'Contacto de Casawasap no encontrado.');
+        redirect_to('index.php?page=casawasap');
+    }
+
+    $row['estado'] = $estado;
+    $row['updated_at'] = now_datetime();
+    storage_upsert('casawasap_contactos.json', $row);
+
+    set_flash('ok', 'Estado actualizado.');
+    redirect_to('index.php?page=casawasap&edit=' . urlencode($id));
+}
+
+function action_baja_casawasap_cliente() {
+    $id = trim(request_post('id'));
+    $row = storage_find_by_id('casawasap_contactos.json', $id);
+
+    if (!$row) {
+        set_flash('error', 'Cliente Casawasap no encontrado.');
+        redirect_to('index.php?page=casawasap');
+    }
+
+    $row['estado'] = 'baja';
+    $row['baja_at'] = now_datetime();
+    $row['updated_at'] = now_datetime();
+    storage_upsert('casawasap_contactos.json', $row);
+
+    set_flash('ok', 'Cliente Casawasap dado de baja.');
+    redirect_to('index.php?page=casawasap&edit=' . urlencode($id));
+}
+
+function action_alta_casawasap_cliente() {
+    $id = trim(request_post('id'));
+    $row = storage_find_by_id('casawasap_contactos.json', $id);
+
+    if (!$row) {
+        set_flash('error', 'Cliente Casawasap no encontrado.');
+        redirect_to('index.php?page=casawasap');
+    }
+
+    $row['estado'] = 'cliente';
+    $row['updated_at'] = now_datetime();
+    storage_upsert('casawasap_contactos.json', $row);
+
+    set_flash('ok', 'Cliente Casawasap reactivado.');
+    redirect_to('index.php?page=casawasap&edit=' . urlencode($id));
+}
+
+function action_discard_jostal_interesada() {
+    $id = trim(request_post('id'));
+    $row = storage_find_by_id('jostal_interesadas.json', $id);
+
+    if (!$row) {
+        set_flash('error', 'Interesada Jostal no encontrada.');
+        redirect_to('index.php?page=jostal&tab=interesadas');
+    }
+
+    $row['estado'] = 'descartada';
+    $row['updated_at'] = now_datetime();
+    storage_upsert('jostal_interesadas.json', $row);
+
+    set_flash('ok', 'Interesada Jostal descartada.');
+    redirect_to('index.php?page=jostal&tab=interesadas&edit=' . urlencode($id));
+}
+
+function action_reactivate_jostal_interesada() {
+    $id = trim(request_post('id'));
+    $row = storage_find_by_id('jostal_interesadas.json', $id);
+
+    if (!$row) {
+        set_flash('error', 'Interesada Jostal no encontrada.');
+        redirect_to('index.php?page=jostal&tab=interesadas');
+    }
+
+    $row['estado'] = 'nueva';
+    $row['updated_at'] = now_datetime();
+    storage_upsert('jostal_interesadas.json', $row);
+
+    set_flash('ok', 'Interesada Jostal reactivada.');
+    redirect_to('index.php?page=jostal&tab=interesadas&edit=' . urlencode($id));
+}
+
+function action_jostal_salida_casa() {
+    $id = trim(request_post('id'));
+    $salida = trim(request_post('salida', business_today_date()));
+    $row = storage_find_by_id('jostal_clientas.json', $id);
+
+    if (!$row) {
+        set_flash('error', 'Clienta Jostal no encontrada.');
+        redirect_to('index.php?page=jostal&tab=clientas');
+    }
+
+    $periodos = jostal_periodos_estancia($row);
+    if (empty($periodos)) {
+        set_flash('error', 'Esta clienta no tiene ninguna estancia abierta.');
+        redirect_to('index.php?page=jostal&tab=clientas&edit=' . urlencode($id));
+    }
+
+    $lastIdx = count($periodos) - 1;
+    $periodos[$lastIdx]['salida'] = $salida;
+
+    $row['periodos_estancia'] = $periodos;
+    $row['updated_at'] = now_datetime();
+    storage_upsert('jostal_clientas.json', $row);
+
+    set_flash('ok', 'Salida de la casa registrada.');
+    redirect_to('index.php?page=jostal&tab=clientas&edit=' . urlencode($id));
+}
+
+function action_jostal_reactivar_casa() {
+    $id = trim(request_post('id'));
+    $entrada = trim(request_post('entrada', business_today_date()));
+    $row = storage_find_by_id('jostal_clientas.json', $id);
+
+    if (!$row) {
+        set_flash('error', 'Clienta Jostal no encontrada.');
+        redirect_to('index.php?page=jostal&tab=clientas');
+    }
+
+    $periodos = jostal_periodos_estancia($row);
+    $periodos[] = array(
+        'entrada' => $entrada,
+        'salida' => ''
+    );
+
+    $row['periodos_estancia'] = $periodos;
+    $row['updated_at'] = now_datetime();
+    storage_upsert('jostal_clientas.json', $row);
+
+    set_flash('ok', 'Reentrada en la casa registrada.');
+    redirect_to('index.php?page=jostal&tab=clientas&edit=' . urlencode($id));
+}
+
+function action_unlock_josue_anuncios() {
+    $password = trim(request_post('password'));
+
+    if ($password === 'hola1234') {
+        $_SESSION['josue_anuncios_unlocked'] = true;
+        set_flash('ok', 'Sección Anuncios desbloqueada.');
+    } else {
+        set_flash('error', 'Contraseña incorrecta.');
+    }
+
+    redirect_to('index.php?page=josue');
+}
+
+function action_save_anuncio() {
+    if (empty($_SESSION['josue_anuncios_unlocked'])) {
+        set_flash('error', 'Debes desbloquear la sección Anuncios.');
+        redirect_to('index.php?page=josue');
+    }
+
+    $id = trim(request_post('id'));
+    if ($id === '') $id = generate_id('anun');
+
+    $existing = storage_find_by_id('anuncios.json', $id);
+
+    $row = array(
+        'id' => $id,
+        'url' => trim(request_post('url')),
+        'user' => trim(request_post('user')),
+        'pass' => trim(request_post('pass')),
+        'descripcion' => trim(request_post('descripcion')),
+        'updated_at' => now_datetime(),
+        'created_at' => ($existing && isset($existing['created_at'])) ? $existing['created_at'] : now_datetime()
+    );
+
+    storage_upsert('anuncios.json', $row);
+    set_flash('ok', 'Anuncio guardado.');
+    redirect_to('index.php?page=josue&tab=anuncios&edit=' . urlencode($id));
+}
+
+function action_delete_anuncio() {
+    if (empty($_SESSION['josue_anuncios_unlocked'])) {
+        set_flash('error', 'Debes desbloquear la sección Anuncios.');
+        redirect_to('index.php?page=josue');
+    }
+
+    $id = trim(request_post('id'));
+    if ($id !== '') {
+        storage_delete('anuncios.json', $id);
+    }
+
+    set_flash('ok', 'Anuncio eliminado.');
+    redirect_to('index.php?page=josue&tab=anuncios');
+}
+
+function action_save_telefono() {
+    $id = trim(request_post('id'));
+    if ($id === '') $id = generate_id('tf');
+
+    $existing = storage_find_by_id('telefonos.json', $id);
+
+    $row = array(
+        'id' => $id,
+        'nombre' => trim(request_post('nombre')),
+        'tfono' => trim(request_post('tfono')),
+        'uso' => trim(request_post('uso')),
+        'pin' => trim(request_post('pin')),
+        'compania' => trim(request_post('compania')),
+        'waha_port' => trim(request_post('waha_port')),
+        'waha' => trim(request_post('waha')),
+        'notas' => trim(request_post('notas')),
+        'destacamos_id' => trim(request_post('destacamos_id')),
+        'updated_at' => now_datetime(),
+        'created_at' => ($existing && isset($existing['created_at'])) ? $existing['created_at'] : now_datetime()
+    );
+
+    storage_upsert('telefonos.json', $row);
+    set_flash('ok', 'Teléfono guardado.');
+    redirect_to('index.php?page=josue&tab=telefonos&edit=' . urlencode($id));
+}
+
+function action_delete_telefono() {
+    $id = trim(request_post('id'));
+    if ($id !== '') {
+        storage_delete('telefonos.json', $id);
+    }
+
+    set_flash('ok', 'Teléfono eliminado.');
+    redirect_to('index.php?page=josue&tab=telefonos');
+}
+function action_save_sendtaxs_state() {
+    $settings = storage_read('settings.json');
+    $settings['sendtaxs_state'] = array(
+        'porc_plaza' => trim(request_post('porc_plaza', '31.5')),
+        'porc_publi_sched' => trim(request_post('porc_publi_sched', '28.4')),
+        'porc_publipub' => trim(request_post('porc_publipub', '21.0')),
+        'porc_pubcasas' => trim(request_post('porc_pubcasas', '19.1')),
+        'total_deseado' => trim(request_post('total_deseado', '51')),
+        'updated_at' => now_datetime(),
+    );
+    storage_write('settings.json', $settings);
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(array('ok' => true));
+    exit;
+}
+
+function action_dismiss_aviso() {
+    $id = trim(request_post('id'));
+    $redirect = trim(request_post('redirect', 'index.php?page=dashboard'));
+
+    if ($id !== '') {
+        aviso_dismiss($id);
+    }
+
+    set_flash('ok', 'Aviso descartado.');
+    redirect_to($redirect);
+}
+
+function action_create_manual_aviso() {
+    $title = trim(request_post('title'));
+    $message = trim(request_post('message'));
+    $scheduledFor = trim(request_post('scheduled_for'));
+    $severity = trim(request_post('severity', 'media'));
+
+    if ($title === '' || $scheduledFor === '') {
+        set_flash('error', 'Debes indicar al menos título y fecha/hora.');
+        redirect_to(avisos_page_url(array('avtab' => 'planned')));
+    }
+
+    if (!strtotime(str_replace('T', ' ', $scheduledFor))) {
+        set_flash('error', 'La fecha/hora del aviso no es válida.');
+        redirect_to(avisos_page_url(array('avtab' => 'planned')));
+    }
+
+    avisos_create_manual_planned($title, $message, $scheduledFor, $severity);
+
+    set_flash('ok', 'Aviso manual planificado correctamente.');
+    redirect_to(avisos_page_url(array('avtab' => 'planned')));
+}
+
+function action_delete_planned_aviso() {
+    $id = trim(request_post('id'));
+
+    if ($id !== '') {
+        avisos_delete_planned($id);
+    }
+
+    set_flash('ok', 'Aviso planificado eliminado.');
+    redirect_to(avisos_page_url(array('avtab' => 'planned')));
+}
+
+function action_save_agenda() {
+    $id = trim(request_post('id'));
+    if ($id === '') $id = generate_id('ag');
+
+    $existing = storage_find_by_id('agenda.json', $id);
+
+    $row = array(
+        'id' => $id,
+        'nombre' => trim(request_post('nombre')),
+        'telefono' => trim(request_post('telefono')),
+        'observaciones' => trim(request_post('observaciones')),
+        'updated_at' => now_datetime(),
+        'created_at' => ($existing && isset($existing['created_at'])) ? $existing['created_at'] : now_datetime()
+    );
+
+    storage_upsert('agenda.json', $row);
+    set_flash('ok', 'Contacto de agenda guardado.');
+    redirect_to('index.php?page=josue&tab=agenda&edit=' . urlencode($id));
+}
+
+function action_delete_agenda() {
+    $id = trim(request_post('id'));
+    if ($id !== '') {
+        storage_delete('agenda.json', $id);
+    }
+
+    set_flash('ok', 'Contacto de agenda eliminado.');
+    redirect_to('index.php?page=josue&tab=agenda');
+}

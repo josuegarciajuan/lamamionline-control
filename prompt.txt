@@ -1,0 +1,146 @@
+[5.4 HIHG]
+
+Haz un planning de como abordar este cambio en el proyecto:
+
+Modificar la subsección josue - agenda, para convertirlo en una agenda real
+
+Contexto:
+
+Esta sección ya exitia, pero en un de los cambios parece que hubo una equivocacion y machaqué su codigo por el de otra seccion. Veras en data un json correpondiente a la agenda. 
+Crea pues la sección agenda que será un crud sencillo de istar crear editar telefonos en la agenda. Hazlo de la forma más original y cómoda de usar que se te ocurra.
+
+Restricciones:
+Haz cambios mínimos.
+Mantén compatibilidad con el flujo actual.
+No rompas responsive.
+
+Antes de editar, explícame el plan.
+
+
+
+[5.4-MINI HIGH]
+En base al planning, y queriendo ser lo más conservador posible en cuanto a tema ahorrar % de uso restante en la herramienta codex, pero asegurando que el modelo que aborda el cambio lo haria de la forma más eficiente posible, basándote tambien en a siguiente tabla:
+| Tipo de tarea                                                                       | Modelo         |        Reasoning | Cuándo usarlo                                                                                                                                               |
+| ----------------------------------------------------------------------------------- | -------------- | ---------------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Entender el proyecto, leer archivos, resumir una función, localizar dónde está algo | `gpt-5.4-mini` |      por defecto | Para inspección y contexto barato/rápido. OpenAI lo recomienda para tareas de coding más ligeras y subagentes. ([OpenAI Developers][1])                     |
+| Cambio pequeño y claro en 1 archivo                                                 | `gpt-5.4`      | `low` o `medium` | Cuando ya sabes qué tocar y no quieres gastar de más. Menor reasoning usa menos razonamiento que `high`. ([OpenAI Developers][2])                           |
+| Cambio normal en 1–3 archivos                                                       | `gpt-5.4`      |         `medium` | Tu modo base. OpenAI recomienda empezar con `gpt-5.4` para la mayoría de tareas complejas de coding y razonamiento. ([OpenAI Developers][2])                |
+| Cambio delicado, multiarchivo, legacy, lógica de negocio                            | `gpt-5.4`      |           `high` | Para minimizar errores cuando hay más riesgo. `gpt-5.4` soporta `high` y `xhigh`, pero no hace falta subir siempre al máximo. ([OpenAI Developers][2])      |
+| Refactor grande o tarea con varios pasos encadenados                                | `gpt-5.4`      |           `high` | Úsalo por fases: analizar → proponer plan → aplicar paso 1 → revisar. OpenAI recomienda dividir tareas complejas en varios turnos. ([OpenAI Developers][3]) |
+| Caso muy difícil, incertidumbre alta, arquitectura sensible                         | `gpt-5.4`      |          `xhigh` | Solo en casos puntuales. Es el modo de más “pensado”, pero también el más caro/lento. ([OpenAI Developers][2])                                              |
+| Te queda poco % y quieres seguir, pero sin tocar nada serio                         | `gpt-5.4-mini` |      por defecto | Mejor para seguir inspeccionando, comparando, resumiendo o preparando el siguiente cambio. ([OpenAI Developers][1])                                         |
+| Te queda poco % y necesitas hacer un cambio simple                                  | `gpt-5.4`      |            `low` | Antes de cambiar de familia/modelo, baja reasoning. Suele ser el fallback más lógico. ([OpenAI Developers][2])                                              |
+
+Que modelo usarias para implementar el código de los cambios propuestos en el planning
+
+
+
+
+Perfecto. Ahora implementa el cambio siguiendo ese plan y el modelo [5.4 medium].
+Cuando termines:
+- ejecuta los checks o tests relevantes,
+- resume qué archivos tocaste,
+- y dime cualquier edge case que haya quedado pendiente.
+
+
+
+------------------------
+
+
+
+añadir mas cosas a los informes y que entienda ordenes de orma inteligente. Añadir todo loque se te ocurra para que sea flexible añ entender ordenes, por ejemmplo si le digo muestra stats de la semana pasada, o del mes pasado , o iuna compratiba de los ultimos 6 meses, o statas de la clienta tal o lo que sea, iventa un sistema para que sea lo mas flexible posible. Primero antes de modificar codigo haz la propuesta y lueg pasaremos a implementarlo.
+
+contratos autos de las chicas en gpt tengo info
+
+
+sshpass -p 'P2R6dABhDnta' scp -r admin@92.113.151.136:/var/www/html/atupuerta/control/* /var/www/html/atupuerta/
+sshpass -p 'P2R6dABhDnta' scp -r /var/www/html/atupuerta/* admin@92.113.151.136:/var/www/html/atupuerta/control/
+sshpass -p 'P2R6dABhDnta' rsync -rv --delete --exclude='data/' -e "ssh" /var/www/html/atupuerta/ admin@92.113.151.136:/var/www/html/atupuerta/control/
+
+
+
+
+
+
+Idea a desarrollar:
+el contrato temporal solo se firma al principio y tendra una clausula en la cual se renovara automaticamente cada semana generando un nuevo contrato a su vez que se entiende como aitorirmado
+
+Instrucciones para Codex:
+- Estudia primero el flujo ya existente relacionado con esta idea.
+- Haz cambios mínimos y seguros.
+- Reutiliza componentes, helpers y patrones ya presentes en el proyecto.
+- Mantén el estilo visual y la estructura actual del CRM.
+- Si hay que tocar backend, vistas, datos o automatizaciones, intégralo de forma coherente con la arquitectura existente.
+- Si modificas JS o CSS, actualiza la versión de caché en index.php.
+- Valida la sintaxis y los checks relevantes al terminar.
+
+Resultado esperado:
+- Implementación completa de la mejora.
+- Explicación breve de qué se ha cambiado.
+- Resumen final de archivos tocados, validaciones hechas y riesgos si los hubiera.
+
+---
+
+
+
+
+pasame los texto de respuesta los vamos a mejorar y los inciales
+
+---
+en todo el sistema veras que al lado de cuando aparece un telefono hay in boton copiar. Por mi resolucion de pantalla hacer que el telefono aparezca en una columna dentro de su celda, es decir cada digito del telefono aparece uno debajp del otro y al lado el boton copiar. queda feo, solventa que sea mas agradable. Por ejemplo que el telefono sea el propio boton que al pulsar envcima se copie
+
+
+
+
+la respuesta automatica de bot comercial, tanto bien como mal , siempre respode con plantilla, deberia responde solo cuando interes real. REviosar la ia que responde, y afinarla
+
+
+
+en publicista perfiles añades esto:
+Complexión / rostro: slim, curvy, toned midsection · oval
+en Descriptor OpenAI
+por lo que lo que esta pasando es que las fotos que se crean son parecidas la original pero gordas!
+Quita esta restriccion
+
+
+
+
+
+
+
+
+
+
+
+Vamos a aplicar algunas mejoras al siguiente proyecto. 
+
+En publicista - campañas, al darle subir anuncios, ha devuelto este error:
+
+Subidos: 3. Fallidos: 2. Error principal: La web rechazó el guardado: Por favor escribe un número de teléfono español válido Por favor escribe un código postal español válido Run: pubrun_23900405. Informe: Campaña: averrrr. Resultado global: 3 anuncios subidos y 2 fallidos. Publicados correctamente: - OK: Cielo: elegancia y trato cercano · ID 1038998 · https://www.destacamos.net/editad.php?id=1038998. - OK: EXCLUSIVA en buriana: cielo · ID 1047366 · https://www.destacamos.net/editad.php?id=1047366. - OK: BRASIL EN BURIANA: CIELO HA LLEGADO · ID 1068189 · https://www.destacamos.net/editad.php?id=1068189. Fallos detectados: - Fallo: cielo, RECIÉN LLEGADA a buriana ✨ · La web rechazó el guardado: Por favor escribe un número de teléfono español válido Por favor escribe un código postal español válido. - Fallo: Una sonrisa, buen gusto y mucha curiosidad · La web rechazó el guardado: Por favor escribe un número de teléfono español válido Por favor escribe un código postal español válido. Run: pubrun_23900405.
+Motor: publicista_campaign_upload · Creado: 2026-04-11 02:15
+
+No tiene sentido, pues he dado a subir 5 anuncios, y 3 si se han subido bien cuando el codigo postal y el telefono es el mismo en todos, ademas que dichos datos no se tienen que modificar. REvisa por que falla y corrigelo 
+
+Te paso el proyecto en un zip, devolverás en un zip los archivos modificados y una explicación de lo que has hecho y por qué funciona.
+Modifica únicamente lo que se te pide, sé cuidadoso que los cambios nuevos no interfieran en demás secciones y funciones ya creadas y funcionando. 
+Antes de devolver los cambios, valida que los archivos que vas a devolver son válidos en sintaxis y cumplen con lo prometido
+
+
+
+
+rm -f /var/www/html/atupuerta.zip && cd /var/www/html && zip -r /var/www/html/atupuerta.zip atupuerta -x "atupuerta/data/*" "atupuerta/DATA_PATH/*"
+
+
+sshpass -p 'P2R6dABhDnta' rsync -rv --delete --exclude='data/' -e "ssh" /var/www/html/atupuerta/ admin@92.113.151.136:/var/www/html/atupuerta/control/
+
+
+
+
+
+Crear un pequeño script que usando esta api de generacion de imagenes desde texto. Por ejemplo haz que se cree un animal o cualquier cosa. Una vez tengamos dominado el uso de la misma, pasaremos a incristarla en otro proyecto más avazando
+
+https://pollo.ai/api-platform/explore
+pollo_2cyPUx2LN2VayY7wBvLtw2Dkm0ptQwRYNM7xGHkARrQH
+
+
+

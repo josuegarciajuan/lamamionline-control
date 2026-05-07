@@ -1,0 +1,11 @@
+{
+    "model": "pollo-image-v2",
+    "attempt": 1,
+    "original_length": 3953,
+    "final_length": 1054,
+    "compacted": 1,
+    "method": "gpt_summary",
+    "openai_request_id": "req_918461a8581f4f7c9cf1765a5d777f19",
+    "openai_http_code": 200,
+    "openai_error": ""
+}

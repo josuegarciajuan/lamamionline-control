@@ -1,0 +1,259 @@
+{
+    "phase_a": {
+        "title_candidates": [
+            "PERLA, RECIÉN LLEGADA A BURRIANA",
+            "MULATA CARIBEÑA CON MUCHA PRESENCIA",
+            "HOY TE SORPRENDE PERLA ✨",
+            "DISCRETA, ELEGANTE Y MUY ATRACTIVA",
+            "LA NOVEDAD QUE ESTABA POR LLEGAR",
+            "PERLA EN BURRIANA: QUIZÁ LO QUE BUSCAS",
+            "UNA MIRADA DIFERENTE EN BURRIANA",
+            "CARÁCTER, ESTILO Y MUCHA NATURALIDAD",
+            "PERLA, SOLO PARA QUIENES SABEN ELEGIR",
+            "APARECIÓ LA MÁS LLAMATIVA DE LA ZONA",
+            "SANGRE CALIENTE Y TRATO CUIDADO",
+            "Burriana tiene nueva protagonista",
+            "PERLA, UN PLAN DISTINTO HOY",
+            "SI TE GUSTA LO EXCLUSIVO, AQUÍ ESTÁ",
+            "Recién llegada y con ganas de conocer",
+            "Elegancia latina en Burriana",
+            "PERLA: PRESENCIA QUE NO SE OLVIDA",
+            "Una mulata con mucha clase",
+            "Lo que hoy sí provoca escribir",
+            "QUIZÁ NO VUELVA A ESTAR TAN CERCA"
+        ],
+        "ad_angles": [
+            {
+                "angle": "Novedad / recién llegada",
+                "hook": "Acaba de llegar y ya está dando que hablar por Burriana.",
+                "key_phrase": "recién llegada, trato cercano y ganas de conocer a quien valore algo distinto",
+                "tone_note": "Abre con sensación de oportunidad y disponibilidad inmediata, sin sonar agresiva."
+            },
+            {
+                "angle": "Elegancia / premium",
+                "hook": "Hay mujeres que no necesitan presentarse demasiado: Perla es una de ellas.",
+                "key_phrase": "presencia elegante, estilo cuidado y una forma de trato que se nota desde el primer mensaje",
+                "tone_note": "Tono reservado, fino y con aire selecto; ideal para destacamos.net."
+            },
+            {
+                "angle": "Exclusividad / solo algunos",
+                "hook": "No es el típico anuncio de pasar desapercibida: aquí hay personalidad de verdad.",
+                "key_phrase": "una opción para quienes buscan algo especial y no se conforman con lo mismo de siempre",
+                "tone_note": "Refuerza escasez y elección, con lenguaje comercial limpio."
+            },
+            {
+                "angle": "Caribeña / magnetismo natural",
+                "hook": "Tiene ese punto caribeño que entra por los ojos y se queda en la conversación.",
+                "key_phrase": "mulata caribeña, encanto natural y una energía que invita a escribirle",
+                "tone_note": "Sugerente y cálido, pero sin caer en vulgaridad ni explicitud."
+            },
+            {
+                "angle": "Sangre caliente / química",
+                "hook": "Hay anuncios que se miran… y otros que despiertan ganas de saber más.",
+                "key_phrase": "sangre caliente, mucha chispa y un trato que no deja indiferente",
+                "tone_note": "Más directo para portal sugerente, controlando el morbo con elegancia."
+            },
+            {
+                "angle": "Cercanía / trato humano",
+                "hook": "Si buscas alguien con buen trato, aquí hay presencia y conversación con gusto.",
+                "key_phrase": "amable, atenta y fácil de conectar desde el primer mensaje",
+                "tone_note": "Humaniza la propuesta y prioriza la facilidad para escribir."
+            },
+            {
+                "angle": "Burriana / enfoque local",
+                "hook": "Burriana tiene nueva chica y no viene a pasar desapercibida.",
+                "key_phrase": "disponible en la zona, con presencia, discreción y ganas de buen contacto",
+                "tone_note": "Muy publicable para captar búsquedas locales y reforzar cercanía."
+            },
+            {
+                "angle": "Curiosidad / misterio",
+                "hook": "No todo se explica en un anuncio: a veces el interés está en descubrirla.",
+                "key_phrase": "Perla deja ganas de seguir leyendo y dar el paso de escribir",
+                "tone_note": "Construye intriga sin exceso; ideal para clics por curiosidad."
+            },
+            {
+                "angle": "Belleza latina / presencia visual",
+                "hook": "Una mulata oscura con una presencia que destaca sin necesidad de exagerar.",
+                "key_phrase": "curvas marcadas, estilo llamativo y una imagen que se recuerda",
+                "tone_note": "Fuerte en atractivo visual, pero manteniendo lenguaje comercial y limpio."
+            },
+            {
+                "angle": "Plan de hoy / inmediatez",
+                "hook": "Si hoy quieres salir de la rutina, Perla puede ser ese plan distinto.",
+                "key_phrase": "respuesta rápida, trato directo y una propuesta que se siente diferente",
+                "tone_note": "Enfatiza urgencia suave y disponibilidad inmediata."
+            },
+            {
+                "angle": "Selección / criterio",
+                "hook": "No es para cualquiera: es para quien sabe reconocer una buena oportunidad.",
+                "key_phrase": "una mujer con carácter, presencia y una vibra que engancha",
+                "tone_note": "Eleva el valor percibido con un filtro implícito de exclusividad."
+            },
+            {
+                "angle": "Premium emocional / experiencia",
+                "hook": "A veces lo premium no va de precio, va de cómo te hacen sentir.",
+                "key_phrase": "detalle, cercanía y una experiencia que deja ganas de repetir",
+                "tone_note": "Orientado a valor y experiencia, muy apto para versión elegante."
+            }
+        ]
+    },
+    "phase_b": {
+        "id": "resp_023989ab3d6c412a0169f3c573aac481a28cb066dea6c4cf9f",
+        "object": "response",
+        "created_at": 1777583475,
+        "status": "completed",
+        "background": false,
+        "billing": {
+            "payer": "developer"
+        },
+        "completed_at": 1777583511,
+        "error": null,
+        "frequency_penalty": 0,
+        "incomplete_details": null,
+        "instructions": null,
+        "max_output_tokens": null,
+        "max_tool_calls": null,
+        "model": "gpt-5.4-mini-2026-03-17",
+        "moderation": null,
+        "output": [
+            {
+                "id": "msg_023989ab3d6c412a0169f3c576208481a29c88a6e9d70b9c4b",
+                "type": "message",
+                "status": "completed",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "annotations": [],
+                        "logprobs": [],
+                        "text": "{\"tone_used\":\"Equilibrado\",\"pack_angle\":\"Perla se presenta como una mulata caribeña, elegante y recién llegada, con un tono discreto para destacamos.net y otro más sugerente para portales con mayor permisividad.\",\"title_options\":[\"PERLA, RECIÉN LLEGADA A BURRIANA\",\"DISCRETA, ELEGANTE Y MUY ATRACTIVA\",\"LA NOVEDAD QUE ESTABA POR LLEGAR\",\"UNA MIRADA DIFERENTE EN BURRIANA\",\"CARÁCTER, ESTILO Y MUCHA NATURALIDAD\",\"PERLA, SOLO PARA QUIENES SABEN ELEGIR\",\"Burriana tiene nueva protagonista\",\"PERLA, UN PLAN DISTINTO HOY\",\"SI TE GUSTA LO EXCLUSIVO, AQUÍ ESTÁ\",\"Elegancia latina en Burriana\"],\"recommended_order\":[\"title_1\",\"title_2\",\"title_3\",\"title_4\",\"title_5\",\"title_6\",\"title_7\",\"title_8\",\"title_9\",\"title_10\"],\"publication_notes\":[\"Usar las 5 primeras piezas en destacamos.net con la versión neutral, priorizando lenguaje elegante, discreto y sin palabras de reclamo sexual.\",\"Reservar la versión sugerente para loquosex.com, donde funcionan mejor los ganchos de morbo controlado, exclusividad y chispa.\",\"Alternar títulos en MAYÚSCULAS completas con otros en formato frase para evitar repetición visual entre publicaciones.\",\"Mantener siempre Burriana como localización principal y no añadir datos no confirmados.\",\"Conviene rotar aperturas entre novedad, elegancia, selección y cercanía para que no parezcan anuncios clonados.\"],\"ads\":[{\"slot\":\"1\",\"focus\":\"Novedad / recién llegada\",\"short_hook\":\"Acaba de llegar y ya despierta curiosidad en Burriana.\",\"title_neutral\":\"PERLA, RECIÉN LLEGADA A BURRIANA\",\"title_suggestive\":\"RECIÉN LLEGADA Y CON GANAS DE CONOCER\",\"body_neutral\":\"Burriana da la bienvenida a Perla ✨ Una mujer con presencia, trato cercano y ese punto distinto que no se ve todos los días. Si valoras la discreción, la elegancia y una conversación que fluya desde el primer mensaje, aquí tienes una opción que merece la pena descubrir. Escríbele y comprueba por qué ya está llamando la atención.\",\"body_suggestive\":\"Acaba de llegar a Burriana y no viene a pasar desapercibida 🔥 Perla tiene ese punto de novedad que despierta curiosidad desde el primer vistazo: presencia, trato cercano y una energía que invita a escribirle sin pensarlo demasiado. Si te gustan las chicas que generan ganas de conocerlas de verdad, este es tu momento.\"},{\"slot\":\"2\",\"focus\":\"Elegancia / premium\",\"short_hook\":\"Hay mujeres que destacan sin necesidad de hacer ruido.\",\"title_neutral\":\"DISCRETA, ELEGANTE Y MUY ATRACTIVA\",\"title_suggestive\":\"ELEGANTE, SUGERENTE Y MUY DIFERENTE\",\"body_neutral\":\"Hay presencias que se notan sin esfuerzo, y Perla es una de ellas 🌹 Su forma de presentarse transmite cuidado, estilo y una elegancia natural que encaja con quien busca algo más selecto. Si te atrae una mujer con clase, carácter y una atención que se nota desde el primer mensaje, aquí tienes un perfil que merece tu atención.\",\"body_suggestive\":\"Perla no necesita exagerar para llamar la atención 😏 Tiene elegancia, personalidad y ese aire premium que hace que quieras escribirle para saber más. Si buscas una chica con estilo, presencia y un trato que sube el nivel desde el primer contacto, aquí la tienes.\"},{\"slot\":\"3\",\"focus\":\"Exclusividad / solo algunos\",\"short_hook\":\"No es para todo el mundo; es para quien sabe elegir.\",\"title_neutral\":\"PERLA, SOLO PARA QUIENES SABEN ELEGIR\",\"title_suggestive\":\"SOLO PARA QUIENES VAN A LO MEJOR\",\"body_neutral\":\"No todos buscan lo mismo, y Perla está pensada para quienes valoran algo especial ✨ Una propuesta con personalidad, trato amable y una imagen que transmite categoría desde el primer vistazo. Si tú también prefieres elegir bien antes que conformarte con lo de siempre, este anuncio te va a interesar.\",\"body_suggestive\":\"No es un anuncio más: es de esos que llaman la atención por algo 😏 Perla tiene ese punto exclusivo que hace que muchos entren… pero solo algunos se animen a escribir. Si te gustan las chicas con presencia, chispa y una vibra que no se olvida, aquí tienes una buena oportunidad.\"},{\"slot\":\"4\",\"focus\":\"Caribeña / magnetismo natural\",\"short_hook\":\"Tiene ese aire caribeño que entra por los ojos y sigue en la conversación.\",\"title_neutral\":\"UNA MIRADA DIFERENTE EN BURRIANA\",\"title_suggestive\":\"CARIBEÑA, ARDIENTE Y MUY LLAMATIVA\",\"body_neutral\":\"Perla aporta a Burriana un aire distinto, cálido y con mucha personalidad 💛 Su estilo transmite naturalidad, cercanía y una presencia que no pasa inadvertida. Si te atrae una mujer con encanto latino y un trato agradable, aquí tienes una opción que encaja muy bien con lo que buscas.\",\"body_suggestive\":\"Perla tiene ese magnetismo caribeño que se nota nada más verla 🔥 Mulata, con mucha presencia y un encanto que deja ganas de escribirle, es de esas mujeres que no se olvidan fácil. Si te gustan las chicas con sangre caliente, chispa y una energía que engancha, ya sabes por dónde empezar.\"},{\"slot\":\"5\",\"focus\":\"Sangre caliente / química\",\"short_hook\":\"Hay anuncios que despiertan curiosidad y otros que invitan a ir un paso más allá.\",\"title_neutral\":\"CARÁCTER, ESTILO Y MUCHA NATURALIDAD\",\"title_suggestive\":\"SANGRE CALIENTE Y TRATO CUIDADO\",\"body_neutral\":\"Perla combina carácter, naturalidad y una forma de estar que resulta cercana desde el primer momento 🌷 No va de aparentar, va de transmitir seguridad, simpatía y una presencia que se siente real. Si valoras más la conexión que el ruido, esta puede ser una de esas opciones que dan buen resultado.\",\"body_suggestive\":\"Hay mujeres que tienen ese punto de chispa que se percibe enseguida 😈 Perla transmite sangre caliente, presencia y un trato cuidado que invita a seguir la conversación. Si buscas alguien que no sea fría ni rutinaria, aquí tienes una candidata que no pasa desapercibida.\"},{\"slot\":\"6\",\"focus\":\"Cercanía / trato humano\",\"short_hook\":\"Cuando el trato es bueno, todo entra mejor.\",\"title_neutral\":\"PERLA, UN PLAN DISTINTO HOY\",\"title_suggestive\":\"SI TE APETECE BUENA COMPAÑÍA, ES AQUÍ\",\"body_neutral\":\"Si hoy te apetece cambiar de rutina, Perla puede ser ese plan que te sorprenda 💬 Es cercana, agradable y sabe crear una conversación cómoda desde el principio. Para quien busca trato humano, discreción y una experiencia cuidada, aquí hay una propuesta muy a tener en cuenta.\",\"body_suggestive\":\"A veces lo que más engancha no es solo la imagen, sino el trato y la conversación 😏 Perla sabe crear ese ambiente donde todo fluye mejor y te apetece seguir escribiendo. Si buscas una chica con cercanía, presencia y un punto sugerente, este plan puede ser justo lo que estabas pensando.\"},{\"slot\":\"7\",\"focus\":\"Burriana / enfoque local\",\"short_hook\":\"Burriana tiene nueva chica y viene con fuerza.\",\"title_neutral\":\"Burriana tiene nueva protagonista\",\"title_suggestive\":\"BURRIANA YA TIENE A QUIEN MIRAR\",\"body_neutral\":\"Perla ya está por Burriana y llega con una presencia que no deja indiferente ✨ Es una opción ideal para quien prefiere cercanía, discreción y una atención agradable desde el primer contacto. Si estabas esperando una novedad en la zona, aquí la tienes.\",\"body_suggestive\":\"Burriana estrena protagonista y no hace falta presentarla demasiado 🔥 Perla llega con ese aire de novedad que llama la atención y una presencia que invita a escribir sin demora. Si te mueves por la zona y te gustan las chicas con personalidad, esta puede ser una gran elección.\"},{\"slot\":\"8\",\"focus\":\"Curiosidad / misterio\",\"short_hook\":\"No todo se dice en un anuncio: a veces el interés está en descubrirla.\",\"title_neutral\":\"PERLA, PRESENCIA QUE NO SE OLVIDA\",\"title_suggestive\":\"LO QUE HOY SÍ PROVOCA ESCRIBIR\",\"body_neutral\":\"Hay perfiles que dejan curiosidad desde la primera línea, y Perla es uno de ellos 🌙 Tiene esa combinación de estilo, naturalidad y presencia que invita a saber más. Si te gusta descubrir por ti mismo a las personas que merecen la pena, aquí tienes un anuncio que cumple.\",\"body_suggestive\":\"Perla no es de las que pasan sin dejar rastro 😏 Su presencia provoca curiosidad, su estilo engancha y su forma de presentarse deja ganas de escribirle. Si te va el misterio bien llevado y las chicas con un punto de morbo elegante, aquí tienes un nombre para recordar.\"},{\"slot\":\"9\",\"focus\":\"Belleza latina / presencia visual\",\"short_hook\":\"Una mulata oscura con una presencia que destaca de verdad.\",\"title_neutral\":\"Una mulata con mucha clase\",\"title_suggestive\":\"MULATA CARIBEÑA CON MUCHA PRESENCIA\",\"body_neutral\":\"Perla transmite esa mezcla de elegancia y fuerza visual que destaca sin necesidad de exagerar 🌺 Mujer morena, con curvas y una presencia muy cuidada, pensada para quien aprecia la belleza latina con clase. Si buscas algo con personalidad y buena impresión desde el primer vistazo, puede interesarte mucho.\",\"body_suggestive\":\"Perla es de esas mulatas caribeñas que llaman la atención por pura presencia 🔥 Oscura, curvilínea y con una vibra muy atractiva, tiene ese efecto de mirar una vez y querer volver a hacerlo. Si te gusta la belleza latina con carácter, aquí hay mucho que descubrir.\"},{\"slot\":\"10\",\"focus\":\"Premium emocional / experiencia\",\"short_hook\":\"Lo premium no siempre va de precio; a veces va de cómo te hacen sentir.\",\"title_neutral\":\"SI TE GUSTA LO EXCLUSIVO, AQUÍ ESTÁ\",\"title_suggestive\":\"QUIZÁ NO VUELVA A ESTAR TAN CERCA\",\"body_neutral\":\"Lo que hace especial a Perla no es solo su presencia, sino la sensación de trato cuidado que transmite desde el inicio 💎 Para quienes buscan algo selecto, amable y con ese punto distinto que eleva la experiencia, esta puede ser una oportunidad muy interesante. Escríbele y descubre por qué encaja tan bien con quien sabe elegir.\",\"body_suggestive\":\"No siempre aparece alguien que reúna presencia, chispa y ese toque exclusivo que de verdad se nota 😏 Perla tiene justo eso: una experiencia que engancha, una vibra cálida y una cercanía que invita a repetir. Si te gustan las oportunidades que no duran siempre, quizás convenga escribirle hoy.\"}]}"
+                    }
+                ],
+                "phase": "final_answer",
+                "role": "assistant"
+            }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": "publicista:copy_pack:gpt-5.4-mini",
+        "prompt_cache_retention": "24h",
+        "reasoning": {
+            "effort": "none",
+            "summary": null
+        },
+        "safety_identifier": null,
+        "service_tier": "flex",
+        "store": false,
+        "temperature": 1,
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "description": null,
+                "name": "publicista_copy_pack",
+                "schema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "tone_used",
+                        "pack_angle",
+                        "title_options",
+                        "ads",
+                        "publication_notes",
+                        "recommended_order"
+                    ],
+                    "properties": {
+                        "tone_used": {
+                            "type": "string"
+                        },
+                        "pack_angle": {
+                            "type": "string"
+                        },
+                        "title_options": {
+                            "type": "array",
+                            "minItems": 10,
+                            "maxItems": 10,
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "recommended_order": {
+                            "type": "array",
+                            "minItems": 10,
+                            "maxItems": 10,
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "publication_notes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "ads": {
+                            "type": "array",
+                            "minItems": 10,
+                            "maxItems": 10,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                    "slot",
+                                    "focus",
+                                    "short_hook",
+                                    "title_neutral",
+                                    "title_suggestive",
+                                    "body_neutral",
+                                    "body_suggestive"
+                                ],
+                                "properties": {
+                                    "slot": {
+                                        "type": "string"
+                                    },
+                                    "focus": {
+                                        "type": "string"
+                                    },
+                                    "short_hook": {
+                                        "type": "string"
+                                    },
+                                    "title_neutral": {
+                                        "type": "string"
+                                    },
+                                    "title_suggestive": {
+                                        "type": "string"
+                                    },
+                                    "body_neutral": {
+                                        "type": "string"
+                                    },
+                                    "body_suggestive": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "strict": true
+            },
+            "verbosity": "medium"
+        },
+        "tool_choice": "auto",
+        "tools": [],
+        "top_logprobs": 0,
+        "top_p": 0.98,
+        "truncation": "disabled",
+        "usage": {
+            "input_tokens": 4604,
+            "input_tokens_details": {
+                "cached_tokens": 0
+            },
+            "output_tokens": 2385,
+            "output_tokens_details": {
+                "reasoning_tokens": 0
+            },
+            "total_tokens": 6989
+        },
+        "user": null,
+        "metadata": []
+    }
+}

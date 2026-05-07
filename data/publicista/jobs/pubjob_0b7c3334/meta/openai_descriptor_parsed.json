@@ -1,0 +1,53 @@
+{
+    "adult_appearing": true,
+    "framing": "Full body, low-angle vertical shot, subject centered, standing in shallow water at the beach",
+    "skin_tone": "Deep brown skin with a warm undertone",
+    "hair_color": "Black",
+    "hair_texture": "Long, wavy to curly texture",
+    "hair_length": "Very long, reaching well past the shoulders and down the back",
+    "body_build": "Slim to athletic build with a lean, toned appearance",
+    "body_curves": "Small to medium bust, narrow waist, visible hip curve, overall hourglass-lean silhouette with a pronounced leg line and moderate lower-body definition",
+    "face_shape": "Face mostly obscured; appears oval or softly rounded based on visible outline",
+    "eyes": "Not clearly visible due to face covering",
+    "lips": "Not clearly visible due to face covering",
+    "nose": "Not clearly visible due to face covering",
+    "eyebrows": "Not clearly visible due to face covering",
+    "makeup": "Not discernible",
+    "outfit_summary": "Colorful string bikini with a multicolor tie-dye style pattern; sheer or lightweight patterned cover-up draped behind/around the hips",
+    "dominant_colors": [
+        "blue",
+        "multicolor",
+        "yellow",
+        "red",
+        "green",
+        "black"
+    ],
+    "accessories": [
+        "Small tiara-like headpiece",
+        "Earrings",
+        "Red wristband",
+        "Belly button piercing"
+    ],
+    "pose_summary": "Standing with one arm raised to shade the forehead and the other arm relaxed by the side; confident beach pose",
+    "expression": "Face covered; expression not visible",
+    "background_summary": "Bright tropical beach scene with blue sky, distant clouds, and shallow green-blue water",
+    "lighting_summary": "Strong direct sunlight with high contrast and vivid colors",
+    "distinguishing_features": [
+        "Deep brown skin tone",
+        "Very long black wavy-curly hair",
+        "Lean athletic body with narrow waist",
+        "Visible belly button piercing",
+        "Colorful bikini",
+        "Small headpiece/tiara",
+        "Tattoo on the left arm"
+    ],
+    "similarity_guidance": "Para mantener un parecido general, conserva la misma complexión esbelta, piel profunda, cabello muy largo oscuro y silueta atlética sin intentar reproducir rasgos faciales exactos.",
+    "risk_notes": [
+        "El rostro está parcialmente cubierto, por lo que varios rasgos faciales no pueden determinarse con precisión.",
+        "La pose y el ángulo reducen la visibilidad de la estructura facial y corporal frontal completa."
+    ],
+    "quality_notes": [
+        "Imagen de buena resolución y colores nítidos.",
+        "La fuerte luz solar puede alterar ligeramente la percepción del tono de piel y las sombras."
+    ]
+}

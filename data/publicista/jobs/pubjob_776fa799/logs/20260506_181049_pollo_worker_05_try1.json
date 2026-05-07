@@ -1,0 +1,10 @@
+{
+    "ok": true,
+    "exit_code": 0,
+    "stdout": "{\"ok\": true, \"error\": \"\", \"image_path\": \"/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_776fa799/candidates/candidate_05_raw.png\", \"image_url\": \"https://videocdn.pollo.ai/web-cdn/pollo/production/cml44ltvu0lq2soxrv2swm5qe/ori/1778083841551-0ab0d447-c48f-46c1-9ee0-be22590b95ec.jpeg?type=download&quality=high&format=original\", \"generation_id\": \"88453427\", \"images\": [{\"index\": 1, \"path\": \"/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_776fa799/candidates/candidate_05_raw.png\", \"url\": \"https://videocdn.pollo.ai/web-cdn/pollo/production/cml44ltvu0lq2soxrv2swm5qe/ori/1778083841551-0ab0d447-c48f-46c1-9ee0-be22590b95ec.jpeg?type=download&quality=high&format=original\", \"size_bytes\": 815149, \"ext\": \"jpg\"}], \"backend\": \"curl-cffi\", \"prompt_length\": 1054, \"requested_num_outputs\": 1, \"image_size_bytes\": 815149, \"image_ext\": \"jpg\"}",
+    "stderr": "",
+    "model": "pollo-image-v2",
+    "prompt_length": 1054,
+    "prompt_compacted": 1,
+    "prompt_method": "gpt_summary"
+}

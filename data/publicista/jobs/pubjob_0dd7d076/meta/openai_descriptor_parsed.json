@@ -1,0 +1,51 @@
+{
+    "adult_appearing": true,
+    "framing": "cuerpo entero, plano general en vertical, sujeto centrado de pie en el agua",
+    "skin_tone": "marrón oscuro a moreno profundo con brillo por la luz solar",
+    "hair_color": "negro",
+    "hair_texture": "lacio con ligera ondulación en las puntas",
+    "hair_length": "muy largo, por debajo de la cintura",
+    "body_build": "complexión delgada y atlética, con cintura marcada y presencia corporal firme",
+    "body_curves": "pecho pequeño a mediano; caderas moderadas; cintura estrecha con buena definición cintura-cadera; silueta general en reloj de arena suave; piernas largas y tonificadas; presencia corporal estilizada",
+    "face_shape": "rostro de forma ovalada con mandíbula suave",
+    "eyes": "ojos no visibles con claridad por la cobertura del rostro",
+    "lips": "no visibles con suficiente detalle",
+    "nose": "no visible con suficiente detalle",
+    "eyebrows": "no visibles con suficiente detalle",
+    "makeup": "no apreciable o muy mínimo",
+    "outfit_summary": "bikini de triángulo multicolor con tiras finas y pareo abierto estampado y colorido",
+    "dominant_colors": [
+        "azul",
+        "verde",
+        "amarillo",
+        "rojo",
+        "negro"
+    ],
+    "accessories": [
+        "aretes pequeños",
+        "pulsera roja",
+        "piercings visibles en el ombligo",
+        "posible accesorio/cadena de cabeza o adorno en el cabello"
+    ],
+    "pose_summary": "de pie sobre el agua, con una mano levantada a modo de visera sobre la frente y la otra relajada junto al cuerpo",
+    "expression": "no discernible por la cobertura del rostro; postura confiada",
+    "background_summary": "playa o costa con mar bajo, horizonte visible, cielo despejado azul intenso y nubes lejanas",
+    "lighting_summary": "luz solar directa y fuerte, con sombras marcadas y colores muy saturados",
+    "distinguishing_features": [
+        "piel morena profunda",
+        "cabello negro muy largo",
+        "cintura estrecha",
+        "piercing en el ombligo",
+        "piernas largas",
+        "silueta delgada y atlética"
+    ],
+    "similarity_guidance": "Mantén una mujer adulta de piel morena profunda, cabello negro muy largo, silueta delgada con cintura marcada y proporciones atléticas suaves, sin intentar copiar rasgos faciales exactos.",
+    "risk_notes": [
+        "El rostro está parcialmente cubierto, por lo que varios rasgos faciales no pueden determinarse con precisión.",
+        "La imagen incluye pose y accesorios llamativos que no deben confundirse con rasgos permanentes."
+    ],
+    "quality_notes": [
+        "Imagen nítida y con buena luz natural.",
+        "El encuadre completo permite valorar bien la silueta y el cabello."
+    ]
+}

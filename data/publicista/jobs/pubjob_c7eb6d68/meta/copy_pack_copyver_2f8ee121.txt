@@ -1,0 +1,112 @@
+PACK PUBLICISTA
+Trabajo: Estrella brasil tetuda 3
+Clienta: Brasileña Estrella
+Fecha: 2026-04-30 22:30:04
+Tono: Equilibrado
+Enfoque: Pack de novedad brasileña con presencia, trato cercano y gancho comercial suave, alternando elegancia neutra y sugerencia controlada para captar clic y mensaje.
+
+IMÁGENES FINALES
+- final_01: data/publicista/jobs/pubjob_c7eb6d68/finals/final_01_square.jpg
+- final_02: data/publicista/jobs/pubjob_c7eb6d68/finals/final_02_square.jpg
+- final_03: data/publicista/jobs/pubjob_c7eb6d68/finals/final_03_square.jpg
+- final_04: data/publicista/jobs/pubjob_c7eb6d68/finals/final_04_square.jpg
+
+TÍTULOS
+- RUBI, LA NOVEDAD BRASILEÑA EN BURRIANA 💞
+- Brasileña rubi: presencia, trato y encanto
+- NOVEDAD en burriana: rubi 🇧🇷
+- Rubi, madura brasileña con mucho por descubrir
+- UNA BRASILEÑA DIFERENTE HA LLEGADO A BURRIANA
+- rubi te recibe con una sonrisa y buen plan ✨
+- Rubi: elegancia latina y trato cercano
+- Madura brasileña en burriana, RECIÉN LLEGADA
+- RUBI ES ESA NOVEDAD QUE LLAMA LA ATENCIÓN
+- Rubi no pasa desapercibida en burriana
+
+ANUNCIOS
+--- SLOT_1 ---
+FOCUS: Presentación de novedad
+HOOK: SI TE GUSTAN LAS NOVEDADES QUE SE NOTAN DESDE EL PRIMER VISTAZO, RUBI YA ESTÁ EN BURRIANA. ✨
+TÍTULO NEUTRO: RUBI, LA NOVEDAD BRASILEÑA EN BURRIANA 💞
+TÍTULO SUGERENTE: RUBI, LA NOVEDAD BRASILEÑA EN BURRIANA 💞
+TEXTO NEUTRO: Burriana tiene una NUEVA cara que merece la pena conocer. Rubi es brasileña, madura y transmite una presencia que se nota nada más verla ✨. Si te gustan las chicas con estilo, cercanía y un punto distinto, aquí tienes una opción que destaca sin esfuerzo. Escríbele y descubre por qué tanta gente se fija en ella.
+TEXTO SUGERENTE: BURRIANA ESTRENA UNA BRASILEÑA QUE NO PASA DESAPERCIBIDA. Rubi es madura, tiene presencia y ese aire de NOVEDAD que despierta curiosidad desde el primer momento ✨. Si buscas algo con más magnetismo y un trato que invite a seguir hablando, ya sabes por dónde empezar. Escríbele y comprueba por ti mismo el efecto Rubi.
+
+--- SLOT_2 ---
+FOCUS: Trato cercano
+HOOK: HAY MUJERES QUE ENTRAN BIEN POR LA MIRADA, PERO SE QUEDAN POR EL TRATO. Rubi es de esas. 📍 📍
+TÍTULO NEUTRO: Brasileña rubi: presencia, trato y encanto
+TÍTULO SUGERENTE: Brasileña rubi: presencia, trato y encanto
+TEXTO NEUTRO: HAY PERFILES QUE LLAMAN LA ATENCIÓN Y OTROS QUE ADEMÁS HACEN FÁCIL LA CONVERSACIÓN. Rubi combina ambas cosas: es brasileña, madura y tiene un trato cercano que invita a escribirle desde el primer mensaje 💬. Si valoras una compañía agradable, con encanto y buena energía, aquí tienes una novedad que encaja muy bien.
+TEXTO SUGERENTE: RUBI TIENE ESA MEZCLA QUE ENGANCHA: PRESENCIA, TRATO Y UN PUNTO LATINO QUE SE NOTA AL HABLAR CON ELLA 💬. Brasileña, madura y con una forma de conectar que hace que el primer mensaje no cueste nada. Si buscas alguien que responda con cercanía y deje ganas de seguir, esta novedad te va a interesar.
+
+--- SLOT_3 ---
+FOCUS: Perfil brasileño con atractivo comercial
+HOOK: BRASILEÑA, MADURA Y CON CARÁCTER: RUBI REÚNE JUSTO LO QUE MUCHA GENTE BUSCA. 💫
+TÍTULO NEUTRO: NOVEDAD en burriana: rubi 🇧🇷
+TÍTULO SUGERENTE: NOVEDAD en burriana: rubi 🇧🇷
+TEXTO NEUTRO: Rubi llega a Burriana con una propuesta sencilla pero muy efectiva: presencia, personalidad y ganas de conocer gente NUEVA. Brasileña, madura y con un estilo propio que se aprecia enseguida, es de esas novedades que no necesitan exagerar para destacar. Si te apetece conocerla, escríbele HOY. 💫
+TEXTO SUGERENTE: HAY NOVEDADES QUE SE NOTAN Y RUBI ES UNA DE ELLAS 🇧🇷. Brasileña, madura y con carácter, llega a Burriana con una energía que despierta interés desde el primer vistazo. Si te atrae una latina con personalidad y un punto de misterio bien llevado, no la dejes pasar. Escríbele y entra en contacto. ✨ ✨
+
+--- SLOT_4 ---
+FOCUS: Elegancia reservada
+HOOK: SI PREFIERES UNA COMPAÑIA CON ESTILO, RUBI ENCAJA DESDE EL PRIMER MENSAJE. 🤍 🤍
+TÍTULO NEUTRO: Rubi, madura brasileña con mucho por descubrir
+TÍTULO SUGERENTE: Rubi, madura brasileña con mucho por descubrir
+TEXTO NEUTRO: NO HACE FALTA LEVANTAR LA VOZ PARA LLAMAR LA ATENCIÓN. Rubi apuesta por una elegancia discreta, un trato agradable y una forma de estar que transmite seguridad. Es brasileña, madura y perfecta para quien busca una compañía reservada, cuidada y con clase. Si te encaja ese estilo, escríbele. 🤍 🤍
+TEXTO SUGERENTE: RUBI NO NECESITA EXCESO PARA DESTACAR: SU FORMA DE ESTAR, SU SEGURIDAD Y SU AIRE BRASILEÑO HACEN EL RESTO. Es madura, sabe marcar presencia y deja una sensación de confianza muy especial. Si prefieres una mujer con estilo y con algo más que una simple foto, aquí tienes una opción que merece el clic. 😈
+
+--- SLOT_5 ---
+FOCUS: Curiosidad por exclusividad
+HOOK: NO TODAS LAS NOVEDADES LLAMAN LA ATENCIÓN IGUAL. Rubi sí. 💬
+TÍTULO NEUTRO: UNA BRASILEÑA DIFERENTE HA LLEGADO A BURRIANA
+TÍTULO SUGERENTE: UNA BRASILEÑA DIFERENTE HA LLEGADO A BURRIANA
+TEXTO NEUTRO: A VECES BASTA CON POCO PARA DARSE CUENTA DE QUE UNA CHICA TIENE ALGO DISTINTO. Rubi es brasileña, madura y transmite una personalidad que se sale de lo habitual. En Burriana ya empieza a llamar la atención por su forma de ser y por la confianza que proyecta 🙂. Si buscas una novedad con carácter, merece la pena escribirle.
+TEXTO SUGERENTE: NO TODAS LAS BRASILEÑAS DEJAN LA MISMA IMPRESIÓN, Y RUBI LO DEMUESTRA DESDE EL PRIMER CONTACTO 🙂. Es madura, tiene presencia y ese punto especial que hace que quieras saber un poco más. En Burriana ya está empezando a destacar, así que si te gustan las novedades con algo de misterio y mucho interés, este es tu momento.
+
+--- SLOT_6 ---
+FOCUS: Latina con presencia
+HOOK: HAY LATINAS QUE PROMETEN MUCHO Y OTRAS QUE SIMPLEMENTE DESTACAN. Rubi pertenece al segundo grupo. 🌟 🌟
+TÍTULO NEUTRO: rubi te recibe con una sonrisa y buen plan ✨
+TÍTULO SUGERENTE: rubi te recibe con una sonrisa y buen plan ✨
+TEXTO NEUTRO: Si lo que quieres es una chica con BUENA PRESENCIA y conversación fácil, Rubi encaja sin complicaciones. Brasileña, madura y con una energía agradable, transmite ese equilibrio entre cercanía y estilo que hace más fácil escribirle ✨. Es una novedad pensada para quien valora el trato y la naturalidad.
+TEXTO SUGERENTE: RUBI COMBINA SIMPATÍA, PRESENCIA Y UN PUNTO LATINO QUE ENTRA MUY BIEN DESDE EL PRINCIPIO ✨. Es brasileña, madura y sabe cómo hacer que la conversación fluya sin forzar nada. Si buscas una mujer con gancho, con trato agradable y con ese aire de novedad que invita a probar, ya la tienes delante.
+
+--- SLOT_7 ---
+FOCUS: Recién llegada / oportunidad
+HOOK: RECIÉN LLEGADA A BURRIANA Y CON MUCHAS GANAS DE CONOCER GENTE INTERESANTE. 🔥
+TÍTULO NEUTRO: Rubi: elegancia latina y trato cercano
+TÍTULO SUGERENTE: Rubi: elegancia latina y trato cercano
+TEXTO NEUTRO: RECIÉN LLEGADA Y CON GANAS DE EMPEZAR BIEN EN BURRIANA, RUBI OFRECE JUSTO LO QUE MUCHA GENTE BUSCA: CERCANÍA, BUENA EDUCACIÓN Y UNA PRESENCIA QUE SE RECUERDA. Es brasileña, madura y tiene ese equilibrio entre elegancia y calidez que hace que merezca la pena conocerla. Si te apetece escribir a una novedad con encanto, aquí la tienes. 🔥
+TEXTO SUGERENTE: Rubi acaba de llegar y ya tiene ese punto de oportunidad que gusta a quienes no dejan pasar las novedades. Brasileña, madura y con elegancia latina, ofrece un trato cercano y una conversación que invita a seguir hablando 😉. Si buscas una opción NUEVA en Burriana con presencia y chispa, escríbele AHORA.
+
+--- SLOT_8 ---
+FOCUS: Atracción por imagen y estilo
+HOOK: A VECES BASTA CON UNA SOLA FOTO PARA ENTENDER QUE HAY ALGO DIFERENTE DETRÁS. ✨ ✨
+TÍTULO NEUTRO: Madura brasileña en burriana, RECIÉN LLEGADA
+TÍTULO SUGERENTE: RUBI ES ESA NOVEDAD QUE LLAMA LA ATENCIÓN
+TEXTO NEUTRO: HAY PERFILES QUE SE ENTIENDEN ENSEGUIDA: PRESENCIA, ESTILO Y UNA FORMA DE MIRAR QUE LO DICE TODO SIN NECESIDAD DE MÁS. Rubi es brasileña, madura y llega a Burriana con una imagen muy cuidada y un encanto natural que no pasa desapercibido. Si te gusta descubrir chicas que suman desde el primer vistazo, escríbele. ✨ ✨
+TEXTO SUGERENTE: RUBI TIENE ESE TIPO DE PRESENCIA QUE HACE QUE LA MIRADA SE QUEDE UN SEGUNDO MÁS DE LO NORMAL. Brasileña, madura y con estilo propio, llega a Burriana como una novedad que despierta interés de inmediato. Si te atraen las chicas que destacan sin hacer ruido, esta te va a enganchar. 🔥 🔥
+
+--- SLOT_9 ---
+FOCUS: Madura segura de sí
+HOOK: LA SEGURIDAD TAMBIÉN SEDUCE, Y RUBI LA LLEVA POR DELANTE. 📍
+TÍTULO NEUTRO: BURRIANA TIENE NUEVA BRASILEÑA Y SE NOTA
+TÍTULO SUGERENTE: Llega rubi, una madura brasileña que impacta
+TEXTO NEUTRO: RUBI TRANSMITE SEGURIDAD, NATURALIDAD Y ESA MADUREZ QUE HACE FÁCIL CONFIAR EN ELLA. Es brasileña, está en Burriana y llega con una forma de ser serena, agradable y muy directa en el trato. Si valoras las mujeres que saben estar y saben responder, esta novedad encaja contigo. 📍
+TEXTO SUGERENTE: CUANDO UNA MUJER TIENE SEGURIDAD, SE NOTA. Rubi llega como una madura brasileña con presencia, carácter y un punto de atracción que no se finge 😉. En Burriana ya empieza a destacar, así que si te apetecen las novedades que realmente dejan huella, no tardes en escribirle.
+
+--- SLOT_10 ---
+FOCUS: Gancho directo de contacto
+HOOK: ¿BUSCAS UNA BRASILEÑA CON BUENA QUÍMICA Y CONVERSACIÓN FÁCIL? Ya la has encontrado. 💫
+TÍTULO NEUTRO: Rubi no pasa desapercibida en burriana
+TÍTULO SUGERENTE: rubi, la brasileña que estabas buscando
+TEXTO NEUTRO: SI TE GUSTAN LAS MUJERES CON PRESENCIA, TRATO AGRADABLE Y UNA CONVERSACIÓN QUE FLUYE, RUBI ES UNA OPCIÓN MUY A TENER EN CUENTA. Brasileña, madura y recién llegada a Burriana, reúne justo lo que convierte una visita en un mensaje. Escríbele y comprueba si encaja contigo. 💫
+TEXTO SUGERENTE: RUBI NO ESTÁ AQUÍ PARA PASAR DE LARGO: ES BRASILEÑA, MADURA Y TIENE EL TIPO DE ENCANTO QUE HACE QUE QUIERAS ESCRIBIR ANTES DE PENSARLO DEMASIADO. Burriana le sienta bien y ella sabe responder con cercanía, presencia y un toque de morbo controlado 😏. Si buscas una novedad que invite al contacto, ya la encontraste.
+
+NOTAS DE PUBLICACIÓN
+- Para destacamos.net, prioriza los slots 1, 2, 4, 5 y 8: tono limpio, elegante y sin palabras de reclamo sexual.
+- Para loquosex.com, usa sobre todo los slots 3, 6, 7, 9 y 10: más directos, con morbo controlado y llamada a escribir.
+- Alterna títulos enteros en MAYÚSCULAS con otros más sobrios para evitar sensación de anuncio repetido.
+- Mantén siempre la idea de NOVEDAD, brasileña, madura y Burriana; es el ancla comercial del pack.
+- No conviene publicar dos variantes seguidas con el mismo arranque; rota entre curiosidad, trato, exclusividad y oportunidad.

@@ -1,0 +1,53 @@
+{
+    "adult_appearing": true,
+    "framing": "primerísimo primer plano / close-up recortado del rostro, cuello y parte superior del pecho",
+    "skin_tone": "piel clara a clara-media con matiz cálido/rosado",
+    "hair_color": "castaño oscuro",
+    "hair_texture": "liso a ligeramente ondulado",
+    "hair_length": "largo, cae por ambos lados del rostro",
+    "body_build": "complexión normal a algo curvilínea, de presencia corporal media",
+    "body_curves": "pecho visible de tamaño mediano a grande; escote pronunciado; caderas no visibles por el encuadre; cuello y parte superior del torso con apariencia suave y femenina; silueta general sugerida curvilínea en la zona superior",
+    "face_shape": "rostro ovalado a ligeramente redondeado, con mejillas llenas",
+    "eyes": "ojos medianos, oscuros, de forma almendrada y parcialmente entornados por el ángulo de la foto",
+    "lips": "labios de tamaño medio a llenos, especialmente el labio inferior, con contorno suave",
+    "nose": "nariz mediana, recta, con puente poco prominente y punta redondeada",
+    "eyebrows": "cejas oscuras, de grosor medio, más bien rectas con leve arco",
+    "makeup": "maquillaje muy sutil o poco visible; apariencia natural",
+    "outfit_summary": "camisa o chaqueta de mezclilla clara abierta sobre un top con encaje color beige/crema",
+    "dominant_colors": [
+        "marrón",
+        "castaño oscuro",
+        "azul claro",
+        "beige/crema",
+        "rosado",
+        "negro"
+    ],
+    "accessories": [
+        "collar fino con colgante",
+        "anillo en la mano",
+        "posible esmalte de uñas rosado"
+    ],
+    "pose_summary": "rostro inclinado hacia arriba, boca entreabierta, una mano levantada cerca de los labios con un dedo apoyado",
+    "expression": "expresión relajada, algo provocadora o pensativa",
+    "background_summary": "interior neutro y poco definido, con una pared clara y líneas de azulejo o rejilla visibles",
+    "lighting_summary": "iluminación cálida y suave, con contraste moderado y algo de grano en la imagen",
+    "distinguishing_features": [
+        "piel clara con subtono cálido",
+        "cabello castaño oscuro largo y liso/ligeramente ondulado",
+        "rostro ovalado-redondeado con mejillas llenas",
+        "ojos oscuros almendrados",
+        "labios medianos a llenos",
+        "nariz recta de tamaño medio",
+        "cejas oscuras de grosor medio",
+        "escote pronunciado y parte superior del torso curvilínea"
+    ],
+    "similarity_guidance": "Mantén una mujer adulta de rasgos suaves, piel clara cálida, cabello largo castaño oscuro, rostro ovalado-redondeado y labios llenos, con una presencia corporal superior curvilínea.",
+    "risk_notes": [
+        "La imagen está muy recortada y no permite evaluar con precisión la complexión completa ni la forma total del cuerpo.",
+        "Parte del rostro está oculto por el ángulo, la mano y el encuadre, lo que limita detalles finos."
+    ],
+    "quality_notes": [
+        "Foto de resolución moderada con algo de ruido/grano.",
+        "El primer plano y la pose dificultan ver orejas, mandíbula completa y proporciones corporales completas."
+    ]
+}

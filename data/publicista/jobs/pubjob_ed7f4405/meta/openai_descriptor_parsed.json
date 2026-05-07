@@ -1,0 +1,47 @@
+{
+    "adult_appearing": true,
+    "framing": "medium full-body selfie, slightly angled from above, torso and upper legs visible",
+    "skin_tone": "medium-deep brown skin tone",
+    "hair_color": "black",
+    "hair_texture": "tight curly / coily",
+    "hair_length": "shoulder-length to long",
+    "body_build": "curvy, full-figured, voluptuous build",
+    "body_curves": "very large bust, pronounced hips, strongly defined waist-to-hip contrast, hourglass silhouette, high overall body presence",
+    "face_shape": "oval with softly rounded contours",
+    "eyes": "not clearly visible due to blur; appear medium-sized",
+    "lips": "full lips",
+    "nose": "broad to متوسط-width nose, not sharply defined",
+    "eyebrows": "full, dark eyebrows",
+    "makeup": "not clearly discernible due to face blur; appears minimal or natural",
+    "outfit_summary": "fitted bright yellow long-sleeve bodycon dress with deep V neckline and ruched detailing",
+    "dominant_colors": [
+        "yellow",
+        "black",
+        "beige",
+        "brown"
+    ],
+    "accessories": [
+        "smartphone"
+    ],
+    "pose_summary": "standing in a mirror selfie pose with one hand holding the phone and the other resting on a counter",
+    "expression": "neutral or soft, not clearly visible due to face blur",
+    "background_summary": "indoor room with warm beige walls, a window to the left, and a countertop in the foreground",
+    "lighting_summary": "soft warm indoor lighting, evenly lit",
+    "distinguishing_features": [
+        "medium-deep brown skin tone",
+        "black curly shoulder-length hair",
+        "oval face with rounded contours",
+        "full lips",
+        "full bust and hourglass figure",
+        "prominent waist-to-hip contrast"
+    ],
+    "similarity_guidance": "Mantén una mujer adulta de piel morena profunda, cabello negro rizado y silueta muy curvilínea con cintura marcada y busto prominente, sin depender de la ropa ni del encuadre.",
+    "risk_notes": [
+        "El rostro está fuertemente desenfocado, así que varios rasgos faciales solo pueden estimarse de forma limitada.",
+        "La parte inferior del cuerpo está parcialmente recortada y la silueta completa no se ve con total precisión."
+    ],
+    "quality_notes": [
+        "Imagen de buena resolución general pero con el rostro intencionalmente difuminado.",
+        "La postura de selfie en espejo limita la visibilidad completa de la complexión y el contorno corporal inferior."
+    ]
+}

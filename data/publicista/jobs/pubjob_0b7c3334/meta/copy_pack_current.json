@@ -1,0 +1,306 @@
+{
+    "id": "copyver_e4e576e6",
+    "created_at": "2026-04-30 22:48:21",
+    "model": "gpt-5.4-mini",
+    "generation_phases": 2,
+    "request_id": "req_c21e88eb9de248e5b81b8a3aceda3025",
+    "http_code": 200,
+    "tone": "equilibrado",
+    "pack_angle": "Pack de novedad brasileña en Burriana con varios enfoques de contacto: desde lo elegante y discreto hasta lo sugerente con complicidad, priorizando cercanía, presencia y ganas de escribir.",
+    "title_options": [
+        "RUBI, LA NOVEDAD BRASILEÑA EN BURIANA",
+        "BRASILEÑA RECIÉN LLEGADA EN BURRIANA ✨",
+        "RUBI: TRATO CERCANO Y PRESENCIA QUE LLAMA",
+        "La brasileña que todos quieren conocer",
+        "rubi, elegancia latina con ganas de escribir",
+        "NOVEDAD en burriana: rubi",
+        "Rubi brasileña, DISCRETA y muy atenta",
+        "Una brasileña diferente en burriana",
+        "RUBI ABRE AGENDA HOY 💫",
+        "RUBI, CONVERSACIÓN FÁCIL Y BUEN AMBIENTE"
+    ],
+    "title_candidates": [
+        "RUBI, LA NOVEDAD BRASILEÑA EN BURIANA",
+        "Brasileña recién llegada en Burriana ✨",
+        "Rubi: trato cercano y presencia que llama",
+        "LA BRASILEÑA QUE TODOS QUIEREN CONOCER",
+        "Rubi, elegancia latina con ganas de escribir",
+        "Novedad en Burriana: RUBI",
+        "Rubi brasileña, discreta y muy atenta",
+        "Una brasileña diferente en Burriana",
+        "RUBI abre agenda hoy 💫",
+        "Latina de Brasil con mucho encanto",
+        "Rubi, conversación fácil y buen ambiente",
+        "BRASILEÑA EN BURIANA: HÁBLAME",
+        "Rubi, una novedad que no pasa desapercibida",
+        "Cita con Rubi, estilo y cercanía",
+        "Rubi, actitud, dulzura y carácter",
+        "Hoy puedes conocer a RUBI",
+        "Brazil en Burriana, con Rubi",
+        "Rubi, la brasileña que invita a escribir",
+        "Disponible en Burriana: Rubi",
+        "Rubi, nueva por la zona y con ganas"
+    ],
+    "ads": [
+        {
+            "slot": "1",
+            "focus": "Novedad brasileña",
+            "short_hook": "Si buscas algo distinto, aquí tienes una brasileña NUEVA en Burriana ✨",
+            "title_neutral": "RUBI, LA NOVEDAD BRASILEÑA EN BURIANA",
+            "title_suggestive": "RUBI, LA NOVEDAD BRASILEÑA EN BURIANA",
+            "body_neutral": "Soy Rubi, brasileña y NUEVA por Burriana. Si te apetece conocer a alguien con presencia, cercanía y ganas de una conversación agradable, ESCRÍBEME 😉. Me gusta dejar buena impresión desde el primer mensaje y cuidar el trato.",
+            "body_suggestive": "Soy Rubi, la brasileña NUEVA en Burriana, y vengo con ganas de que me escribas 😘. Si te atrae descubrir una novedad con presencia, cercanía y ese punto que despierta curiosidad, aquí me tienes. Empecemos con una buena conversación."
+        },
+        {
+            "slot": "2",
+            "focus": "Trato cercano",
+            "short_hook": "A VECES LO QUE MÁS ENGANCHA NO ES EL MISTERIO, SINO EL TRATO. 📍",
+            "title_neutral": "Rubi, trato cercano y presencia que llama",
+            "title_suggestive": "Rubi, trato cercano y presencia que llama",
+            "body_neutral": "Conmigo encontrarás una conversación fácil, natural y muy agradable. Soy Rubi, brasileña en Burriana, y me gusta que todo fluya con educación, buen ambiente y un punto de complicidad. Si valoras el trato de verdad, ESCRÍBEME 💬",
+            "body_suggestive": "Si te gusta una chica que responde con naturalidad y sabe crear buen ambiente, ESCRÍBEME. Soy Rubi, brasileña en Burriana, y me encanta ese trato cercano que invita a seguir la charla y dejarte llevar por la complicidad ✨"
+        },
+        {
+            "slot": "3",
+            "focus": "Cita discreta",
+            "short_hook": "PARA QUIENES PREFIEREN UN ENCUENTRO TRANQUILO, SIN COMPLICACIONES. 💫 💫",
+            "title_neutral": "rubi, ELEGANTE y muy DISCRETA",
+            "title_suggestive": "RUBI, DISCRETA Y CON UN PUNTO DE MORBO SUAVE",
+            "body_neutral": "ME GUSTA CUIDAR LOS DETALLES Y CREAR UN AMBIENTE CÓMODO DESDE EL PRIMER MENSAJE. Soy Rubi, brasileña en Burriana, y si buscas una forma reservada, elegante y agradable de conocernos, aquí tienes una opción que encaja contigo. 💫 💫",
+            "body_suggestive": "SI PREFIERES UNA CITA DISCRETA PERO CON CHISPA, RUBI PUEDE SER JUSTO LO QUE BUSCAS 😉. Soy brasileña, estoy en Burriana y me gusta crear una atmósfera cuidada, cercana y con ese punto de curiosidad que hace escribir."
+        },
+        {
+            "slot": "4",
+            "focus": "Latina con presencia",
+            "short_hook": "HAY MUJERES QUE NO NECESITAN PRESENTARSE DEMASIADO PARA LLAMAR LA ATENCIÓN. 🤍",
+            "title_neutral": "La brasileña que todos quieren conocer",
+            "title_suggestive": "La brasileña que te hace escribir",
+            "body_neutral": "RUBI TRAE ESE ENCANTO BRASILEÑO QUE SE NOTA DESDE EL PRIMER CONTACTO. Soy una latina con presencia, trato agradable y una forma de comunicar que deja ganas de seguir hablando. Si te apetece conocerme, te leo. 🤍",
+            "body_suggestive": "SOY RUBI, BRASILEÑA EN BURRIANA, Y TENGO ESE ENCANTO LATINO QUE NO PASA DESAPERCIBIDO 🔥. Si te gustan las chicas con presencia, seguridad y un aire que invita a la curiosidad, aquí tienes una conversación que puede ponerse interesante."
+        },
+        {
+            "slot": "5",
+            "focus": "Juegos y complicidad",
+            "short_hook": "SI TE GUSTAN LOS JUEGOS DE COMPLICIDAD, VAS A QUERER ESCRIBIRLE. 💬 💬",
+            "title_neutral": "RUBI, CONVERSACIÓN FÁCIL Y BUEN AMBIENTE",
+            "title_suggestive": "RUBI Y SUS JUEGOS DE COMPLICIDAD 💫",
+            "body_neutral": "CON RUBI TODO EMPIEZA CON UNA BUENA CONVERSACIÓN Y UNA ACTITUD CERCANA. Soy brasileña, estoy en Burriana y me encanta crear un ambiente agradable donde todo resulte natural. Si te apetece hablar con alguien atenta, aquí estoy. 💬 💬",
+            "body_suggestive": "CON RUBI NO HACE FALTA CORRER: PRIMERO UNA CHARLA CON CHISPA, LUEGO SE VE HASTA DÓNDE LLEGA LA COMPLICIDAD 😏. Soy brasileña en Burriana y me gusta ese juego sutil que hace que un mensaje se convierta en ganas de repetir."
+        },
+        {
+            "slot": "6",
+            "focus": "Burriana hoy",
+            "short_hook": "Burriana tiene una novedad que merece la pena descubrir HOY mismo. 🌟",
+            "title_neutral": "NOVEDAD en burriana: rubi",
+            "title_suggestive": "NOVEDAD en buriana: rubi 😘",
+            "body_neutral": "Rubi está disponible para quien quiera salir de la rutina con algo diferente. Soy brasileña, estoy en Burriana y me gusta transmitir cercanía, BUENA PRESENCIA y una atención que se nota desde el primer contacto. 🌟",
+            "body_suggestive": "Si HOY te apetece una novedad real en Burriana, aquí la tienes 🔥. Soy Rubi, brasileña, y me gusta despertar interés desde el primer saludo. ESCRÍBEME y vemos qué plan te encaja mejor."
+        },
+        {
+            "slot": "7",
+            "focus": "Brasileña madura",
+            "short_hook": "HAY EXPERIENCIAS QUE SOLO SE ENTIENDEN CUANDO CONOCES A UNA MUJER CON RECORRIDO Y ACTITUD. 🔥 🔥",
+            "title_neutral": "Rubi, brasileña, DISCRETA y muy atenta",
+            "title_suggestive": "Rubi, brasileña madura con mucho encanto",
+            "body_neutral": "RUBI COMBINA MADUREZ, NATURALIDAD Y ESE PUNTO BRASILEÑO QUE MARCA LA DIFERENCIA. Me presento con calma, con buena conversación y con una forma de estar que transmite confianza. Si buscas algo serio y agradable, háblame. 🔥 🔥",
+            "body_suggestive": "SOY RUBI, UNA BRASILEÑA MADURA CON PRESENCIA Y ESE ENCANTO QUE ENGANCHA SIN HACER RUIDO 😉. Me gusta el trato atento, la conversación con intención y ese punto de madurez que convierte un mensaje en algo más interesante."
+        },
+        {
+            "slot": "8",
+            "focus": "Encanto y carácter",
+            "short_hook": "NO TODO ES APARIENCIA: EL CARÁCTER TAMBIÉN CONQUISTA. ✨",
+            "title_neutral": "rubi, elegancia latina con ganas de escribir",
+            "title_suggestive": "rubi, dulzura, carácter y bastante juego",
+            "body_neutral": "Rubi tiene una mezcla muy interesante de dulzura, seguridad y presencia. Soy brasileña en Burriana y me gusta que el primer contacto ya diga mucho de cómo soy: cercana, educada y con carácter. Si te apetece, ESCRÍBEME. ✨",
+            "body_suggestive": "HAY CHICAS QUE CONQUISTAN POR LA MEZCLA JUSTA DE DULZURA Y CARÁCTER, Y RUBI VA POR AHÍ 😍. Soy brasileña en Burriana y me gusta dejar esa sensación de querer seguir la conversación un poco más."
+        },
+        {
+            "slot": "9",
+            "focus": "Contacta sin vueltas",
+            "short_hook": "SI TE APETECE ESCRIBIR A ALGUIEN QUE RESPONDE CON NATURALIDAD, YA LA HAS ENCONTRADO. 📍 📍",
+            "title_neutral": "Rubi abre agenda HOY 💫",
+            "title_suggestive": "RUBI ABRE AGENDA HOY 💫",
+            "body_neutral": "Rubi contesta con cercanía y hace fácil dar el primer paso. Si te apetece hablar con una brasileña en Burriana que responde de forma natural y cuida el trato, ESCRÍBEME y te cuento más. 📍 📍",
+            "body_suggestive": "HOY tengo ganas de conocer a quien sepa ir al grano con buen rollo 😏. Soy Rubi, brasileña en Burriana, y si te apetece alguien que contesta, suma y deja curiosidad, ya sabes qué hacer."
+        },
+        {
+            "slot": "10",
+            "focus": "Deseo de conocer",
+            "short_hook": "La curiosidad hace su trabajo cuando una chica realmente LLAMA LA ATENCIÓN. 💫",
+            "title_neutral": "Rubi, una NOVEDAD que no pasa desapercibida",
+            "title_suggestive": "RUBI, LA BRASILEÑA QUE INVITA A ESCRIBIR 🔥",
+            "body_neutral": "RUBI DESPIERTA ESE INTERÉS QUE INVITA A ESCRIBIR SIN PENSARLO DEMASIADO. Soy brasileña, estoy en Burriana y me gusta una presentación elegante, cercana y con presencia. Si te ha picado la curiosidad, háblame 😉",
+            "body_suggestive": "HAY PERFILES QUE SE MIRAN Y SE OLVIDAN, Y OTROS QUE TE HACEN ESCRIBIR CASI SIN DARTE CUENTA 😘. Soy Rubi, brasileña en Burriana, y tengo justo ese punto de novedad y presencia que activa la curiosidad."
+        }
+    ],
+    "publication_notes": [
+        "En destacamos.net conviene priorizar las versiones más neutras: trato cercano, cita discreta, elegancia y novedad, evitando palabras de reclamo sexual o demasiado directas.",
+        "En loquosex.com funcionan mejor las versiones sugerentes con gancho, especialmente las que hablan de juego, complicidad, agenda hoy y brasileña con presencia.",
+        "Alterna títulos en MAYÚSCULAS con otros en formato frase para no parecer repetitiva y mejorar CTR por saturación visual.",
+        "Mantén la localidad Burriana visible en varios activos para reforzar relevancia local y sensación de disponibilidad real.",
+        "No conviene publicar dos anuncios casi iguales seguidos; mejor rotar ángulo, apertura y cierre para que cada pieza parezca un anuncio distinto."
+    ],
+    "recommended_order": [
+        "RUBI, LA NOVEDAD BRASILEÑA EN BURIANA",
+        "Rubi, trato cercano y presencia que llama",
+        "Rubi, elegancia latina con ganas de escribir",
+        "Novedad en Burriana: RUBI",
+        "Rubi brasileña, discreta y muy atenta",
+        "Una brasileña diferente en Burriana",
+        "RUBI abre agenda hoy 💫",
+        "LA BRASILEÑA QUE TODOS QUIEREN CONOCER",
+        "Brasileña recién llegada en Burriana ✨",
+        "Rubi, conversación fácil y buen ambiente"
+    ],
+    "raw_response_path": "data/publicista/jobs/pubjob_0b7c3334/meta/copy_pack_copyver_e4e576e6_raw.json",
+    "parsed_json_path": "data/publicista/jobs/pubjob_0b7c3334/meta/copy_pack_copyver_e4e576e6.json",
+    "export_txt_path": "data/publicista/jobs/pubjob_0b7c3334/meta/copy_pack_copyver_e4e576e6.txt",
+    "export_json_path": "",
+    "validation": {
+        "titles_check": [
+            {
+                "index": 0,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 1,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 2,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 3,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 4,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 5,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 6,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 7,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 8,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            },
+            {
+                "index": 9,
+                "ok_destacamos": true,
+                "ok_loquosex": true,
+                "issues": []
+            }
+        ],
+        "ads_check": [
+            {
+                "slot": "1",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "2",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "3",
+                "neutral_ok": false,
+                "neutral_issues": [
+                    "Contiene el reclamo vacío 'DISCRETA' en un contexto promocional y un emoji de tono no neutro; además incluye lenguaje demasiado insinuante para la variante neutra."
+                ],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "4",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "5",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "6",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "7",
+                "neutral_ok": false,
+                "neutral_issues": [
+                    "Usa 'DISCRETA' y un emoji de llama/tono sensual en variante neutra; no mantiene un tono suficientemente reservado."
+                ],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "8",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "9",
+                "neutral_ok": true,
+                "neutral_issues": [],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            },
+            {
+                "slot": "10",
+                "neutral_ok": false,
+                "neutral_issues": [
+                    "Incluye 'no pasa desapercibida' y 'te ha picado la curiosidad' con tono demasiado reclamo/insinuación para destacamos.net."
+                ],
+                "suggestive_ok": true,
+                "suggestive_issues": []
+            }
+        ]
+    },
+    "source_summary": "Para mantener un parecido general, conserva la misma complexión esbelta, piel profunda, cabello muy largo oscuro y silueta atlética sin intentar reproducir rasgos faciales exactos.",
+    "reference_source_site": "destacamos+loquosex",
+    "reference_source_label": "destacamos.net + loquosex.com",
+    "reference_source_url": "https://www.destacamos.net/1/id/desc/recent_ads.html",
+    "reference_examples_count": 22
+}

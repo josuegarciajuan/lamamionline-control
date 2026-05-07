@@ -1,0 +1,18 @@
+{
+    "ok": false,
+    "endpoint": "/v1/responses",
+    "http_code": 429,
+    "request_id": "req_69301d85babd43b38555ae54ed6d96ba",
+    "decoded": {
+        "error": {
+            "message": "We're currently processing too many requests — please try again later.",
+            "type": "invalid_request_error",
+            "param": null,
+            "code": "rate_limit_exceeded"
+        }
+    },
+    "raw_body": "{\n  \"error\": {\n    \"message\": \"We're currently processing too many requests — please try again later.\",\n    \"type\": \"invalid_request_error\",\n    \"param\": null,\n    \"code\": \"rate_limit_exceeded\"\n  }\n}",
+    "error": "We're currently processing too many requests — please try again later.",
+    "used_model": "gpt-5.4-mini",
+    "service_tier": "flex"
+}

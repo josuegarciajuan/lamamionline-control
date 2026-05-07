@@ -1,0 +1,112 @@
+PACK PUBLICISTA
+Trabajo: Sara Valencia
+Clienta: Sara Valencia
+Fecha: 2026-05-04 21:33:44
+Tono: Equilibrado
+Enfoque: Sandra, española de Valencia con presencia madura y trato cercano, presentada en clave de novedad local, curiosidad y contacto fácil, con versiones discretas y sugerentes según portal.
+
+IMÁGENES FINALES
+- final_01: data/publicista/jobs/pubjob_8ec9c437/finals/final_01_square.jpg
+- final_02: data/publicista/jobs/pubjob_8ec9c437/finals/final_02_square.jpg
+- final_03: data/publicista/jobs/pubjob_8ec9c437/finals/final_03_square.jpg
+- final_04: data/publicista/jobs/pubjob_8ec9c437/finals/final_04_square.jpg
+
+TÍTULOS
+- SANDRA, LA ESPAÑOLA DE BURRIANA QUE NO PASA DESAPERCIBIDA
+- NOVEDAD en burriana: sandra
+- SANDRA: TRATO CERCANO, PRESENCIA Y MUCHAS GANAS DE CONOCERTE
+- La de valencia que está dando que hablar en burriana
+- sandra, una cita distinta desde burriana
+- BURRIANA TIENE UNA SORPRESA Y SE LLAMA SANDRA
+- SANDRA, MIRADA SERENA Y PLANES QUE ENGANCHAN
+- DISPONIBLE en burriana: sandra
+- La española más comentada de burriana
+- SANDRA LLEGA CON UNA PROPUESTA MUY TENTADORA
+
+ANUNCIOS
+--- SLOT_1 ---
+FOCUS: Novedad local con presencia
+HOOK: ACABA DE LLEGAR A BURRIANA Y YA ESTÁ LEVANTANDO MIRADAS 👀
+TÍTULO NEUTRO: NOVEDAD en burriana: sandra
+TÍTULO SUGERENTE: BURRIANA TIENE UNA SORPRESA Y SE LLAMA SANDRA
+TEXTO NEUTRO: SANDRA ES DE VALENCIA Y ACABA DE INSTALARSE POR BURRIANA. Tiene esa mezcla de presencia, trato y seguridad que hace que apetezca escribirle. Si te gustan las mujeres con personalidad y conversación fácil, aquí tienes una opción que no pasa desapercibida. 📩
+TEXTO SUGERENTE: SANDRA ACABA DE LLEGAR A BURRIANA Y YA ESTÁ DANDO QUE HABLAR. Tiene ese punto de presencia, seguridad y juego que hace que uno quiera escribir sin pensarlo demasiado. Si te gusta conocer perfiles que llaman la atención desde el primer vistazo, esta es una de esas oportunidades que no duran mucho. 👀
+
+--- SLOT_2 ---
+FOCUS: Española cercana y elegante
+HOOK: SI BUSCAS UNA ESPAÑOLA CON CLASE Y CONVERSACIÓN FÁCIL, AQUÍ LA TIENES ✨
+TÍTULO NEUTRO: SANDRA: TRATO CERCANO, PRESENCIA Y MUCHAS GANAS DE CONOCERTE
+TÍTULO SUGERENTE: La de valencia que está dando que hablar en burriana
+TEXTO NEUTRO: SANDRA TRANSMITE CERCANÍA, NATURALIDAD Y UN TRATO MUY AGRADABLE. Es de Valencia y se presenta en Burriana con esa forma de estar que invita a hablar, conocerse y dejar que la conversación fluya sola. Si valoras la elegancia y el buen trato, te va a encajar. ✨
+TEXTO SUGERENTE: LA LLAMAN LA DE VALENCIA, Y EN BURRIANA YA ESTÁ LLAMANDO LA ATENCIÓN. Sandra mezcla clase, cercanía y una forma de mirar que despierta curiosidad al instante. Si te atraen las españolas con carácter y un punto de complicidad, aquí tienes algo que merece un mensaje. 😉
+
+--- SLOT_3 ---
+FOCUS: Mujer madura con magnetismo
+HOOK: HAY PERFILES QUE NO NECESITAN EXAGERAR PARA LLAMAR LA ATENCIÓN 😉
+TÍTULO NEUTRO: SANDRA, MIRADA SERENA Y PLANES QUE ENGANCHAN
+TÍTULO SUGERENTE: SANDRA EN CLAVE DE PREMIO
+TEXTO NEUTRO: SANDRA TIENE ESE ESTILO DE MUJER MADURA, SEGURA Y JUGUETONA QUE ENGANCHA SIN HACER RUIDO. No necesita adornos para destacar: su forma de estar, de hablar y de presentarse ya dice bastante. Si te gustan los perfiles con magnetismo real, merece la pena descubrirla. 💫
+TEXTO SUGERENTE: SANDRA JUEGA EN OTRA LIGA: PRESENCIA MADURA, SEGURIDAD Y ESE PUNTO DE MUJER QUE SABE PERFECTAMENTE EL EFECTO QUE CAUSA. No va de más, va de mejor. Si buscas un perfil que te deje con ganas de escribir y ver hasta dónde puede llegar la conversación, aquí tienes una candidata seria 😉
+
+--- SLOT_4 ---
+FOCUS: Juego y complicidad
+HOOK: SI TE GUSTA EL TRATO CON CHISPA, SANDRA PUEDE SER JUSTO LO QUE ESTABAS BUSCANDO 🤍 🤍
+TÍTULO NEUTRO: SANDRA, CERCA, DISCRETA Y CON MUCHÍSIMO ARTE
+TÍTULO SUGERENTE: SANDRA, UN PERFIL CON MUCHO JUEGO
+TEXTO NEUTRO: A SANDRA LE GUSTA EL BUEN TRATO, LA CONVERSACIÓN CON RITMO Y ESA COMPLICIDAD QUE APARECE CUANDO HAY FEELING DE VERDAD. Es cercana, discreta y sabe mantener un ambiente cómodo desde el primer mensaje. Si te atrae alguien con arte para conectar, aquí la tienes. 🤍 🤍
+TEXTO SUGERENTE: CON SANDRA EL JUEGO EMPIEZA PRONTO: UN MENSAJE, UNA BROMA, UN POCO DE CHISPA Y LA CONVERSACIÓN YA TOMA OTRA TEMPERATURA. Tiene ese punto juguetón que engancha y hace que todo sea más fácil. Si te gustan las mujeres que responden con gracia y saben seguirte el ritmo, te va a gustar. 😏
+
+--- SLOT_5 ---
+FOCUS: Exclusividad discreta
+HOOK: NO SIEMPRE APARECE ALGUIEN ASÍ POR TU ZONA: APROVECHA MIENTRAS ESTÉ DISPONIBLE 💬
+TÍTULO NEUTRO: DISPONIBLE en burriana: sandra
+TÍTULO SUGERENTE: NO TE QUEDES CON LA DUDA: ESCRIBE A SANDRA
+TEXTO NEUTRO: Sandra cuida el detalle, el trato y la DISCRECIÓN, y eso se nota desde el primer contacto. Está en Burriana y no todos los días aparece un perfil así en la zona. Si te gusta ir a lo seguro y con buen gusto, puede ser el momento de escribirle. 💬
+TEXTO SUGERENTE: NO SIEMPRE SE CRUZA UNA CHICA COMO SANDRA POR BURRIANA, ASÍ QUE CONVIENE NO PENSARLO DEMASIADO. Tiene ese aire reservado, pero con suficiente chispa como para despertar interés enseguida. Si te quedas con la duda, probablemente ya llegues tarde. 📲
+
+--- SLOT_6 ---
+FOCUS: La de Valencia con personalidad
+HOOK: LA LLAMAN ‘LA DE VALENCIA’… Y CUANDO LA CONOCES ENTIENDES POR QUÉ 🔥
+TÍTULO NEUTRO: La española más comentada de burriana
+TÍTULO SUGERENTE: LA DE VALENCIA QUE MIRA Y ENGANCHA
+TEXTO NEUTRO: SANDRA COMBINA CARÁCTER, DULZURA Y UNA ACTITUD MUY SUYA QUE NO DEJA INDIFERENTE. Es de Valencia y en Burriana se presenta con una imagen cuidada, cercana y con presencia. Si te atraen las españolas con personalidad, aquí tienes una opción muy interesante. 🌟 🌟
+TEXTO SUGERENTE: A SANDRA LA LLAMAN LA DE VALENCIA POR ALGO: TIENE PERSONALIDAD, SABE ESTAR Y ADEMÁS DEJA ESA SENSACIÓN DE QUERER SABER UN POCO MÁS. En Burriana ya despierta curiosidad, y no es casualidad. Si te gustan las chicas con presencia y un punto travieso, esta te va a encajar. 🔥
+
+--- SLOT_7 ---
+FOCUS: Cercanía que invita a escribir
+HOOK: A VECES BASTA UN MENSAJE PARA ROMPER EL HIELO CON ALGUIEN QUE MERECE LA PENA 🔥
+TÍTULO NEUTRO: SANDRA, MIRADA SERENA Y PLANES QUE ENGANCHAN
+TÍTULO SUGERENTE: HOY me apetece conocerte mejor: sandra
+TEXTO NEUTRO: SANDRA RESPONDE CON NATURALIDAD, BUEN ROLLO Y UNA FORMA DE HABLAR QUE HACE MUY FÁCIL ROMPER EL HIELO. Si te apetece un contacto sencillo, directo y con buena energía, aquí tienes a alguien que pone de su parte para que todo fluya. Escribirle puede ser el mejor primer paso. 🔥
+TEXTO SUGERENTE: CON SANDRA NO HACE FALTA COMPLICARSE: UN MENSAJE BASTA PARA EMPEZAR ALGO CON BUEN RITMO. Tiene naturalidad, respuesta ágil y ese punto de cercanía que invita a seguir la conversación. Si te apetece conocer a una chica que sabe entrar al juego desde el principio, este es el momento. ✉️
+
+--- SLOT_8 ---
+FOCUS: Burriana como punto de interés
+HOOK: Burriana tiene NUEVA protagonista y no piensa pasar desapercibida ✨ ✨
+TÍTULO NEUTRO: Burriana: acaba de llegar sandra
+TÍTULO SUGERENTE: BURRIANA | SANDRA, LA CHICA QUE PROVOCA CURIOSIDAD
+TEXTO NEUTRO: SANDRA LLEGA CON UNA ENERGÍA DIFERENTE, ABIERTA A CONOCER Y A DEJAR BUENA IMPRESIÓN DESDE EL PRINCIPIO. Está en Burriana y encaja muy bien si buscas trato amable, presencia y una sensación de estreno real en la zona. Una propuesta que suma por estilo y cercanía. ✨ ✨
+TEXTO SUGERENTE: BURRIANA ACABA DE GANAR UNA PROTAGONISTA QUE NO PASA INADVERTIDA. Sandra trae una mezcla de presencia, cercanía y curiosidad que la hace destacar desde el primer contacto. Si eres de los que no dejan pasar las novedades interesantes, ya sabes dónde mirar. 👌
+
+--- SLOT_9 ---
+FOCUS: Sugerente controlado
+HOOK: HAY ALGO EN SANDRA QUE DESPIERTA CURIOSIDAD DESDE EL MINUTO UNO 😏
+TÍTULO NEUTRO: sandra, una cita distinta desde burriana
+TÍTULO SUGERENTE: SANDRA, LA ESPAÑOLA DE BURRIANA QUE NO PASA DESAPERCIBIDA
+TEXTO NEUTRO: SU FORMA DE MIRAR, HABLAR Y DEJARSE CONOCER TIENE JUSTO EL PUNTO QUE ENGANCHA SIN NECESIDAD DE FORZAR NADA. Sandra ofrece un trato agradable, una presencia muy cuidada y una conversación que invita a seguir. Si buscas algo distinto, aquí lo tienes. 📍
+TEXTO SUGERENTE: Sandra tiene ese algo difícil de explicar que hace que uno quiera escribirle enseguida. Española, de Valencia y AHORA en Burriana, combina dulzura, carácter y un punto juguetón muy atractivo. Si te gustan los perfiles que despiertan morbo controlado y curiosidad real, esta va contigo. 😏
+
+--- SLOT_10 ---
+FOCUS: Alquiler compartido / dinámica con amiga
+HOOK: SANDRA LLEGA SOLA, PERO NO DESCARTA COMPARTIR PLAN CON UNA AMIGA MÁS ADELANTE 😉
+TÍTULO NEUTRO: SANDRA LLEGA CON UNA PROPUESTA MUY TENTADORA
+TÍTULO SUGERENTE: ENTRA EN MI PLAZA Y TE CUENTO EL RESTO 😉
+TEXTO NEUTRO: Sandra entra en plaza en Burriana con una idea abierta y flexible: empezar con buen contacto y dejar que las cosas se organicen con calma. Es una opción interesante para quien valora el trato directo, la DISCRECIÓN y un perfil con margen para adaptarse a lo que surja. 💫
+TEXTO SUGERENTE: SANDRA NO CIERRA PUERTAS Y ESO LA HACE TODAVÍA MÁS INTERESANTE. Entra en plaza en Burriana y, más adelante, incluso podría valorar compartir con una amiga. Si te gustan los perfiles con posibilidad de moverse, cambiar y sorprender, aquí tienes una puerta abierta. 😉
+
+NOTAS DE PUBLICACIÓN
+- En destacamos.net usa siempre la variante neutral: tono discreto, elegante y sin palabras de carga sexual o reclamo agresivo.
+- En loquosex.com prioriza la variante sugerente, con más chispa, curiosidad y guiños de contacto, pero sin entrar en lo explícito.
+- Alterna títulos en mayúsculas totales con otros en formato frase para evitar sensación de clon repetido.
+- Mantén Burriana y la referencia a Valencia como ancla local; ayudan a dar credibilidad y cercanía.
+- Usa un solo emoji por bloque como máximo, solo para reforzar gancho o cercanía, no para decorar de más.
