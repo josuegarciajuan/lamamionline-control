@@ -172,3 +172,53 @@ Campos opcionales:
 2. **PII mínima en trazas:** no registrar texto completo por defecto; usar extracto corto sanitizado y metadatos mínimos.
 3. **Escalado no inducible por texto libre:** `escalado_recomendado` no puede activarse por una única instrucción textual sin cumplir reglas de negocio.
 4. **Protección anti-spoofing/replay (precondición de ingestión):** eventos deben llegar desde webhook autenticado y con control de duplicados.
+
+## Contratos de comportamiento CX2-F3
+
+### Contrato de ponderaciones base
+- Debe existir un catálogo versionado `signal_weight_catalog_version` con pesos por `signal_type`.
+- `signal_type` no catalogado debe evaluarse con peso `0` (fallback neutro de F2).
+
+### Contrato de cálculo de `score_interes`
+- `score_interes` es entero en rango `0..100`.
+- Cálculo contractual mínimo:
+  1. `contrib_i = peso_base_i * f_conf_i * f_recencia_i`
+  2. `score_raw = 35 + Σ(contrib_i) + penalizacion_inactividad`
+  3. `score_interes = round(clamp(score_raw, 0, 100))`
+
+Factores obligatorios:
+- `f_conf_i = clamp(confidence_i, 0.30, 1.00)`.
+- `f_recencia_i` exponencial por clase:
+  - `positiva`: semivida 120h
+  - `neutra`: semivida 72h
+  - `negativa`: semivida 240h
+- Penalización de inactividad: sin señales positivas en 72h => `-2` por día (tope `-20`).
+
+### Contrato de dominancia de bloqueo
+Si existe señal `bloqueo` activa en ventana:
+1. `estado_interes` debe ser `descartado`.
+2. `score_interes` debe ser `0`.
+3. `escalado_recomendado` debe ser `false`.
+4. `motivo_principal` debe indicar señal/regla dominante.
+
+### Contrato de tramos y transición
+Tramos base:
+- `bajo`: `0..49`
+- `medio`: `50..74`
+- `alto`: `75..100`
+
+Histeresis mínima obligatoria:
+- subir a `medio` solo con `score >= 52`; bajar a `bajo` con `score <= 47`.
+- subir a `alto` solo con `score >= 78`; bajar a `medio` con `score <= 72`.
+
+### Contrato de consistencia tramo ↔ estado
+- `frio` solo válido en tramo bajo (sin bloqueo activo).
+- `templado` solo válido en tramo medio.
+- `caliente` requiere tramo alto + señal de intención explícita reciente.
+- `descartado` prevalece por bloqueo activo.
+
+### Seguridad contractual obligatoria en scoring (F3)
+1. **Anti-replay e idempotencia:** entradas con `idempotency_key` y dedupe temporal obligatorio.
+2. **Anti-gaming por spam:** limitar contribución acumulada por subtipo en ventana.
+3. **No escalado por evento único ambiguo:** no activar escalado sin reglas de negocio cumplidas.
+4. **Trazabilidad auditable:** registrar versión de pesos, factores aplicados y regla que produjo score/tramo.

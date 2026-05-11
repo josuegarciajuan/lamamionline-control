@@ -50,3 +50,19 @@ Desbloquear la ejecución por comando `/fase CX2-F1` con una base SDD trazable a
 
 ### Motivo
 Establecer una interfaz de señales consistente y auditable para habilitar el scoring de interés en CX2-F3 con menor ambigüedad operativa.
+
+## 2026-05-11 · CX2-F3 — Scoring inicial
+
+### Cambios
+- Se definió el modelo de scoring inicial en `spec/design.md` con:
+  - ponderaciones base por señal,
+  - fórmula de cálculo con factor de confianza y recencia,
+  - degradación temporal por inactividad,
+  - tramos `bajo/medio/alto` y reglas de histéresis.
+- Se formalizaron contratos de F3 en `spec/contracts.md` para cálculo, consistencia tramo↔estado, dominancia de bloqueo y trazabilidad auditable.
+- Se añadieron controles contractuales de seguridad para anti-replay, anti-gaming por spam y prevención de escalado por señal ambigua única.
+- Se actualizó checklist de `spec/tasks.md` marcando `CX2-F3` como completada.
+- Se añadió ADR-004 con la decisión arquitectónica de scoring inicial.
+
+### Motivo
+Disponer de un score inicial conservador, explicable y resistente a ruido para soportar fases posteriores de auditoría y escalado operativo.

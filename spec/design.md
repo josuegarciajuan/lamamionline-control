@@ -169,3 +169,65 @@ Reglas mínimas:
 
 ### Resultado esperado de F2
 Disponibilidad de un contrato documental único para señales y normalización que permita implementar scoring en F3 sin ambigüedad semántica.
+
+## Diseño CX2-F3 — Scoring inicial
+
+### Objetivo de diseño
+Definir un scoring inicial explicable y conservador para transformar señales normalizadas (F2) en `score_interes` (`0..100`) y estado operativo (F1), con degradación temporal y control de oscilaciones.
+
+### Ponderaciones base por señal (v1)
+Peso bruto antes de aplicar confianza y recencia:
+
+| Clase | Señal | Peso base |
+|---|---|---:|
+| positiva | `wa.intent_buy_explicit` | +24 |
+| positiva | `wa.intent_price_request` | +14 |
+| positiva | `wa.intent_availability_request` | +12 |
+| positiva | `wa.intent_followup_accept` | +10 |
+| positiva | `wa.reply_fast` | +6 |
+| neutra | `wa.question_generic` | +2 |
+| neutra | `wa.message_ack` | +1 |
+| neutra | `wa.intent_postpone` | -4 |
+| neutra | `wa.silence_timeout_soft` | -6 |
+| negativa | `wa.price_objection` | -10 |
+| negativa | `wa.competitor_mention` | -8 |
+| negativa | `wa.intent_not_interested` | -24 |
+| negativa | `wa.silence_timeout_hard` | -16 |
+| bloqueo | `wa.block_keyword` | dominancia |
+| bloqueo | `wa.opt_out_request` | dominancia |
+| bloqueo | `wa.abusive_content` | dominancia |
+| neutra fallback | `<canal>.unknown` | 0 |
+
+### Fórmula de scoring inicial (contract-friendly)
+1. Contribución por señal: `contrib_i = peso_base_i * f_conf_i * f_recencia_i`.
+2. Factor confianza: `f_conf_i = clamp(confidence_i, 0.30, 1.00)`.
+3. Factor recencia (decaimiento exponencial):
+   - `positiva`: semivida 120h,
+   - `neutra`: semivida 72h,
+   - `negativa`: semivida 240h.
+4. Score previo: `score_raw = 35 + Σ(contrib_i) + penalizacion_inactividad`.
+5. Penalización por inactividad: sin señales positivas en 72h => `-2` puntos por día (tope `-20`).
+6. Score final: `score_interes = round(clamp(score_raw, 0, 100))`.
+
+### Reglas de dominancia y anti-ruido
+1. Si existe señal de clase `bloqueo` activa en ventana, forzar `estado_interes=descartado`, `score_interes=0`, `escalado_recomendado=false`.
+2. Limitar contribución acumulada por subtipo en ventana para evitar picos por repetición.
+3. Aplicar dedupe contractual de F2 antes del cálculo.
+
+### Tramos y criterios de cambio
+Tramos base:
+- `bajo`: `0..49`
+- `medio`: `50..74`
+- `alto`: `75..100`
+
+Mapeo de estado:
+- `frio` => tramo bajo sin bloqueo activo.
+- `templado` => tramo medio.
+- `caliente` => tramo alto con al menos una señal de intención explícita reciente.
+
+Histeresis conservadora para reducir flapping:
+- subir a medio: `score >= 52`; bajar a bajo: `score <= 47`.
+- subir a alto: `score >= 78`; bajar a medio: `score <= 72`.
+
+### Resultado esperado de F3
+Queda definido el cálculo base de score, su degradación temporal y el criterio de cambio de tramo de forma auditable y consistente con F1/F2.

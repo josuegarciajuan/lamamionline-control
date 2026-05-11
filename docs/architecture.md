@@ -24,4 +24,5 @@
 ### Bloque CX2
 - **CX2-F1 (completada):** modelo base de interés real (estados canónicos, score y reglas de escalado documental).
 - **CX2-F2 (completada):** catálogo de señales por canal, taxonomía cerrada de clases y contrato de normalización mínima para alimentar scoring en CX2-F3.
+- **CX2-F3 (completada):** definición del motor de scoring inicial (ponderaciones, recencia/degradación temporal, tramos e histéresis) con controles anti-ruido y trazabilidad.
 - Decisión técnica asociada: introducir una capa lógica de `InterestSignalNormalized` como interfaz estable entre ingestión de eventos y motor de scoring.

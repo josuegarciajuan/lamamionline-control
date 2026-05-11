@@ -36,8 +36,9 @@ Habilitar un modelo operativo y trazable de **interés real** para el bot comerc
     - Normalizar eventos para evaluación homogénea.
     - Incluir controles de seguridad contractual para evitar inyección por texto libre, spoofing básico y sobreexposición de PII en trazas.
 3. **CX2-F3 — Motor de scoring inicial**
-   - Aplicar ponderaciones base por señal y ventana temporal.
-   - Establecer trazabilidad de cómo se calcula el score.
+    - Aplicar ponderaciones base por señal y ventana temporal.
+    - Establecer trazabilidad de cómo se calcula el score.
+    - Definir controles contractuales anti-manipulación (replay, spam de señales y escalado indebido).
 4. **CX2-F4 — Persistencia y auditoría de decisiones**
    - Registrar estado, score y motivo de transición.
    - Habilitar historial auditable por lead/conversación.

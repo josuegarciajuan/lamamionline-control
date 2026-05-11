@@ -39,9 +39,9 @@
 - [x] Definir normalización mínima para consumo del scoring.
 
 ### CX2-F3 — Scoring inicial
-- [ ] Definir ponderaciones base por señal.
-- [ ] Definir efecto temporal (degradación/recencia) a nivel contractual.
-- [ ] Definir criterios de cambio de tramo (bajo/medio/alto).
+- [x] Definir ponderaciones base por señal.
+- [x] Definir efecto temporal (degradación/recencia) a nivel contractual.
+- [x] Definir criterios de cambio de tramo (bajo/medio/alto).
 
 ### CX2-F4 — Persistencia y auditoría
 - [ ] Definir registro de evaluaciones con trazabilidad de reglas.
