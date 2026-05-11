@@ -466,6 +466,12 @@ function comercial_default_process_seed($slug) {
         'recipient_blacklist' => array(),
         'positive_keywords' => array('info', 'interesa', 'interesada', 'precio', 'como', 'cómo', 'vale', 'ok', 'si', 'sí'),
         'negative_keywords' => array('no', 'baja', 'stop', 'nada', 'molestes', 'interesa no'),
+        'ia_context_prompt' => '',
+        'signal_detection_rules' => array(),
+        'conversation_max_auto_turns' => 2,
+        'escalation_score_threshold' => 78,
+        'ia_learning_enabled' => 1,
+        'auto_notify_operator' => 1,
         'auto_followup' => 1,
         'auto_create_lead' => 0,
         'created_at' => now_datetime(),
@@ -485,6 +491,7 @@ function comercial_default_process_seed($slug) {
         $base['message_templates'] = comercial_default_process_templates($slug, 'message_templates');
         $base['followup_templates'] = comercial_default_process_templates($slug, 'followup_templates');
         $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal'));
+        $base['ia_context_prompt'] = "Eres un comercial para alquiler de habitaciones/plazas en Casa Burriana. Tono: cercano, femenino, usa 'guapa', 'cariño'. Objetivo: detectar chicas interesadas en plaza o alquiler y concertar visita.";
         return $base;
     }
 
@@ -496,6 +503,7 @@ function comercial_default_process_seed($slug) {
         $base['message_templates'] = comercial_default_process_templates($slug, 'message_templates');
         $base['followup_templates'] = comercial_default_process_templates($slug, 'followup_templates');
         $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal'));
+        $base['ia_context_prompt'] = "Eres La Mami Online, un servicio de publicista digital. Tono: cercano, profesional, entusiasta. Objetivo: conseguir que la clienta se dé de alta (29€) para recibir clientes extra.";
         return $base;
     }
 
@@ -508,6 +516,7 @@ function comercial_default_process_seed($slug) {
         $base['message_templates'] = comercial_default_process_templates($slug, 'message_templates');
         $base['followup_templates'] = comercial_default_process_templates($slug, 'followup_templates');
         $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal', 'publi10'));
+        $base['ia_context_prompt'] = "Eres comercial de CasaWasap captando colaboradores (publicistas, RRPP, fotógrafos). Tono: directo, profesional. Objetivo: conseguir que presenten casas de citas para ganar comisión recurrente.";
         return $base;
     }
 
@@ -522,6 +531,7 @@ function comercial_default_process_seed($slug) {
         $base['message_templates'] = comercial_default_process_templates($slug, 'message_templates');
         $base['followup_templates'] = comercial_default_process_templates($slug, 'followup_templates');
         $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal', 'publi10'));
+        $base['ia_context_prompt'] = "Eres comercial de CasaWasap, un telefonista IA para casas. Tono: cercano, resolutivo. Objetivo: vender el servicio de atención WhatsApp 24/7 a dueños de casas.";
         return $base;
     }
 
@@ -753,6 +763,12 @@ function comercial_normalize_process($row) {
     $out['recipient_blacklist'] = comercial_normalize_phone_blacklist_lines($out['recipient_blacklist'] ?? array());
     $out['positive_keywords'] = comercial_normalize_textarea_lines($out['positive_keywords']);
     $out['negative_keywords'] = comercial_normalize_textarea_lines($out['negative_keywords']);
+    $out['ia_context_prompt'] = trim((string)($out['ia_context_prompt'] ?? ''));
+    $out['signal_detection_rules'] = comercial_normalize_textarea_lines($out['signal_detection_rules'] ?? array());
+    $out['conversation_max_auto_turns'] = max(0, (int)($out['conversation_max_auto_turns'] ?? 2));
+    $out['escalation_score_threshold'] = max(0, min(100, (int)($out['escalation_score_threshold'] ?? 78)));
+    $out['ia_learning_enabled'] = !empty($out['ia_learning_enabled']) ? 1 : 0;
+    $out['auto_notify_operator'] = !empty($out['auto_notify_operator']) ? 1 : 0;
     $out['assigned_line_ids'] = array_values(array_unique(array_filter(array_map('strval', (array)$out['assigned_line_ids']))));
     $out['last_target_phone'] = comercial_only_digits((string)($out['last_target_phone'] ?? ''));
 
@@ -4687,6 +4703,22 @@ function render_comercial_page() {
             comercial_field_textarea('followup_templates', 'Textos de seguimiento (un bloque por variante)', comercial_templates_to_textarea(comercial_process_message_pool($selectedProcess, 'followup_templates')), 10);
             comercial_field_textarea('positive_keywords', 'Palabras qualified (una por línea)', comercial_array_to_textarea($selectedProcess['positive_keywords']), 5);
             comercial_field_textarea('negative_keywords', 'Keywords negativas (una por línea)', comercial_array_to_textarea($selectedProcess['negative_keywords']), 5);
+
+            // --- Campos IA ---
+            comercial_field_textarea('ia_context_prompt', 'Contexto IA (instrucciones de tono y objetivo)', (string)($selectedProcess['ia_context_prompt'] ?? ''), 8);
+            echo '<div class="field-help" style="margin-top:-6px; margin-bottom:12px;">Texto que se inyecta en el prompt de la IA para definir el tono, objetivo comercial y estilo de conversación.</div>';
+            comercial_field_textarea('signal_detection_rules', 'Reglas de detección de señales (formato: frase|señal|confianza)', comercial_array_to_textarea($selectedProcess['signal_detection_rules'] ?? array()), 10);
+            echo '<div class="field-help" style="margin-top:-6px; margin-bottom:12px;">Una regla por línea. Ej: "quiero comprar|wa.intent_buy_explicit|0.90"</div>';
+            echo '<div class="form-grid-2">';
+            comercial_field_number('conversation_max_auto_turns', 'Máx. respuestas automáticas', $selectedProcess['conversation_max_auto_turns'] ?? 2);
+            comercial_field_number('escalation_score_threshold', 'Umbral de notificación al operador (score)', $selectedProcess['escalation_score_threshold'] ?? 78);
+            echo '</div>';
+            echo '<div class="field-help" style="margin-top:-6px; margin-bottom:12px;">Número máximo de respuestas automáticas consecutivas antes de pedir intervención humana. | Si el score de interés supera este valor, se notifica al operador humano.</div>';
+            echo '<div class="commercial-inline-checks">';
+            echo '<label><input type="checkbox" name="ia_learning_enabled" value="1"' . (!empty($selectedProcess['ia_learning_enabled']) ? ' checked' : '') . '> Aprendizaje IA activo</label>';
+            echo '<label><input type="checkbox" name="auto_notify_operator" value="1"' . (!empty($selectedProcess['auto_notify_operator']) ? ' checked' : '') . '> Notificar automáticamente al detectar lead caliente</label>';
+            echo '</div>';
+            echo '<div class="field-help" style="margin-top:-6px; margin-bottom:12px;">El bot aprende de las respuestas humanas exitosas y las usa como referencia. | Al detectar un lead con score alto, se notifica automáticamente al operador.</div>';
 
             echo '<div class="field"><label>Líneas asignadas</label><div class="commercial-checkboxes">';
             foreach ($lines as $line) {

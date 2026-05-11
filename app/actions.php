@@ -193,6 +193,12 @@ function handle_post_actions() {
         case 'save_publicista_campaign_item_meta':
             action_save_publicista_campaign_item_meta();
             break;
+        case 'save_publicista_campaign_auto_rotation':
+            action_save_publicista_campaign_auto_rotation();
+            break;
+        case 'force_publicista_campaign_auto_rotation_now':
+            action_force_publicista_campaign_auto_rotation_now();
+            break;
         case 'rebalance_publicista_campaign_distribution':
             action_rebalance_publicista_campaign_distribution();
             break;
@@ -1326,6 +1332,86 @@ function action_save_josue_text() {
     redirect_to('index.php?page=josue&tab=' . urlencode($tab));
 }
 
+function configm_override_types_for_autoroute() {
+    return array(
+        'attention',
+        'attention:unattended',
+        'attention:attended_24h',
+        'attention:attended_48h',
+        'overdue',
+        'integrity',
+        'inactivity',
+        'performance',
+        'strategic',
+        'events',
+        'milestones',
+        'recurring',
+        'recurring:destacamos_publish',
+        'recurring:mundosex_publish',
+    );
+}
+
+function configm_sender_candidates_for_autoroute() {
+    if (function_exists('configm_telefonos_sender_candidates')) {
+        $rows = (array)configm_telefonos_sender_candidates();
+        $out = array();
+        foreach ($rows as $row) {
+            if (!is_array($row)) continue;
+            $id = trim((string)($row['id'] ?? ''));
+            $phone = trim((string)($row['phone'] ?? ''));
+            $value = $id !== '' ? $id : $phone;
+            if ($value === '') continue;
+            $out[] = $value;
+        }
+        if (!empty($out)) return array_values($out);
+    }
+
+    $rows = storage_read('telefonos.json');
+    $out = array();
+    foreach ((array)$rows as $row) {
+        if (!is_array($row)) continue;
+        $id = trim((string)($row['id'] ?? ''));
+        $phone = trim((string)($row['tfono'] ?? ($row['telefono'] ?? '')));
+        $value = $id !== '' ? $id : $phone;
+        if ($value === '') continue;
+        $out[] = $value;
+    }
+    return array_values($out);
+}
+
+function configm_default_override_assignments($lineValues) {
+    $lineValues = array_values(array_filter((array)$lineValues, function($v) {
+        return trim((string)$v) !== '';
+    }));
+    if (empty($lineValues)) return array();
+
+    $lineA = $lineValues[0];
+    $lineB = $lineValues[count($lineValues) > 1 ? 1 : 0];
+    $lineC = $lineValues[count($lineValues) > 2 ? 2 : (count($lineValues) > 1 ? 1 : 0)];
+
+    return array(
+        // Críticos / importantes
+        'attention' => $lineA,
+        'attention:unattended' => $lineA,
+        'attention:attended_24h' => $lineA,
+        'attention:attended_48h' => $lineA,
+        'overdue' => $lineA,
+        'integrity' => $lineA,
+        'inactivity' => $lineA,
+
+        // Seguimiento negocio
+        'performance' => $lineB,
+        'strategic' => $lineB,
+
+        // Operativo / bajo valor inmediato
+        'events' => $lineC,
+        'milestones' => $lineC,
+        'recurring' => $lineC,
+        'recurring:destacamos_publish' => $lineC,
+        'recurring:mundosex_publish' => $lineC,
+    );
+}
+
 function action_save_configm() {
     $settings = storage_read('settings.json');
     $defaults = is_file(BASE_PATH . '/avisos_config.php') ? (require BASE_PATH . '/avisos_config.php') : array();
@@ -1386,6 +1472,20 @@ function action_save_configm() {
     }
 
     $finalOverrideMap = array_merge($legacyMap, $cleanOverrideMap);
+
+    // Autocompletado inteligente: si algún tipo clave no se asignó manualmente,
+    // lo repartimos por líneas existentes para mantener un routing estable.
+    $defaultAssignments = configm_default_override_assignments(configm_sender_candidates_for_autoroute());
+    foreach (configm_override_types_for_autoroute() as $typeKey) {
+        $normalizedType = strtolower(trim((string)$typeKey));
+        if ($normalizedType === '') continue;
+        if (!isset($finalOverrideMap[$normalizedType]) || trim((string)$finalOverrideMap[$normalizedType]) === '') {
+            if (!empty($defaultAssignments[$normalizedType])) {
+                $finalOverrideMap[$normalizedType] = trim((string)$defaultAssignments[$normalizedType]);
+            }
+        }
+    }
+
     ksort($finalOverrideMap);
     $overrideLines = array();
     foreach ($finalOverrideMap as $k => $v) {
@@ -2154,8 +2254,17 @@ function action_save_publicista_free_bump_config() {
 }
 
 function action_run_publicista_free_bump_cycle() {
+    $forcedAccountId = trim((string)request_post('account_id', ''));
+    $forcedAccount = null;
+    if ($forcedAccountId !== '') {
+        $forcedAccount = publicista_account_get($forcedAccountId);
+    }
     $requestId = generate_id('pfbreq');
-    $result = publicista_free_bump_run_due(true, array('trigger' => 'manual', 'request_id' => $requestId));
+    $result = publicista_free_bump_run_due(true, array(
+        'trigger' => 'manual',
+        'request_id' => $requestId,
+        'forced_account_id' => $forcedAccountId,
+    ));
     $existingLog = function_exists('publicista_free_bump_find_log_by_request_id')
         ? publicista_free_bump_find_log_by_request_id($requestId)
         : null;
@@ -2196,7 +2305,13 @@ function action_run_publicista_free_bump_cycle() {
         $result['log_id'] = trim((string)($fallbackRow['id'] ?? ''));
     }
     if (!empty($result['ok'])) {
-        $msg = 'Subida gratis ejecutada correctamente.';
+        $msg = $forcedAccountId !== ''
+            ? 'Subida gratis forzada ejecutada correctamente.'
+            : 'Subida gratis ejecutada correctamente.';
+        if ($forcedAccountId !== '') {
+            $forcedLabel = trim((string)($forcedAccount['display_name'] ?? ($forcedAccount['login_user'] ?? $forcedAccountId)));
+            $msg .= ' Cuenta: ' . $forcedLabel . '.';
+        }
         if (trim((string)($result['listing_id'] ?? '')) !== '') {
             $msg .= ' Listing: ' . trim((string)$result['listing_id']) . '.';
         }
@@ -2207,7 +2322,12 @@ function action_run_publicista_free_bump_cycle() {
         if ($status === 'waiting_window') {
             set_flash('ok', 'No tocaba ejecutar ahora. Próximo intento: ' . trim((string)($result['next_run_at'] ?? 'sin planificar')) . '.');
         } elseif ($status === 'no_available') {
-            set_flash('error', 'No había anuncios libres para subir en las cuentas revisadas.');
+            $msg = $forcedAccountId !== ''
+                ? 'No había anuncios libres para subir en la cuenta forzada.'
+                : 'No había anuncios libres para subir en las cuentas revisadas.';
+            set_flash('error', $msg);
+        } elseif ($status === 'forced_account_not_ready' || $status === 'forced_account_not_found' || $status === 'forced_account_outside_window') {
+            set_flash('error', $error !== '' ? $error : 'La cuenta forzada no se pudo ejecutar en este momento.');
         } elseif ($status === 'error') {
             $accountLabel = trim((string)($result['account_label'] ?? ''));
             $msg = $error !== '' ? $error : 'Alguna cuenta devolvió error al intentar subir gratis.';
@@ -2463,10 +2583,39 @@ function action_save_publicista_campaign() {
         $existingItems = publicista_campaign_items_for_campaign($id);
         $hasItems = !empty($existingItems);
         $hasDistributionMatrix = !empty($existing['distribution_matrix'] ?? array());
-        $oldListingRefs = is_array($existing['selected_listing_refs'] ?? null) ? array_values($existing['selected_listing_refs']) : array();
-        $listingRefsChanged = $selectedListingRefs !== $oldListingRefs;
+        $normalizeIdsForCompare = function($values) {
+            $normalized = array_values(array_filter(array_map('trim', (array)$values), function($value) {
+                return $value !== '';
+            }));
+            sort($normalized, SORT_STRING);
+            return $normalized;
+        };
 
-        $shouldRegenerate = !$hasItems || !$hasDistributionMatrix || $listingRefsChanged;
+        $oldListingRefs = $normalizeIdsForCompare(is_array($existing['selected_listing_refs'] ?? null) ? $existing['selected_listing_refs'] : array());
+        $newListingRefs = $normalizeIdsForCompare($selectedListingRefs);
+        $listingRefsChanged = $newListingRefs !== $oldListingRefs;
+
+        $oldAccountIds = $normalizeIdsForCompare(is_array($existing['account_ids'] ?? null) ? $existing['account_ids'] : array());
+        $newAccountIds = $normalizeIdsForCompare($accountIds);
+        $accountIdsChanged = $newAccountIds !== $oldAccountIds;
+
+        $oldProductIds = $normalizeIdsForCompare(is_array($existing['product_ids'] ?? null) ? $existing['product_ids'] : array());
+        $newProductIds = $normalizeIdsForCompare($productIds);
+        $productIdsChanged = $newProductIds !== $oldProductIds;
+
+        $oldPlanningId = trim((string)($existing['planning_id'] ?? ''));
+        $planningChanged = $oldPlanningId !== $planningId;
+
+        $oldStrategyOptionCode = trim((string)($existing['strategy_option_code'] ?? ''));
+        $strategyChanged = $oldStrategyOptionCode !== $row['strategy_option_code'];
+
+        $shouldRegenerate = !$hasItems
+            || !$hasDistributionMatrix
+            || $listingRefsChanged
+            || $accountIdsChanged
+            || $productIdsChanged
+            || $planningChanged
+            || $strategyChanged;
 
         if (!$shouldRegenerate) {
             // Items exist, distribution_matrix is set, and listing refs haven't changed — skip regeneration.
@@ -2592,6 +2741,152 @@ function action_save_publicista_campaign_item_meta() {
     publicista_campaign_item_save($item);
     set_flash('ok', 'Metadatos del item actualizados.');
     redirect_to(publicista_page_url('campanas', array('edit' => $campaignId)));
+}
+
+function action_save_publicista_campaign_auto_rotation() {
+    $campaignId = trim((string)request_post('campaign_id'));
+    $campaign = $campaignId !== '' ? publicista_campaign_get($campaignId) : null;
+    if (!$campaign) {
+        set_flash('error', 'No se encontró la campaña.');
+        redirect_to(publicista_page_url('campanas'));
+    }
+
+    $items = publicista_campaign_items_for_campaign($campaignId);
+    if (empty($items)) {
+        set_flash('error', 'Solo puedes configurar la auto-rotación cuando la campaña ya tiene composición generada.');
+        redirect_to(publicista_page_url('campanas', array('edit' => $campaignId)));
+    }
+
+    $schedule = publicista_campaign_auto_rotation_schedule_defaults();
+    $enabledRaw = trim((string)request_post('auto_rotation_enabled', ''));
+    $schedule['enabled'] = in_array($enabledRaw, array('1', 'on', 'true', 'yes'), true);
+    $schedule['daily_start_time'] = trim((string)request_post('auto_rotation_daily_start_time', $schedule['daily_start_time']));
+    $schedule['daily_end_time'] = trim((string)request_post('auto_rotation_daily_end_time', $schedule['daily_end_time']));
+    $schedule['every_hours'] = max(1, (int)request_post('auto_rotation_every_hours', request_post('auto_rotation_frequency_hours', $schedule['every_hours'])));
+    $schedule['run_immediately_once'] = $schedule['enabled'] ? true : false;
+    $schedule['last_run_at'] = trim((string)(($campaign['auto_rotation_schedule']['last_run_at'] ?? '')));
+    $schedule['next_run_at'] = trim((string)(($campaign['auto_rotation_schedule']['next_run_at'] ?? '')));
+    if ($schedule['enabled'] && $schedule['next_run_at'] === '') {
+        $schedule['next_run_at'] = now_datetime();
+    }
+    $schedule['status'] = $schedule['enabled'] ? 'active' : 'disabled';
+    $schedule['last_error'] = $schedule['enabled'] ? trim((string)(($campaign['auto_rotation_schedule']['last_error'] ?? ''))) : '';
+    $schedule['updated_at'] = now_datetime();
+    $schedule = publicista_campaign_auto_rotation_schedule_normalize($schedule);
+
+    $campaign['auto_rotation_schedule'] = $schedule;
+    $campaign['execution_summary'] = array_merge((array)($campaign['execution_summary'] ?? array()), array(
+        'auto_rotation_status' => $schedule['enabled'] ? 'active' : 'inactive',
+        'auto_rotation_last_status' => $schedule['enabled'] ? 'Configuración guardada' : 'Auto-rotación desactivada',
+        'auto_rotation_last_error' => $schedule['enabled'] ? trim((string)(($campaign['execution_summary']['auto_rotation_last_error'] ?? ''))) : '',
+        'auto_rotation_updated_at' => now_datetime(),
+    ));
+    $campaign['updated_at'] = now_datetime();
+
+    publicista_campaign_save($campaign);
+
+    if (!empty($schedule['enabled'])) {
+        foreach (publicista_campaigns_get() as $other) {
+            $otherId = trim((string)($other['id'] ?? ''));
+            if ($otherId === '' || $otherId === $campaignId) continue;
+            $otherSchedule = publicista_campaign_auto_rotation_schedule_normalize((array)($other['auto_rotation_schedule'] ?? array()));
+            if (empty($otherSchedule['enabled'])) continue;
+            $otherSchedule['enabled'] = false;
+            $otherSchedule['status'] = 'disabled';
+            $otherSchedule['updated_at'] = now_datetime();
+            $other['auto_rotation_schedule'] = $otherSchedule;
+            $other['execution_summary'] = array_merge((array)($other['execution_summary'] ?? array()), array(
+                'auto_rotation_status' => 'inactive',
+                'auto_rotation_last_status' => 'Desactivada automáticamente al activar otra campaña.',
+            ));
+            $other['updated_at'] = now_datetime();
+            publicista_campaign_save($other);
+        }
+    }
+
+    set_flash('ok', 'Horario de auto-rotación guardado.');
+    redirect_to(publicista_page_url('campanas', array('edit' => $campaignId)));
+}
+
+function action_force_publicista_campaign_auto_rotation_now() {
+    $campaignId = trim((string)request_post('campaign_id'));
+    $campaign = $campaignId !== '' ? publicista_campaign_get($campaignId) : null;
+    if (!$campaign) {
+        set_flash('error', 'No se encontró la campaña.');
+        redirect_to(publicista_page_url('campanas'));
+    }
+
+    $items = publicista_campaign_items_for_campaign($campaignId);
+    if (empty($items)) {
+        set_flash('error', 'La campaña no tiene items generados.');
+        redirect_to(publicista_page_url('campanas', array('edit' => $campaignId)));
+    }
+
+    if (publicista_campaign_running_run($campaignId) || trim((string)($campaign['estado'] ?? '')) === 'uploading') {
+        set_flash('error', 'Ya hay una subida en curso para esta campaña.');
+        redirect_to(publicista_page_url('campanas', array('edit' => $campaignId)));
+    }
+
+    list($okDispatch, $savedCampaign, $meta) = publicista_campaign_dispatch_async($campaignId);
+    if (!$okDispatch) {
+        $msg = trim((string)($meta['error'] ?? 'No se pudo lanzar la resubida.'));
+        set_flash('error', $msg);
+        redirect_to(publicista_page_url('campanas', array('edit' => $campaignId)));
+    }
+
+    $runId = trim((string)($meta['run_id'] ?? ''));
+    $msg = 'Resubida forzada lanzada en segundo plano.';
+    if ($runId !== '') $msg .= ' Run: ' . $runId . '.';
+    $msg .= ' Recibirás un aviso cuando termine.';
+    set_flash('ok', $msg);
+
+    $targetUrl = publicista_page_url('campanas', array('edit' => $campaignId));
+    publicista_finish_redirect_response($targetUrl);
+
+    try {
+        list($okRun, $finalCampaign, $run, $runMeta) = publicista_campaign_execute($campaignId, array(
+            'run_id' => $runId,
+            'auto_rotation' => true,
+        ));
+        $notifyCampaign = $finalCampaign ?: (publicista_campaign_get($campaignId) ?: $campaign);
+        $notifyRun = $run ?: ($runId !== '' ? publicista_run_get($runId) : array());
+        publicista_campaign_notify_execution_finished($notifyCampaign, $notifyRun, $runMeta, $okRun);
+    } catch (Throwable $e) {
+        $failedCampaign = publicista_campaign_get($campaignId) ?: $campaign;
+        if ($failedCampaign) {
+            $failedCampaign['estado'] = 'error';
+            $failedCampaign['updated_at'] = now_datetime();
+            $failedCampaign['execution_summary'] = array_merge((array)($failedCampaign['execution_summary'] ?? array()), array(
+                'last_phase' => 'error',
+                'last_run_id' => $runId,
+                'last_run_status' => 'failed',
+                'last_run_error' => $e->getMessage(),
+                'last_upload_finished_at' => now_datetime(),
+                'auto_rotation_last_error' => $e->getMessage(),
+            ));
+            publicista_campaign_save($failedCampaign);
+        }
+        $failedRun = $runId !== '' ? publicista_run_get($runId) : null;
+        if ($failedRun) {
+            $failedRun['estado'] = 'failed';
+            $failedRun['finished_at'] = now_datetime();
+            $failedRun['summary'] = 'Error fatal durante la resubida forzada: ' . $e->getMessage();
+            $failedRun['pipeline'] = array_merge((array)($failedRun['pipeline'] ?? array()), array(
+                'status' => 'error',
+                'stage' => 'fatal_error',
+                'summary' => $failedRun['summary'],
+            ));
+            $failedRun['updated_at'] = $failedRun['finished_at'];
+            publicista_run_save($failedRun);
+        }
+        publicista_campaign_notify_execution_finished(
+            $failedCampaign ?: array('id' => $campaignId, 'nombre' => 'Campaña ' . $campaignId),
+            $failedRun ?: array('id' => $runId),
+            array('error' => $e->getMessage(), 'published' => 0, 'failed' => 0, 'results' => array()),
+            false
+        );
+    }
+    exit;
 }
 
 function action_rebalance_publicista_campaign_distribution() {
@@ -2959,9 +3254,31 @@ function action_toggle_comercial_process_enabled() {
 function action_dismiss_aviso() {
     $id = trim(request_post('id'));
     $redirect = trim(request_post('redirect', 'index.php?page=dashboard'));
+    $isAjax = strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest';
+
+    if (!csrf_validate((string)request_post('csrf_token'))) {
+        if ($isAjax) {
+            header('Content-Type: application/json; charset=utf-8');
+            http_response_code(419);
+            echo json_encode(array(
+                'ok' => false,
+                'message' => 'La sesión del formulario ha caducado. Recarga la página e inténtalo de nuevo.',
+            ));
+            exit;
+        }
+
+        set_flash('error', 'La sesión del formulario ha caducado. Recarga la página e inténtalo de nuevo.');
+        redirect_to($redirect);
+    }
 
     if ($id !== '') {
         aviso_dismiss($id);
+    }
+
+    if ($isAjax) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('ok' => true, 'id' => $id));
+        exit;
     }
 
     set_flash('ok', 'Aviso descartado.');
@@ -3242,7 +3559,8 @@ function action_save_comercial_process() {
         'id', 'nombre', 'slug', 'source_type', 'priority',
         'window_start_hour', 'window_end_hour',
         'source_mysql_host', 'source_mysql_db', 'source_mysql_user', 'source_mysql_pass', 'source_mysql_query',
-        'source_phone_field', 'source_queue_files', 'message_templates', 'followup_templates', 'positive_keywords', 'negative_keywords'
+        'source_phone_field', 'source_queue_files', 'message_templates', 'followup_templates', 'positive_keywords', 'negative_keywords',
+        'ia_context_prompt', 'signal_detection_rules', 'conversation_max_auto_turns', 'escalation_score_threshold'
     );
 
     foreach ($fields as $field) {
@@ -3253,6 +3571,8 @@ function action_save_comercial_process() {
     $row['enabled'] = request_post('enabled') ? 1 : 0;
     $row['auto_followup'] = request_post('auto_followup') ? 1 : 0;
     $row['auto_create_lead'] = request_post('auto_create_lead') ? 1 : 0;
+    $row['ia_learning_enabled'] = request_post('ia_learning_enabled') ? 1 : 0;
+    $row['auto_notify_operator'] = request_post('auto_notify_operator') ? 1 : 0;
     comercial_upsert_process($row);
     set_flash('ok', 'Proceso comercial guardado.');
     redirect_to(comercial_page_url('procesos', array('edit' => $row['id'])));
