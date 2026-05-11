@@ -1832,19 +1832,18 @@ function comercial_decision_score_confidence($thread, $classification, $text) {
     if (comercial_safe_len($text) >= 18) $score += 0.10;
     if (preg_match('/\b(precio|zona|horario|cuando|cu[aá]ndo|ubicaci[oó]n|interesa)\b/ui', $text)) $score += 0.12;
     if (comercial_inbound_has_risk_phrase($text)) $score -= 0.45;
-    if (preg_match('/^(ok|vale|si|sí|hola|buenas|gracias|👍|👌|🙂|okey)$/ui', trim($text))) $score -= 0.25;
     return max(0, min(1, $score));
 }
 
 function comercial_decide_inbound_action($thread, $process, $classification, $text) {
     $thread = comercial_normalize_thread($thread);
     $settings = comercial_get_settings();
-    $maxTurns = max(1, (int)($settings['conversation_max_auto_turns'] ?? 2));
+    $maxTurns = max(1, (int)($process['conversation_max_auto_turns'] ?? $settings['conversation_max_auto_turns'] ?? 2));
     $maxDefers = max(0, (int)($settings['conversation_max_defers'] ?? 2));
     $confidence = comercial_decision_score_confidence($thread, $classification, $text);
     $risk = comercial_inbound_has_risk_phrase($text);
 
-    if (empty($settings['ia_second_turn_enabled'])) {
+    if (empty($settings['ia_second_turn_enabled']) && empty($process['ia_learning_enabled'])) {
         return array('action' => 'legacy', 'confidence' => $confidence, 'risk' => $risk);
     }
     if ($risk) {
@@ -1853,7 +1852,7 @@ function comercial_decide_inbound_action($thread, $process, $classification, $te
     if ($thread['auto_turn_count'] >= $maxTurns) {
         return array('action' => 'escalate_human', 'confidence' => $confidence, 'risk' => false, 'reason' => 'max_auto_turns_reached');
     }
-    if ($confidence < 0.45) {
+    if ($confidence < 0.30) {
         if ($thread['defer_count'] < $maxDefers) {
             return array('action' => 'defer', 'confidence' => $confidence, 'risk' => false, 'reason' => 'low_confidence_defer');
         }
