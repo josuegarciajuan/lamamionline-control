@@ -1839,12 +1839,11 @@ function comercial_decide_inbound_action($thread, $process, $classification, $te
     $thread = comercial_normalize_thread($thread);
     $settings = comercial_get_settings();
     $maxTurns = max(1, (int)($process['conversation_max_auto_turns'] ?? $settings['conversation_max_auto_turns'] ?? 2));
-    $maxDefers = max(0, (int)($settings['conversation_max_defers'] ?? 2));
     $confidence = comercial_decision_score_confidence($thread, $classification, $text);
     $risk = comercial_inbound_has_risk_phrase($text);
 
     if (empty($settings['ia_second_turn_enabled']) && empty($process['ia_learning_enabled'])) {
-        return array('action' => 'legacy', 'confidence' => $confidence, 'risk' => $risk);
+        return array('action' => 'auto_reply_second_turn', 'confidence' => $confidence, 'risk' => $risk, 'reason' => 'legacy_mode_reply');
     }
     if ($risk) {
         return array('action' => 'escalate_human', 'confidence' => $confidence, 'risk' => true, 'reason' => 'risk_phrase');
@@ -1852,16 +1851,13 @@ function comercial_decide_inbound_action($thread, $process, $classification, $te
     if ($thread['auto_turn_count'] >= $maxTurns) {
         return array('action' => 'escalate_human', 'confidence' => $confidence, 'risk' => false, 'reason' => 'max_auto_turns_reached');
     }
-    if ($confidence < 0.30) {
-        if ($thread['defer_count'] < $maxDefers) {
-            return array('action' => 'defer', 'confidence' => $confidence, 'risk' => false, 'reason' => 'low_confidence_defer');
-        }
-        return array('action' => 'escalate_human', 'confidence' => $confidence, 'risk' => false, 'reason' => 'low_confidence_exhausted');
+    if ($classification === 'negative') {
+        return array('action' => 'defer', 'confidence' => $confidence, 'risk' => false, 'reason' => 'negative_intent_defer');
     }
     if (in_array((string)$classification, array('responded', 'very_hot', 'qualified'), true)) {
         return array('action' => 'auto_reply_second_turn', 'confidence' => $confidence, 'risk' => false, 'reason' => 'eligible');
     }
-    return array('action' => 'legacy', 'confidence' => $confidence, 'risk' => false);
+    return array('action' => 'auto_reply_second_turn', 'confidence' => $confidence, 'risk' => false, 'reason' => 'default_reply');
 }
 
 function comercial_webhook_log_matches_thread($thread, $log) {
