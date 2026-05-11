@@ -42,6 +42,7 @@ Habilitar un modelo operativo y trazable de **interés real** para el bot comerc
 4. **CX2-F4 — Persistencia y auditoría de decisiones**
    - Registrar estado, score y motivo de transición.
    - Habilitar historial auditable por lead/conversación.
+   - Definir retención mínima y controles de integridad/no repudio del historial.
 5. **CX2-F5 — Reglas de escalado operativo**
    - Activar umbrales de escalado y anti-ruido.
    - Definir handoff a humano con contexto mínimo obligatorio.

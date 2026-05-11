@@ -231,3 +231,83 @@ Histeresis conservadora para reducir flapping:
 
 ### Resultado esperado de F3
 Queda definido el cálculo base de score, su degradación temporal y el criterio de cambio de tramo de forma auditable y consistente con F1/F2.
+
+## Diseño CX2-F4 — Persistencia y auditoría
+
+### Objetivo de diseño
+Añadir persistencia auditable de evaluaciones CX2 para conservar trazabilidad de decisiones sin alterar la lógica de scoring de F3.
+
+### Entidades lógicas (F4)
+1. **InterestAssessmentRecord**
+   - Snapshot inmutable por evaluación.
+   - Incluye estado, score, tramo, motivo, escalado y marcas temporales.
+2. **InterestRuleTrace**
+   - Evidencia de reglas aplicadas/no aplicadas y señales usadas.
+3. **OperationalAuditStamp**
+   - Metadatos de auditoría técnica: actor, origen, correlación, versión contractual y resultado de escritura.
+
+### Estrategia de persistencia (agnóstica de backend)
+- Registro lógico append-only de evaluaciones.
+- El estado más reciente por conversación se deriva por `evaluated_at` más alto.
+- Trazabilidad 1:N entre evaluación y reglas aplicadas.
+- Compatible con backend `json|dual|mysql` de Fase 2.
+
+### Retención mínima por conversación
+- Mantener **mínimo 20 evaluaciones más recientes** por `conversation_id`.
+- Mantener **mínimo 90 días de historial** por conversación.
+- Si hay conflicto entre límites, prevalece la política que conserva más historial.
+
+### Relación con fases previas
+- **F1:** conserva estados canónicos y consistencia de transición.
+- **F2:** referencia señales normalizadas como evidencia de decisión.
+- **F3:** persiste versión de catálogo de pesos y factores aplicados.
+
+### Seguridad y cumplimiento (F4)
+1. Integridad del historial (inmutabilidad lógica y trazabilidad de cambios).
+2. Minimización de PII y controles de retención por categoría de dato.
+3. Auditoría de accesos y operaciones de lectura/exportación de evidencia.
+4. No repudio operativo (actor, momento, acción y resultado verificables).
+
+### Resultado esperado de F4
+Disponibilidad de un historial auditable, retenido y consistente que permita investigar decisiones, explicar escalados y preparar controles operativos de F5.
+
+## Diseño CX2-F5 — Escalado operativo
+
+### Objetivo de diseño
+Definir reglas operativas conservadoras para escalar a comercial humano con trazabilidad completa, reutilizando F1-F4 y sin cambios de runtime en esta fase.
+
+### Umbrales definitivos de escalado
+Se considera `escalado_operativo_candidato=true` si se cumple una de estas vías:
+
+1. **standard_hot_stable**
+   - `estado_interes=caliente`.
+   - `score_interes >= 78`.
+   - Al menos una señal explícita positiva en últimas `24h` (`wa.intent_buy_explicit|wa.intent_price_request|wa.intent_availability_request`).
+   - Estabilidad mínima: 2 evaluaciones consecutivas en tramo alto (`score>=75`) separadas por >= `5m` dentro de una ventana de `60m`.
+
+2. **fast_track_explicit_buy**
+   - `score_interes >= 90`.
+   - Señal `wa.intent_buy_explicit` en últimas `2h` con `confidence >= 0.80`.
+   - Sin señal de bloqueo activa.
+
+### Exclusiones absolutas
+Nunca escalar automáticamente si:
+- `estado_interes=descartado`.
+- hay señal de clase `bloqueo` activa.
+- hay `wa.opt_out_request` activa.
+- `score_interes < 75`.
+
+### Anti-ruido y anti-duplicado
+1. **Cooldown**: máximo 1 handoff por `conversation_id` cada `24h`.
+2. **Excepción controlada**: se permite nuevo handoff en cooldown solo si `delta_score >= +15` y aparece nueva intención explícita.
+3. **Dedupe temporal**: suprimir candidatos repetidos por huella en ventana `30m`.
+4. **Guardia de contradicción**: si coexisten `wa.intent_buy_explicit` y `wa.intent_not_interested` en `120m`, bloquear auto-handoff y exigir revisión manual.
+
+### Payload mínimo de handoff a comercial
+- Identidad/traza: `handoff_id`, `lead_id`, `conversation_id`, `assessment_id`, `trace_id`, `created_at`.
+- Decisión: `estado_interes`, `score_interes`, `score_band`, `escalado_recomendado`, `escalado_operativo_candidato`, `regla_escalado_aplicada`, `motivo_principal`.
+- Evidencia: `top_signals` (máx 3), `blocking_flags`, `last_positive_at`, `last_negative_at`.
+- Contexto: `channel`, `last_user_message_excerpt` (sanitizado), `suggested_priority` (`alta|media`).
+
+### Resultado esperado de F5
+Quedan definidos umbrales, supresión de ruido/duplicados y contrato de handoff mínimo para activar integración operativa en F6 con bajo riesgo.

@@ -44,14 +44,14 @@
 - [x] Definir criterios de cambio de tramo (bajo/medio/alto).
 
 ### CX2-F4 — Persistencia y auditoría
-- [ ] Definir registro de evaluaciones con trazabilidad de reglas.
-- [ ] Definir retención mínima de historial por conversación.
-- [ ] Definir campos obligatorios para auditoría operativa.
+- [x] Definir registro de evaluaciones con trazabilidad de reglas.
+- [x] Definir retención mínima de historial por conversación.
+- [x] Definir campos obligatorios para auditoría operativa.
 
 ### CX2-F5 — Escalado operativo
-- [ ] Definir umbrales definitivos de escalado.
-- [ ] Definir anti-ruido y anti-duplicado de escalados.
-- [ ] Definir payload mínimo de handoff a comercial humano.
+- [x] Definir umbrales definitivos de escalado.
+- [x] Definir anti-ruido y anti-duplicado de escalados.
+- [x] Definir payload mínimo de handoff a comercial humano.
 
 ### CX2-F6 — Integración operativa
 - [ ] Definir visualización de estado/score en panel.

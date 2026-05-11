@@ -222,3 +222,159 @@ Histeresis mínima obligatoria:
 2. **Anti-gaming por spam:** limitar contribución acumulada por subtipo en ventana.
 3. **No escalado por evento único ambiguo:** no activar escalado sin reglas de negocio cumplidas.
 4. **Trazabilidad auditable:** registrar versión de pesos, factores aplicados y regla que produjo score/tramo.
+
+## Contratos de comportamiento CX2-F4
+
+### Contrato de persistencia de evaluación (`InterestAssessmentRecord`)
+Campos obligatorios:
+- `assessment_id` (string único)
+- `lead_id` (string)
+- `conversation_id` (string)
+- `evaluated_at` (ISO-8601 UTC)
+- `estado_interes` (enum F1)
+- `score_interes` (entero `0..100`)
+- `score_band` (enum: `bajo|medio|alto`)
+- `motivo_principal` (string no vacío)
+- `escalado_recomendado` (boolean)
+- `signal_weight_catalog_version` (string)
+- `scoring_model_version` (string)
+- `trace_id` (string)
+
+Reglas:
+1. Cada evaluación debe persistirse como nuevo registro (inmutabilidad lógica).
+2. El estado vigente por conversación se obtiene por `evaluated_at` más reciente.
+3. Debe respetar consistencia de F1/F3 (`estado_interes`, `score_interes`, `score_band`).
+
+### Contrato de trazabilidad de reglas (`InterestRuleTrace`)
+Campos obligatorios por evaluación:
+- `assessment_id`
+- `trace_generated_at` (ISO-8601 UTC)
+- `blocking_rule_applied` (boolean)
+- `applied_rules` (array)
+- `decision_summary` (string corto)
+- `input_signal_refs` (array de `signal_id` de F2)
+
+Reglas:
+1. Si `escalado_recomendado=true`, debe existir regla `triggered` que lo justifique.
+2. Si `estado_interes=descartado` por bloqueo, debe registrarse regla de dominancia.
+
+### Contrato de retención mínima
+Política mínima obligatoria:
+1. Conservar al menos **20** evaluaciones más recientes por `conversation_id`.
+2. Conservar al menos **90 días** de historial por conversación.
+3. Una purga no puede eliminar el registro más reciente de una conversación con historial.
+
+### Contrato de auditoría operativa
+Campos obligatorios por escritura de evaluación:
+- `audit_event_id` (string único)
+- `audit_at` (ISO-8601 UTC)
+- `actor_type` (enum: `system|operator|job`)
+- `actor_id` (string)
+- `origin` (enum: `api|cron|manual|reprocess`)
+- `idempotency_key` (string)
+- `request_id` (string)
+- `trace_id` (string)
+- `contract_version` (string)
+- `storage_backend_mode` (enum: `json|dual|mysql`)
+- `write_result` (enum: `success|rejected|failed`)
+
+Reglas:
+1. Toda evaluación persistida debe tener sello de auditoría completo.
+2. Operaciones con `idempotency_key` repetida no deben duplicar evaluación lógica.
+3. Fallos de escritura deben registrarse con causa técnica resumida.
+
+### Seguridad contractual obligatoria en persistencia/auditoría (F4)
+1. Integridad de historial: mecanismo de verificación de integridad de eventos (tamper-evident).
+2. Control de acceso: mínimo privilegio para lectura/exportación de auditoría.
+3. PII: minimización, masking por defecto y retención alineada a política.
+4. No repudio: identificación de actor y correlación completa de la operación.
+
+## Contratos de comportamiento CX2-F5
+
+### Contrato de elegibilidad de escalado operativo
+Campo derivado: `escalado_operativo_candidato` (boolean).
+
+`escalado_operativo_candidato=true` si cumple una vía:
+1. `standard_hot_stable`:
+   - `estado_interes=caliente`
+   - `score_interes >= 78`
+   - señal explícita positiva en `24h`
+   - 2 evaluaciones consecutivas con `score_interes >= 75`, separadas >= `5m`, en `60m`
+2. `fast_track_explicit_buy`:
+   - `score_interes >= 90`
+   - `wa.intent_buy_explicit` en `2h`
+   - `confidence >= 0.80`
+   - sin bloqueo activo
+
+Si es `true`, `regla_escalado_aplicada` es obligatoria (`standard_hot_stable|fast_track_explicit_buy`).
+
+### Exclusiones contractuales (hard-stop)
+`escalado_operativo_candidato=false` cuando:
+1. `estado_interes=descartado`
+2. existe señal `signal_class=bloqueo` activa
+3. existe `wa.opt_out_request` activa
+4. `score_interes < 75`
+
+### Contrato anti-ruido y anti-duplicado
+1. Cooldown: máximo 1 candidato por `conversation_id` cada `24h`.
+2. Excepción de cooldown: solo con `delta_score >= +15` y nueva señal explícita positiva.
+3. `handoff_dedupe_key` obligatorio (`conversation_id + score_band + regla_escalado_aplicada + dominant_signal_type + bucket_30m`).
+4. Misma `handoff_dedupe_key` en `30m` => suprimir creación de nuevo candidato.
+5. Si en `120m` coexisten `wa.intent_buy_explicit` y `wa.intent_not_interested`:
+   - `escalado_operativo_candidato=false`
+   - `requiere_revision_manual=true`
+   - `regla_bloqueo_operativo=conflicting_intent_guard`
+
+### Contrato de payload mínimo de handoff (`CommercialHandoffPayload`)
+Campos obligatorios:
+- `handoff_id` (string único)
+- `lead_id` (string)
+- `conversation_id` (string)
+- `assessment_id` (string)
+- `trace_id` (string)
+- `created_at` (ISO-8601 UTC)
+- `estado_interes` (enum F1)
+- `score_interes` (int 0..100)
+- `score_band` (enum `bajo|medio|alto`)
+- `escalado_recomendado` (boolean)
+- `escalado_operativo_candidato` (boolean)
+- `regla_escalado_aplicada` (enum F5)
+- `motivo_principal` (string no vacío)
+- `top_signals` (array 1..3 con `signal_type`, `signal_class`, `occurred_at`, `confidence`)
+- `blocking_flags` (objeto)
+- `last_positive_at` (ISO-8601 UTC|null)
+- `last_negative_at` (ISO-8601 UTC|null)
+- `channel` (enum F2)
+- `last_user_message_excerpt` (string corto sanitizado)
+- `suggested_priority` (`alta|media`)
+
+### Reglas de seguridad contractuales obligatorias (F5)
+1. Toda operación mutante de escalado MUST incluir identidad de actor, `request_id`, `trace_id` e idempotencia por intención.
+2. Overrides humanos MUST requerir MFA, mínimo privilegio y caducidad temporal.
+3. Overrides de alto impacto MUST exigir aprobación dual (4-eyes).
+4. Estados `BLOCKED|FROZEN|LOCKED` MUST denegar operaciones no lectura (fail-closed).
+5. Payload de handoff MUST minimizar PII y no incluir datos sensibles completos en logs/trazas.
+6. Replays con misma idempotencia MUST no producir doble efecto de escalado.
+
+### Trazabilidad operativa F5
+Por candidato creado/suprimido/bloqueado registrar:
+- `audit_event_id`
+- `conversation_id`
+- `assessment_id`
+- `handoff_dedupe_key`
+- `decision` (`created|suppressed|blocked`)
+- `decision_reason`
+- `trace_id`
+- `audit_at`
+
+### Casos de prueba manuales mínimos F5
+1. Umbral por debajo (`score=77`) no escala.
+2. Umbral estándar (`score=78`) con estabilidad sí escala.
+3. Fast-track (`score>=90` + `intent_buy_explicit`) sí escala.
+4. Señal de bloqueo activa impide escalado.
+5. Cooldown 24h suprime segundo handoff.
+6. Excepción por `delta_score>=+15` permite nuevo handoff.
+7. `handoff_dedupe_key` repetida en 30m se suprime.
+8. Contradicción (`intent_buy_explicit` + `intent_not_interested`) fuerza revisión manual.
+9. Payload sin campo obligatorio falla validación.
+10. Regresión F1-F4 mantiene consistencia de estado/score/auditoría.
