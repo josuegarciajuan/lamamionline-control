@@ -697,11 +697,6 @@ function comercial_save_processes($rows) {
 
 function comercial_prepare_process_for_storage($row) {
     $row = is_array($row) ? $row : array();
-    $slug = trim((string)($row['slug'] ?? ''));
-    if (comercial_process_has_hardcoded_templates($slug)) {
-        $row['message_templates'] = array();
-        $row['followup_templates'] = array();
-    }
     return $row;
 }
 
@@ -747,18 +742,13 @@ function comercial_normalize_process($row) {
     $out['window_end_hour'] = max(0, min(23, (int)$out['window_end_hour']));
     $out['source_type'] = in_array($out['source_type'], array('jsonl_queue', 'mysql_recent'), true) ? $out['source_type'] : 'jsonl_queue';
     $out['source_queue_files'] = comercial_resolve_queue_files((string)$out['slug'], $out['source_queue_files']);
-    if (comercial_process_has_hardcoded_templates((string)$out['slug'])) {
+    $out['message_templates'] = comercial_normalize_template_blocks($out['message_templates']);
+    $out['followup_templates'] = comercial_normalize_template_blocks($out['followup_templates']);
+    if (empty($out['message_templates'])) {
         $out['message_templates'] = comercial_default_process_templates((string)$out['slug'], 'message_templates');
+    }
+    if (empty($out['followup_templates'])) {
         $out['followup_templates'] = comercial_default_process_templates((string)$out['slug'], 'followup_templates');
-    } else {
-        $out['message_templates'] = comercial_normalize_template_blocks($out['message_templates']);
-        $out['followup_templates'] = comercial_normalize_template_blocks($out['followup_templates']);
-        if (comercial_templates_match_legacy((string)$out['slug'], 'message_templates', $out['message_templates'])) {
-            $out['message_templates'] = comercial_default_process_templates((string)$out['slug'], 'message_templates');
-        }
-        if (comercial_templates_match_legacy((string)$out['slug'], 'followup_templates', $out['followup_templates'])) {
-            $out['followup_templates'] = comercial_default_process_templates((string)$out['slug'], 'followup_templates');
-        }
     }
     $out['recipient_blacklist'] = comercial_normalize_phone_blacklist_lines($out['recipient_blacklist'] ?? array());
     $out['positive_keywords'] = comercial_normalize_textarea_lines($out['positive_keywords']);
@@ -914,6 +904,54 @@ function comercial_phone_is_blacklisted($phone, $process, &$matchedEntry = '') {
     return false;
 }
 
+// ─── Registro global de teléfonos ya contactados (deduplicación entre procesos) ───
+
+function comercial_get_sent_phones() {
+    $rows = storage_read('comercial_sent_phones.json');
+    $out = array();
+    foreach ((array)$rows as $row) {
+        $phone = comercial_only_digits((string)($row['phone'] ?? ''));
+        if ($phone === '') continue;
+        $out[] = array(
+            'id' => trim((string)($row['id'] ?? '')),
+            'phone' => $phone,
+            'process_slug' => trim((string)($row['process_slug'] ?? '')),
+            'sent_at' => trim((string)($row['sent_at'] ?? '')),
+        );
+    }
+    return $out;
+}
+
+function comercial_phone_was_contacted($phone) {
+    $entries = comercial_get_sent_phones();
+    if (empty($entries)) return false;
+    foreach ($entries as $entry) {
+        if (comercial_phone_matches($phone, $entry['phone'])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function comercial_register_sent_phone($phone, $processSlug = '') {
+    $phoneDigits = comercial_only_digits($phone);
+    if ($phoneDigits === '') return null;
+
+    // Evitar duplicados: si ya existe, no volver a registrar
+    if (comercial_phone_was_contacted($phoneDigits)) return null;
+
+    $entry = array(
+        'id' => generate_id('cmsent'),
+        'phone' => $phoneDigits,
+        'process_slug' => trim((string)$processSlug),
+        'sent_at' => now_datetime(),
+    );
+    storage_upsert('comercial_sent_phones.json', $entry);
+    return $entry;
+}
+
+// ─── Fin registro global de enviados ───
+
 function comercial_templates_match_legacy($slug, $field, $value) {
     $current = comercial_normalize_template_blocks($value);
     $legacy = comercial_normalize_template_blocks(comercial_legacy_process_templates($slug, $field));
@@ -926,10 +964,11 @@ function comercial_templates_match_legacy($slug, $field, $value) {
 function comercial_process_message_pool($process, $field) {
     $process = is_array($process) ? $process : array();
     $slug = trim((string)($process['slug'] ?? ''));
-    if (comercial_process_has_hardcoded_templates($slug)) {
-        return comercial_normalize_template_blocks(comercial_default_process_templates($slug, $field));
+    $pool = comercial_normalize_template_blocks(isset($process[$field]) ? $process[$field] : array());
+    if (empty($pool)) {
+        $pool = comercial_normalize_template_blocks(comercial_default_process_templates($slug, $field));
     }
-    return comercial_normalize_template_blocks(isset($process[$field]) ? $process[$field] : array());
+    return $pool;
 }
 
 function comercial_hardcoded_min_message_length($slug, $field) {
@@ -2215,17 +2254,23 @@ function comercial_webhook_extract_payload($request = array()) {
         $request['from'] ?? '',
         $request['from_phone'] ?? '',
         $dataInfo['SenderAlt'] ?? '',
+        $dataInfo['Sender'] ?? '',
+        $payload['participant'] ?? '',
+        $data['participant'] ?? '',
+        $dataId['participant'] ?? '',
         $body['from'] ?? '',
         $payload['from'] ?? '',
         $payload['chatId'] ?? '',
         $payload['author'] ?? '',
-        $payload['participant'] ?? '',
         $data['from'] ?? '',
         $data['author'] ?? '',
-        $data['participant'] ?? '',
         $dataId['remote'] ?? '',
-        $dataId['participant'] ?? '',
     ));
+
+    $rawFrom = trim((string)$from);
+    $isStatusBroadcast = stripos($rawFrom, 'status@broadcast') !== false
+        || stripos((string)($dataInfo['Chat'] ?? ''), 'status@broadcast') !== false;
+    $isGroupMessage = !empty($dataInfo['IsGroup']) && !$isStatusBroadcast;
 
     $to = comercial_first_nonempty_value(array(
         $request['to'] ?? '',
@@ -2280,6 +2325,8 @@ function comercial_webhook_extract_payload($request = array()) {
         'port' => trim((string)$linePort),
         'message_id' => $messageId,
         'from_me' => $fromMe ? 1 : 0,
+        'is_status_broadcast' => $isStatusBroadcast ? 1 : 0,
+        'is_group' => $isGroupMessage ? 1 : 0,
         'raw' => $body,
     );
 }
@@ -2359,6 +2406,16 @@ function comercial_handle_webhook_http() {
             comercial_webhook_log_append('received_parsed', $logContext);
             comercial_webhook_log_append('ignored_from_me', $logContext + array('http_status' => 200));
             voice_json_response(array('ok' => true, 'ignored' => 'from_me'));
+        }
+
+        if (!empty($payload['is_status_broadcast']) || !empty($payload['is_group'])) {
+            $ignoreReason = !empty($payload['is_status_broadcast']) ? 'status_broadcast' : 'group_message';
+            comercial_webhook_log_append('received_parsed', $logContext);
+            comercial_webhook_log_append('ignored_non_direct_message', $logContext + array(
+                'reason' => $ignoreReason,
+                'http_status' => 200,
+            ));
+            voice_json_response(array('ok' => true, 'ignored' => $ignoreReason));
         }
 
         $messageId = trim((string)($payload['message_id'] ?? ''));
@@ -3120,14 +3177,6 @@ function comercial_pick_message($process, $field) {
     $pool = comercial_process_message_pool($process, $field);
     if (empty($pool)) return '';
     $picked = $pool[array_rand($pool)];
-    $slug = trim((string)($process['slug'] ?? ''));
-    $minLen = comercial_hardcoded_min_message_length($slug, $field);
-    if ($minLen > 0 && comercial_safe_len($picked) < $minLen) {
-        usort($pool, function ($a, $b) {
-            return comercial_safe_len($b) <=> comercial_safe_len($a);
-        });
-        return (string)$pool[0];
-    }
     return $picked;
 }
 
@@ -3632,6 +3681,12 @@ function comercial_jsonl_dequeue_first_valid($path, $phoneField, $excludePhone =
                 continue;
             }
 
+            // Deduplicación global: evitar enviar a teléfonos ya contactados por cualquier proceso
+            if (comercial_phone_was_contacted($phone)) {
+                $skipIndexes[$index] = true;
+                continue;
+            }
+
             $candidate = array(
                 'ok' => true,
                 'source_type' => 'jsonl_queue',
@@ -3712,6 +3767,10 @@ function comercial_pick_candidate_from_mysql($process) {
             $matchedBlacklist = '';
             if (comercial_phone_is_blacklisted($phone, $process, $matchedBlacklist)) {
                 $blacklistHits++;
+                continue;
+            }
+            // Deduplicación global: evitar enviar a teléfonos ya contactados por cualquier proceso
+            if (comercial_phone_was_contacted($phone)) {
                 continue;
             }
             $existing = comercial_find_thread_by_process_phone((string)$process['id'], $phone);
@@ -3861,6 +3920,7 @@ function comercial_run_tick($forceProcessId = '') {
                 'created_at' => now_datetime(),
             ));
             comercial_upsert_thread($thread);
+            comercial_register_sent_phone($targetPhone, (string)$process['slug']);
             $results[] = array('process' => $process['nombre'], 'ok' => true, 'target_phone' => $targetPhone, 'line' => (string)($line['nombre'] ?? ''));
         } else {
             $results[] = array('process' => $process['nombre'], 'ok' => false, 'target_phone' => $targetPhone, 'reason' => (string)$send['error']);
@@ -4623,14 +4683,8 @@ function render_comercial_page() {
             comercial_field_text('source_phone_field', 'Campo teléfono JSONL', $selectedProcess['source_phone_field']);
             comercial_field_textarea('source_queue_files', 'Rutas de colas JSONL (una por línea)', comercial_array_to_textarea($selectedProcess['source_queue_files']), 5);
             echo '<div class="field-help" style="margin-top:-6px; margin-bottom:12px;">Para este proyecto, las colas por defecto viven en <code>data/comercial_queues/</code>. Cada línea del fichero debe ser un JSON y el teléfono debe ir en el campo <code>' . e($selectedProcess['source_phone_field']) . '</code> (por defecto <code>group_key</code>).</div>';
-            if (comercial_process_has_hardcoded_templates((string)$selectedProcess['slug'])) {
-                echo '<div class="info-strip" style="margin:12px 0;">Los textos de este proceso están hardcodeados en código. Aquí solo se muestran como referencia.</div>';
-                echo '<div class="field"><label>Textos iniciales hardcodeados</label><textarea rows="18" readonly>' . e(comercial_templates_to_textarea(comercial_process_message_pool($selectedProcess, 'message_templates'))) . '</textarea></div>';
-                echo '<div class="field"><label>Respuesta automática al qualified</label><textarea rows="10" readonly>' . e(comercial_templates_to_textarea(comercial_process_message_pool($selectedProcess, 'followup_templates'))) . '</textarea></div>';
-            } else {
-                comercial_field_textarea('message_templates', 'Textos iniciales (uno por bloque)', comercial_templates_to_textarea($selectedProcess['message_templates']), 18);
-                comercial_field_textarea('followup_templates', 'Textos de seguimiento (uno por bloque)', comercial_templates_to_textarea($selectedProcess['followup_templates']), 10);
-            }
+            comercial_field_textarea('message_templates', 'Textos iniciales (un bloque por variante, separados por doble salto de línea)', comercial_templates_to_textarea(comercial_process_message_pool($selectedProcess, 'message_templates')), 18);
+            comercial_field_textarea('followup_templates', 'Textos de seguimiento (un bloque por variante)', comercial_templates_to_textarea(comercial_process_message_pool($selectedProcess, 'followup_templates')), 10);
             comercial_field_textarea('positive_keywords', 'Palabras qualified (una por línea)', comercial_array_to_textarea($selectedProcess['positive_keywords']), 5);
             comercial_field_textarea('negative_keywords', 'Keywords negativas (una por línea)', comercial_array_to_textarea($selectedProcess['negative_keywords']), 5);
 
