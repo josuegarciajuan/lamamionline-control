@@ -1830,7 +1830,7 @@ function comercial_decision_score_confidence($thread, $classification, $text) {
     if ($classification === 'very_hot') $score += 0.35;
     if ($classification === 'qualified') $score += 0.25;
     if (comercial_safe_len($text) >= 18) $score += 0.10;
-    if (preg_match('/\b(precio|zona|horario|cuando|cu[aá]ndo|ubicaci[oó]n|interesa)\b/ui', $text)) $score += 0.12;
+    if (preg_match('/\b(precio|zona|horario|cuando|cu[aá]ndo|ubicaci[oó]n|interesa|donde|d[oó]nde|direcci[oó]n|sitio|localizaci[oó]n)\b/ui', $text)) $score += 0.12;
     if (comercial_inbound_has_risk_phrase($text)) $score -= 0.45;
     return max(0, min(1, $score));
 }
@@ -4243,6 +4243,32 @@ function comercial_handle_inbound_message($payload) {
                 'intent_reason' => $intentReason,
                 'action' => 'escalated_human',
                 'target_phone' => (string)$thread['target_phone'],
+            );
+        }
+        if (($decision['action'] ?? '') === 'auto_reply_second_turn' && $autoFollowup && trim((string)$thread['qualified_reply_sent_at']) === '') {
+            $followup = comercial_pick_message($process, 'followup_templates');
+            $replied = false;
+            if ($followup !== '') {
+                $send = comercial_send_thread_message($thread, $followup, array('event_type' => 'qualified_auto_reply_sent'));
+                if (!empty($send['ok'])) {
+                    $thread = comercial_normalize_thread((array)($send['thread'] ?? $thread));
+                    $thread['qualified_reply_sent_at'] = now_datetime();
+                    $thread['auto_turn_count'] = (int)$thread['auto_turn_count'] + 1;
+                    $replied = true;
+                }
+            }
+            $thread = comercial_thread_apply_stage($thread, 'responded');
+            comercial_upsert_thread($thread);
+            comercial_create_reply_aviso($thread, $classification, $text, $intentReason, $messageId);
+            return array(
+                'ok' => true,
+                'thread_id' => $thread['id'],
+                'classification' => $classification,
+                'intent_reason' => $intentReason,
+                'action' => $replied ? 'qualified_reply_sent' : 'responded',
+                'target_phone' => (string)$thread['target_phone'],
+                'test_probe' => comercial_thread_is_test_probe($thread) ? 1 : 0,
+                'test_key' => trim((string)($thread['test_key'] ?? '')),
             );
         }
         $thread = comercial_thread_apply_stage($thread, 'responded');
