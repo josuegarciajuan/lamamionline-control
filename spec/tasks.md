@@ -54,9 +54,9 @@
 - [x] Definir payload mínimo de handoff a comercial humano.
 
 ### CX2-F6 — Integración operativa
-- [ ] Definir visualización de estado/score en panel.
-- [ ] Definir acciones de confirmación/corrección humana.
-- [ ] Definir trazabilidad de overrides manuales.
+- [x] Definir visualización de estado/score en panel.
+- [x] Definir acciones de confirmación/corrección humana.
+- [x] Definir trazabilidad de overrides manuales.
 
 ### CX2-F7 — Calibración y guardrails
 - [ ] Definir rutina de calibración periódica.

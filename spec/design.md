@@ -311,3 +311,44 @@ Nunca escalar automáticamente si:
 
 ### Resultado esperado de F5
 Quedan definidos umbrales, supresión de ruido/duplicados y contrato de handoff mínimo para activar integración operativa en F6 con bajo riesgo.
+
+## Diseño CX2-F6 — Integración operativa en panel
+
+### Objetivo de diseño
+Integrar en panel comercial el estado/score de CX2 para priorización y habilitar confirmación/corrección humana con trazabilidad completa, sin recalcular scoring ni cambiar runtime en esta fase.
+
+### Visualización operativa mínima
+Cada ítem de conversación debe mostrar:
+- `lead_id`, `conversation_id`, `assessment_id`, `trace_id`.
+- `estado_interes`, `score_interes`, `score_band`.
+- `escalado_recomendado`, `escalado_operativo_candidato`, `regla_escalado_aplicada`.
+- `motivo_principal`, `top_signals` (máx 3), `blocking_flags`.
+- `evaluated_at`, `last_positive_at`, `last_negative_at`.
+
+Prioridad sugerida (solo lectura operativa):
+- `alta`: candidato operativo verdadero y sin bloqueo.
+- `media`: tramo alto sin candidato.
+- `normal`: resto.
+
+### Acciones humanas permitidas
+1. `confirmar_handoff`: confirma recomendación para gestión humana.
+2. `corregir_clasificacion`: corrige estado operativo visible en panel con motivo obligatorio.
+3. `reabrir_revision`: reabre caso con nueva evidencia y referencia al override padre.
+
+Regla clave: ninguna acción humana en F6 altera el cálculo histórico de `score_interes` ni la semántica de F1-F5.
+
+### Trazabilidad de overrides manuales
+Registrar en append-only lógico:
+- `override_id`, `action_type`, `action_result`, `reason_code`, `reason_note`.
+- `lead_id`, `conversation_id`, `assessment_id`, `parent_override_id`.
+- `actor_id`, `actor_role`, `request_id`, `trace_id`, `idempotency_key`, `created_at`.
+
+### Seguridad operativa (F6)
+1. Acciones mutantes solo para roles autorizados.
+2. Overrides con MFA reciente en acciones críticas.
+3. Idempotencia obligatoria para evitar doble ejecución por reintentos.
+4. Estados bloqueados deben fallar en cerrado (`BLOCKED|FROZEN|LOCKED`).
+5. Notas y vistas con minimización de PII.
+
+### Resultado esperado de F6
+Queda definida una interfaz operativa única para panel, con acciones humanas controladas y auditables, lista para implementación técnica/instrumentación en F7.

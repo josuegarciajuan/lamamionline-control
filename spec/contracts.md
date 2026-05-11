@@ -378,3 +378,71 @@ Por candidato creado/suprimido/bloqueado registrar:
 8. Contradicción (`intent_buy_explicit` + `intent_not_interested`) fuerza revisión manual.
 9. Payload sin campo obligatorio falla validación.
 10. Regresión F1-F4 mantiene consistencia de estado/score/auditoría.
+
+## Contratos de comportamiento CX2-F6
+
+### Contrato de visualización operativa (`PanelOperationalView`)
+Campos obligatorios por ítem:
+- `lead_id`, `conversation_id`, `assessment_id`, `trace_id`
+- `estado_interes`, `score_interes`, `score_band`
+- `escalado_recomendado`, `escalado_operativo_candidato`, `regla_escalado_aplicada`
+- `motivo_principal`, `top_signals`, `blocking_flags`
+- `evaluated_at`, `last_positive_at`, `last_negative_at`
+- `suggested_priority` (`alta|media|normal`)
+
+Reglas:
+1. `suggested_priority=alta` requiere `escalado_operativo_candidato=true` y ausencia de bloqueo activo.
+2. Panel debe reflejar exactamente el snapshot de `assessment_id` (sin recálculo de score en F6).
+3. Si faltan campos obligatorios de F4/F5, el ítem queda `inconsistente` y no habilita acciones mutantes.
+
+### Contrato de acciones humanas (`ManualOperationalAction`)
+Acciones permitidas:
+- `confirmar_handoff`
+- `corregir_clasificacion`
+- `reabrir_revision`
+
+Payload mínimo obligatorio:
+- `action_id`, `action_type`, `conversation_id`, `lead_id`, `assessment_id`
+- `reason_code`, `reason_note`
+- `actor_id`, `actor_role`, `request_id`, `trace_id`, `idempotency_key`, `created_at`
+- `parent_override_id` (obligatorio en `reabrir_revision`)
+
+Reglas:
+1. Acción fuera del enum -> rechazo `422`.
+2. Misma `idempotency_key` -> `noop` sin doble efecto.
+3. `assessment_id` inexistente/no trazable -> rechazo `409/422`.
+4. En estados `BLOCKED|FROZEN|LOCKED` toda acción mutante debe denegarse (`fail-closed`).
+5. `confirmar_handoff` no puede modificar `score_interes`, `score_band` ni `estado_interes`.
+
+### Contrato de trazabilidad de overrides (`ManualOverrideRecord`)
+Registro obligatorio por acción aceptada/rechazada:
+- `override_id`, `action_id`, `conversation_id`, `lead_id`, `assessment_id`
+- `action_type`, `action_result` (`confirmed|corrected|reopened|rejected|noop`)
+- `previous_operational_state`, `new_operational_state`
+- `reason_code`, `reason_note`
+- `actor_id`, `actor_role`, `request_id`, `trace_id`, `idempotency_key`, `audit_at`
+
+Reglas:
+1. Historial append-only lógico.
+2. Override enlazado 1:1 a `assessment_id` de F4.
+3. `reabrir_revision` requiere `parent_override_id` válido.
+4. `reason_note` y trazas deben minimizar PII.
+
+### Seguridad contractual obligatoria (F6)
+1. Overrides MUST aplicar autorización contextual y mínimo privilegio.
+2. Overrides críticos MUST requerir MFA reciente (step-up).
+3. Solicitud y aprobación de override crítico MUST respetar separación de funciones (4-eyes).
+4. Eventos de override MUST auditarse en almacenamiento append-only con integridad verificable.
+5. Replays de acción MUST bloquearse por `idempotency_key` + `request_id` + ventana temporal.
+
+### Casos de prueba manuales mínimos F6
+1. Prioridad alta visible cuando `escalado_operativo_candidato=true` y sin bloqueo.
+2. Ítem con bloqueo activo no habilita acción mutante.
+3. `confirmar_handoff` crea override auditado con actor/razón.
+4. `corregir_clasificacion` sin `reason_note` falla validación.
+5. Reintento con misma `idempotency_key` produce `noop`.
+6. `reabrir_revision` sin `parent_override_id` falla validación.
+7. Snapshot de score/estado no cambia por acción humana en F6.
+8. Acción con rol no autorizado es denegada.
+9. Override crítico sin MFA reciente es denegado.
+10. Regresión F1-F5 mantiene consistencia contractual.
