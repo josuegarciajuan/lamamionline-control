@@ -352,3 +352,44 @@ Registrar en append-only lógico:
 
 ### Resultado esperado de F6
 Queda definida una interfaz operativa única para panel, con acciones humanas controladas y auditables, lista para implementación técnica/instrumentación en F7.
+
+## Diseño CX2-F7 — Calibración y guardrails
+
+### Objetivo de diseño
+Definir un ciclo de calibración periódica y guardrails medibles para reducir falsos positivos y sobre-escalado de CX2, sin introducir cambios de runtime en esta fase.
+
+### Rutina de calibración periódica
+1. **Semanal (operativa)**
+   - Revisión por ventana UTC de evaluaciones cerradas.
+   - Cálculo de métricas por canal y regla de escalado aplicada.
+   - Estado de ciclo: `ok|warning|breach`.
+2. **Mensual (calibración)**
+   - Tendencia de 4 semanas.
+   - Propuesta de ajuste de reglas/pesos con comparación contra baseline.
+3. **Trimestral (gobierno)**
+   - Consolidación de versiones vigentes.
+   - Depuración de reglas obsoletas y actualización de objetivos operativos.
+
+### Guardrails de riesgo
+- **FP_rate objetivo semanal**: `<= 12%`.
+- **FP_rate warning**: `>12%` y `<=18%`.
+- **FP_rate breach**: `>18%`.
+- **Over_escalation_rate objetivo**: `<=20%`.
+- **Over_escalation_rate breach**: `>25%`.
+- **Incidente crítico**: cualquier escalado con bloqueo activo u `opt_out_request` (esperado `0`).
+
+Comportamiento:
+- `warning`: congelar promoción automática y abrir revisión.
+- `breach`: activar contención, análisis causa raíz y propuesta de rollback lógico de versión.
+
+### Criterios de revisión por resultados
+- Versiones controladas:
+  - `scoring_model_version`
+  - `signal_weight_catalog_version`
+  - `escalation_policy_version`
+- Decisiones permitidas: `promote|hold|rollback|discard`.
+- `promote` requiere 2 ciclos semanales consecutivos en `ok` y sin regresión en exclusiones F5.
+- `breach` en ventana evaluada invalida promoción.
+
+### Resultado esperado de F7
+Queda definido un marco de calibración y guardrails trazable para evolucionar reglas de CX2 con riesgo acotado y preparar cierre de aceptación en F8.

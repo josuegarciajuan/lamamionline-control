@@ -446,3 +446,69 @@ Reglas:
 8. Acción con rol no autorizado es denegada.
 9. Override crítico sin MFA reciente es denegado.
 10. Regresión F1-F5 mantiene consistencia contractual.
+
+## Contratos de comportamiento CX2-F7
+
+### Contrato de ciclo de calibración (`CalibrationCycle`)
+Campos obligatorios:
+- `calibration_cycle_id`
+- `cycle_type` (`weekly_operational|monthly_calibration|quarterly_governance`)
+- `window_start`, `window_end` (UTC)
+- `evaluated_population_size` (int >= 0)
+- `baseline_versions` (`scoring_model_version`, `signal_weight_catalog_version`, `escalation_policy_version`)
+- `status` (`ok|warning|breach`)
+- `generated_at`, `generated_by`, `trace_id`
+
+Reglas:
+1. F7 es runtime-neutral: no altera ejecución en tiempo real de F1-F6.
+2. Muestra insuficiente => `status=warning` + `insufficient_sample=true`.
+3. Salida de ciclo debe ser reproducible con misma ventana + mismas versiones base.
+
+### Contrato de métricas y guardrails (`CalibrationGuardrails`)
+Métricas obligatorias:
+- `fp_rate` (`0..1`)
+- `over_escalation_rate` (`0..1`)
+- `blocked_escalation_incidents` (int >= 0)
+
+Límites obligatorios:
+1. `fp_rate_target <= 0.12`
+2. `fp_rate_warning > 0.12 && <= 0.18`
+3. `fp_rate_breach > 0.18`
+4. `over_escalation_rate_target <= 0.20`
+5. `over_escalation_rate_breach > 0.25`
+6. `blocked_escalation_incidents > 0` => `status=breach`
+
+### Contrato de revisión/versionado de reglas (`RuleVersionReview`)
+Campos obligatorios:
+- `review_id`
+- `candidate_versions` (`scoring_model_version`, `signal_weight_catalog_version`, `escalation_policy_version`)
+- `baseline_versions`
+- `decision` (`promote|hold|rollback|discard`)
+- `decision_reason`
+- `evidence_refs` (>=1 `calibration_cycle_id`)
+- `approved_by`, `approved_at`, `trace_id`
+
+Reglas:
+1. `promote` requiere al menos 2 ciclos semanales consecutivos en `ok`.
+2. Si existe `breach` en la ventana evaluada, `promote` es inválido.
+3. `rollback|discard` debe referenciar guardrail incumplido.
+4. Historial de decisiones es append-only lógico.
+
+### Seguridad contractual obligatoria (F7)
+1. Métricas de calibración MUST vincularse a `dataset_version_id`, `rule_set_version_id`, `code_commit_sha` y hash de artefacto.
+2. Datasets MUST validar integridad (hash/firma) antes de uso.
+3. Cambios de reglas MUST usar aprobación dual (4-eyes) con separación de funciones.
+4. Rollback MUST ser atómico para reglas+dataset+parámetros versionados.
+5. Auditoría de calibración MUST ser append-only con integridad verificable.
+
+### Casos de prueba manuales mínimos F7
+1. Ciclo semanal con muestra suficiente y métricas en objetivo => `ok`.
+2. `fp_rate` en warning => `warning` y plan de ajuste.
+3. `fp_rate` en breach => bloqueo de promoción.
+4. `over_escalation_rate` en breach => `hold|rollback`.
+5. Escalado con bloqueo activo => incidente y `breach`.
+6. Intento de `promote` con un solo ciclo `ok` => rechazo.
+7. Trazabilidad permite reconstruir la decisión.
+8. Artefacto de dataset con hash inválido => rechazo.
+9. Autoaprobación de cambio crítico => denegada.
+10. Regresión F1-F6 mantiene consistencia contractual.

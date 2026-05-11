@@ -59,9 +59,9 @@
 - [x] Definir trazabilidad de overrides manuales.
 
 ### CX2-F7 — Calibración y guardrails
-- [ ] Definir rutina de calibración periódica.
-- [ ] Definir límites para falsos positivos y sobre-escalado.
-- [ ] Definir criterios de revisión de reglas por resultados.
+- [x] Definir rutina de calibración periódica.
+- [x] Definir límites para falsos positivos y sobre-escalado.
+- [x] Definir criterios de revisión de reglas por resultados.
 
 ### CX2-F8 — Cierre y aceptación
 - [ ] Definir métricas de éxito (negocio y operación).
