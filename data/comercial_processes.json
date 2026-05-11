@@ -5,17 +5,17 @@
         "nombre": "CasaWasap",
         "enabled": 1,
         "priority": 100,
-        "daily_target_percent": 23.3,
+        "daily_target_percent": 29.7,
         "daily_target_absolute": 0,
         "window_start_hour": 8,
         "window_end_hour": 22,
-        "min_interval_seconds": 2520,
-        "max_interval_seconds": 3410,
+        "min_interval_seconds": 2040,
+        "max_interval_seconds": 2760,
         "source_type": "jsonl_queue",
         "source_queue_files": [
-            "\/var\/www\/html\/atupuerta\/control\/data\/comercial_queues\/casawasap_1.jsonl",
-            "\/var\/www\/html\/atupuerta\/control\/data\/comercial_queues\/casawasap_2.jsonl",
-            "\/var\/www\/html\/atupuerta\/control\/data\/comercial_queues\/casawasap_3.jsonl"
+            "/var/www/html/atupuerta/control/data/comercial_queues/casawasap_1.jsonl",
+            "/var/www/html/atupuerta/control/data/comercial_queues/casawasap_2.jsonl",
+            "/var/www/html/atupuerta/control/data/comercial_queues/casawasap_3.jsonl"
         ],
         "source_phone_field": "group_key",
         "source_mysql_host": "localhost",
@@ -28,8 +28,12 @@
             "tf_f500d7c3",
             "tf_5ebfef80"
         ],
-        "message_templates": [],
-        "followup_templates": [],
+        "message_templates": [
+            "Buenas 👋\n\nSi tienes una casa con mucho movimiento en WhatsApp, esto te puede servir:\nCasaWasap es un \"telefonista\" con IA que contesta 24/7, mantiene la conversacion y cierra al cliente como una telefonista real. Solo te molesta cuando hay una visita seria con hora estimada de llegada. Ademas puede llevar varios numeros a la vez.\n\nEntra 2 min, prueba la demo y chatea como si fueras cliente: https://casawasap.com/\n\nDeja de estar pegado al WhatsApp, sube la conversion y centrate en otras partes del negocio.\n\nSi quieres, dime \"INFO\" y te lo adapto a tu caso en 3 lineas. 📲"
+        ],
+        "followup_templates": [
+            "CasaWasap contesta los telefonos de tu casa todo el dia (24/7), mantiene el hilo y filtra curiosos: a ti te llega solo aviso de los que tienen intencion real de ir \\u2705\nAl ser algo tan novedoso, esto se entiende mejor en voz. Si te va bien, hacemos una llamada de 5 min y te explico todo un poco mas"
+        ],
         "recipient_blacklist": [],
         "positive_keywords": [
             "info",
@@ -54,11 +58,11 @@
         "auto_followup": 1,
         "auto_create_lead": 0,
         "created_at": "2026-04-01 10:51:22",
-        "updated_at": "2026-05-07 14:15:01",
-        "last_run_at": "2026-05-07 13:39:18",
-        "next_run_at": "2026-05-07 15:22:56",
+        "updated_at": "2026-05-11 12:56:01",
+        "last_run_at": "2026-05-11 12:53:18",
+        "next_run_at": "2026-05-11 14:02:09",
         "last_line_id": "tf_f500d7c3",
-        "last_target_phone": "34613868550",
+        "last_target_phone": "34613803886",
         "last_result": "send_ok",
         "last_error": ""
     },
@@ -68,12 +72,12 @@
         "nombre": "LaMami",
         "enabled": 1,
         "priority": 100,
-        "daily_target_percent": 33.4,
+        "daily_target_percent": 35.7,
         "daily_target_absolute": 0,
         "window_start_hour": 8,
         "window_end_hour": 20,
-        "min_interval_seconds": 1530,
-        "max_interval_seconds": 2070,
+        "min_interval_seconds": 1412,
+        "max_interval_seconds": 1912,
         "source_type": "mysql_recent",
         "source_queue_files": [],
         "source_phone_field": "group_key",
@@ -87,8 +91,13 @@
             "tf_f500d7c3",
             "tf_5ebfef80"
         ],
-        "message_templates": [],
-        "followup_templates": [],
+        "message_templates": [
+            "Hola 😊\nSoy La Mami Online, un nuevo concepto de \"publicista\" 🔥\n\n\\u2705 Te llevo clientes extra a la puerta de tu casa\n\\u2705 Alta unica: 29\\u20AC (gestion/activacion)\n\\u2705 Solo pagas comision cuando llega cliente 💸\n\\u2705 10\\u20AC / 30min (si es 1h \\u2192 20\\u20AC)\n\nLa idea: te damos de alta y empezamos a mandarte clientes.\nTu sigues con lo tuyo, y esto es un EXTRA para sumar mas.\n\nSi quieres verlo rapido 👇\nhttps://lamami.online\n\nSi te interesa, responde \"info\" y te lo explico en 1 minuto 😉🚀",
+            "Hola 😊\nSoy La Mami Online 🔥, un nuevo concepto de \"publicista\".\n\n\\u2705 Clientes extra\n\\u2705 Alta unica 29\\u20AC (activacion)\n\\u2705 Comision solo si llega cliente 💸\n\\u2705 10\\u20AC / 30min (1h \\u2192 20\\u20AC)\n\nTe activas una vez y a partir de ahi solo pagas cuando llega cliente.\n\nMas info rapida aqui 👇\nhttps://lamami.online\n\n\\u00BFTe cuadra? Responde \"info\" 😉"
+        ],
+        "followup_templates": [
+            "Hola 😊 \\u00A1Genial! Te explico un poco como funciona para que te empiecen a entrar citas extra 🚀\nEs super simple:\n\n\\u2705 Yo pongo la publi\n\\u2705 Yo contesto los mensajes\n\\u2705 A ti solo te llegan citas listas 📅 Te aviso 20 minutos antes de que vaya un cliente, me confirmas si estas disponible y te lo mando de camino a tu localizacion.\n\\u2705 29\\u20AC una unica vez para siempre, en concepto de alta. Luego solo pagas una pequena comision por cada cliente extra que te llevamos.\n\nSi quieres arrancar HOY mismo, responde este mensaje y te digo que informacion has de enviar para empezar ya mismo 👇"
+        ],
         "recipient_blacklist": [],
         "positive_keywords": [
             "info",
@@ -113,11 +122,11 @@
         "auto_followup": 1,
         "auto_create_lead": 0,
         "created_at": "2026-04-01 10:51:22",
-        "updated_at": "2026-05-07 14:15:01",
-        "last_run_at": "2026-05-07 13:45:21",
-        "next_run_at": "2026-05-07 14:52:49",
-        "last_line_id": "tf_de558a13",
-        "last_target_phone": "34671577315",
+        "updated_at": "2026-05-11 12:56:01",
+        "last_run_at": "2026-05-11 12:55:20",
+        "next_run_at": "2026-05-11 13:35:49",
+        "last_line_id": "tf_f500d7c3",
+        "last_target_phone": "34631974561",
         "last_result": "send_ok",
         "last_error": ""
     },
@@ -127,12 +136,12 @@
         "nombre": "Plaza",
         "enabled": 1,
         "priority": 100,
-        "daily_target_percent": 31.2,
+        "daily_target_percent": 19.8,
         "daily_target_absolute": 0,
         "window_start_hour": 9,
         "window_end_hour": 23,
-        "min_interval_seconds": 1947,
-        "max_interval_seconds": 2635,
+        "min_interval_seconds": 3060,
+        "max_interval_seconds": 4140,
         "source_type": "mysql_recent",
         "source_queue_files": [],
         "source_phone_field": "group_key",
@@ -146,8 +155,12 @@
             "tf_f500d7c3",
             "tf_5ebfef80"
         ],
-        "message_templates": [],
-        "followup_templates": [],
+        "message_templates": [
+            "Holaa guapa 😊 Soy de Casa Burriana. Ahora hay muchisimo curro porque varias se han ido de vacaciones 🔥 Tenemos hueco ya. Puedes venir en plaza 60/40 (15-21 dias, renovable) o en alquiler baratito si vas por tu cuenta 🏠 \\u00BFTe cuento por aqui sin compromiso? 😘"
+        ],
+        "followup_templates": [
+            "Holaa 😊\nTenemos casa grande y tranquila, limpieza diaria, varios banos, wifi + smartTV, sabanas/toallas y buen ambiente 🏠\\u2728\n\\u00BFQue te interesa mas para entrar: PLAZA (compartida) o ALQUILER (habitacion privada)?\nO si quieres, te paso las 2 opciones en 2 mensajitos. Ya me dices que prefieres carino 😘"
+        ],
         "recipient_blacklist": [],
         "positive_keywords": [
             "info",
@@ -172,11 +185,11 @@
         "auto_followup": 1,
         "auto_create_lead": 0,
         "created_at": "2026-04-01 10:51:22",
-        "updated_at": "2026-05-07 14:15:01",
-        "last_run_at": "2026-05-07 12:59:20",
-        "next_run_at": "2026-05-07 14:29:34",
+        "updated_at": "2026-05-11 12:56:01",
+        "last_run_at": "2026-05-11 12:53:34",
+        "next_run_at": "2026-05-11 14:50:42",
         "last_line_id": "tf_de558a13",
-        "last_target_phone": "34613625513",
+        "last_target_phone": "34613896420",
         "last_result": "send_ok",
         "last_error": ""
     },
@@ -186,17 +199,17 @@
         "nombre": "Publicista",
         "enabled": 1,
         "priority": 100,
-        "daily_target_percent": 12.1,
+        "daily_target_percent": 14.8,
         "daily_target_absolute": 0,
         "window_start_hour": 8,
         "window_end_hour": 23,
-        "min_interval_seconds": 5100,
-        "max_interval_seconds": 6900,
+        "min_interval_seconds": 4172,
+        "max_interval_seconds": 5646,
         "source_type": "jsonl_queue",
         "source_queue_files": [
-            "\/var\/www\/html\/atupuerta\/control\/data\/comercial_queues\/publicista_1.jsonl",
-            "\/var\/www\/html\/atupuerta\/control\/data\/comercial_queues\/publicista_2.jsonl",
-            "\/var\/www\/html\/atupuerta\/control\/data\/comercial_queues\/publicista_3.jsonl"
+            "/var/www/html/atupuerta/control/data/comercial_queues/publicista_1.jsonl",
+            "/var/www/html/atupuerta/control/data/comercial_queues/publicista_2.jsonl",
+            "/var/www/html/atupuerta/control/data/comercial_queues/publicista_3.jsonl"
         ],
         "source_phone_field": "group_key",
         "source_mysql_host": "localhost",
@@ -209,8 +222,12 @@
             "tf_f500d7c3",
             "tf_5ebfef80"
         ],
-        "message_templates": [],
-        "followup_templates": [],
+        "message_templates": [
+            "Hola! 👋 Una pregunta: \\u00BFtienes contacto con casas de citas? (publicista, fotografo, RRPP, comercial, taxista, agencia\\u2026)\n\nTe cuento: CasaWasap es un \"telefonista\" con IA que lleva el WhatsApp 24/7 como si fuera alguien de la casa (tono natural), calienta la conversacion y solo avisa cuando hay una visita seria con tiempo de llegada.\n\n💸 Tu solo haces la presentacion (abrir la puerta) y te llevas comision alta + comision mensual recurrente por cada casa activa.\n\\u2705 Sin soporte \\u2022 \\u2705 Sin herramientas \\u2022 \\u2705 Nosotros cerramos, configuramos y damos soporte\n\n📌 En 1 minuto ves como funciona y las comisiones como colaborador:\n👉 https://casawasap.com/seller.html\n\nY aqui tienes la demo para probarlo haciendo de cliente:\n👉 https://casawasap.com\n\nSi te encaja, respondeme \"INFO\" y te explico el resto \\u263A\\uFE0F"
+        ],
+        "followup_templates": [
+            "Hola 👋\nCasaWasap contesta los telefonos de tu casa todo el dia (24/7), mantiene el hilo y filtra curiosos: a ti te llega solo aviso de los que tienen intencion real de ir \\u2705\n\nSi tienes estas en contacto con casas de citas, te puedes sacar un buen extra por cada casa que hagas de intermediador. 100\\u20AC fijos mensuales por cada una.\n\nAl ser algo tan novedoso, es mejor explicar todas las ventajas en voz. Si te va bien, hacemos una llamada de 5 min y te explico todo un poco mas"
+        ],
         "recipient_blacklist": [],
         "positive_keywords": [
             "info",
@@ -235,11 +252,11 @@
         "auto_followup": 1,
         "auto_create_lead": 0,
         "created_at": "2026-04-01 10:51:22",
-        "updated_at": "2026-05-07 14:15:01",
-        "last_run_at": "2026-05-07 12:15:19",
-        "next_run_at": "2026-05-07 15:34:14",
+        "updated_at": "2026-05-11 12:56:01",
+        "last_run_at": "2026-05-11 12:53:51",
+        "next_run_at": "2026-05-11 15:19:46",
         "last_line_id": "tf_f500d7c3",
-        "last_target_phone": "34625600933",
+        "last_target_phone": "34613832410",
         "last_result": "send_ok",
         "last_error": ""
     }
