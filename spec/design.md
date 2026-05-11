@@ -393,3 +393,151 @@ Comportamiento:
 
 ### Resultado esperado de F7
 Queda definido un marco de calibración y guardrails trazable para evolucionar reglas de CX2 con riesgo acotado y preparar cierre de aceptación en F8.
+
+## Diseño CX2-F8 — Cierre y aceptación
+
+### Objetivo de diseño
+Cerrar formalmente la fase documental CX2 con métricas de éxito de negocio y operación, un checklist de consistencia documental completo (F1→F8) y criterios de aprobación de cierre con evidencias exigibles. Sin cambios de runtime en esta fase.
+
+### Métricas de éxito de negocio (aceptación comercial)
+
+1. **Tasa de precisión en escalado (`escalation_precision`)**
+   - Definición: `handoffs_aceptados_por_comercial / total_handoffs_generados_por_cx2` en ventana de evaluación.
+   - Objetivo mínimo: `>= 70%`.
+   - Fuente de verdad: trazabilidad F5 (handoff creado) + F6 (confirmación humana `confirmar_handoff`).
+   - Umbral de rechazo: `< 50%` sostenido en 2 ciclos de calibración F7.
+
+2. **Cobertura de leads calientes detectados (`hot_lead_recall`)**
+   - Definición: `leads_calientes_detectados_por_cx2 / total_leads_calientes_revisados` en ventana, donde "total revisados" incluye los escalados por vía operativa alternativa.
+   - Objetivo mínimo: `>= 60%` en revisión mensual F7.
+   - Nota: métrica dependiente de disponer de fuente externa de verificación (feedback operativo de F6).
+
+3. **Impacto en tiempo de respuesta comercial (`time_to_handoff`)**
+   - Definición: minutos transcurridos entre primera señal explícita positiva y `handoff_id` creado.
+   - Objetivo operativo: mediana `<= 120 min` en franja operativa (08:00-20:00 UTC).
+   - Fuente de verdad: `last_positive_at` en payload F5 + `created_at` de handoff.
+
+4. **Ratio de sobre-escalado percibido (`perceived_over_escalation`)**
+   - Definición: `handoffs_corregidos_como_no_interes / total_handoffs` en ventana, donde "corregidos" proviene de acción humana `corregir_clasificacion` en F6 con corrección a estado no-caliente/descartado.
+   - Objetivo: `<= 15%`.
+   - Complementa `over_escalation_rate` de F7 con perspectiva operativa humana.
+
+5. **Tasa de bloqueo efectivo (`blocking_effectiveness`)**
+   - Definición: ausencia de handoffs generados con señal de bloqueo activa (`signal_class=bloqueo` u `opt_out_request`).
+   - Objetivo absoluto: `0 incidentes`.
+   - Incumplimiento => `breach` inmediato según F7.
+
+### Métricas de éxito de operación (aceptación técnica)
+
+1. **Consistencia documental completa (`doc_consistency_score`)**
+   - Definición: número de reglas contractuales F1-F8 verificadas sin contradicción / total de reglas verificables.
+   - Objetivo: `100%` para cierre.
+   - Herramienta: checklist F8 de consistencia (ver abajo).
+
+2. **Cobertura de auditoría por evaluación (`audit_trail_completeness`)**
+   - Definición: evaluaciones con `assessment_id` que poseen sello de auditoría completo (F4) y trazabilidad de reglas (F4).
+   - Objetivo: `100%` de evaluaciones post-cierre documental.
+
+3. **Integridad de versionado de artefactos (`artifact_version_integrity`)**
+   - Definición: existencia de versiones canónicas documentadas para:
+     - `scoring_model_version`
+     - `signal_weight_catalog_version`
+     - `escalation_policy_version`
+     - `contract_version`
+   - Objetivo: todos los artefactos con hash/referencia inmutable en el momento de cierre.
+
+4. **Reproducibilidad de decisión (`decision_reproducibility`)**
+   - Definición: capacidad de reconstruir cualquier `assessment_id` de muestra usando mismas señales, pesos y reglas versionadas.
+   - Objetivo: `100%` de la muestra aleatoria de validación (mínimo 10 evaluaciones).
+
+5. **Preparación para Fase 3 operativa (`phase3_readiness`)**
+   - Definición: se cumplen todas las precondiciones documentales de CX2-F8 para que una futura implementación de runtime pueda realizarse sin ambigüedad.
+   - Objetivo: checklist F8 completo al 100%.
+
+### Checklist de consistencia documental final F1 → F8
+
+Cada ítem debe verificarse como `OK`/`NC` (no conformidad) antes del cierre. Una NC bloquea la firma.
+
+| # | Fase | Ítem de verificación | Evidencia requerida |
+|---|---|---|---|
+| 1 | F1 | Estados canónicos (`sin_datos|frio|templado|caliente|descartado`) son conjunto cerrado en design ↔ contracts. | Coincidencia literal entre `spec/design.md` §Diseño CX2-F1 y `spec/contracts.md` §Contratos CX2-F1. |
+| 2 | F1 | Score en rango `0..100`, entero, coexiste con `motivo_principal` obligatorio en cambios de tramo. | Contracts F1 §Contrato de score de interés + §Reglas contractuales de transición. |
+| 3 | F1 | Reglas de escalado F1 (`caliente` o `score>=75`+intención) consistentes con F5. | Contracts F1 §Reglas contractuales de escalado vs. Contracts F5 §Contrato de elegibilidad. Sin contradicción. |
+| 4 | F2 | Catálogo de señales cerrado (`positiva|neutra|negativa|bloqueo`), mismo en design y contracts. | Design F2 §Taxonomía canónica ↔ Contracts F2 §Taxonomía de señales. |
+| 5 | F2 | `InterestSignalNormalized` tiene campos obligatorios idénticos en design y contracts. | Design F2 §Normalización mínima ↔ Contracts F2 §Contrato de señal normalizada. |
+| 6 | F2 | Señales de bloqueo (`block_keyword|opt_out_request|abusive_content`) fuerzan `descartado` en F1/F3/F5 consistentemente. | Contracts F2 §Reglas de precedencia + Contracts F3 §Contrato de dominancia de bloqueo + Contracts F5 §Exclusiones contractuales. |
+| 7 | F3 | Pesos base por señal de design coinciden con valores en contracts (misma tabla semántica). | Design F3 §Ponderaciones base vs. Contracts F3 §Contrato de ponderaciones base. |
+| 8 | F3 | Fórmula de scoring (`contrib_i`, `score_raw`, `score_interes`) sin ambigüedad entre design y contracts. | Design F3 §Fórmula de scoring ↔ Contracts F3 §Contrato de cálculo de `score_interes`. |
+| 9 | F3 | Semividas de recencia (`positiva=120h`, `neutra=72h`, `negativa=240h`) iguales en design y contracts. | Comparación literal en ambos documentos. |
+| 10 | F3 | Histeresis (`52/47` medio↔bajo, `78/72` alto↔medio) igual en design y contracts. | Design F3 §Tramos + Contracts F3 §Contrato de tramos y transición. |
+| 11 | F3 | Dominancia de bloqueo (`estado=descartado`, `score=0`, `escalado=false`) idéntica en design y contracts. | Design F3 §Reglas de dominancia ↔ Contracts F3 §Contrato de dominancia de bloqueo. |
+| 12 | F4 | `InterestAssessmentRecord` tiene mismo conjunto de campos obligatorios en design y contracts. | Design F4 §Estrategia de persistencia ↔ Contracts F4 §Contrato de persistencia de evaluación. |
+| 13 | F4 | Retención mínima (20 evaluaciones / 90 días) idéntica en design y contracts. | Design F4 §Retención mínima ↔ Contracts F4 §Contrato de retención mínima. |
+| 14 | F4 | `OperationalAuditStamp` con campos obligatorios completos en contracts y referenciado en design. | Contracts F4 §Contrato de auditoría operativa. |
+| 15 | F5 | `standard_hot_stable` y `fast_track_explicit_buy` con mismos umbrales en design y contracts. | Design F5 §Umbrales definitivos ↔ Contracts F5 §Contrato de elegibilidad. |
+| 16 | F5 | Hard-stops (`descartado`, `bloqueo`, `opt_out`, `score<75`) coinciden en design y contracts. | Design F5 §Exclusiones absolutas ↔ Contracts F5 §Exclusiones contractuales. |
+| 17 | F5 | Reglas anti-ruido (cooldown 24h, dedupe 30m, delta +15, guardia 120m) idénticas en design y contracts. | Design F5 §Anti-ruido ↔ Contracts F5 §Contrato anti-ruido. |
+| 18 | F6 | `PanelOperationalView` con mismos campos obligatorios en design y contracts. | Design F6 §Visualización operativa ↔ Contracts F6 §Contrato de visualización. |
+| 19 | F6 | Acciones humanas (`confirmar_handoff|corregir_clasificacion|reabrir_revision`) mismo enum cerrado en ambos documentos. | Design F6 §Acciones humanas ↔ Contracts F6 §Contrato de acciones humanas. |
+| 20 | F6 | Overrides no modifican score/estado histórico. Misma regla en design y contracts. | Design F6 (regla clave de no alteración) ↔ Contracts F6 (regla 5 de acciones humanas). |
+| 21 | F7 | Métricas de guardrails (`fp_rate`, `over_escalation_rate`, `blocked_escalation_incidents`) con mismos umbrales en design y contracts. | Design F7 §Guardrails de riesgo ↔ Contracts F7 §Contrato de métricas y guardrails. |
+| 22 | F7 | Ciclos (semanal/mensual/trimestral) con mismas reglas de decisión (`promote|hold|rollback|discard`) en design y contracts. | Design F7 §Rutina de calibración + §Criterios de revisión ↔ Contracts F7 §Contrato de ciclo + §Contrato de revisión. |
+| 23 | F7 | `promote` requiere 2 ciclos semanales en `ok` y `breach` invalida promoción. Coincidencia en design y contracts. | Design F7 §Criterios de revisión ↔ Contracts F7 §Contrato de revisión/versionado. |
+| 24 | F4-F7 | Seguridad contractual (no-trust input, minimización PII, no repudio, idempotencia, MFA, 4-eyes, tamper-evident, integridad de artefactos) presente en todas las fases donde aplica. | Cada sección de seguridad en contracts F2-F7. |
+| 25 | F8 | Métricas de éxito documentadas en design y referenciadas en contracts. | Esta sección en design ↔ contracts F8. |
+| 26 | F8 | Checklist de consistencia documental completo y trazable. | Esta tabla. Cada ítem con evidencia cruzada. |
+| 27 | General | `requirements.md` refleja correctamente el alcance de CX2-F8. | `spec/requirements.md` §Bloque CX2 lista F1-F8 con descripción de F8. |
+| 28 | General | `tasks.md` refleja todas las tareas CX2-F1..F8 completadas o en estado correcto. | `spec/tasks.md` §CX2-F8. |
+| 29 | General | `changelog.md` contiene entradas para F1-F8. | `docs/changelog.md`. |
+| 30 | General | ADRs de CX2 (003-008) existen y están en estado `Aprobada`. | `docs/adr/ADR-003` a `ADR-008`. |
+
+### Criterios de aprobación de cierre con evidencias
+
+El cierre de CX2 se aprueba cuando se cumplen **todas** las condiciones siguientes. Cada condición requiere evidencia verificable.
+
+#### A. Aprobación de negocio
+
+| Condición | Umbral | Evidencia |
+|---|---|---|
+| A1. Métricas de negocio simuladas/revisadas sobre datos históricos | `escalation_precision >= 70%`, `perceived_over_escalation <= 15%`, `blocking_effectiveness = 0 incidentes` en muestra representativa (mínimo 50 conversaciones) | Informe de simulación con trazabilidad de evaluaciones F4 y handoffs F5 sobre datos históricos, firmado por responsable comercial. |
+| A2. Alineación con flujo operativo actual | No hay contradicción entre el modelo CX2 y el proceso comercial vigente | Checklist de validación operativa firmado por responsable de operaciones. |
+| A3. Criterios de escalado revisados y aceptados por comercial | Umbrales F5 aprobados explícitamente | Acta de revisión con visto bueno de responsable comercial. |
+
+#### B. Aprobación técnica
+
+| Condición | Umbral | Evidencia |
+|---|---|---|
+| B1. Checklist de consistencia documental | 30/30 ítems en `OK` | Esta tabla completada y firmada. |
+| B2. Reproducibilidad de decisión | 10/10 evaluaciones de muestra reconstruibles con mismas señales + reglas | Informe de reproducibilidad con `assessment_id`, señales de entrada, score resultante y hash de versión de reglas. |
+| B3. Integridad de versionado | `scoring_model_version`, `signal_weight_catalog_version`, `escalation_policy_version`, `contract_version` fijados con hash inmutable en el momento de cierre | Manifiesto de versiones (`data/cx2_closure_manifest.json`). |
+| B4. Precondición Fase 3 operativa | Ningún contrato CX2 bloquea la implementación de runtime | Declaración de readiness firmada por arquitectura. |
+| B5. Seguridad contractual validada | Todos los controles de F2-F7 revisados sin hallazgos bloqueantes | Informe de revisión de seguridad contractual. |
+
+#### C. Aprobación de gobierno
+
+| Condición | Umbral | Evidencia |
+|---|---|---|
+| C1. ADR-008 aprobada | Estado `Aprobada` | ADR-008 en `docs/adr/`. |
+| C2. Cierre firmado | Firma dual (comercial + arquitectura) | Acta de cierre CX2 con fecha, firmantes y hash de integridad documental. |
+| C3. Trazabilidad de cierre | `closure_id` único generado, inmutable y registrado | Registro en `data/cx2_closure_manifest.json` con `closure_id`, `closed_at`, `approved_by[]`, `document_hash`. |
+
+### Manifiesto de cierre (`cx2_closure_manifest.json`)
+
+Estructura mínima del artefacto de cierre:
+
+- `closure_id`, `closed_at` (ISO-8601 UTC), `approved_by` (array de firmantes).
+- `contract_versions`: `scoring_model_version`, `signal_weight_catalog_version`, `escalation_policy_version`, `contract_version`.
+- `document_hashes`: SHA-256 de `spec/design.md`, `spec/contracts.md`, `spec/requirements.md`, `spec/tasks.md` en el momento de cierre.
+- `checklist_result`: resumen del checklist de 30 ítems (`ok_count`, `nc_count`, `nc_items`).
+- `business_metrics_summary`: snapshot de métricas A1-A3 con `sample_size`, `evaluation_window`, `result` y `pass`.
+- `technical_approval_summary`: snapshot de métricas B1-B5 con `result` y `pass`.
+- `governance_summary`: referencia a ADR-008, `closure_id` y firmas digitales.
+
+### Fuera de alcance en CX2-F8
+- Implementación de runtime de CX2 (pertenece a fase posterior, post-cierre documental).
+- Ejecución real de calibración F7 sobre datos vivos (F7 es marco; F8 solo exige simulaciones sobre históricos).
+- Cambios en código existente del CRM (`index.php`, `app/*.php`, cron, webhooks).
+- Migración de datos reales a tablas CX2.
+
+### Resultado esperado de F8
+Queda cerrada la fase documental de CX2 con métricas de aceptación claras, un checklist de consistencia verificable y criterios de aprobación con evidencias trazables. El bloque CX2 queda listo para implementación técnica de runtime en fase posterior, con bajo riesgo de ambigüedad contractual.

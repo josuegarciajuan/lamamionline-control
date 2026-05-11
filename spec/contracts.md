@@ -512,3 +512,117 @@ Reglas:
 8. Artefacto de dataset con hash inválido => rechazo.
 9. Autoaprobación de cambio crítico => denegada.
 10. Regresión F1-F6 mantiene consistencia contractual.
+
+## Contratos de comportamiento CX2-F8
+
+### Contrato de métricas de éxito de negocio (`BusinessSuccessMetrics`)
+
+Campos obligatorios en informe de aceptación:
+- `evaluation_window_start`, `evaluation_window_end` (ISO-8601 UTC)
+- `sample_size` (int >= 50)
+- `escalation_precision` (decimal `0..1`)
+- `hot_lead_recall` (decimal `0..1`, nullable si fuente externa no disponible)
+- `time_to_handoff_median_minutes` (int >= 0)
+- `perceived_over_escalation` (decimal `0..1`)
+- `blocking_incidents` (int, debe ser `0`)
+- `generated_at`, `generated_by`, `trace_id`
+
+Reglas:
+1. `escalation_precision < 0.50` sostenido en 2 ciclos F7 => bloqueo de aceptación.
+2. `blocking_incidents > 0` => `breach` inmediato, cierre denegado.
+3. Métricas deben calcularse sobre misma muestra evaluable (no poblaciones dispares por métrica).
+4. Cualquier métrica sin dato debe declararse `unavailable` con motivo documentado.
+
+### Contrato de métricas de éxito de operación (`OperationalSuccessMetrics`)
+
+Campos obligatorios en informe de aceptación:
+- `doc_consistency_score` (decimal `0..1`, debe ser `1.00`)
+- `audit_trail_completeness` (decimal `0..1`, debe ser `1.00`)
+- `artifact_version_integrity` (boolean, debe ser `true`)
+- `decision_reproducibility` (decimal `0..1`, debe ser `1.00`)
+- `phase3_readiness` (boolean, debe ser `true`)
+- `generated_at`, `generated_by`, `trace_id`
+
+Reglas:
+1. `doc_consistency_score < 1.00` bloquea la firma (ítem NC en checklist).
+2. `decision_reproducibility < 1.00` bloquea la firma (ambigüedad en reglas).
+3. `phase3_readiness = false` bloquea el cierre (precondición no satisfecha).
+
+### Contrato de checklist de consistencia documental (`ClosureConsistencyChecklist`)
+
+Campos obligatorios por ítem:
+- `item_number` (int `1..30`)
+- `phase` (string: `F1|F2|F3|F4|F5|F6|F7|F8|General`)
+- `description` (string)
+- `result` (enum: `OK|NC`)
+- `evidence_ref` (string: ruta de documento + sección)
+- `reviewed_by`, `reviewed_at` (ISO-8601 UTC)
+
+Reglas:
+1. El checklist completo (30 ítems) debe ejecutarse en cada intento de cierre.
+2. Una sola `NC` bloquea la firma del acta de cierre.
+3. Cada `NC` debe acompañarse de `remediation_plan` antes de reintentar cierre.
+4. El resultado agregado (`ok_count`, `nc_count`, `nc_items[]`) forma parte del manifiesto de cierre.
+
+### Contrato de aprobación de cierre (`ClosureApproval`)
+
+Campos obligatorios del acta de cierre:
+- `closure_id` (string único)
+- `closed_at` (ISO-8601 UTC)
+- `approved_by` (array, mínimo 2 entradas: responsable comercial + responsable arquitectura)
+- `contract_version` (string)
+- `scoring_model_version` (string)
+- `signal_weight_catalog_version` (string)
+- `escalation_policy_version` (string)
+- `checklist_result` (objeto: `ok_count`, `nc_count`, `nc_items[]`)
+- `business_metrics_pass` (boolean)
+- `operational_metrics_pass` (boolean)
+- `document_hash` (string: SHA-256 del agregado documental en el momento de cierre)
+- `trace_id` (string)
+
+Reglas:
+1. Aprobación requiere `checklist_result.ok_count = 30`.
+2. Aprobación requiere `business_metrics_pass = true` y `operational_metrics_pass = true`.
+3. Firma dual obligatoria: al menos un firmante de negocio (`role=comercial`) y uno técnico (`role=arquitectura`).
+4. `document_hash` vincula inmutablemente el acta al estado documental del cierre.
+5. El `closure_id` se genera una única vez y no se reutiliza en reintentos (nuevo intento => nuevo `closure_id`).
+
+### Contrato de manifiesto de cierre (`ClosureManifest`)
+
+Campos obligatorios del artefacto persistible (`data/cx2_closure_manifest.json`):
+- `closure_id` (string)
+- `closed_at` (ISO-8601 UTC)
+- `approved_by` (array de `{name, role, signed_at}`)
+- `contract_versions` (objeto: `contract_version`, `scoring_model_version`, `signal_weight_catalog_version`, `escalation_policy_version`)
+- `document_hashes` (objeto: `design_md`, `contracts_md`, `requirements_md`, `tasks_md`)
+- `checklist_summary` (objeto: `ok_count`, `nc_count`)
+- `business_metrics_summary` (objeto: `sample_size`, `evaluation_window`, `escalation_precision`, `perceived_over_escalation`, `blocking_incidents`, `pass`)
+- `operational_metrics_summary` (objeto: `doc_consistency_score`, `decision_reproducibility`, `phase3_readiness`, `pass`)
+- `governance_summary` (objeto: `adr_008_status`, `approval_type`=`dual_signature`)
+- `trace_id` (string)
+
+Reglas:
+1. El manifiesto es inmutable lógico una vez cerrado (append-only en destino).
+2. Cualquier modificación post-cierre del manifiesto debe generar un nuevo `closure_id` con referencia al anterior (`supersedes_closure_id`).
+3. El manifiesto debe ser verificable contra los `document_hashes` registrados (tamper-evident).
+
+### Seguridad contractual obligatoria (F8)
+
+1. Firma del acta de cierre debe ser verificable (hash documental + identidad de firmantes trazable).
+2. El manifiesto de cierre debe almacenarse con integridad protegida (hash propio verificable).
+3. Las evidencias de aceptación (simulaciones, checklist, informes) deben conservarse junto al manifiesto con referencias inmútables.
+4. El proceso de cierre debe respetar separación de funciones: quien ejecuta el checklist no puede ser el único firmante del acta.
+5. Cualquier reapertura post-cierre (post-implementación de runtime) debe generar nuevo `closure_id` con trazabilidad completa del motivo de reapertura.
+
+### Casos de prueba manuales mínimos F8
+
+1. Checklist de 30 ítems ejecutado con `OK` en todos => cierre aprobable.
+2. Checklist con al menos una `NC` => cierre bloqueado hasta `remediation_plan` ejecutado.
+3. `blocking_incidents > 0` => `breach`, cierre denegado independientemente del resto de métricas.
+4. `escalation_precision < 0.50` en simulación con >=50 conversaciones => no se alcanza umbral de negocio.
+5. `doc_consistency_score < 1.00` => cierre bloqueado por ambigüedad contractual.
+6. `decision_reproducibility < 1.00` => cierre bloqueado por reglas no determinísticas.
+7. Manifiesto de cierre sin `business_metrics_pass=true` y `operational_metrics_pass=true` => acta inválida.
+8. Acta firmada por un solo rol (sin dualidad comercial + arquitectura) => cierre no válido.
+9. `document_hashes` no coinciden con el estado actual de los archivos => integridad comprometida, cierre inválido.
+10. Regresión completa F1-F7: todos los contratos previos se mantienen sin cambios ni contradicciones introducidas por F8.

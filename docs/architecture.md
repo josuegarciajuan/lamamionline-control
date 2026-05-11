@@ -29,4 +29,5 @@
 - **CX2-F5 (completada):** reglas operativas de escalado con umbrales estables, anti-ruido/anti-duplicado y payload mínimo de handoff humano, manteniendo enfoque documental sin cambios runtime.
 - **CX2-F6 (completada):** integración documental en panel con vista operativa de estado/score/prioridad, acciones humanas controladas y trazabilidad de overrides manuales.
 - **CX2-F7 (completada):** ciclo documental de calibración y guardrails con límites de riesgo medibles, versionado de reglas y decisiones de promoción/rollback auditables.
+- **CX2-F8 (completada):** cierre documental del bloque CX2 con métricas de aceptación, checklist de consistencia F1-F8, acta de aprobación dual y manifiesto inmutable. Las 8 fases CX2 quedan cerradas como especificación trazable lista para implementación.
 - Decisión técnica asociada: introducir una capa lógica de `InterestSignalNormalized` como interfaz estable entre ingestión de eventos y motor de scoring.

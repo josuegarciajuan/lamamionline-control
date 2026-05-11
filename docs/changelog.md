@@ -116,3 +116,45 @@ Cerrar la integración documental entre decisiones CX2 y operación diaria del p
 
 ### Motivo
 Establecer un marco de calibración trazable y conservador para evolucionar reglas sin comprometer estabilidad operativa antes del cierre de aceptación en F8.
+
+## 2026-05-11 · CX2-F8 — Cierre y aceptación documental
+
+### Cambios
+- Se definieron métricas de éxito documental de negocio (`escalation_precision`, `hot_lead_recall`, `time_to_handoff_median`, `perceived_over_escalation`, `blocking_incidents`) y de operación (`doc_consistency_score`, `audit_trail_completeness`, `decision_reproducibility`, `phase3_readiness`).
+- Se formalizó en `spec/contracts.md` el acta de cierre `ClosureApproval` con firma dual, `ClosureConsistencyChecklist` de 30 ítems y `ClosureManifest` inmutable con hash documental.
+- Se documentó en `spec/design.md` el diseño de cierre con checklist de consistencia F1-F8, criterios de aprobación (negocio, técnico, gobierno) y métricas de aceptación.
+- Se incorporaron controles de seguridad para integridad de evidencias, segregación de funciones en la firma y anti-tampering del manifiesto.
+- Se añadió `ADR-008` con la decisión de cierre formal del bloque CX2.
+- Se ejecutó la checklist final de consistencia documental verificando trazabilidad completa F1-F7 en los artefactos spec.
+- Se marcó `CX2-F8` como completada en `spec/tasks.md`, cerrando las 8 fases del bloque CX2 a nivel documental SDD.
+
+### Motivo
+Formalizar la finalización del bloque CX2 como paquete documental completo, consistente y listo para implementación de runtime sin deuda especificativa.
+
+## 2026-05-11 · CX2-F8 — Cierre y aceptación (auditado)
+
+### Cambios
+- Se auditó el gap contractual↔runtime: CX2-F1 a CX2-F7 están en fase SDD (spec-only); F8 no dispone de métricas operativas reales hasta que exista implementación. El cierre documental es precondición, no sustituto.
+- Se auditaron riesgos residuales P0/P1 del código real (`app/auth.php`, `app/db.php`, `DATA_PATH/users.json`) con impacto directo en trazabilidad, no-repudio y segregación de funciones exigidos por CX2.
+- Se formalizaron en `spec/contracts.md` los contratos CX2-F8 distribuidos en 6 bloques (A–F):
+  - **A** — `CX2AcceptanceMetrics`: acta de aceptación con métricas de negocio, operación y seguridad, incluyendo gates obligatorios (`credentials_in_code=false`, `plaintext_passwords=false`, `guardrails_status=ok`).
+  - **B** — `CX2SecurityClosureChecklist`: 17 ítems de seguridad pre-cierre (SEC-01 a SEC-17) cubriendo credenciales, RBAC, segregación 4-eyes, integridad de evidencias, minimización PII y seguridad contractual CX2.
+  - **C** — `CX2EvidencePackage`: paquete de evidencias con SHA-256 del contenido completo, 8 artefactos mínimos obligatorios y verificación de integridad por `artifact_hash`.
+  - **D** — `CX2ApprovalRecord`: aprobación con segregación de funciones (2+ aprobadores, roles distintos al requester, MFA para overrides críticos, recusación por conflicto, caducidad temporal).
+  - **E** — Trazabilidad de cierre: secuencia inmutable de eventos (`acceptance_generated → checklist_completed → evidence_packaged → approval_granted → closure_finalized`), append-only.
+  - **F** — Métricas complementarias de negocio/operación refinadas y `CX2ClosureManifest` como artefacto persistible (`DATA_PATH/cx2_closure_manifest.json`) con hash documental y firma dual.
+- Se añadieron 12 casos de prueba manuales mínimos de F8 cubriendo escenarios de aceptación, checklist, integridad de evidencias, segregación de funciones y regresión F1-F7.
+- Se actualizó `docs/changelog.md` y se referenció ADR-008. `spec/tasks.md` marca CX2-F8 como completada.
+
+### Riesgos residuales documentados al cierre
+| ID | Riesgo | Severidad | Estado |
+|----|--------|-----------|--------|
+| R01 | Gap spec↔runtime: contratos F1-F7 sin implementación | CRITICAL (A04) | Aceptado con condición: cierre documental no sustituye validación de runtime |
+| R02 | Contraseñas en texto plano (`DATA_PATH/users.json`) | CRITICAL (A02) | Exigido en SEC-01 como gate de aceptación |
+| R03 | Credenciales DB hardcodeadas (`app/db.php`) | CRITICAL (A02) | Exigido en SEC-02 como gate de aceptación |
+| R04 | Auto-login por IP whitelist sin RBAC | HIGH (A01) | Exigido en SEC-03; deshabilitable |
+| R05 | Integridad de evidencias sin mecanismo criptográfico | HIGH (A08) | Exigido en SEC-08; hash chaining |
+| R06 | Sin RBAC ni segregación 4-eyes implementados | HIGH (A01) | Exigido en SEC-05/SEC-06 |
+
+### Motivo
+Cerrar formalmente la fase documental del bloque CX2 con contratos auditados de aceptación, seguridad y gobierno, estableciendo precondiciones verificables (P0 mitigados, checklist aprobado, firma dual) antes de autorizar la implementación técnica de runtime.

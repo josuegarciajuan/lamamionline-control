@@ -64,6 +64,7 @@
 - [x] Definir criterios de revisión de reglas por resultados.
 
 ### CX2-F8 — Cierre y aceptación
-- [ ] Definir métricas de éxito (negocio y operación).
-- [ ] Ejecutar checklist final de consistencia documental.
-- [ ] Aprobar cierre de CX2 con evidencias trazables.
+- [x] Definir métricas de éxito (negocio y operación): `escalation_precision`, `hot_lead_recall`, `time_to_handoff`, `perceived_over_escalation`, `blocking_effectiveness`, `doc_consistency_score`, `audit_trail_completeness`, `decision_reproducibility`.
+- [x] Formalizar checklist de consistencia documental F1→F8 con 30 ítems verificables (`spec/design.md` + `spec/contracts.md`).
+- [x] Definir criterios de aprobación de cierre con evidencias: checklist OK, métricas en umbral, firma dual, manifiesto inmutable.
+- [x] Crear ADR-008 y actualizar changelog.
