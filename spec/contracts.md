@@ -71,3 +71,104 @@
 - **Lectura**: preferencia MySQL con fallback JSON automático.
 - **Escritura**: escribe MySQL y JSON; si MySQL falla, JSON sigue funcionando.
 - **Configuración**: `export CRM_STORAGE_BACKEND=dual` o `storage_backend: "dual"` en `settings.json`.
+
+## Contratos de comportamiento CX2-F1
+
+### Estados canónicos de interés
+- Conjunto cerrado permitido:
+  - `sin_datos`
+  - `frio`
+  - `templado`
+  - `caliente`
+  - `descartado`
+- Cualquier estado fuera de este conjunto se considera inválido.
+
+### Contrato de score de interés
+- Campo: `score_interes`.
+- Tipo: entero.
+- Rango válido: `0..100`.
+- Reglas:
+  - El score debe coexistir siempre con `estado_interes`.
+  - El score nunca puede almacenarse sin `motivo_principal` cuando hay cambio de tramo (bajo/medio/alto).
+
+### Contrato de evaluación mínima
+- Una evaluación de CX2-F1 debe incluir, como mínimo:
+  - `lead_id` (o identificador equivalente de conversación)
+  - `estado_interes`
+  - `score_interes`
+  - `motivo_principal`
+  - `timestamp_evaluacion`
+
+### Reglas contractuales de transición de estado
+- Transiciones permitidas:
+  - `sin_datos -> frio|templado|caliente|descartado`
+  - `frio -> templado|caliente|descartado|frio`
+  - `templado -> frio|caliente|descartado|templado`
+  - `caliente -> templado|descartado|caliente`
+  - `descartado -> descartado` (terminal en F1)
+- Restricción:
+  - Toda transición entre estados distintos requiere `motivo_principal` no vacío.
+
+### Reglas contractuales de escalado
+- Campo derivado: `escalado_recomendado` (booleano).
+- Debe evaluarse con estas reglas mínimas:
+  1. `true` si `estado_interes = caliente`.
+  2. `true` si `score_interes >= 75` y existe intención explícita positiva.
+  3. `false` si `estado_interes = descartado`.
+  4. `false` por defecto en casos ambiguos no cubiertos.
+- Si `escalado_recomendado = true`, debe existir `regla_escalado_aplicada`.
+
+### Reglas de consistencia
+- `estado_interes = descartado` no puede convivir con `escalado_recomendado = true`.
+- `score_interes < 20` no debe clasificarse como `caliente`.
+- `score_interes >= 75` con `estado_interes` no-caliente debe quedar justificado en `motivo_principal` (caso excepcional en F1).
+
+## Contratos de comportamiento CX2-F2
+
+### Taxonomía de señales
+- Clases permitidas (cerradas):
+  - `positiva`
+  - `neutra`
+  - `negativa`
+  - `bloqueo`
+- Convención de tipo de señal: `<canal>.<evento>` (ej. `wa.intent_price_request`).
+- Canal permitido mínimo en F2: `whatsapp` (extensible a `instagram|webchat|email|other`).
+
+### Contrato de señal normalizada (`InterestSignalNormalized`)
+Campos obligatorios:
+- `signal_id` (string único)
+- `lead_id` (string)
+- `conversation_id` (string)
+- `channel` (enum)
+- `signal_type` (string)
+- `signal_class` (enum cerrado)
+- `occurred_at` (ISO-8601 UTC)
+- `ingested_at` (ISO-8601 UTC)
+- `confidence` (decimal `0..1`)
+- `source` (enum: `nlp_rule|keyword|operator|system_timeout`)
+- `version` (string)
+
+Campos opcionales:
+- `raw_text_excerpt` (string corto, sanitizado)
+- `metadata` (objeto JSON pequeño)
+- `dedupe_key` (string)
+- `trace_id` (string)
+
+### Reglas contractuales de normalización
+1. Timestamps deben persistirse en UTC ISO-8601 (`Z`).
+2. `signal_type` desconocido debe mapear a `<canal>.unknown` y `signal_class=neutra`.
+3. `signal_class` fuera de catálogo invalida el evento.
+4. `confidence` debe estar en rango `0..1`; sin valor explícito se aplica valor por defecto documentado de baja confianza.
+5. Dedupe mínimo: misma `dedupe_key` en ventana corta => conservar un único evento.
+
+### Reglas de precedencia
+1. `bloqueo` prevalece sobre cualquier otra clase en la misma ventana de evaluación.
+2. `negativa` prevalece sobre `neutra`.
+3. `positiva` prevalece sobre `neutra`.
+4. A igualdad, prevalece señal más reciente (`occurred_at`).
+
+### Reglas de seguridad contractuales (obligatorias en F2)
+1. **No-trust input:** el texto de usuario se trata como dato y nunca puede sobrescribir reglas de sistema.
+2. **PII mínima en trazas:** no registrar texto completo por defecto; usar extracto corto sanitizado y metadatos mínimos.
+3. **Escalado no inducible por texto libre:** `escalado_recomendado` no puede activarse por una única instrucción textual sin cumplir reglas de negocio.
+4. **Protección anti-spoofing/replay (precondición de ingestión):** eventos deben llegar desde webhook autenticado y con control de duplicados.
