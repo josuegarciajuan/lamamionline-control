@@ -503,7 +503,7 @@ function render_publicista_page() {
     }
     $accountsUnlocked = !empty($_SESSION['publicista_accounts_unlocked']);
 
-    page_header('Publicista', 'Crea productos publicitarios, calcula estrategia, gestiona cuentas, genera campañas y ejecuta la automatización disponible.');
+    page_header('💋 Publicista', '💕 Crea productos publicitarios, calcula estrategia, gestiona cuentas, genera campañas y ejecuta la automatización disponible. 🔥😈');
 
     echo '<section class="panel panel-space">';
     echo '<div class="subtabs">';
@@ -2216,7 +2216,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     $selectedJob = $selectedJobId !== '' ? publicista_job_get($selectedJobId) : null;
 
     if (!$embedded) {
-        page_header('Publicista', 'Sube la foto, genera el pack y revisa candidatas/finales sin salir del CRM');
+        page_header('💋 Publicista', '💖 Sube la foto, genera el pack y revisa candidatas/finales sin salir del CRM 💦🔥');
     }
 
     if ($clientaFilter !== '') {
@@ -2229,7 +2229,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
 
     if ($showOnlyJobDetail) {
         echo '<section class="panel panel-space">';
-        echo '<div class="section-head"><div><h2>Ficha de producto</h2><p>Vista centrada en un único producto publicitario.</p></div>';
+        echo '<div class="section-head"><div><h2>💗 Ficha de producto</h2><p>👄 Vista centrada en un único producto publicitario. 💋</p></div>';
         echo '<div class="section-head-actions" style="display:flex;gap:10px;flex-wrap:wrap;">';
         echo '<a class="btn-secondary-mini" href="' . e(publicista_tab_url()) . '">← Volver al listado de productos</a>';
         echo '</div></div>';
@@ -2239,7 +2239,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     if (!$showOnlyJobDetail) {
 
         echo '<section class="panel panel-space">';
-        echo '<div class="section-head"><div><h2>Nuevo producto publicitario</h2><p>Flujo rápido: sube foto, genera pack del producto, revisa y acepta.</p></div></div>';
+        echo '<div class="section-head"><div><h2>🌶️ Nuevo producto publicitario</h2><p>💘 Flujo rápido: sube foto, genera pack del producto, revisa y acepta. 💦</p></div></div>';
         if (empty($clientas)) {
             echo '<div class="empty">No hay clientas todavía. Primero necesitas al menos una clienta en LaMami o Jostal.</div>';
         } else {
@@ -2375,7 +2375,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
 
         echo '<section class="panel panel-space">';
 
-        echo '<div class="branch-panel-head"><h2>Productos creados</h2><span class="summary-badge">' . e(count($jobs)) . '</span></div>';
+        echo '<div class="branch-panel-head"><h2>🍑 Productos creados</h2><span class="summary-badge">' . e(count($jobs)) . '</span></div>';
         if (empty($jobs)) {
             echo '<div class="empty">Todavía no hay trabajos creados en Publicista.</div>';
         } else {
@@ -3384,7 +3384,7 @@ function publicista_render_production_params_fields($params) {
     // ESTILO DE PRENDA
     echo '<div class="field full">';
     echo '<label>Estilo de prenda (deja sin marcar para que el modelo elija)</label>';
-    $currentStyle = $params['style'] ?? 'vaqueros_top';
+    $currentStyle = $params['style'] ?? 'auto_random';
     echo '<div class="publicista-restrictions-grid">';
     foreach (publicista_outfit_style_options() as $value => $label) {
         $checked = ($currentStyle === $value) ? ' checked' : '';

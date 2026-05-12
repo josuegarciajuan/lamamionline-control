@@ -213,3 +213,22 @@ Primera fase de la feature EstadosWasap: establecer el modelo de datos, configur
 
 ### Motivo
 Eliminar el aspecto "demasiado profesional" de las fotos: persona siempre centrada, en primer plano, pose editorial. Ahora las fotos parecen tomadas por un amigo con el móvil: a veces más lejos, a veces descentradas, siempre naturales.
+
+## 2026-05-12 · Fase ropa — Ropa automática humilde y sexy, look distinto por foto (Publicista Perfiles)
+
+### Cambios
+- Se añadió opción `auto_random` como default en el selector de estilo: el sistema asigna automáticamente un look diferente por imagen desde un pool de 12 outfits.
+- Pool `publicista_cheap_sexy_outfit_pool()`: 12 combinaciones baratas y sexys (vaqueros+top, minifalda, vestido corto ceñido, shorts, leggings, body, mono, etc.).
+- Cada imagen recibe un outfit distinto vía `[ROPA PARA ESTA IMAGEN]` inyectado en el prompt de cada variante.
+- Lenguaje de tejidos actualizado: "polyester barato", "licra de mercadillo", "denim desgastado", "imitación cuero" — ropa de Primark/Shein, no de lujo.
+- Nivel `sexy` redefinido como "sexy de barrio": ceñido, escotes moderados, algo de piel — sin lencería visible, sin desnudo.
+- `publicista_build_outfit_session_lock()` adaptado para `auto_random`: instruye al modelo a usar looks diferentes por imagen en vez de forzar el mismo.
+- `publicista_build_pollo_master_prompt()`: cuando `auto_random`, el prompt indica que cada imagen lleva un look distinto asignado en `[ROPA PARA ESTA IMAGEN]`.
+- Se añadió validación whitelist de `outfit_style` en `normalize_outfit_params` (finding LOW corregido).
+- Se corrigió defensivamente el fallback de `$style` en `build_outfit_prompt_details` para no usar raw input.
+
+### Archivos
+- `app/helpers.php`, `app/publicista.php`, `app/views.php`, `docs/changelog.md`
+
+### Motivo
+Eliminar el patrón "mismo vestido corto con escote en las 4 fotos" y el aspecto de "ropa de lujo". Ahora cada imagen muestra un look diferente, barato y realista, adecuado al perfil socioeconómico del sector.

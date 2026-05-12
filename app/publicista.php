@@ -2372,7 +2372,7 @@ function publicista_build_outfit_prompt_details($job) {
     );
 
     $color = ($pp['color'] ?? 'auto') !== 'auto' ? ($colorMap[$pp['color']] ?? $pp['color']) : '';
-    $style = !empty($pp['style']) ? ($styleMap[$pp['style']] ?? $pp['style']) : 'look casual de calle realista';
+    $style = isset($styleMap[$pp['style']]) ? $styleMap[$pp['style']] : 'look casual de calle realista';
     $level = $levelMap[$pp['level'] ?? 'sexy'] ?? $levelMap['sexy'];
     $fit = $fitMap[$pp['fit'] ?? 'ajustado'] ?? 'ajustado al cuerpo';
 
@@ -2665,10 +2665,17 @@ function publicista_build_pollo_master_prompt($job) {
         $selfieLine = 'La serie puede incluir selfies realistas o fotos tipo selfie frente al espejo, con ángulo natural de móvil, sin convertir todas las tomas en primerísimo plano.';
     }
 
-    $outfitLine = 'La ropa debe basarse en lo elegido en el formulario: ' . trim((string)($outfitDetails['summary'] ?? 'look casual de calle realista'));
-    $outfitLine .= '. La ropa debe verse natural, de calle, como la que llevaría una persona normal en su día a día, no ropa de pasarela ni de sesión de fotos profesional.';
-    $outfitLine .= ' Tejidos normales (algodón, denim, punto, lino), caída natural, arrugas sutiles donde corresponda. Nada de tejidos perfectos sin textura ni ropa que parece recién comprada.';
-    $outfitLine .= ' Evita vestidos idénticos en todas las fotos: si hay varias imágenes, que la ropa varíe de forma natural entre looks cotidianos coherentes.';
+    $styleKey = trim((string)($pp['style'] ?? 'auto_random'));
+    if ($styleKey === 'auto_random') {
+        $outfitLine = 'Cada imagen de esta serie lleva un look diferente asignado automáticamente en [ROPA PARA ESTA IMAGEN] al final del prompt. NO uses la misma ropa en todas las imágenes.';
+        $outfitLine .= ' Toda la ropa debe ser BARATA y de clase humilde: poliéster de mercadillo, licra, algodón fino, denim desgastado, imitación cuero. NADA de lujo, nada de diseño, nada de marca.';
+        $outfitLine .= ' La ropa debe ser SEXY y PROVOCATIVA pero SIN cruzar el límite sexual: ceñida, escotes moderados, algo de piel (piernas, hombros, cintura). NUNCA lencería visible, NUNCA transparencias, NUNCA desnudo. Sexy de barrio, no de pasarela.';
+    } else {
+        $outfitLine = 'La ropa debe basarse en lo elegido en el formulario: ' . trim((string)($outfitDetails['summary'] ?? 'look casual de calle realista'));
+        $outfitLine .= '. La ropa debe verse natural, de calle, como la que llevaría una persona normal en su día a día, no ropa de pasarela ni de sesión de fotos profesional.';
+        $outfitLine .= ' Tejidos normales (algodón, denim, punto, lino), caída natural, arrugas sutiles donde corresponda. Nada de tejidos perfectos sin textura ni ropa que parece recién comprada.';
+        $outfitLine .= ' Evita vestidos idénticos en todas las fotos: si hay varias imágenes, que la ropa varíe de forma natural entre looks cotidianos coherentes.';
+    }
 
     $sections = array();
 
@@ -2949,6 +2956,17 @@ function publicista_build_prompt_variants($masterPrompt, $count = 6, $retryMode 
         }
     }
 
+    // ---- Pollo random outfits ----
+    $randomOutfits = array();
+    $useAutoOutfit = false;
+    if ($isPollo) {
+        $styleKey = trim((string)($pp['style'] ?? 'auto_random'));
+        $useAutoOutfit = ($styleKey === 'auto_random');
+        if ($useAutoOutfit && function_exists('publicista_pick_random_outfits')) {
+            $randomOutfits = publicista_pick_random_outfits($count);
+        }
+    }
+
     // ---- Pollo casual shots override ----
     if ($isPollo) {
         $shots = array(
@@ -3042,9 +3060,19 @@ function publicista_build_prompt_variants($masterPrompt, $count = 6, $retryMode 
             $bgNote = '[FONDO PARA ESTA IMAGEN] ' . $bg['description'] . '. IMPORTANTE: esta imagen concreta usa este fondo. La iluminación debe ser coherente con este entorno (luz natural de exterior si es exterior, luz interior si es interior).';
         }
 
+        // Inject random outfit if in auto_random mode
+        $outfitNote = '';
+        if ($useAutoOutfit && isset($randomOutfits[$i])) {
+            $o = $randomOutfits[$i];
+            $outfitNote = '[ROPA PARA ESTA IMAGEN] ' . $o['description'] . '. IMPORTANTE: esta imagen concreta lleva ESTE look, no otro. La ropa debe verse barata (poliester, licra, imitacion), ceñida y sexy de barrio, con arrugas naturales y sin aspecto de lujo.';
+        }
+
         $variantExtra = trim(implode(' ', array_filter($variantNotes)));
         if ($bgNote !== '') {
             $variantExtra = trim($variantExtra . ' ' . $bgNote);
+        }
+        if ($outfitNote !== '') {
+            $variantExtra = trim($variantExtra . ' ' . $outfitNote);
         }
         $out[] = trim($masterPrompt . "
 
@@ -8569,4 +8597,274 @@ function publicista_estados_wasap_get_bot_casa_lines() {
         }
     }
     return $lines;
+}
+
+function publicista_estados_wasap_get_waha_settings() {
+    $host = 'http://100.117.92.74';
+    $apiKey = 'local321';
+    $timeout = 30;
+    if (function_exists('comercial_get_settings')) {
+        $cs = comercial_get_settings();
+        $host = rtrim((string)($cs['waha_host'] ?? $host), '/') ?: $host;
+        $apiKey = trim((string)($cs['waha_api_key'] ?? $apiKey)) ?: $apiKey;
+        $timeout = max(10, (int)($cs['curl_timeout_sec'] ?? $timeout));
+    } else {
+        $stored = storage_read('comercial_settings.json');
+        if (is_array($stored)) {
+            $host = rtrim((string)($stored['waha_host'] ?? $host), '/') ?: $host;
+            $apiKey = trim((string)($stored['waha_api_key'] ?? $apiKey)) ?: $apiKey;
+            $timeout = max(10, (int)($stored['curl_timeout_sec'] ?? $timeout));
+        }
+    }
+    return array('waha_host' => $host, 'waha_api_key' => $apiKey, 'curl_timeout_sec' => $timeout);
+}
+
+function publicista_estados_wasap_fetch_active_girls() {
+    $cacheFile = 'publicista_estados_wasap_girls_cache.json';
+    $cacheTTL = 900;
+
+    $cached = storage_read($cacheFile);
+    if (is_array($cached) && !empty($cached['fetched_at'])) {
+        $age = time() - strtotime((string)$cached['fetched_at']);
+        if ($age < $cacheTTL && isset($cached['girls']) && is_array($cached['girls'])) {
+            return $cached['girls'];
+        }
+    }
+
+    $url = 'https://casawasap.com/girlsconf/data/girls.json';
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    $body = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+
+    if ($err !== '' || $code !== 200 || empty($body)) {
+        $expired = is_array($cached) && isset($cached['girls']) ? $cached['girls'] : array();
+        return $expired;
+    }
+
+    $decoded = json_decode($body, true);
+    $all = is_array($decoded) && isset($decoded['girls']) ? $decoded['girls'] : array();
+
+    $active = array();
+    foreach ($all as $g) {
+        if (!empty($g['activa']) && !empty($g['nombre'])) {
+            $fotos = array();
+            foreach ((array)($g['fotos'] ?? array()) as $f) {
+                $f = trim((string)$f);
+                if ($f !== '') $fotos[] = $f;
+            }
+            $active[] = array(
+                'id' => trim((string)($g['id'] ?? '')),
+                'nombre' => trim((string)($g['nombre'] ?? '')),
+                'fotos' => $fotos,
+            );
+        }
+    }
+
+    storage_write($cacheFile, array(
+        'fetched_at' => now_datetime(),
+        'girls' => $active,
+    ));
+    return $active;
+}
+
+// ─── Format builders ──────────────────────────────────────────────────────
+
+function publicista_estados_wasap_hearts() {
+    $pool = array('💋','💕','💖','💘','💗','💓','💞','❤️‍🔥','😘','🍑','✨','🔥','💫','🌹','🥂','💝','🌺','💐');
+    return $pool[array_rand($pool)];
+}
+
+function publicista_estados_wasap_pick_photos($fotos, $count) {
+    $fotos = array_values((array)$fotos);
+    if (empty($fotos)) return array();
+    if (count($fotos) <= $count) {
+        shuffle($fotos);
+        return $fotos;
+    }
+    $keys = (array)array_rand($fotos, $count);
+    $picked = array();
+    foreach ($keys as $k) $picked[] = $fotos[$k];
+    return $picked;
+}
+
+function publicista_estados_wasap_format_chicas_de_hoy($girls) {
+    if (empty($girls)) return '';
+    $h = publicista_estados_wasap_hearts();
+    $lines = array("$h Chicas de hoy $h", '');
+    foreach ($girls as $g) {
+        $foto = !empty($g['fotos']) ? $g['fotos'][array_rand($g['fotos'])] : '';
+        $lines[] = ($foto !== '') ? "{$g['nombre']}: $foto" : $g['nombre'];
+    }
+    $lines[] = '';
+    $lines[] = 'Ven a vernos amor 😘💕';
+    return implode("\n", $lines);
+}
+
+function publicista_estados_wasap_format_chica_del_dia($girls) {
+    if (empty($girls)) return '';
+    $chica = $girls[array_rand($girls)];
+    $h = publicista_estados_wasap_hearts();
+    $fotos = publicista_estados_wasap_pick_photos($chica['fotos'], 2);
+    $lines = array("🔥 Ven a disfrutar con {$chica['nombre']} $h");
+    foreach ($fotos as $f) $lines[] = $f;
+    $lines[] = '';
+    $lines[] = 'Lo pasarás rico 💖🍑';
+    return implode("\n", $lines);
+}
+
+function publicista_estados_wasap_format_duo_sexy($girls) {
+    if (empty($girls)) return '';
+    $pick = $girls;
+    shuffle($pick);
+    $duo = array_slice($pick, 0, min(2, count($pick)));
+    $h = publicista_estados_wasap_hearts();
+    $lines = array("$h Hoy te esperan... $h", '');
+    foreach ($duo as $g) {
+        $foto = !empty($g['fotos']) ? $g['fotos'][array_rand($g['fotos'])] : '';
+        $lines[] = ($foto !== '') ? "{$g['nombre']}: $foto" : $g['nombre'];
+    }
+    $lines[] = '';
+    $lines[] = 'No te lo pierdas 🍑✨';
+    return implode("\n", $lines);
+}
+
+function publicista_estados_wasap_format_catalogo_rapido($girls) {
+    if (empty($girls)) return '';
+    $nombres = array();
+    foreach ($girls as $g) $nombres[] = $g['nombre'];
+    $h = publicista_estados_wasap_hearts();
+    $lines = array(
+        "📋 Nuestro catálogo hoy:",
+        '',
+        implode(' · ', $nombres),
+        '',
+        "Todas disponibles. Pide tu cita 💬$h",
+    );
+    return implode("\n", $lines);
+}
+
+function publicista_estados_wasap_format_estrella_grupo($girls) {
+    if (empty($girls)) return '';
+    $estrella = $girls[array_rand($girls)];
+    $h = publicista_estados_wasap_hearts();
+    $fotos = publicista_estados_wasap_pick_photos($estrella['fotos'], 2);
+    $resto = array();
+    foreach ($girls as $g) {
+        if ($g['id'] !== $estrella['id']) $resto[] = $g['nombre'];
+    }
+    $lines = array("⭐ Estrella del día: {$estrella['nombre']} ⭐");
+    foreach ($fotos as $f) $lines[] = $f;
+    if (!empty($resto)) {
+        $lines[] = '';
+        $lines[] = 'También disponible: ' . implode(', ', $resto);
+    }
+    $lines[] = '';
+    $lines[] = "Ven a conocernos $h💖";
+    return implode("\n", $lines);
+}
+
+function publicista_estados_wasap_build_status_text($girls, $formato) {
+    if (empty($girls)) return '';
+    $formatos = array_keys(publicista_estados_wasap_format_options());
+
+    if ($formato === 'mix_aleatorio') {
+        $noMix = array_values(array_filter($formatos, function($f) { return $f !== 'mix_aleatorio'; }));
+        $formato = $noMix[array_rand($noMix)];
+    }
+
+    switch ($formato) {
+        case 'chica_del_dia':
+            return publicista_estados_wasap_format_chica_del_dia($girls);
+        case 'duo_sexy':
+            return publicista_estados_wasap_format_duo_sexy($girls);
+        case 'catalogo_rapido':
+            return publicista_estados_wasap_format_catalogo_rapido($girls);
+        case 'estrella_grupo':
+            return publicista_estados_wasap_format_estrella_grupo($girls);
+        default:
+            return publicista_estados_wasap_format_chicas_de_hoy($girls);
+    }
+}
+
+// ─── Publishing ───────────────────────────────────────────────────────────
+
+function publicista_estados_wasap_publish_to_line($line, $text) {
+    $settings = publicista_estados_wasap_get_waha_settings();
+    $payload = array(
+        'text' => $text,
+        'backgroundColor' => '#25D366',
+        'font' => 0,
+    );
+    $result = comercial_waha_post_json($settings, $line['waha_port'], 'api/default/status/text', $payload);
+    return $result;
+}
+
+function publicista_estados_wasap_publicar_ahora() {
+    $config = publicista_estados_wasap_get_config();
+    if (empty($config['enabled'])) {
+        return array('ok' => false, 'error' => 'Estados Wasap está desactivado.', 'results' => array());
+    }
+
+    $allLines = publicista_estados_wasap_get_bot_casa_lines();
+    $enabledIds = $config['lineas'];
+    $lines = array();
+    foreach ($allLines as $l) {
+        if (in_array($l['id'], $enabledIds, true)) $lines[] = $l;
+    }
+    if (empty($lines)) {
+        return array('ok' => false, 'error' => 'No hay líneas bot casa habilitadas.', 'results' => array());
+    }
+
+    $girls = publicista_estados_wasap_fetch_active_girls();
+    if (empty($girls)) {
+        return array('ok' => false, 'error' => 'No hay chicas activas en este momento.', 'results' => array());
+    }
+
+    $formato = $config['formato'];
+    $text = publicista_estados_wasap_build_status_text($girls, $formato);
+    if ($text === '') {
+        return array('ok' => false, 'error' => 'No se pudo generar el texto del estado.', 'results' => array());
+    }
+
+    $results = array();
+    $allOk = true;
+    foreach ($lines as $line) {
+        $pubResult = publicista_estados_wasap_publish_to_line($line, $text);
+        $ok = !empty($pubResult['ok']) && ($pubResult['http_code'] >= 200 && $pubResult['http_code'] < 300);
+        $results[] = array(
+            'linea_id' => $line['id'],
+            'linea_nombre' => $line['nombre'],
+            'ok' => $ok,
+            'http_code' => (int)($pubResult['http_code'] ?? 0),
+            'error' => $ok ? '' : trim((string)($pubResult['error'] ?? 'Error desconocido')),
+        );
+
+        publicista_estados_wasap_add_log_entry(array(
+            'published_at' => now_datetime(),
+            'linea_id' => $line['id'],
+            'linea_nombre' => $line['nombre'],
+            'formato_usado' => $formato,
+            'texto' => $text,
+            'resultado' => $ok ? 'ok' : 'error',
+            'http_code' => (int)($pubResult['http_code'] ?? 0),
+            'error' => $ok ? '' : trim((string)($pubResult['error'] ?? '')),
+        ));
+
+        if (!$ok) $allOk = false;
+    }
+
+    $total = count($results);
+    $oks = count(array_filter($results, function($r) { return !empty($r['ok']); }));
+    return array(
+        'ok' => $allOk,
+        'message' => "Publicado en $oks/$total líneas.",
+        'error' => $allOk ? '' : "Falló en " . ($total - $oks) . " línea(s).",
+        'results' => $results,
+    );
 }

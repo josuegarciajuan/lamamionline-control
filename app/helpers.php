@@ -509,6 +509,7 @@ function publicista_outfit_color_options() {
 
 function publicista_outfit_style_options() {
     return array(
+        'auto_random'   => 'Automático (el sistema asigna looks diferentes por foto)',
         'vestido_corto'  => 'Vestido corto (sobre la rodilla)',
         'vestido_largo'  => 'Vestido largo / maxi',
         'conjunto_top'   => 'Conjunto top + falda',
@@ -520,6 +521,43 @@ function publicista_outfit_style_options() {
         'falda_casual'      => 'Falda + top casual (look diario)',
         'chaqueta_casual'   => 'Chaqueta/americana + vaqueros',
     );
+}
+
+function publicista_cheap_sexy_outfit_pool() {
+    return array(
+        'vaqueros_camiseta' => 'vaqueros baratos muy ceñidos de Primark con camiseta de tirantes blanca de algodón fino de mercadillo, ajustada al cuerpo, look de calle económico y sexy',
+        'minifalda_top' => 'minifalda vaquera barata con top corto ajustado de lycra que deja ver un poco de cintura, conjunto de mercadillo favorecedor',
+        'vestido_corto_ceñido' => 'vestido corto de punto barato, muy ceñido, color liso, escote en V moderado, tejido de poliéster de mercadillo con caída natural y alguna arruga visible — sexy sin ser lujoso',
+        'shorts_camiseta' => 'shorts vaqueros cortos desgastados con camiseta básica ajustada de algodón fino, look de verano económico y provocador',
+        'falda_tubo_blusa' => 'falda de tubo barata de imitación cuero con blusa ajustada de tejido fino, look de discoteca de barrio',
+        'leggings_top' => 'leggings negros baratos muy ceñidos con top largo de lycra que cubre hasta la cadera, look deportivo sexy de gimnasio económico',
+        'mono_corto' => 'mono corto barato con escote en V moderado, tela elástica de poliéster de mercadillo, ceñido al cuerpo, una sola pieza favorecedora',
+        'body_vaqueros' => 'body de manga larga muy ceñido de licra barata con vaqueros ajustados y rotos en las rodillas, look de calle atrevido y económico',
+        'falda_crop_top' => 'falda plisada corta barata con crop top que deja ver un poco de abdomen, conjunto de imitación colegiala sexy de tienda económica',
+        'vestido_camiseta' => 'vestido camiseta ceñido de algodón barato, por encima de la rodilla, escote redondo normal, cómodo y sexy de diario',
+        'conjunto_deportivo' => 'conjunto de chándal barato muy ceñido, chaqueta abierta con top debajo, pantalón ajustado, look de gimnasio económico y sexy',
+        'vestido_saten' => 'vestido corto imitación satén barato, tirantes finos, escote moderado en pico, ceñido — imitación lencería pero es un vestido real, NO lencería',
+    );
+}
+
+function publicista_pick_random_outfits($count = 4) {
+    $pool = publicista_cheap_sexy_outfit_pool();
+    $keys = array_keys($pool);
+    $count = max(1, min((int)$count, count($keys)));
+    $picked = array();
+    $available = $keys;
+    for ($i = 0; $i < $count; $i++) {
+        if (empty($available)) break;
+        $idx = array_rand($available);
+        $key = $available[$idx];
+        $picked[] = array(
+            'key' => $key,
+            'description' => $pool[$key],
+        );
+        unset($available[$idx]);
+        $available = array_values($available);
+    }
+    return $picked;
 }
 
 function publicista_outfit_level_options() {
@@ -653,6 +691,10 @@ function publicista_normalize_outfit_params($raw) {
     $out = array();
     $out['color']        = trim((string)($raw['outfit_color'] ?? ($raw['color'] ?? 'auto')));
     $out['style']        = trim((string)($raw['outfit_style'] ?? ($raw['style'] ?? '')));
+    $allowedStyles = array_keys(publicista_outfit_style_options());
+    if ($out['style'] !== '' && !in_array($out['style'], $allowedStyles, true)) {
+        $out['style'] = 'auto_random';
+    }
     $out['level']        = trim((string)($raw['outfit_level'] ?? ($raw['level'] ?? 'sexy')));
     $out['fit']          = trim((string)($raw['outfit_fit'] ?? ($raw['fit'] ?? 'ajustado')));
     $out['setting']      = trim((string)($raw['setting_type'] ?? ($raw['setting'] ?? 'auto')));
