@@ -2622,14 +2622,17 @@ function publicista_build_pollo_master_prompt($job) {
         'pie_dinamica' => 'pose de pie con movimiento sutil, cadera viva, asimetría natural y sensación de espontaneidad',
         'sentada' => 'pose sentada elegante y favorecedora, relajada pero llamativa, con actitud segura',
         'apoyada' => 'pose apoyada en pared, espejo o mueble de forma natural, confiada y muy fotogénica',
+        'casual' => 'pose totalmente espontánea y natural, como si un amigo tomara la foto sin avisar — brazos relajados, postura cotidiana, nada de pose de modelo ni postureo, gesto natural de estar en casa o en la calle',
     );
     if (isset($poseMap[$pose])) $poseLine = $poseMap[$pose];
 
-    $framingLine = 'encuadre vertical o cuadrado natural, fotográfico y favorecedor';
+    $framingLine = 'encuadre casual de móvil, variando entre planos cercanos y lejanos, a veces descentrado, como fotos reales tomadas por una persona normal — nada de composición profesional perfecta';
     $framingMap = array(
         'entero' => 'encuadre de cuerpo entero, de cabeza a pies, con aire suficiente alrededor y sin cortar manos ni pies',
         'medio' => 'encuadre medio o tres cuartos corto, centrado en rostro, torso y actitud',
         'tres_cuartos' => 'encuadre tres cuartos, dejando ver bien silueta, ropa y gesto corporal',
+        'lejano' => 'encuadre con la persona más alejada de la cámara, viéndose mucho espacio y entorno alrededor, como foto casual de móvil donde el fotógrafo está a 2-3 metros — nada de retrato cercano ni primer plano',
+        'descentrado' => 'encuadre donde la persona NO está en el centro de la imagen sino desplazada a un lado, dejando espacio vacío en el otro lado — como foto casual mal encuadrada de móvil',
     );
     if (isset($framingMap[$framing])) $framingLine = $framingMap[$framing];
 
@@ -2885,6 +2888,10 @@ function publicista_build_prompt_variants($masterPrompt, $count = 6, $retryMode 
         $shots = array_fill(0, 8, 'Plano medio, encuadre desde la cintura hacia arriba.');
     } elseif ($framingPref === 'tres_cuartos') {
         $shots = array_fill(0, 8, 'Plano tres cuartos, encuadre desde las rodillas hacia arriba.');
+    } elseif ($framingPref === 'lejano') {
+        $shots = array_fill(0, 8, 'Plano lejano: persona a 2-3 metros de la cámara, se ve el entorno completo.');
+    } elseif ($framingPref === 'descentrado') {
+        $shots = array_fill(0, 8, 'Plano descentrado: persona desplazada a un lado del encuadre, como foto casual de móvil.');
     } else {
         $shots = array(
             'Plano de cuerpo entero: figura completa de cabeza a pies, con una pierna ligeramente adelantada, peso sobre una cadera, un brazo separado del cuerpo y energía de campaña premium.',
@@ -2908,6 +2915,7 @@ function publicista_build_prompt_variants($masterPrompt, $count = 6, $retryMode 
         'pie_dinamica'  => 'Postura: de pie con leve movimiento de cadera, reparto de peso favorecedor, brazos vivos y pose dinámica natural.',
         'sentada'       => 'Postura: sentada elegantemente, cruce de piernas suave, espalda erguida, manos bien colocadas y actitud segura.',
         'apoyada'       => 'Postura: apoyada en la pared o en un mueble, pose relajada, confiada, editorial y con asimetría natural del cuerpo.',
+        'casual'        => 'Postura: completamente natural y espontánea, como si un amigo tomara la foto — brazos relajados, postura cotidiana, nada de pose.',
         'variado'       => '',
     );
     $poseStr = $poseExtra[$posePref] ?? '';
@@ -2920,7 +2928,7 @@ function publicista_build_prompt_variants($masterPrompt, $count = 6, $retryMode 
     );
     $expressionStr = $expressionExtra[$expressionPref] ?? '';
 
-    $isPollo = $job ? publicista_is_pollo_model(publicista_array_get($job, 'model')) : false;
+    $isPollo = $job ? (function_exists('publicista_job_uses_pollo_model') && publicista_job_uses_pollo_model($job)) : false;
 
     $randomBackgrounds = array();
     $useRandomBg = false;
@@ -2931,6 +2939,45 @@ function publicista_build_prompt_variants($masterPrompt, $count = 6, $retryMode 
         if ($useRandomBg && function_exists('publicista_pick_random_backgrounds')) {
             $randomBackgrounds = publicista_pick_random_backgrounds($count);
         }
+    }
+
+    // ---- Pollo casual shots override ----
+    if ($isPollo) {
+        $shots = array(
+            'Plano lejano: persona a 2-3 metros de la cámara, espacio vacío alrededor, se ve el entorno completo. Nada de primer plano ni retrato cercano.',
+            'Plano medio casual: persona desde la cintura hacia arriba pero ligeramente descentrada a la izquierda, con más espacio a la derecha — como foto de móvil mal encuadrada.',
+            'Plano entero casual: figura completa visible pero no perfectamente centrada, con aire desigual a los lados, piernas cortadas por el borde inferior como foto real de móvil.',
+            'Plano lejano descentrado: persona a la izquierda del encuadre, se ve la habitación entera a la derecha, como foto casual donde el fondo importa más que el encuadre perfecto.',
+            'Plano medio: desde cintura hacia arriba, con la persona ligeramente girada y no mirando a cámara — foto espontánea, no posada.',
+            'Plano entero: persona de cuerpo completo pero sin posar, caminando o en movimiento natural, foto robada sin pose.',
+            'Plano selfie: persona sosteniendo el móvil, ángulo desde abajo o ligeramente torcido, selfie real no profesional.',
+            'Plano lejano: persona pequeña en el encuadre, mucho ambiente alrededor, como foto donde la persona no es el único foco.',
+        );
+
+        $selfieShots = array(
+            'Selfie natural: persona sosteniendo el móvil con una mano, ángulo ligeramente inclinado, brazo visible, fondo de la habitación detrás — como un selfie real de WhatsApp, no producido.',
+            'Selfie de espejo: persona mirando al espejo, el móvil tapa parte de la cara, reflejo realista con el teléfono bien visible — absolutamente natural y amateur.',
+        );
+
+        // Casual pose extra for Pollo
+        $poseExtra = array(
+            'pie_estatica'  => 'Postura: de pie pero relajada, como esperando algo, peso sobre una pierna, brazos sueltos — postura cotidiana, no de modelo.',
+            'pie_dinamica'  => 'Postura: caminando o en movimiento ligero, foto espontánea — no posada.',
+            'sentada'       => 'Postura: sentada de forma natural en una silla, sofá o borde de cama, como estarías en tu casa — nada de pose editorial.',
+            'apoyada'       => 'Postura: apoyada en la pared o marco de puerta de manera relajada y cotidiana, como quien espera — informal.',
+            'casual'        => 'Postura: completamente natural y espontánea, como si no supieras que te están haciendo la foto. NADA de pose de modelo. Manos en los bolsillos, mirando el móvil, ajustándose el pelo — gestos cotidianos reales.',
+            'variado'       => '',
+        );
+        $poseStr = $poseExtra[$posePref] ?? '';
+
+        // Casual expression for Pollo
+        $expressionExtra = array(
+            'sonrisa'   => 'Expresión: sonrisa natural y espontánea, como cuando te hace gracia algo — no sonrisa de anuncio.',
+            'seria'     => 'Expresión: seria pero relajada, como mirando el móvil o pensando en algo — no pose de modelo.',
+            'sugerente' => 'Expresión: mirada segura pero natural, gesto cotidiano no forzado, como cuando alguien te mira con interés — sin cara de anuncio.',
+            'variado'   => '',
+        );
+        $expressionStr = $expressionExtra[$expressionPref] ?? '';
     }
 
     if ($isPollo) {
@@ -3764,9 +3811,7 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
     $pipelineImageModel = trim((string)(($job['models'] ?? array())['image'] ?? ''));
     $usePollo = function_exists('publicista_is_pollo_model') && publicista_is_pollo_model($pipelineImageModel);
     $masterPrompt = $usePollo ? publicista_build_pollo_master_prompt($job) : publicista_build_master_prompt($job);
-    $variants = $usePollo
-        ? array_fill(0, 4, $masterPrompt)
-        : publicista_build_prompt_variants($masterPrompt, 6, false, $job);
+    $variants = publicista_build_prompt_variants($masterPrompt, $usePollo ? 4 : 6, false, $job);
     publicista_store_prompt_master($jobId, $masterPrompt, $variants);
 
     $sourceFs = BASE_PATH . '/' . ltrim((string)publicista_array_get(publicista_array_get($job, 'source_image', array()), 'stored_path', ''), '/');

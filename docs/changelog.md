@@ -175,3 +175,22 @@ Cerrar formalmente la fase documental del bloque CX2 con contratos auditados de 
 
 ### Motivo
 Eliminar el patrón "mismo fondo en las 4 fotos" que delataba IA. Cada foto del pack recibe un fondo natural distinto automáticamente, simulando fotos reales en días y lugares diferentes.
+
+## 2026-05-12 · Fase planos — Encuadres casuales y no profesionales (Publicista Perfiles)
+
+### Cambios
+- Se añadieron opciones de encuadre `lejano` (persona a 2-3m) y `descentrado` (no centrada) al selector.
+- Se añadió pose `casual` (foto de amigo, sin pose de modelo).
+- En `publicista_build_pollo_master_prompt()`: framing y pose maps actualizados con descripciones casuales.
+- En `publicista_build_prompt_variants()`: para Pollo, los shots se reemplazan con planos lejanos, descentrados y casuales. Selfies naturales de móvil.
+- **Corregido bug crítico**: el path Pollo ahora llama a `build_prompt_variants()` (antes usaba `array_fill` con 4 prompts idénticos).
+- **Corregido**: `$isPollo` en `build_prompt_variants` ahora usa `publicista_job_uses_pollo_model()` que lee `$job['models']['image']` correctamente.
+- Se añadió validación whitelist para `framing`, `pose`, `expression`, `makeup`, `lighting` y `outfit_variety` en `normalize_outfit_params`.
+- Se añadió `lejano`/`descentrado` al branch no-Pollo para evitar caer en variado.
+- Defaults del form: encuadre `lejano`, pose `casual`.
+
+### Archivos
+- `app/helpers.php`, `app/publicista.php`, `app/views.php`, `docs/changelog.md`
+
+### Motivo
+Eliminar el aspecto "demasiado profesional" de las fotos: persona siempre centrada, en primer plano, pose editorial. Ahora las fotos parecen tomadas por un amigo con el móvil: a veces más lejos, a veces descentradas, siempre naturales.

@@ -588,6 +588,8 @@ function publicista_framing_options() {
         'entero'        => 'Plano entero (figura completa)',
         'medio'         => 'Plano medio (desde cintura)',
         'tres_cuartos'  => 'Plano tres cuartos',
+        'lejano'        => 'Lejano (persona más alejada, se ve entorno)',
+        'descentrado'   => 'Descentrado (persona no centrada, foto casual)',
     );
 }
 
@@ -598,6 +600,7 @@ function publicista_pose_options() {
         'pie_dinamica'  => 'De pie, con movimiento sutil',
         'sentada'       => 'Sentada elegante',
         'apoyada'       => 'Apoyada en pared o mueble',
+        'casual'        => 'Casual / espontánea (como foto de amigo)',
     );
 }
 
@@ -670,6 +673,31 @@ function publicista_normalize_outfit_params($raw) {
     $allowedSelfieModes = array_keys(publicista_selfie_mode_options());
     if (!in_array($out['selfie_mode'], $allowedSelfieModes, true)) {
         $out['selfie_mode'] = 'off';
+    }
+
+    $allowedFraming = array_keys(publicista_framing_options());
+    if (!in_array($out['framing'], $allowedFraming, true)) {
+        $out['framing'] = 'variado';
+    }
+    $allowedPose = array_keys(publicista_pose_options());
+    if (!in_array($out['pose'], $allowedPose, true)) {
+        $out['pose'] = 'variado';
+    }
+    $allowedExpression = array_keys(publicista_expression_options());
+    if (!in_array($out['expression'], $allowedExpression, true)) {
+        $out['expression'] = 'variado';
+    }
+    $allowedMakeup = array_keys(publicista_makeup_options());
+    if (!in_array($out['makeup'], $allowedMakeup, true)) {
+        $out['makeup'] = 'auto';
+    }
+    $allowedLighting = array_keys(publicista_lighting_options());
+    if (!in_array($out['lighting'], $allowedLighting, true)) {
+        $out['lighting'] = 'auto';
+    }
+    $allowedVariety = array_keys(publicista_outfit_variety_options());
+    if (!in_array($out['outfit_variety'], $allowedVariety, true)) {
+        $out['outfit_variety'] = 'off';
     }
 
     $rawComplements = isset($raw['outfit_complements']) && is_array($raw['outfit_complements'])

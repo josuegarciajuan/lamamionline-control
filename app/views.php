@@ -3441,7 +3441,7 @@ function publicista_render_production_params_fields($params) {
     echo '<div class="field">';
     echo '<label>Encuadre preferido</label>';
     echo '<select name="framing_pref">';
-    $currentFraming = $params['framing'] ?? 'variado';
+    $currentFraming = $params['framing'] ?? 'lejano';
     foreach (publicista_framing_options() as $value => $label) {
         $sel = ($currentFraming === $value) ? ' selected' : '';
         echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
@@ -3466,7 +3466,7 @@ function publicista_render_production_params_fields($params) {
     echo '<div class="field">';
     echo '<label>Postura preferida</label>';
     echo '<select name="pose_pref">';
-    $currentPose = $params['pose'] ?? 'apoyada';
+    $currentPose = $params['pose'] ?? 'casual';
     foreach (publicista_pose_options() as $value => $label) {
         $sel = ($currentPose === $value) ? ' selected' : '';
         echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
