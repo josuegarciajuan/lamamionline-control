@@ -515,6 +515,10 @@ function publicista_outfit_style_options() {
         'mono'           => 'Mono / jumpsuit elegante',
         'conjunto_pantalon' => 'Conjunto pantalón + blusa',
         'body_falda'     => 'Body / bodysuit + falda',
+        'vaqueros_top'      => 'Vaqueros + top/blusa casual',
+        'pantalon_camisa'   => 'Pantalón + camisa o blusa',
+        'falda_casual'      => 'Falda + top casual (look diario)',
+        'chaqueta_casual'   => 'Chaqueta/americana + vaqueros',
     );
 }
 
@@ -542,16 +546,29 @@ function publicista_outfit_complement_options() {
         'bolso'          => 'Bolso de mano pequeño',
         'cinturon'       => 'Cinturón',
         'sin_complementos' => 'Sin complementos',
+        'zapatillas'        => 'Zapatillas / deportivas',
+        'botas_planas'      => 'Botas planas',
+    );
+}
+
+function publicista_outfit_variety_options() {
+    return array(
+        'off'       => 'Misma ropa en todas las fotos',
+        'mixed'     => 'Variar entre 2-3 looks diferentes (más natural)',
     );
 }
 
 function publicista_setting_type_options() {
     return array(
         'auto'          => 'Auto (el modelo elige)',
+        'random'        => 'Aleatorio natural (fondos variados automáticamente)',
         'hotel_lujoso'  => 'Interior lujoso (hotel, salón elegante)',
         'minimalista'   => 'Interior minimalista (fondo liso, studio)',
         'calido'        => 'Interior cálido (apartamento acogedor)',
         'urbano_noche'  => 'Exterior urbano de noche',
+        'dormitorio_real' => 'Dormitorio real (habitación normal, objetos cotidianos)',
+        'salon_casa'    => 'Salón de casa (ambiente doméstico vivido)',
+        'espejo_selfie' => 'Selfie de espejo (baño o habitación con espejo)',
     );
 }
 
@@ -636,12 +653,17 @@ function publicista_normalize_outfit_params($raw) {
     $out['level']        = trim((string)($raw['outfit_level'] ?? ($raw['level'] ?? 'sexy')));
     $out['fit']          = trim((string)($raw['outfit_fit'] ?? ($raw['fit'] ?? 'ajustado')));
     $out['setting']      = trim((string)($raw['setting_type'] ?? ($raw['setting'] ?? 'auto')));
+    $allowedSettings = array_keys(publicista_setting_type_options());
+    if (!in_array($out['setting'], $allowedSettings, true)) {
+        $out['setting'] = 'auto';
+    }
     $out['lighting']     = trim((string)($raw['lighting_type'] ?? ($raw['lighting'] ?? 'auto')));
     $out['framing']      = trim((string)($raw['framing_pref'] ?? ($raw['framing'] ?? 'variado')));
     $out['pose']         = trim((string)($raw['pose_pref'] ?? ($raw['pose'] ?? 'variado')));
     $out['expression']   = trim((string)($raw['expression_pref'] ?? ($raw['expression'] ?? 'variado')));
     $out['makeup']       = trim((string)($raw['makeup_pref'] ?? ($raw['makeup'] ?? 'auto')));
     $out['selfie_mode']  = trim((string)($raw['selfie_mode'] ?? 'off'));
+    $out['outfit_variety'] = trim((string)($raw['outfit_variety'] ?? 'off'));
     $out['operator_brief'] = trim((string)($raw['operator_brief'] ?? ''));
     $out['copy_brief']   = trim((string)($raw['copy_brief'] ?? ''));
 
@@ -2086,4 +2108,43 @@ function lamamibot_build_sync_summary($telefonosIds, $clientasIds, $sync) {
     }
 
     return implode(' · ', $parts);
+}
+
+// --- Pollo.ai random natural background pool ---
+
+function publicista_natural_background_pool() {
+    return array(
+        'dormitorio_real' => 'dormitorio normal con la cama deshecha, ropa doblada en una silla, un cargador en la mesilla, ventana con luz natural entrando — aspecto de habitación real vivida, foto tomada con móvil',
+        'salon_casa' => 'salón de casa real: sofá con mantas y cojines, mesa de centro con objetos (mando a distancia, taza, revista), televisión o cuadros en la pared, una planta — ambiente doméstico auténtico',
+        'espejo_selfie' => 'selfie frente a un espejo de cuerpo entero en un dormitorio o baño real — el teléfono se intuye en la mano, el espejo tiene ligeras marcas o reflejos, se ven objetos de la habitación reflejados',
+        'playa' => 'playa o paseo marítimo de día, con gente de fondo desenfocada, arena, palmeras o edificios costeros — luz natural de exterior real',
+        'calle' => 'calle normal urbana de día, con tiendas, coches aparcados, farolas, acera — fondo de calle real con profundidad y elementos urbanos cotidianos',
+        'pared' => 'primer plano contra una pared de ladrillo visto o una pared pintada con algo de textura y desconchones — fondo urbano sencillo y realista',
+        'tienda_ropa' => 'dentro de una tienda de ropa normal, con perchas, estanterías con ropa doblada, y otras prendas colgadas al fondo — ambiente de tienda real con luz fluorescente',
+        'probador' => 'dentro de un probador de tienda, con cortina y espejo, luz de fluorescente — espacio pequeño y real, no retocado',
+        'parque' => 'banco de parque urbano, con césped y árboles detrás, gente paseando al fondo — exterior natural y relajado',
+        'cafeteria' => 'sentada en una mesa de cafetería o bar normal, con una taza delante, servilletas, el mostrador de fondo — ambiente de bar real',
+        'coche' => 'dentro de un coche normal, asiento de copiloto, se ve parte del salpicadero y la ventanilla con la calle al fondo — foto espontánea en coche',
+        'escaleras' => 'escaleras de edificio o bloque de pisos, barandilla metálica, escalones de mármol o cemento — fondo arquitectónico real de edificio normal',
+    );
+}
+
+function publicista_pick_random_backgrounds($count = 4) {
+    $pool = publicista_natural_background_pool();
+    $keys = array_keys($pool);
+    $count = max(1, min((int)$count, count($keys)));
+    $picked = array();
+    $available = $keys;
+    for ($i = 0; $i < $count; $i++) {
+        if (empty($available)) break;
+        $idx = array_rand($available);
+        $key = $available[$idx];
+        $picked[] = array(
+            'key' => $key,
+            'description' => $pool[$key],
+        );
+        unset($available[$idx]);
+        $available = array_values($available);
+    }
+    return $picked;
 }

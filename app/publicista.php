@@ -2344,6 +2344,10 @@ function publicista_build_outfit_prompt_details($job) {
         'mono'               => 'mono / jumpsuit de corte limpio, estilizado y moderno',
         'conjunto_pantalon'  => 'conjunto de pantalón y blusa con aire editorial premium',
         'body_falda'         => 'body de cobertura completa con falda de cintura alta, acabado editorial',
+        'vaqueros_top'      => 'vaqueros ajustados con top o blusa casual de calle, look diario realista y favorecedor',
+        'pantalon_camisa'   => 'pantalón de vestir fluido con camisa o blusa informal, estilo oficina moderna o calle',
+        'falda_casual'      => 'falda midi o corta informal con top básico, look diario natural sin pretensiones de pasarela',
+        'chaqueta_casual'   => 'americana o chaqueta informal sobre vaqueros y camiseta básica, estilo urbano real',
     );
     $levelMap = array(
         'discreto'  => 'atractivo editorial discreto, con cobertura elegante, silueta favorecedora, tejido opaco y estilo premium NO sexual, sin transparencias, sin ropa interior visible y sin desnudo',
@@ -2362,10 +2366,12 @@ function publicista_build_outfit_prompt_details($job) {
         'bolso'            => 'bolso de mano pequeño y refinado',
         'cinturon'         => 'cinturón fino que define la cintura',
         'sin_complementos' => 'sin complementos',
+        'zapatillas'        => 'zapatillas deportivas blancas o negras de estilo urbano',
+        'botas_planas'      => 'botas planas de diario',
     );
 
     $color = ($pp['color'] ?? 'auto') !== 'auto' ? ($colorMap[$pp['color']] ?? $pp['color']) : '';
-    $style = !empty($pp['style']) ? ($styleMap[$pp['style']] ?? $pp['style']) : 'vestido corto elegante';
+    $style = !empty($pp['style']) ? ($styleMap[$pp['style']] ?? $pp['style']) : 'look casual de calle realista';
     $level = $levelMap[$pp['level'] ?? 'sexy'] ?? $levelMap['sexy'];
     $fit = $fitMap[$pp['fit'] ?? 'ajustado'] ?? 'ajustado al cuerpo';
 
@@ -2421,9 +2427,10 @@ function publicista_build_outfit_production($job) {
 
 function publicista_build_outfit_session_lock($job) {
     $pp = function_exists('publicista_job_production_params') ? publicista_job_production_params($job) : array();
+    $varietyMode = trim((string)($pp['outfit_variety'] ?? 'off'));
     $details = publicista_build_outfit_prompt_details($job);
 
-    $styleKey = trim((string)($pp['style'] ?? 'vestido_corto'));
+    $styleKey = trim((string)($pp['style'] ?? 'vaqueros_top'));
     $fitKey = trim((string)($pp['fit'] ?? 'ajustado'));
     $levelKey = trim((string)($pp['level'] ?? 'sexy'));
     $rawComplements = is_array($pp['complements'] ?? null) ? $pp['complements'] : array();
@@ -2498,6 +2505,16 @@ function publicista_build_outfit_session_lock($job) {
 
     $strictSummary = trim($pieceSentence . ', color base ' . $color . ', ' . $fitSentence . ', ' . $fabricSentence . ', ' . $coverageSentence . ', con el mismo contraste tonal, mismos ribetes o acentos discretos y la misma lectura visual premium en toda la sesión, ' . implode(', ', $complementParts));
 
+    if ($varietyMode === 'mixed') {
+        // Modo variedad: ropa diferente pero coherente entre fotos
+        $variedSummary = trim($pieceSentence . ', color base ' . $color . ', ' . $fitSentence . ', ' . $fabricSentence . ', ' . $coverageSentence . ', con variaciones naturales entre fotos — mismo estilo general pero cambiando entre 2-3 looks distintos que compartan la misma vibra (ej: una foto con top diferente, otra con chaqueta extra, otra con accesorio distinto). Que parezca que la misma persona se hizo fotos en días distintos con ropa de su armario, no un desfile de moda.');
+        return array(
+            'strict_summary' => $variedSummary,
+            'consistency_block' => 'VARIEDAD NATURAL DE ROPA: ' . $variedSummary . '. Entre las distintas imágenes de esta serie, la ropa DEBE variar de forma natural: la mujer lleva 2-3 looks diferentes pero coherentes entre sí (mismo estilo, colores compatibles, vibra similar). Parece la misma persona en distintos momentos, no un desfile. Cada foto puede tener una prenda diferente (otro top, otra chaqueta, otro pantalón) pero manteniendo el mismo tipo de look general.',
+            'negative_block' => 'IMPORTANTE: NO uses exactamente la misma ropa en todas las fotos. Varía entre 2-3 looks distintos pero coherentes. Evita cambios radicales de estilo entre fotos.',
+        );
+    }
+
     return array(
         'strict_summary' => $strictSummary,
         'consistency_block' => 'MISMA PRENDA EXACTA EN TODA LA SESIÓN: ' . $strictSummary . '. Debe parecer literalmente una única sesión de fotos realizada el mismo día con el mismo vestuario. No cambies entre imágenes el tipo de escote, mangas, tirantes, largo, patrón, tejido, costuras, adornos, zapatos ni complementos. Mantén también los mismos acentos visuales del outfit, evitando que se simplifique a un bloque monocolor plano o genérico. No generes variantes parecidas: debe ser exactamente la misma prenda repetida en distintos encuadres.',
@@ -2509,23 +2526,27 @@ function publicista_build_setting_description($job) {
     $pp = function_exists('publicista_job_production_params') ? publicista_job_production_params($job) : array();
 
     $settingMap = array(
-        'hotel_lujoso'  => 'interior lujoso: habitación de hotel de alta gama o salón elegante con mobiliario de calidad, colores neutros y cálidos',
-        'minimalista'   => 'fondo liso de studio fotográfico, minimalista y limpio, sin distracciones',
-        'calido'        => 'interior cálido tipo apartamento acogedor, con luz de lámpara y ambiente elegante',
-        'urbano_noche'  => 'exterior urbano de noche, luces de ciudad al fondo, calle o terraza',
+        'hotel_lujoso'  => 'interior lujoso pero vivido: habitación de hotel de alta gama con una maleta abierta, un bolso sobre la cama, una copa en la mesilla, cortinas entreabiertas — aspecto real, no de catálogo ni de revista retocada',
+        'minimalista'   => 'habitación real con pared lisa de color neutro, un mueble sencillo, suelo de madera o moqueta con textura visible, sombras naturales — nada de fondo de estudio artificial ni color plano vacío',
+        'calido'        => 'interior de apartamento normal y acogedor: sofá con cojines, una lámpara de pie encendida, libros apilados, una taza sobre la mesa, objetos personales — cálido pero realista, como una foto de móvil en casa',
+        'urbano_noche'  => 'exterior urbano de noche con luces de ciudad al fondo, calle o terraza, con reflejos en cristales y farolas — ambiente nocturno real con algo de grano y textura urbana',
+        'dormitorio_real' => 'dormitorio normal con la cama deshecha, ropa doblada en una silla, un cargador en la mesilla, ventana con luz natural entrando, espejo apoyado en la pared — aspecto de habitación real vivida, foto tomada con móvil',
+        'salon_casa' => 'salón de casa real: sofá con mantas y cojines, mesa de centro con objetos (mando a distancia, taza, revista), televisión o cuadros en la pared, una planta — ambiente doméstico auténtico, no de escaparate',
+        'espejo_selfie' => 'selfie frente a un espejo de cuerpo entero en un dormitorio o baño real — el teléfono se intuye en la mano (parte visible en el reflejo), el espejo tiene ligeras marcas o reflejos, se ven objetos de la habitación reflejados detrás de la mujer',
+        'random' => 'entorno natural variado y realista, con profundidad y contexto cotidiano',
     );
     $lightingMap = array(
-        'natural'   => 'luz natural suave entrando por ventana lateral',
-        'studio'    => 'iluminación de studio con beauty light frontal y relleno suave',
-        'calida'    => 'luz cálida y envolvente de lámparas o velas, ambiente acogedor y elegante',
-        'contraluz' => 'contraluz dramático con silueta definida y halo luminoso',
+        'natural'   => 'luz natural suave entrando por ventana lateral, mezclada con luz ambiente interior — no iluminación de estudio perfecta, sino luz real de habitación',
+        'studio'    => 'iluminación suave pero con sombras reales, como un aro de luz casero o ventana grande — no iluminación de plató profesional hiperperfecta',
+        'calida'    => 'luz cálida de lámpara de pie o mesilla mezclada con algo de luz natural residual — ambiente acogedor pero con sombras naturales, no iluminación de catálogo',
+        'contraluz' => 'contraluz natural desde una ventana o puerta abierta, con la silueta suavemente iluminada por rebote de luz en paredes y objetos cercanos — dramático pero creíble',
     );
 
     $setting = $pp['setting'] ?? 'auto';
     $lighting = $pp['lighting'] ?? 'auto';
 
-    $settingStr = ($setting !== 'auto' && isset($settingMap[$setting])) ? $settingMap[$setting] : 'interior elegante y luminoso, fondo limpio y agradable';
-    $lightingStr = ($lighting !== 'auto' && isset($lightingMap[$lighting])) ? $lightingMap[$lighting] : 'luz suave, equilibrada y realista con sombras coherentes';
+    $settingStr = ($setting !== 'auto' && isset($settingMap[$setting])) ? $settingMap[$setting] : 'interior normal y realista, como una habitación o salón de casa con objetos cotidianos, texturas reales en paredes y muebles — nada de fondo de estudio genérico';
+    $lightingStr = ($lighting !== 'auto' && isset($lightingMap[$lighting])) ? $lightingMap[$lighting] : 'luz realista y coherente con mezcla de fuentes (ventana + lámpara interior), sombras naturales, sin iluminación de estudio perfecta';
 
     return array('setting' => $settingStr, 'lighting' => $lightingStr);
 }
@@ -2593,6 +2614,7 @@ function publicista_build_pollo_master_prompt($job) {
     $pose = trim((string)($pp['pose'] ?? 'variado'));
     $expression = trim((string)($pp['expression'] ?? 'variado'));
     $makeup = trim((string)($pp['makeup'] ?? 'auto'));
+    $outfitVariety = trim((string)($pp['outfit_variety'] ?? 'off'));
 
     $poseLine = 'pose femenina, segura, fotogénica y natural, evitando brazos muertos pegados al torso y evitando postura rígida de pasaporte';
     $poseMap = array(
@@ -2632,9 +2654,10 @@ function publicista_build_pollo_master_prompt($job) {
         $selfieLine = 'La serie puede incluir selfies realistas o fotos tipo selfie frente al espejo, con ángulo natural de móvil, sin convertir todas las tomas en primerísimo plano.';
     }
 
-    $outfitLine = 'La ropa debe basarse en lo elegido en el formulario: ' . trim((string)($outfitDetails['summary'] ?? 'look sexy, llamativo y elegante'));
-    $outfitLine .= '. La ropa debe verse sexy, llamativa, femenina, favorecedora y con gancho visual, pero sin lencería, sin desnudo y sin erotismo explícito.';
-    $outfitLine .= ' Debe evitar monotonía: mejor contraste visual, color con intención, textura visible, patrón o detalles de confección creíbles y look más comercial que plano.';
+    $outfitLine = 'La ropa debe basarse en lo elegido en el formulario: ' . trim((string)($outfitDetails['summary'] ?? 'look casual de calle realista'));
+    $outfitLine .= '. La ropa debe verse natural, de calle, como la que llevaría una persona normal en su día a día, no ropa de pasarela ni de sesión de fotos profesional.';
+    $outfitLine .= ' Tejidos normales (algodón, denim, punto, lino), caída natural, arrugas sutiles donde corresponda. Nada de tejidos perfectos sin textura ni ropa que parece recién comprada.';
+    $outfitLine .= ' Evita vestidos idénticos en todas las fotos: si hay varias imágenes, que la ropa varíe de forma natural entre looks cotidianos coherentes.';
 
     $sections = array();
 
@@ -2644,24 +2667,35 @@ function publicista_build_pollo_master_prompt($job) {
 
     $sections[] = '[MUJER] Una sola mujer adulta. Debe mantener parecido general claro con la referencia original, pero sin copiar identidad exacta. ' . $subject . '. Concéntrate en parecerse a la mujer real por rostro, cabello, piel, complexión y silueta, no por la ropa original.';
     $sections[] = '[ROPA Y ESTILO] ' . $outfitLine;
-    $sections[] = '[POSE Y ACTITUD] ' . $poseLine . '. ' . $expressionLine . '. Mirada viva, lenguaje corporal femenino y natural, postura atractiva y segura.';
+    $sections[] = '[POSE Y ACTITUD] ' . $poseLine . '. ' . $expressionLine . '. Mirada viva, lenguaje corporal femenino y natural, postura atractiva y segura. La pose debe sentirse espontánea, como si un amigo tomara la foto, no una modelo profesional posando en estudio. Evita poses demasiado perfectas o simétricas: mejor un gesto natural e imperfecto.';
     if ($selfieLine !== '') {
         $sections[] = '[SELFIE] ' . $selfieLine;
     }
     $sections[] = '[ENCUADRE] ' . $framingLine . '.';
-    $sections[] = '[AMBIENTE] Fondo y entorno: ' . trim((string)($envDesc['setting'] ?? 'entorno interior realista con contexto')) . '. Debe sentirse real, vivido y coherente, nunca fondo liso de estudio genérico salvo que se haya pedido minimalista.';
-    $lightingLine = trim((string)($envDesc['lighting'] ?? 'luz realista y coherente'));
-    if ($makeupLine !== '') {
-        $sections[] = '[LUZ Y ACABADO] ' . $lightingLine . '. ' . $makeupLine . '. Foto realista, nítida, con buen detalle en piel, pelo, ropa y fondo.';
+    // If random mode, use a generic line — specific backgrounds go into variants
+    $ambientKey = trim((string)($pp['setting'] ?? 'random'));
+    if ($ambientKey === 'random') {
+        $sections[] = '[AMBIENTE] Cada imagen de esta serie tendrá un fondo distinto asignado automáticamente por el sistema. La descripción del fondo específico para cada imagen se incluye al final del prompt en [FONDO PARA ESTA IMAGEN].';
     } else {
-        $sections[] = '[LUZ Y ACABADO] ' . $lightingLine . '. Foto realista, nítida, con buen detalle en piel, pelo, ropa y fondo.';
+        $sections[] = '[AMBIENTE] Fondo y entorno: ' . trim((string)($envDesc['setting'] ?? 'entorno interior realista con contexto')) . '. El entorno debe parecer una foto real tomada en un espacio cotidiano, no un montaje de estudio. Incluye objetos personales y algo de desorden sutil: texturas reales en paredes, suelo y muebles. Debe sentirse real, vivido y coherente, nunca fondo liso de estudio genérico salvo que se haya pedido minimalista.';
+    }
+    $lightingLine = trim((string)($envDesc['lighting'] ?? 'luz realista y coherente'));
+    $realismNote = 'La imagen NO debe verse generada por IA. Textura de piel con poros visibles y pequeñas imperfecciones naturales. Sin efecto plastificado ni filtro de belleza. Parece foto tomada con smartphone de gama alta por una persona normal, no foto de estudio profesional.';
+    if ($makeupLine !== '') {
+        $sections[] = '[LUZ Y ACABADO] ' . $lightingLine . '. ' . $makeupLine . '. ' . $realismNote;
+    } else {
+        $sections[] = '[LUZ Y ACABADO] ' . $lightingLine . '. ' . $realismNote;
     }
 
-    $sections[] = '[CALIDAD] Fotografía realista, auténtica y comercial. Evita aspecto soso, ropa monocolor pobre, pose rígida, expresión apagada, manos deformes, dedos extra, proporciones irreales, texto, watermark, collage, dibujos o CGI.';
+    $sections[] = '[CALIDAD] Fotografía realista, auténtica y comercial. Piel con poros y textura natural, pequeñas arrugas o líneas de expresión visibles. Sin piel lisa de maniquí ni efecto Barbie. Evita aspecto soso, ropa monocolor pobre, pose rígida, expresión apagada, manos deformes, dedos extra, proporciones irreales, texto, watermark, collage, dibujos o CGI. El resultado debe confundirse con una foto real tomada por una persona.';
     $sections[] = '[SEGURIDAD] Sexy y llamativa sí, pero siempre como glamour adulto no explícito: totalmente vestida, sin lencería visible, sin desnudo, sin transparencias íntimas, sin acto sexual ni foco fetichista.';
 
     if ($restrictions !== '') {
         $sections[] = '[RESTRICCIONES] ' . $restrictions . '.';
+    }
+
+    if ($outfitVariety === 'mixed') {
+        $sections[] = '[VARIEDAD DE ROPA] ENTRE LAS DISTINTAS IMÁGENES DE ESTA SERIE, LA ROPA DEBE VARIAR. No uses exactamente el mismo outfit en todas las fotos. Usa 2-3 looks diferentes pero del mismo estilo y vibra (ej: vaqueros con distinto top, o misma americana sobre distinta camiseta). Cada imagen debe ser visualmente distinta en cuanto a ropa se refiere. No conviertas esto en un desfile de moda — son looks cotidianos de la misma persona.';
     }
 
     return trim(implode("\n\n", array_filter($sections, function($x) {
@@ -2886,12 +2920,34 @@ function publicista_build_prompt_variants($masterPrompt, $count = 6, $retryMode 
     );
     $expressionStr = $expressionExtra[$expressionPref] ?? '';
 
-    $camera = array(
-        'Fotografía realista, estética de cámara profesional DSLR, profundidad de campo natural.',
-        'Fotografía con objetivo 85mm f/1.8, fondo ligeramente desenfocado, sujeto nítido.',
-        'Estética fotográfica natural, sin filtros ni post-proceso excesivo, proporciones humanas creíbles.',
-        'Iluminación y profundidad equilibradas, textura de piel fotográfica, sin exageraciones digitales.',
-    );
+    $isPollo = $job ? publicista_is_pollo_model(publicista_array_get($job, 'model')) : false;
+
+    $randomBackgrounds = array();
+    $useRandomBg = false;
+    if ($isPollo) {
+        $ppBg = ($job && function_exists('publicista_job_production_params')) ? publicista_job_production_params($job) : array();
+        $settingKey = trim((string)($ppBg['setting'] ?? 'random'));
+        $useRandomBg = ($settingKey === 'random');
+        if ($useRandomBg && function_exists('publicista_pick_random_backgrounds')) {
+            $randomBackgrounds = publicista_pick_random_backgrounds($count);
+        }
+    }
+
+    if ($isPollo) {
+        $camera = array(
+            'Fotografía realista de smartphone de gama alta (iPhone/Galaxy), estética natural sin retoques excesivos ni filtros, textura de cámara real con algo de ruido y grano fino.',
+            'Foto tomada con móvil en mano, ligero desenfoque de fondo natural de lente de smartphone, colores reales sin saturación artificial.',
+            'Estética de foto real de móvil, con imperfecciones sutiles de iluminación, sin post-procesado digital excesivo, proporciones humanas creíbles.',
+            'Foto espontánea como de cámara de móvil, calidad amateur pero favorecedora, con textura de piel real y ambiente doméstico cotidiano.',
+        );
+    } else {
+        $camera = array(
+            'Fotografía realista, estética de cámara profesional DSLR, profundidad de campo natural.',
+            'Fotografía con objetivo 85mm f/1.8, fondo ligeramente desenfocado, sujeto nítido.',
+            'Estética fotográfica natural, sin filtros ni post-proceso excesivo, proporciones humanas creíbles.',
+            'Iluminación y profundidad equilibradas, textura de piel fotográfica, sin exageraciones digitales.',
+        );
+    }
 
     $retryNote = $retryMode
         ? ' CORRECCIÓN: prioriza absolutamente manos con exactamente cinco dedos, un único rostro bien definido, ausencia total de artefactos y complexión fiel a la referencia.'
@@ -2924,7 +2980,17 @@ function publicista_build_prompt_variants($masterPrompt, $count = 6, $retryMode 
             $variantNotes[] = 'IMPORTANTE: esta variante concreta NO debe ser selfie; conserva un encuadre editorial normal.';
         }
 
+        // Inject random background if in random mode
+        $bgNote = '';
+        if ($useRandomBg && isset($randomBackgrounds[$i])) {
+            $bg = $randomBackgrounds[$i];
+            $bgNote = '[FONDO PARA ESTA IMAGEN] ' . $bg['description'] . '. IMPORTANTE: esta imagen concreta usa este fondo. La iluminación debe ser coherente con este entorno (luz natural de exterior si es exterior, luz interior si es interior).';
+        }
+
         $variantExtra = trim(implode(' ', array_filter($variantNotes)));
+        if ($bgNote !== '') {
+            $variantExtra = trim($variantExtra . ' ' . $bgNote);
+        }
         $out[] = trim($masterPrompt . "
 
 [ENCUADRE Y POSE PARA ESTA IMAGEN] " . $variantExtra . $retryNote);
@@ -7861,13 +7927,18 @@ function publicista_build_pollo_environment_guard($job, $maxChars = 0) {
     $setting = trim((string)($envDesc['setting'] ?? 'entorno realista con contexto'));
     $lighting = trim((string)($envDesc['lighting'] ?? 'luz realista y coherente'));
 
-    if ($settingKey === 'minimalista') {
+    if ($settingKey === 'random') {
+        $guard = '[AMBIENTE Y FONDO] El fondo de cada imagen se describe individualmente en [FONDO PARA ESTA IMAGEN] al final del prompt. Usa exactamente ese entorno descrito. Asegúrate de que el fondo sea coherente con la iluminación indicada y tenga profundidad natural y elementos de contexto reales.';
+    } elseif ($settingKey === 'minimalista') {
         $guard = '[AMBIENTE Y FONDO] Mantén el ambiente minimalista solicitado, pero con textura y profundidad reales. Fondo limpio y controlado, nunca un color plano vacío ni un recorte de estudio artificial. Iluminación: ' . $lighting . '.';
-    } elseif ($settingKey !== '' && $settingKey !== 'auto') {
+    } elseif ($settingKey !== '' && $settingKey !== 'auto' && $settingKey !== 'random') {
         $guard = '[AMBIENTE Y FONDO] El ambiente debe leerse claramente como ' . $setting . '. Deben verse elementos de contexto reales y coherentes con ese entorno; evita fondo liso, uniforme o de estudio genérico. Iluminación: ' . $lighting . '.';
     } else {
         $guard = '[AMBIENTE Y FONDO] Usa un entorno realista con contexto visible y profundidad natural, no un fondo uniforme o de estudio genérico. La escena debe incluir detalles ambientales creíbles alrededor de la mujer y luz coherente.';
     }
+
+    $antiAi = '[ANTI-AI LOOK] La imagen NO debe verse generada por inteligencia artificial. Añade imperfecciones propias de fotografía real: ruido sutil de sensor, grano fino en zonas oscuras, textura de poros en la piel, ligeras sombras duras donde corresponda, reflejos naturales en ojos y labios. La piel debe tener textura humana, no acabado plastificado ni filtro belleza. La iluminación debe parecer luz real de habitación, no iluminación de render 3D. El resultado debe confundirse con una foto tomada con móvil por una persona normal.';
+    $guard = trim($guard . "\n\n" . $antiAi);
 
     $guard = trim(publicista_pollo_normalize_prompt_text($guard, false));
     $maxChars = (int)$maxChars;

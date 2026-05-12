@@ -158,3 +158,20 @@ Formalizar la finalización del bloque CX2 como paquete documental completo, con
 
 ### Motivo
 Cerrar formalmente la fase documental del bloque CX2 con contratos auditados de aceptación, seguridad y gobierno, estableciendo precondiciones verificables (P0 mitigados, checklist aprobado, firma dual) antes de autorizar la implementación técnica de runtime.
+
+## 2026-05-12 · Fase escenarios — Pool de fondos naturales aleatorios (Publicista Perfiles)
+
+### Cambios
+- Se añadió pool de 12 fondos 100% naturales (`publicista_natural_background_pool()`): dormitorio, salón, espejo selfie, playa, calle, pared, tienda de ropa, probador, parque, cafetería, coche, escaleras.
+- Se creó `publicista_pick_random_backgrounds($count)` para seleccionar N fondos distintos sin repetición.
+- En modo Pollo.ai, cuando `setting=random`, cada imagen del pack recibe un fondo distinto automáticamente vía `[FONDO PARA ESTA IMAGEN]`.
+- Se añadió opción `random` al selector de fondo como default del formulario.
+- Se adaptó `publicista_build_pollo_environment_guard()` para modo random.
+- Se añadió validación whitelist de `setting_type` en `publicista_normalize_outfit_params()` (finding MEDIUM corregido).
+- Se corrigió dead code en `$settingMap` que hacía inaccesible la key `random` (finding LOW corregido).
+
+### Archivos
+- `app/helpers.php`, `app/publicista.php`, `app/views.php`, `docs/changelog.md`
+
+### Motivo
+Eliminar el patrón "mismo fondo en las 4 fotos" que delataba IA. Cada foto del pack recibe un fondo natural distinto automáticamente, simulando fotos reales en días y lugares diferentes.
