@@ -287,3 +287,18 @@ Eliminar el patrón "mismo vestido corto con escote en las 4 fotos" y el aspecto
 
 ### Motivo
 Las imágenes 1:1 parecen editadas profesionalmente. Las fotos reales de móvil tienen ratios 2:3, 3:4 o 9:16 — nunca cuadradas. Mantener el ratio nativo del modelo Pollo elimina este patrón artificial.
+
+## 2026-05-12 · Fase outpainting — GPT extiende imágenes 1:1 de pollo-image-v2 a ratio de móvil
+
+### Cambios
+- Modelo default restaurado a `pollo-image-v2` (mejor calidad, pero fuerza 1:1).
+- Nueva función `publicista_outpaint_to_phone_ratio()`: convierte 1:1 → ratios de móvil (2:3, 3:4, 4:5, 9:16 aleatorios) vía outpainting con GPT.
+- Nuevo comando `pad-canvas` en Python worker: crea lienzo con ratio destino + máscara (negro=preservar centro, blanco=rellenar bordes con GPT).
+- Pipeline Pollo: tras generar 1:1, se ejecuta outpainting vía OpenAI Image Edit API con máscara. GPT extiende fondo sin tocar a la persona.
+- Si outpainting falla, se mantiene la imagen 1:1 original (degradación gracefully).
+
+### Archivos
+- `app/publicista.php`, `tools/publicista_image_worker.py`, `docs/changelog.md`
+
+### Motivo
+pollo-image-v2 es el mejor modelo pero genera 1:1. El outpainting con GPT añade bordes de forma natural, convirtiendo la imagen cuadrada en una foto con proporción de móvil sin perder la calidad base.

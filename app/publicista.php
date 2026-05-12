@@ -1686,6 +1686,126 @@ function publicista_openai_image_edit($prompt, $imagePath, $options = array()) {
 }
 
 
+function publicista_outpaint_to_phone_ratio($jobId, $squareImagePath, $candidateId) {
+    $job = publicista_job_get($jobId);
+    $result = array(
+        'ok' => false,
+        'outpainted_path' => '',
+        'ratio' => '',
+        'error' => '',
+    );
+
+    if (!file_exists($squareImagePath)) {
+        $result['error'] = 'No existe la imagen cuadrada para outpainting.';
+        return $result;
+    }
+
+    // Ratios de móvil disponibles
+    $ratios = array('2:3', '3:4', '4:5', '9:16');
+    $targetRatio = $ratios[array_rand($ratios)];
+
+    $candidateDir = publicista_job_fs_paths($jobId)['candidates_dir'];
+    if (!is_dir($candidateDir)) {
+        mkdir($candidateDir, 0755, true);
+    }
+    $safeId = preg_replace('/[^a-z0-9_\-]/i', '_', $candidateId);
+    $paddedPath = $candidateDir . '/' . $safeId . '_padded.png';
+    $maskPath = $candidateDir . '/' . $safeId . '_mask.png';
+    $outpaintedPath = $candidateDir . '/' . $safeId . '_outpainted.jpg';
+    $jsonPath = $candidateDir . '/' . $safeId . '_pad_meta.json';
+
+    // Paso 1: Crear lienzo con padding + máscara via Python worker
+    $workerScript = BASE_PATH . '/tools/publicista_image_worker.py';
+    $cmd = 'python3 '
+        . escapeshellarg($workerScript) . ' pad-canvas '
+        . '--input ' . escapeshellarg($squareImagePath) . ' '
+        . '--output-padded ' . escapeshellarg($paddedPath) . ' '
+        . '--output-mask ' . escapeshellarg($maskPath) . ' '
+        . '--ratio ' . escapeshellarg($targetRatio) . ' '
+        . '--base-size 1024 '
+        . '--output-json ' . escapeshellarg($jsonPath);
+
+    $cmdOutput = array();
+    $cmdCode = 0;
+    exec($cmd . ' 2>&1', $cmdOutput, $cmdCode);
+
+    if ($cmdCode !== 0 || !file_exists($paddedPath) || !file_exists($maskPath)) {
+        $result['error'] = 'El worker Python (pad-canvas) falló. Código: ' . $cmdCode . '. Salida: ' . implode("\n", array_slice($cmdOutput, 0, 10));
+        return $result;
+    }
+
+    // Leer dimensiones del lienzo para el size del API
+    $canvasW = 1024;
+    $canvasH = 1024;
+    if (file_exists($jsonPath)) {
+        $meta = json_decode(file_get_contents($jsonPath), true);
+        if (is_array($meta)) {
+            $canvasW = (int)($meta['canvas_width'] ?? 1024);
+            $canvasH = (int)($meta['canvas_height'] ?? 1024);
+        }
+    }
+
+    // Paso 2: Outpainting via OpenAI Image Edit
+    $outpaintPrompt = implode(' ', array(
+        'Extend the background naturally beyond the visible area.',
+        'The person in the center must remain EXACTLY identical — no changes to the person at all.',
+        'Continue the same wall, floor, room, furniture, and environment seamlessly as if the photo was originally taken with a wider angle.',
+        'The result must look like a single unedited photo taken with a phone camera.',
+        'No text, no watermark, no artifacts, no distortion.',
+    ));
+
+    $editOptions = array(
+        'model' => publicista_ai_config()['image_model'],
+        'size' => $canvasW . 'x' . $canvasH,
+        'n' => 1,
+        'mask_path' => $maskPath,
+    );
+
+    $editResult = publicista_openai_image_edit($outpaintPrompt, $paddedPath, $editOptions);
+
+    if (!$editResult['ok']) {
+        $result['error'] = 'Outpainting GPT falló: ' . ($editResult['error'] ?? 'Error desconocido.');
+        // Limpiar archivos temporales
+        @unlink($paddedPath);
+        @unlink($maskPath);
+        @unlink($jsonPath);
+        return $result;
+    }
+
+    // Paso 3: Guardar imagen outpainted
+    $imageData = publicista_decode_generated_image_bytes($editResult['decoded']);
+    if (!$imageData[0]) {
+        $result['error'] = 'No se pudo decodificar la imagen outpainted: ' . $imageData[1];
+        @unlink($paddedPath);
+        @unlink($maskPath);
+        @unlink($jsonPath);
+        return $result;
+    }
+
+    $bytes = $imageData[1];
+    if (file_put_contents($outpaintedPath, $bytes) === false) {
+        $result['error'] = 'No se pudo guardar la imagen outpainted.';
+        @unlink($paddedPath);
+        @unlink($maskPath);
+        @unlink($jsonPath);
+        return $result;
+    }
+
+    // Limpiar temporales
+    @unlink($paddedPath);
+    @unlink($maskPath);
+    @unlink($jsonPath);
+
+    $result['ok'] = true;
+    $result['outpainted_path'] = publicista_path_to_web($outpaintedPath);
+    $result['outpainted_fs'] = $outpaintedPath;
+    $result['ratio'] = $targetRatio;
+    $result['generation_id'] = $editResult['request_id'];
+
+    return $result;
+}
+
+
 function publicista_openai_download_public_file_bytes($url) {
     $url = trim((string)$url);
     if ($url === '' || !function_exists('curl_init')) {
@@ -3986,6 +4106,45 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
                 'worker_result' => array('mode' => 'pollo_native_ratio', 'no_square_crop' => true),
             );
             $okLocal = true;
+
+            // Paso extra: Outpainting GPT para convertir 1:1 a ratio de móvil
+            $squareFs = BASE_PATH . '/' . ltrim((string)$localOrError['square_path'], '/');
+            if (file_exists($squareFs)) {
+                $outpaintResult = publicista_outpaint_to_phone_ratio($jobId, $squareFs, $candidateId);
+                if ($outpaintResult['ok']) {
+                    // Reemplazar el square_path con la imagen outpainted (ratio de móvil)
+                    $localOrError['square_path'] = $outpaintResult['outpainted_path'];
+                    $localOrError['worker_result']['outpainted'] = true;
+                    $localOrError['worker_result']['outpaint_ratio'] = $outpaintResult['ratio'];
+                    // Regenerar preview con la imagen outpainted
+                    $previewTarget = $candidateDir . '/' . $safeBasename . '_preview.jpg';
+                    if (function_exists('imagecreatefromstring') && file_exists($outpaintResult['outpainted_fs'])) {
+                        $maxRawBytes = 10 * 1024 * 1024;
+                        $rawBytes = (filesize($outpaintResult['outpainted_fs']) <= $maxRawBytes) ? file_get_contents($outpaintResult['outpainted_fs']) : false;
+                        if ($rawBytes !== false) {
+                            $imgInfo = @getimagesizefromstring($rawBytes);
+                            if ($imgInfo && ($imgInfo[0] * $imgInfo[1] <= 50000000)) {
+                                $src = @imagecreatefromstring($rawBytes);
+                                if ($src !== false) {
+                                    $sw2 = imagesx($src);
+                                    $sh2 = imagesy($src);
+                                    $maxSide = 320;
+                                    $ratio2 = min($maxSide / $sw2, $maxSide / $sh2);
+                                    $pw = max(1, (int)round($sw2 * $ratio2));
+                                    $ph = max(1, (int)round($sh2 * $ratio2));
+                                    $preview = imagecreatetruecolor($pw, $ph);
+                                    imagecopyresampled($preview, $src, 0, 0, 0, 0, $pw, $ph, $sw2, $sh2);
+                                    imagejpeg($preview, $previewTarget, 85);
+                                    imagedestroy($preview);
+                                    imagedestroy($src);
+                                }
+                            }
+                        }
+                    }
+                    $localOrError['preview_path'] = file_exists($previewTarget) ? publicista_path_to_web($previewTarget) : $localOrError['preview_path'];
+                }
+                // Si outpainting falla, mantenemos la imagen 1:1 sin cambios
+            }
         } else {
             list($okLocal, $localOrError) = publicista_prepare_arbitrary_image_locally($jobId, $genOrError['raw_fs_path'], preg_replace('/[^a-z0-9_\-]/i', '_', $candidateId), 'candidates_dir');
         }
@@ -4968,12 +5127,19 @@ function publicista_copy_contains_emoji($text) {
     return $text !== '' && preg_match('/[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]/u', $text);
 }
 
+function publicista_copy_count_emojis($text) {
+    $text = (string)$text;
+    if ($text === '') return 0;
+    preg_match_all('/[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}]/u', $text, $matches);
+    return count($matches[0] ?? array());
+}
+
 function publicista_copy_pick_emoji($variant = 'neutral', $slot = '') {
     $variant = trim((string)$variant);
     $slot = trim((string)$slot);
     $map = array(
-        'neutral' => array('✨', '📍', '💫', '🤍', '💬', '🌟', '🔥'),
-        'suggestive' => array('🔥', '💋', '✨', '😈', '💫', '👀', '💌'),
+        'neutral' => array('💕', '💋', '💖', '💗', '✨', '💫', '👄', '💘', '💞', '💓', '🌹', '😘'),
+        'suggestive' => array('🔥', '💋', '💦', '😈', '👄', '🍑', '💘', '💕', '✨', '💫', '💞', '💗'),
     );
     $pool = isset($map[$variant]) ? $map[$variant] : $map['neutral'];
     $offset = 0;
@@ -5053,16 +5219,40 @@ function publicista_copy_polish_title($title) {
     return publicista_copy_apply_keyword_uppercase(publicista_copy_sentence_case($title), 3);
 }
 
+function publicista_copy_polish_title_emojis($title, $variant = 'neutral', $slot = '') {
+    $title = trim((string)$title);
+    if ($title === '') return '';
+    // Ensure 1-2 emojis in title
+    $emojiCount = publicista_copy_count_emojis($title);
+    if ($emojiCount < 1) {
+        $title = publicista_copy_pick_emoji($variant, $slot . '_title') . ' ' . $title;
+        $emojiCount++;
+    }
+    if ($emojiCount < 2 && (int)sprintf('%u', crc32($slot . '|' . $variant . '|title_extra')) % 2 === 0) {
+        $title = $title . ' ' . publicista_copy_pick_emoji($variant, $slot . '_title_extra');
+    }
+    return trim($title);
+}
+
 function publicista_copy_polish_ad_variant_text($text, $variant = 'neutral', $slot = '') {
     $text = publicista_copy_emphasize_body_text($text);
     if ($text === '') {
         return '';
     }
-    if (!publicista_copy_contains_emoji($text)) {
+    // Ensure 2-3 emojis in body text
+    $emojiCount = publicista_copy_count_emojis($text);
+    if ($emojiCount < 2) {
+        // Add first emoji if needed
         $text .= ' ' . publicista_copy_pick_emoji($variant, $slot);
-        if ((int)sprintf('%u', crc32($slot . '|' . $variant)) % 2 === 0) {
-            $text .= ' ' . publicista_copy_pick_emoji($variant, $slot . '_extra');
-        }
+        $emojiCount++;
+    }
+    if ($emojiCount < 2) {
+        $text .= ' ' . publicista_copy_pick_emoji($variant, $slot . '_extra');
+        $emojiCount++;
+    }
+    // 50% chance of a third emoji for extra sensuality
+    if ($emojiCount < 3 && (int)sprintf('%u', crc32($slot . '|' . $variant . '|third')) % 2 === 0) {
+        $text .= ' ' . publicista_copy_pick_emoji($variant, $slot . '_third');
     }
     return trim($text);
 }
@@ -5071,7 +5261,8 @@ function publicista_copy_apply_marketing_polish($version) {
     $version = is_array($version) ? $version : array();
     $titleOptions = array_values((array)publicista_array_get($version, 'title_options', array()));
     foreach ($titleOptions as $idx => $title) {
-        $titleOptions[$idx] = publicista_copy_polish_title($title);
+        $polished = publicista_copy_polish_title($title);
+        $titleOptions[$idx] = publicista_copy_polish_title_emojis($polished, 'neutral', 'title_' . ($idx + 1));
     }
     $version['title_options'] = $titleOptions;
 
@@ -5082,8 +5273,12 @@ function publicista_copy_apply_marketing_polish($version) {
         }
         $slot = trim((string)publicista_array_get($ad, 'slot', 'slot_' . ($idx + 1)));
         $ad['short_hook'] = publicista_copy_polish_ad_variant_text((string)publicista_array_get($ad, 'short_hook', ''), 'neutral', $slot);
-        $ad['title_neutral'] = publicista_copy_polish_title((string)publicista_array_get($ad, 'title_neutral', ''));
-        $ad['title_suggestive'] = publicista_copy_polish_title((string)publicista_array_get($ad, 'title_suggestive', ''));
+        $ad['title_neutral'] = publicista_copy_polish_title_emojis(
+            publicista_copy_polish_title((string)publicista_array_get($ad, 'title_neutral', '')), 'neutral', $slot . '_nt'
+        );
+        $ad['title_suggestive'] = publicista_copy_polish_title_emojis(
+            publicista_copy_polish_title((string)publicista_array_get($ad, 'title_suggestive', '')), 'suggestive', $slot . '_st'
+        );
         $ad['body_neutral'] = publicista_copy_polish_ad_variant_text((string)publicista_array_get($ad, 'body_neutral', ''), 'neutral', $slot);
         $ad['body_suggestive'] = publicista_copy_polish_ad_variant_text((string)publicista_array_get($ad, 'body_suggestive', ''), 'suggestive', $slot);
         $ads[$idx] = $ad;
@@ -5413,8 +5608,9 @@ function publicista_build_copy_context($job) {
         . "- Los títulos deben parecer títulos reales de portal: directos, atractivos, con fuerza comercial — no genéricos ni de ficha técnica.\n"
         . "- USA MAYÚSCULAS de forma estratégica. En títulos, priorízalas claramente y sin miedo; idealmente el título entero o sus palabras de mayor impacto deben ir en mayúsculas. En descripciones, usa mayúsculas en puntos concretos para destacar ganchos, CTA, novedad o rasgos diferenciales.\n"
         . "- Los textos deben invitar a escribir: transmitir presencia, trato, ambiente, implicación o morbo según el ángulo.\n"
-        . "- Incluye emoticonos/emoji con intención comercial y de forma natural. Debe haber al menos 1 emoji útil por anuncio, pero sin recargar ni parecer spam.\n"
-        . "- Máximo 2 emojis por anuncio, colocados estratégicamente. No llenes de emojis.\n"
+        . "- Incluye emoticonos/emoji con intención comercial y de forma natural, con un tono sensual y atractivo (corazones, besos, fuego, gotas, miradas, labios...).\n"
+        . "- En los TÍTULOS: 1-2 emojis bien colocados que refuercen el gancho emocional o la curiosidad.\n"
+        . "- En las DESCRIPCIONES: 2-3 emojis estratégicos que den ritmo, deseo y cercanía sin sobrecargar.\n"
         . "- Nunca suenes a prompt de generación de imagen: evita mencionar piel, cabello, pose, iluminación, fondo, outfit salvo que sea muy natural y comercial.\n"
         . "- No copies teléfonos, precios, nombres reales ni rasgos físicos concretos de los ejemplos scrapeados.\n";
 
@@ -5895,7 +6091,7 @@ function publicista_regenerate_copy_title_option($jobId, $titleIndex) {
     $newTitle = trim((string)publicista_array_get($parsed, 'title', ''));
     if ($newTitle === '') return array(false, 'OpenAI devolvió un título vacío.');
 
-    $version['title_options'][$titleIndex] = publicista_copy_polish_title($newTitle);
+    $version['title_options'][$titleIndex] = publicista_copy_polish_title_emojis(publicista_copy_polish_title($newTitle), 'neutral', 'title_' . ($titleIndex + 1));
     $version['updated_at'] = now_datetime();
 
     list($okSave, $saved) = publicista_save_current_copy_version($jobId, $version);
@@ -5964,8 +6160,8 @@ function publicista_regenerate_copy_ad_slot($jobId, $slot) {
         'slot' => $slot,
         'focus' => trim((string)publicista_array_get($parsed, 'focus', '')),
         'short_hook' => publicista_copy_polish_ad_variant_text((string)publicista_array_get($parsed, 'short_hook', ''), 'neutral', $slot),
-        'title_neutral' => publicista_copy_polish_title((string)publicista_array_get($parsed, 'title_neutral', '')),
-        'title_suggestive' => publicista_copy_polish_title((string)publicista_array_get($parsed, 'title_suggestive', '')),
+        'title_neutral' => publicista_copy_polish_title_emojis(publicista_copy_polish_title((string)publicista_array_get($parsed, 'title_neutral', '')), 'neutral', $slot . '_nt'),
+        'title_suggestive' => publicista_copy_polish_title_emojis(publicista_copy_polish_title((string)publicista_array_get($parsed, 'title_suggestive', '')), 'suggestive', $slot . '_st'),
         'body_neutral' => publicista_copy_polish_ad_variant_text((string)publicista_array_get($parsed, 'body_neutral', ''), 'neutral', $slot),
         'body_suggestive' => publicista_copy_polish_ad_variant_text((string)publicista_array_get($parsed, 'body_suggestive', ''), 'suggestive', $slot),
     );
@@ -5989,6 +6185,7 @@ function publicista_copy_wide_prompt($contextPrompt) {
         . "curiosidad/gancho, elegancia/exclusividad, cercanía/trato, sugerente controlado, novedad. "
         . "Una parte deben ser aptos para destacamos (sin palabras sexuales), y otra parte más directos, siempre sin caer en spam.\n"
         . "- Los títulos deben salir con mentalidad de marketing puro: hechos para captar la mirada, provocar clic y generar curiosidad real.\n"
+        . "- Añade 1-2 emojis sensuales en cada título (corazones, besos, fuego, gotas, labios...) para reforzar el gancho emocional.\n"
         . "- Mezcla estilos de casing con intención comercial: algunos títulos totalmente en MAYÚSCULAS, otros en minúscula o frase normal con solo 1-3 palabras clave en MAYÚSCULAS.\n"
         . "- 12 ángulos de anuncio (ad_angles). Cada ángulo tiene: 'angle' (nombre del enfoque), "
         . "'hook' (primera frase de gancho), 'key_phrase' (frase clave del cuerpo), 'tone_note' (nota de tono para redactar la versión final).\n"
@@ -6013,7 +6210,7 @@ function publicista_copy_refine_prompt($contextPrompt, $wideResult) {
         . "3. De los 12 ángulos, elige los 10 más potentes y distintos entre sí. Con cada uno redacta un anuncio completo "
         . "(title_neutral, body_neutral, title_suggestive, body_suggestive) siguiendo las reglas ya indicadas.\n"
         . "4. En las descripciones usa MAYÚSCULAS en momentos estratégicos para remarcar gancho, novedad, CTA o atributos diferenciales, sin pasarte ni parecer spam.\n"
-        . "5. Incluye emoticonos/emoji útiles y naturales para reforzar clic, cercanía o morbo controlado, sin sobrecargar.\n"
+        . "5. Incluye emoticonos/emoji sensuales y naturales (corazones, besos, fuego, gotas, labios...): 1-2 en cada título y 2-3 en cada body, colocados estratégicamente para dar ritmo, deseo y cercanía.\n"
         . "6. El pack_angle debe resumir en 1 frase el enfoque conjunto del pack.\n"
         . "7. publication_notes: 3-5 notas prácticas de publicación (en qué portal usar qué variante, qué estilos conviene alternar, etc.).\n"
         . "8. recommended_order: los 10 slots en orden recomendado de publicación.\n"
@@ -7699,9 +7896,9 @@ function publicista_ads_euros($value) {
 
 function publicista_pollo_models() {
     return array(
-        'flux-dev'         => array('name' => 'FLUX Dev (Pollo.ai)',       'modelName' => 'flux-dev',         'aspectRatio' => '2:3', 'supports_mode' => false),
         'pollo-image-v2'   => array('name' => 'Pollo Image v2',            'modelName' => 'pollo-image-v2',   'aspectRatio' => '1:1', 'resolution' => '1K', 'supports_mode' => true),
         'pollo-image-v1-6' => array('name' => 'Pollo Image v1.6',          'modelName' => 'pollo-image-v1-6', 'aspectRatio' => '1:1', 'supports_mode' => false),
+        'flux-dev'         => array('name' => 'FLUX Dev (Pollo.ai)',       'modelName' => 'flux-dev',         'aspectRatio' => '2:3', 'supports_mode' => false),
         'seedream'         => array('name' => 'Seedream (Pollo.ai)',       'modelName' => 'seedream',         'aspectRatio' => '2:3', 'supports_mode' => false),
         'nano-banana'      => array('name' => 'Nano Banana (Pollo.ai)',    'modelName' => 'nano-banana',      'aspectRatio' => '4:3', 'supports_mode' => false),
     );

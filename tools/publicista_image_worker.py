@@ -263,6 +263,80 @@ def apply_manual_blur(args: argparse.Namespace) -> Dict:
 
 
 # ---------------------------------------------------------------------------
+# Outpainting: crear lienzo con ratio de móvil + máscara
+# ---------------------------------------------------------------------------
+
+PHONE_RATIOS = [
+    (2, 3),
+    (3, 4),
+    (4, 5),
+    (9, 16),
+]
+
+
+def pad_canvas_for_outpaint(args: argparse.Namespace) -> Dict:
+    source = Image.open(args.input).convert('RGBA')
+    sw, sh = source.size
+    if sw <= 0 or sh <= 0:
+        raise RuntimeError('La imagen de entrada tiene dimensiones inválidas.')
+
+    if args.ratio:
+        parts = args.ratio.split(':')
+        ratio_w, ratio_h = int(parts[0]), int(parts[1])
+    else:
+        import random
+        ratio_w, ratio_h = random.choice(PHONE_RATIOS)
+
+    base_size = int(args.base_size)
+    if ratio_w >= ratio_h:
+        canvas_w = base_size
+        canvas_h = max(1, int(round(base_size * ratio_h / ratio_w)))
+    else:
+        canvas_h = base_size
+        canvas_w = max(1, int(round(base_size * ratio_w / ratio_h)))
+
+    if canvas_w < sw or canvas_h < sh:
+        scale_factor = max(sw / canvas_w, sh / canvas_h)
+        canvas_w = max(sw, int(round(canvas_w * scale_factor)))
+        canvas_h = max(sh, int(round(canvas_h * scale_factor)))
+
+    canvas = Image.new('RGBA', (canvas_w, canvas_h), (255, 255, 255, 255))
+    ox = (canvas_w - sw) // 2
+    oy = (canvas_h - sh) // 2
+    canvas.paste(source, (ox, oy), source)
+
+    canvas_rgb = canvas.convert('RGB')
+    os.makedirs(os.path.dirname(args.output_padded), exist_ok=True)
+    canvas_rgb.save(args.output_padded, 'PNG', optimize=False)
+
+    mask = Image.new('L', (canvas_w, canvas_h), 255)
+    mask_draw_area = Image.new('L', (sw, sh), 0)
+    mask.paste(mask_draw_area, (ox, oy))
+    os.makedirs(os.path.dirname(args.output_mask), exist_ok=True)
+    mask.save(args.output_mask, 'PNG', optimize=False)
+
+    result = {
+        'ok': True,
+        'input_path': args.input,
+        'output_padded': args.output_padded,
+        'output_mask': args.output_mask,
+        'ratio': f'{ratio_w}:{ratio_h}',
+        'canvas_width': int(canvas_w),
+        'canvas_height': int(canvas_h),
+        'original_width': int(sw),
+        'original_height': int(sh),
+        'offset_x': int(ox),
+        'offset_y': int(oy),
+    }
+
+    if args.output_json:
+        os.makedirs(os.path.dirname(args.output_json), exist_ok=True)
+        with open(args.output_json, 'w', encoding='utf-8') as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+    return result
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -295,6 +369,14 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument('--intensity', type=float, default=8.0, help='Intensidad del blur manual entre 1 y 20')
     m.add_argument('--preview-size', type=int, default=320)
 
+    pc = sub.add_parser('pad-canvas', help='Crea lienzo con ratio de móvil y máscara para outpainting')
+    pc.add_argument('--input', required=True)
+    pc.add_argument('--output-padded', required=True)
+    pc.add_argument('--output-mask', required=True)
+    pc.add_argument('--output-json', default='')
+    pc.add_argument('--ratio', default='', help='Ratio destino (ej: 2:3). Si no se especifica, aleatorio.')
+    pc.add_argument('--base-size', type=int, default=1024, help='Tamaño base del lado más largo')
+
     return parser
 
 
@@ -308,6 +390,8 @@ def main() -> int:
             result = export_png(args)
         elif args.command == 'apply-manual-blur':
             result = apply_manual_blur(args)
+        elif args.command == 'pad-canvas':
+            result = pad_canvas_for_outpaint(args)
         else:
             raise RuntimeError('Comando no soportado')
         print(json.dumps(result, ensure_ascii=False))
