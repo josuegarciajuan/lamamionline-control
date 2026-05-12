@@ -214,6 +214,27 @@ Primera fase de la feature EstadosWasap: establecer el modelo de datos, configur
 ### Motivo
 Dotar de lógica de negocio completa para publicar estados de WhatsApp atractivos con fotos de chicas activas desde las líneas bot casa, con formatos variados y registro de actividad.
 
+## 2026-05-12 · EstadosWasap PanelEstados — Interfaz visual
+
+### Cambios
+- Se añadió tab `📱 Estados` en la barra de subpestañas de Publicista.
+- Nueva página `render_publicista_estados_wasap_page()` con:
+  - Panel de estado (activo/pausado, líneas habilitadas, formato, frecuencia, última publicación).
+  - Formulario de configuración completo: on/off, frecuencia (tipo + valor), horario (inicio/fin), selector de formato (6 opciones), selector de líneas bot casa con checkboxes.
+  - Botón "Publicar ahora" para disparo manual con feedback flash.
+  - Tabla de historial con fecha, línea, formato, resultado, HTTP code y vista previa del texto.
+- Se actualizó versión de caché CSS/JS en `index.php` (v=20260512_2).
+- Verificado: renderizado sin errores, 12/12 checks de presencia de elementos OK, publicación 2/2 líneas exitosa.
+
+### Archivos
+- `app/views.php` (+110 líneas: tab registration + render completo)
+- `index.php` (cache busting v=20260512_2)
+- `spec/tasks.md` (PanelEstados completado)
+- `docs/changelog.md`
+
+### Motivo
+Proveer una interfaz visual completa para gestionar la publicación de estados de WhatsApp: configurar, disparar manualmente y auditar el historial desde el panel de Publicista.
+
 ## 2026-05-12 · Fase planos — Encuadres casuales y no profesionales (Publicista Perfiles)
 
 ### Cambios

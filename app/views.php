@@ -496,7 +496,7 @@ function render_lamami_page() {
 function render_publicista_page() {
     $tab = request_get('tab', 'crear_perfiles');
     if ($tab === 'calculo_publicidad') $tab = 'estrategias';
-    $allowed = array('crear_perfiles', 'estrategias', 'cuentas', 'campanas', 'subir_anuncios', 'run_log');
+    $allowed = array('crear_perfiles', 'estrategias', 'cuentas', 'campanas', 'subir_anuncios', 'run_log', 'estados_wasap');
 
     if (!in_array($tab, $allowed, true)) {
         $tab = 'crear_perfiles';
@@ -512,6 +512,7 @@ function render_publicista_page() {
     echo '<a class="subtab ' . ($tab === 'estrategias' ? 'active' : '') . '" href="' . e(publicista_page_url('estrategias')) . '">Estrategias</a>';
     echo '<a class="subtab ' . ($tab === 'campanas' ? 'active' : '') . '" href="' . e(publicista_page_url('campanas')) . '">Campañas</a>';
     echo '<a class="subtab ' . ($tab === 'subir_anuncios' ? 'active' : '') . '" href="' . e(publicista_page_url('subir_anuncios')) . '">Subir anuncios</a>';
+    echo '<a class="subtab ' . ($tab === 'estados_wasap' ? 'active' : '') . '" href="' . e(publicista_page_url('estados_wasap')) . '">📱 Estados</a>';
     echo '</div>';
     echo '</section>';
 
@@ -556,6 +557,11 @@ function render_publicista_page() {
         return;
     }
 
+    if ($tab === 'estados_wasap') {
+        render_publicista_estados_wasap_page();
+        return;
+    }
+
     render_publicista_crear_perfiles_page(true);
 }
 
@@ -590,6 +596,160 @@ function render_publicista_run_log_page() {
     }
     echo '<p class="muted" style="margin-top:12px;">Aquí está el run completo con items, errores, payloads resumidos, humanTrace y debug_log.</p>';
     echo '<pre style="white-space:pre-wrap;word-break:break-word;max-width:100%;overflow:auto;margin-top:12px;">' . e($json) . '</pre>';
+    echo '</section>';
+}
+
+function render_publicista_estados_wasap_page() {
+    $config = publicista_estados_wasap_get_config();
+    $log = publicista_estados_wasap_get_log();
+    $allLines = publicista_estados_wasap_get_bot_casa_lines();
+    $enabledIds = $config['lineas'];
+    $enabledLines = array();
+    foreach ($allLines as $l) {
+        if (in_array($l['id'], $enabledIds, true)) $enabledLines[] = $l;
+    }
+
+    // ── Status cards ───────────────────────────────────────────────
+    echo '<section class="panel panel-space">';
+    echo '<div class="branch-panel-head"><h2>📱 Estados WhatsApp</h2><span class="summary-badge">' . ($config['enabled'] ? 'Activo' : 'Pausado') . '</span></div>';
+    echo '<div class="cards four" style="margin-top:14px;">';
+    echo '<div class="info-strip"><strong>Estado</strong><br>' . ($config['enabled'] ? '✅ Publicación automática activa' : '⏸️ Pausado') . '</div>';
+    echo '<div class="info-strip"><strong>Líneas habilitadas</strong><br>' . count($enabledLines) . ' de ' . count($allLines) . '</div>';
+    echo '<div class="info-strip"><strong>Formato</strong><br>' . e(publicista_estados_wasap_format_options()[$config['formato']] ?? $config['formato']) . '</div>';
+    $freqLabel = publicista_estados_wasap_frecuencia_options()[$config['frecuencia_tipo']] ?? $config['frecuencia_tipo'];
+    $freqDetail = $config['frecuencia_tipo'] === 'cada_x_horas' ? "Cada {$config['frecuencia_valor']}h" : "{$config['frecuencia_valor']} veces/día";
+    echo '<div class="info-strip"><strong>Frecuencia</strong><br>' . e($freqLabel . ' — ' . $freqDetail) . ' (' . e($config['hora_inicio']) . '–' . e($config['hora_fin']) . ')</div>';
+    echo '</div>';
+
+    $lastLog = !empty($log) ? end($log) : null;
+    $lastPubAt = $lastLog ? $lastLog['published_at'] : '—';
+    $lastResult = $lastLog ? ($lastLog['resultado'] === 'ok' ? '✅ OK' : '❌ Error') : '—';
+    echo '<div class="cards four" style="margin-top:12px;">';
+    echo '<div class="info-strip"><strong>Última publicación</strong><br>' . e($lastPubAt) . '</div>';
+    echo '<div class="info-strip"><strong>Último resultado</strong><br>' . $lastResult . '</div>';
+    if ($lastLog) {
+        echo '<div class="info-strip"><strong>Última línea usada</strong><br>' . e($lastLog['linea_nombre'] ?? '—') . '</div>';
+        echo '<div class="info-strip"><strong>Último HTTP</strong><br>' . e((string)($lastLog['http_code'] ?? '—')) . '</div>';
+    } else {
+        echo '<div class="info-strip"><strong>Última línea</strong><br>—</div>';
+        echo '<div class="info-strip"><strong>Último HTTP</strong><br>—</div>';
+    }
+    echo '</div>';
+    echo '</section>';
+
+    // ── Config form ────────────────────────────────────────────────
+    echo '<section class="panel panel-space">';
+    echo '<div class="section-head"><div><h2>Configuración</h2><p>Define cómo y cuándo se publican los estados de WhatsApp con fotos de las chicas activas.</p></div></div>';
+    echo '<form method="post" class="form-grid">';
+    echo '<input type="hidden" name="action" value="save_estados_wasap_config">';
+
+    // Enabled
+    echo '<div class="field">';
+    echo '<label>Activado</label>';
+    echo '<label style="display:flex;gap:8px;align-items:center;margin-top:10px;">';
+    echo '<input type="checkbox" name="enabled" value="1"' . ($config['enabled'] ? ' checked' : '') . '>';
+    echo 'Publicar estados automáticamente';
+    echo '</label>';
+    echo '</div>';
+
+    // Frequency type
+    echo '<div class="field">';
+    echo '<label>Frecuencia</label>';
+    echo '<select name="frecuencia_tipo" style="margin-top:8px;">';
+    foreach (publicista_estados_wasap_frecuencia_options() as $val => $label) {
+        $sel = $config['frecuencia_tipo'] === $val ? ' selected' : '';
+        echo '<option value="' . e($val) . '"' . $sel . '>' . e($label) . '</option>';
+    }
+    echo '</select>';
+    echo '</div>';
+
+    // Frequency value
+    echo '<div class="field">';
+    echo '<label>Valor</label>';
+    echo '<input type="number" name="frecuencia_valor" value="' . e((string)$config['frecuencia_valor']) . '" min="1" max="24" style="margin-top:8px;width:100%;">';
+    echo '<div class="field-help">Horas entre publicaciones (si "Cada X horas") o veces al día (si "X veces al día").</div>';
+    echo '</div>';
+
+    // Time range
+    echo '<div class="field"><label>Hora inicio</label><input type="time" name="hora_inicio" value="' . e($config['hora_inicio']) . '" style="margin-top:8px;width:100%;"></div>';
+    echo '<div class="field"><label>Hora fin</label><input type="time" name="hora_fin" value="' . e($config['hora_fin']) . '" style="margin-top:8px;width:100%;"></div>';
+
+    // Format
+    echo '<div class="field full">';
+    echo '<label>Formato de publicación</label>';
+    echo '<select name="formato" style="margin-top:8px;width:100%;max-width:420px;">';
+    foreach (publicista_estados_wasap_format_options() as $val => $label) {
+        $sel = $config['formato'] === $val ? ' selected' : '';
+        echo '<option value="' . e($val) . '"' . $sel . '>' . e($label) . '</option>';
+    }
+    echo '</select>';
+    echo '<div class="field-help">Elige el estilo del estado. "Mix aleatorio" alterna entre todos los formatos.</div>';
+    echo '</div>';
+
+    // Lines selector
+    echo '<div class="field full">';
+    echo '<label>Líneas bot casa</label>';
+    if (empty($allLines)) {
+        echo '<div class="empty" style="margin-top:8px;">No hay líneas con uso "bot casa" y WAHA configurado. Añádelas en Josué → Teléfonos.</div>';
+    } else {
+        echo '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-top:8px;">';
+        foreach ($allLines as $line) {
+            $checked = in_array($line['id'], $enabledIds, true) ? ' checked' : '';
+            echo '<label class="info-strip" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 12px;">';
+            echo '<input type="checkbox" name="lineas[]" value="' . e($line['id']) . '"' . $checked . '>';
+            echo '<span><strong>' . e($line['nombre']) . '</strong><br><span class="muted">' . e($line['tfono']) . ' · puerto ' . e($line['waha_port']) . '</span></span>';
+            echo '</label>';
+        }
+        echo '</div>';
+        echo '<div class="field-help">Selecciona las líneas en las que se publicará el estado. Se enviará el mismo texto a todas las seleccionadas.</div>';
+    }
+    echo '</div>';
+
+    echo '<div class="full" style="display:flex;gap:10px;flex-wrap:wrap;">';
+    echo '<button class="btn-primary">💾 Guardar configuración</button>';
+    echo '</div>';
+    echo '</form>';
+    echo '</section>';
+
+    // ── Manual publish ─────────────────────────────────────────────
+    echo '<section class="panel panel-space">';
+    echo '<div class="section-head"><div><h2>Publicación manual</h2><p>Publica un estado ahora mismo en las líneas habilitadas, sin esperar a la automatización. Ideal para pruebas o emergencias.</p></div>';
+    echo '<div class="section-head-actions">';
+    echo '<form method="post" class="inline-form">';
+    echo '<input type="hidden" name="action" value="publicar_estado_manual">';
+    echo '<button class="btn-primary">📤 Publicar ahora</button>';
+    echo '</form>';
+    echo '</div></div>';
+    echo '</section>';
+
+    // ── Log table ──────────────────────────────────────────────────
+    echo '<section class="panel panel-space">';
+    echo '<div class="section-head"><div><h2>Historial de publicaciones</h2><p>Últimas ' . min(count($log), 200) . ' publicaciones registradas.</p></div></div>';
+
+    if (empty($log)) {
+        echo '<div class="empty" style="margin-top:12px;">No hay publicaciones registradas todavía. Usa "Publicar ahora" para hacer una prueba.</div>';
+    } else {
+        echo '<div class="table-wrap" style="margin-top:12px;"><table><thead><tr>';
+        echo '<th>Fecha</th><th>Línea</th><th>Formato</th><th>Resultado</th><th>HTTP</th><th>Vista previa</th>';
+        echo '</tr></thead><tbody>';
+        $reversedLog = array_reverse($log);
+        foreach ($reversedLog as $entry) {
+            $ok = ($entry['resultado'] ?? '') === 'ok';
+            $badge = $ok ? '<span class="summary-badge">✅ OK</span>' : '<span class="summary-badge" style="background:var(--danger,#c0392b);">❌ Error</span>';
+            $date = !empty($entry['published_at']) ? date('d/m H:i', strtotime($entry['published_at'])) : '—';
+            $preview = mb_substr((string)($entry['texto'] ?? ''), 0, 80) . (mb_strlen((string)($entry['texto'] ?? '')) > 80 ? '…' : '');
+            $errorMsg = !$ok && !empty($entry['error']) ? '<br><span class="muted" style="color:var(--danger,#c0392b);">' . e($entry['error']) . '</span>' : '';
+            echo '<tr>';
+            echo '<td style="white-space:nowrap;">' . e($date) . '</td>';
+            echo '<td>' . e($entry['linea_nombre'] ?? $entry['linea_id'] ?? '—') . '</td>';
+            echo '<td>' . e($entry['formato_usado'] ?? '—') . '</td>';
+            echo '<td>' . $badge . $errorMsg . '</td>';
+            echo '<td>' . e((string)($entry['http_code'] ?? '—')) . '</td>';
+            echo '<td style="max-width:300px;white-space:pre-wrap;word-break:break-word;">' . e($preview) . '</td>';
+            echo '</tr>';
+        }
+        echo '</tbody></table></div>';
+    }
     echo '</section>';
 }
 

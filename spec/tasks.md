@@ -48,10 +48,10 @@
 
 ### PanelEstados — Interfaz visual
 
-- [ ] Añadir tab `estados_wasap` en `render_publicista_page()`.
-- [ ] Formulario de configuración (on/off, frecuencia, horario, formato, selector de líneas bot casa).
-- [ ] Botón "Publicar ahora" para prueba manual.
-- [ ] Tabla de log con historial de publicaciones.
+- [x] Añadir tab `estados_wasap` en `render_publicista_page()`.
+- [x] Formulario de configuración (on/off, frecuencia, horario, formato, selector de líneas bot casa).
+- [x] Botón "Publicar ahora" para prueba manual.
+- [x] Tabla de log con historial de publicaciones.
 
 ### AutoEstados — Publicación automática
 

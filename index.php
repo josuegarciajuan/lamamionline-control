@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>LaMami CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="assets/style.css?v=20260507_7">
+    <link rel="stylesheet" href="assets/style.css?v=20260512_2">
 </head>
 <body class="page-<?= e($page) ?>" data-page="<?= e($page) ?>">
 <?php if ($page === 'login'): ?>
@@ -119,6 +119,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </main>
     </div>
 <?php endif; ?>
-<script src="assets/app.js?v=20260507_7"></script>
+<script src="assets/app.js?v=20260512_2"></script>
 </body>
 </html>
