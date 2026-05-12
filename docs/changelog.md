@@ -272,3 +272,18 @@ Eliminar el aspecto "demasiado profesional" de las fotos: persona siempre centra
 
 ### Motivo
 Eliminar el patrón "mismo vestido corto con escote en las 4 fotos" y el aspecto de "ropa de lujo". Ahora cada imagen muestra un look diferente, barato y realista, adecuado al perfil socioeconómico del sector.
+
+## 2026-05-12 · Fase ratios — Proporciones nativas de móvil, sin recorte 1:1 (Publicista Perfiles)
+
+### Cambios
+- Modelo Pollo por defecto cambiado a `flux-dev` (ratio 2:3 nativo, como foto de móvil vertical).
+- Para trabajos Pollo: se **elimina el recorte cuadrado 1:1** — las imágenes mantienen su ratio nativo (2:3 o 4:3 según modelo).
+- En vez de llamar al Python worker `prepare-source` (que fuerza lienzo cuadrado), se copia la imagen generada tal cual y se genera un preview manteniendo el ratio.
+- Misma lógica aplicada en `publicista_regenerate_candidate()` para regeneraciones individuales.
+- Añadida protección contra memory exhaustion: límite de 10MB de archivo y 50M píxeles antes de `imagecreatefromstring`.
+
+### Archivos
+- `app/publicista.php`, `docs/changelog.md`
+
+### Motivo
+Las imágenes 1:1 parecen editadas profesionalmente. Las fotos reales de móvil tienen ratios 2:3, 3:4 o 9:16 — nunca cuadradas. Mantener el ratio nativo del modelo Pollo elimina este patrón artificial.

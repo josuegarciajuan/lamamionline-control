@@ -3933,7 +3933,62 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
         );
         $candidateRow['raw_path'] = $genOrError['raw_path'];
 
-        list($okLocal, $localOrError) = publicista_prepare_arbitrary_image_locally($jobId, $genOrError['raw_fs_path'], preg_replace('/[^a-z0-9_\-]/i', '_', $candidateId), 'candidates_dir');
+        if ($usePollo) {
+            // Pollo: mantener ratio nativo (2:3, 4:3), no hacer square crop 1:1
+            $rawFs = $genOrError['raw_fs_path'];
+            $ext = strtolower(pathinfo($rawFs, PATHINFO_EXTENSION)) ?: 'jpg';
+            $candidateDir = publicista_job_fs_paths($jobId)['candidates_dir'];
+            $safeBasename = preg_replace('/[^a-z0-9_\-]/i', '_', $candidateId);
+            $squareTarget = $candidateDir . '/' . $safeBasename . '_square.' . $ext;
+            $previewTarget = $candidateDir . '/' . $safeBasename . '_preview.jpg';
+            if (!is_dir($candidateDir)) {
+                mkdir($candidateDir, 0755, true);
+            }
+            if (!copy($rawFs, $squareTarget)) {
+                $candidateRow['error'] = 'No se pudo copiar la imagen Pollo con ratio nativo.';
+                $candidates[] = $candidateRow;
+                continue;
+            }
+            // Generar preview simple (max 320px lado más largo, manteniendo ratio)
+            if (function_exists('imagecreatefromstring')) {
+                $maxRawBytes = 10 * 1024 * 1024; // 10 MB máximo
+                $rawBytes = (filesize($squareTarget) <= $maxRawBytes) ? file_get_contents($squareTarget) : false;
+                if ($rawBytes !== false) {
+                    // Verificar dimensiones antes de decodificar (evitar OOM)
+                    $imgInfo = @getimagesizefromstring($rawBytes);
+                    if ($imgInfo && ($imgInfo[0] * $imgInfo[1] > 50000000)) {
+                        $rawBytes = false; // >50M pixels, demasiado grande
+                    }
+                }
+                if ($rawBytes !== false) {
+                    $src = @imagecreatefromstring($rawBytes);
+                    if ($src !== false) {
+                        $sw = imagesx($src);
+                        $sh = imagesy($src);
+                        $maxSide = 320;
+                        $ratio = min($maxSide / $sw, $maxSide / $sh);
+                        $pw = max(1, (int)round($sw * $ratio));
+                        $ph = max(1, (int)round($sh * $ratio));
+                        $preview = imagecreatetruecolor($pw, $ph);
+                        imagecopyresampled($preview, $src, 0, 0, 0, 0, $pw, $ph, $sw, $sh);
+                        imagejpeg($preview, $previewTarget, 85);
+                        imagedestroy($preview);
+                        imagedestroy($src);
+                    }
+                }
+            }
+            $localOrError = array(
+                'ok' => true,
+                'square_path' => publicista_path_to_web($squareTarget),
+                'preview_path' => file_exists($previewTarget) ? publicista_path_to_web($previewTarget) : '',
+                'face_blur_path' => '',
+                'analysis_json_path' => '',
+                'worker_result' => array('mode' => 'pollo_native_ratio', 'no_square_crop' => true),
+            );
+            $okLocal = true;
+        } else {
+            list($okLocal, $localOrError) = publicista_prepare_arbitrary_image_locally($jobId, $genOrError['raw_fs_path'], preg_replace('/[^a-z0-9_\-]/i', '_', $candidateId), 'candidates_dir');
+        }
         if (!$okLocal) {
             $candidateRow['error'] = $localOrError;
             $candidates[] = $candidateRow;
@@ -4124,7 +4179,60 @@ function publicista_regenerate_candidate($jobId, $candidateId, $refineText = '')
     $row['status'] = 'processing';
     $row['round'] = 'manual_retry';
 
-    list($okLocal, $localOrError) = publicista_prepare_arbitrary_image_locally($jobId, $genOrError['raw_fs_path'], preg_replace('/[^a-z0-9_\-]/i', '_', $candidateId) . '_manual', 'candidates_dir');
+    $usePollo = publicista_job_uses_pollo_model($job);
+    if ($usePollo) {
+        // Pollo: mantener ratio nativo (2:3, 4:3), no hacer square crop 1:1
+        $rawFs = $genOrError['raw_fs_path'];
+        $ext = strtolower(pathinfo($rawFs, PATHINFO_EXTENSION)) ?: 'jpg';
+        $candidateDir = publicista_job_fs_paths($jobId)['candidates_dir'];
+        $safeBasename = preg_replace('/[^a-z0-9_\-]/i', '_', $candidateId) . '_manual';
+        $squareTarget = $candidateDir . '/' . $safeBasename . '_square.' . $ext;
+        $previewTarget = $candidateDir . '/' . $safeBasename . '_preview.jpg';
+        if (!is_dir($candidateDir)) {
+            mkdir($candidateDir, 0755, true);
+        }
+        if (!copy($rawFs, $squareTarget)) {
+            return array(false, 'No se pudo copiar la imagen Pollo con ratio nativo.');
+        }
+        // Generar preview simple (max 320px lado más largo, manteniendo ratio)
+        if (function_exists('imagecreatefromstring')) {
+            $maxRawBytes = 10 * 1024 * 1024; // 10 MB máximo
+            $rawBytes = (filesize($squareTarget) <= $maxRawBytes) ? file_get_contents($squareTarget) : false;
+            if ($rawBytes !== false) {
+                $imgInfo = @getimagesizefromstring($rawBytes);
+                if ($imgInfo && ($imgInfo[0] * $imgInfo[1] > 50000000)) {
+                    $rawBytes = false;
+                }
+            }
+            if ($rawBytes !== false) {
+                $src = @imagecreatefromstring($rawBytes);
+                if ($src !== false) {
+                    $sw = imagesx($src);
+                    $sh = imagesy($src);
+                    $maxSide = 320;
+                    $ratio = min($maxSide / $sw, $maxSide / $sh);
+                    $pw = max(1, (int)round($sw * $ratio));
+                    $ph = max(1, (int)round($sh * $ratio));
+                    $preview = imagecreatetruecolor($pw, $ph);
+                    imagecopyresampled($preview, $src, 0, 0, 0, 0, $pw, $ph, $sw, $sh);
+                    imagejpeg($preview, $previewTarget, 85);
+                    imagedestroy($preview);
+                    imagedestroy($src);
+                }
+            }
+        }
+        $localOrError = array(
+            'ok' => true,
+            'square_path' => publicista_path_to_web($squareTarget),
+            'preview_path' => file_exists($previewTarget) ? publicista_path_to_web($previewTarget) : '',
+            'face_blur_path' => '',
+            'analysis_json_path' => '',
+            'worker_result' => array('mode' => 'pollo_native_ratio', 'no_square_crop' => true),
+        );
+        $okLocal = true;
+    } else {
+        list($okLocal, $localOrError) = publicista_prepare_arbitrary_image_locally($jobId, $genOrError['raw_fs_path'], preg_replace('/[^a-z0-9_\-]/i', '_', $candidateId) . '_manual', 'candidates_dir');
+    }
     if (!$okLocal) return array(false, $localOrError);
     $row['square_path'] = $localOrError['square_path'];
     $row['face_blur_path'] = '';
@@ -7591,9 +7699,9 @@ function publicista_ads_euros($value) {
 
 function publicista_pollo_models() {
     return array(
+        'flux-dev'         => array('name' => 'FLUX Dev (Pollo.ai)',       'modelName' => 'flux-dev',         'aspectRatio' => '2:3', 'supports_mode' => false),
         'pollo-image-v2'   => array('name' => 'Pollo Image v2',            'modelName' => 'pollo-image-v2',   'aspectRatio' => '1:1', 'resolution' => '1K', 'supports_mode' => true),
         'pollo-image-v1-6' => array('name' => 'Pollo Image v1.6',          'modelName' => 'pollo-image-v1-6', 'aspectRatio' => '1:1', 'supports_mode' => false),
-        'flux-dev'         => array('name' => 'FLUX Dev (Pollo.ai)',       'modelName' => 'flux-dev',         'aspectRatio' => '2:3', 'supports_mode' => false),
         'seedream'         => array('name' => 'Seedream (Pollo.ai)',       'modelName' => 'seedream',         'aspectRatio' => '2:3', 'supports_mode' => false),
         'nano-banana'      => array('name' => 'Nano Banana (Pollo.ai)',    'modelName' => 'nano-banana',      'aspectRatio' => '4:3', 'supports_mode' => false),
     );
