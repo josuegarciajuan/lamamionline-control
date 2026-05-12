@@ -8636,7 +8636,6 @@ function publicista_estados_wasap_fetch_active_girls() {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 15);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     $body = curl_exec($ch);
     $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $err = curl_error($ch);
@@ -8744,7 +8743,7 @@ function publicista_estados_wasap_format_catalogo_rapido($girls) {
         '',
         implode(' · ', $nombres),
         '',
-        "Todas disponibles. Pide tu cita 💬$h",
+        "Todas disponibles. Pide tu cita 💬{$h}",
     );
     return implode("\n", $lines);
 }
@@ -8765,7 +8764,7 @@ function publicista_estados_wasap_format_estrella_grupo($girls) {
         $lines[] = 'También disponible: ' . implode(', ', $resto);
     }
     $lines[] = '';
-    $lines[] = "Ven a conocernos $h💖";
+    $lines[] = "Ven a conocernos {$h}💖";
     return implode("\n", $lines);
 }
 

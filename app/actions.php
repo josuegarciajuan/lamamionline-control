@@ -278,6 +278,12 @@ function handle_post_actions() {
         case 'comercial_promote_thread':
             action_comercial_promote_thread();
             break;
+        case 'save_estados_wasap_config':
+            action_save_estados_wasap_config();
+            break;
+        case 'publicar_estado_manual':
+            action_publicar_estado_manual();
+            break;
         case 'dismiss_aviso':
             action_dismiss_aviso();
             break;
@@ -3776,4 +3782,22 @@ function action_comercial_promote_thread() {
     }
     set_flash('error', is_string($result) ? $result : 'No se pudo crear el lead.');
     redirect_to(comercial_page_url('conversaciones'));
+}
+
+// ─── Estados Wasap ────────────────────────────────────────────────────────
+
+function action_save_estados_wasap_config() {
+    $config = publicista_estados_wasap_save_config($_POST);
+    set_flash('ok', 'Configuración de estados Wasap guardada.');
+    redirect_to('index.php?page=publicista&tab=estados_wasap');
+}
+
+function action_publicar_estado_manual() {
+    $result = publicista_estados_wasap_publicar_ahora();
+    if (!empty($result['ok'])) {
+        set_flash('ok', $result['message']);
+    } else {
+        set_flash('error', $result['error']);
+    }
+    redirect_to('index.php?page=publicista&tab=estados_wasap');
 }

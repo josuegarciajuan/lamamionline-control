@@ -39,11 +39,12 @@
 
 ### MotorEstados — Lógica de negocio
 
-- [ ] Fetch chicas activas desde `girls.json` (con caché local).
-- [ ] Construir texto del estado según formato seleccionado (emojis, enlaces de fotos).
-- [ ] Publicar vía WAHA `POST /api/{session}/status/text` usando `comercial_waha_post_json()`.
-- [ ] Registrar resultado en log.
-- [ ] Acciones: `action_save_estados_wasap_config`, `action_publicar_estado_manual`.
+- [x] Fetch chicas activas desde `girls.json` (con caché local de 15 min).
+- [x] Construir texto del estado según formato seleccionado (emojis, enlaces de fotos).
+- [x] Publicar vía WAHA `POST /api/{session}/status/text` usando `comercial_waha_post_json()`.
+- [x] Registrar resultado en log con rotación (máx 200 entradas).
+- [x] Acciones: `action_save_estados_wasap_config`, `action_publicar_estado_manual`.
+- [x] Validación funcional de todos los formatos, fetch, publish, log.
 
 ### PanelEstados — Interfaz visual
 

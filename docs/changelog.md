@@ -195,6 +195,25 @@ Eliminar el patrón "mismo fondo en las 4 fotos" que delataba IA. Cada foto del 
 ### Motivo
 Primera fase de la feature EstadosWasap: establecer el modelo de datos, configuración y funciones base para permitir la publicación automática de estados de WhatsApp con fotos de chicas activas desde las líneas bot casa.
 
+## 2026-05-12 · EstadosWasap MotorEstados — Lógica de negocio
+
+### Cambios
+- Se implementó `publicista_estados_wasap_fetch_active_girls()`: fetch HTTPS de `girls.json` con caché local de 15 min y fallback a caché expirada si falla la red.
+- Se implementaron 6 builders de formato de estado (`chicas_de_hoy`, `chica_del_dia`, `duo_sexy`, `catalogo_rapido`, `estrella_grupo`, `mix_aleatorio`) con emojis aleatorios y tono sexy.
+- Se implementó `publicista_estados_wasap_publicar_ahora()`: orquestador que obtiene chicas activas, construye texto y publica en cada línea bot casa habilitada vía WAHA `POST /api/default/status/text`.
+- Se añadió `publicista_estados_wasap_get_waha_settings()` para obtener host/key/timeout de la config comercial con fallback a defaults.
+- Se añadieron acciones POST: `save_estados_wasap_config` y `publicar_estado_manual` en `app/actions.php`.
+- Publicación verificada con éxito: WAHA respondió 201 Created en línea publi2.
+
+### Archivos
+- `app/publicista.php` (+195 líneas: 11 funciones nuevas)
+- `app/actions.php` (+18 líneas: 2 acciones + dispatch cases)
+- `spec/tasks.md` (MotorEstados completado)
+- `docs/changelog.md`
+
+### Motivo
+Dotar de lógica de negocio completa para publicar estados de WhatsApp atractivos con fotos de chicas activas desde las líneas bot casa, con formatos variados y registro de actividad.
+
 ## 2026-05-12 · Fase planos — Encuadres casuales y no profesionales (Publicista Perfiles)
 
 ### Cambios
