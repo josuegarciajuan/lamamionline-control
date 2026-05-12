@@ -2338,6 +2338,7 @@ function publicista_build_outfit_prompt_details($job) {
         'plateado' => 'plateado / metálico',
     );
     $styleMap = array(
+        'auto_random'        => 'look automático asignado por el sistema — ropa barata y sexy de barrio',
         'vestido_corto'      => 'vestido corto por encima de la rodilla, de línea limpia y acabado editorial',
         'vestido_largo'      => 'vestido largo elegante de presencia premium',
         'conjunto_top'       => 'conjunto de top y falda con apariencia sofisticada y urbana',
@@ -2351,7 +2352,7 @@ function publicista_build_outfit_prompt_details($job) {
     );
     $levelMap = array(
         'discreto'  => 'atractivo editorial discreto, con cobertura elegante, silueta favorecedora, tejido opaco y estilo premium NO sexual, sin transparencias, sin ropa interior visible y sin desnudo',
-        'sexy'      => 'atractivo editorial adulto y glamouroso, con silueta favorecedora, corte pulido, detalles visuales sofisticados y cobertura elegante, expresamente NO sexual, sin transparencias, sin mostrar ropa interior y sin desnudo',
+        'sexy'      => 'sexy y provocativo de barrio, con silueta marcada y favorecedora, ropa ceñida, algo de piel visible (hombros, piernas, cintura, escote moderado), expresamente NO sexual — sin lencería visible, sin transparencias explícitas, sin desnudo, sin tanga a la vista. Glamour de discoteca de barrio, no de pasarela.',
         'sugerente' => 'presencia editorial adulta, magnética y fotogénica, con glamour comercial impactante pero expresamente NO sexual, sin transparencias, sin ropa interior visible, sin desnudo y sin lectura erótica explícita',
     );
     $fitMap = array(
@@ -2375,11 +2376,11 @@ function publicista_build_outfit_prompt_details($job) {
     $level = $levelMap[$pp['level'] ?? 'sexy'] ?? $levelMap['sexy'];
     $fit = $fitMap[$pp['fit'] ?? 'ajustado'] ?? 'ajustado al cuerpo';
 
-    $texture = 'tejido opaco de calidad con textura visible, costuras limpias, paneles definidos y acabado fotográfico premium';
+    $texture = 'tejido económico con textura visible: poliéster barato, algodón fino de mercadillo, licra, denim desgastado. La ropa debe verse accesible y cotidiana, nada de lujo ni diseño. Con arrugas naturales y caída real, no planchada ni perfecta. Aspecto de ropa de Primark/Shein/Zara básico, no de firma de lujo.';
     if (($pp['fit'] ?? 'ajustado') === 'fluido') {
-        $texture = 'tejido opaco con caída elegante, textura visible y movimiento limpio, con capas visuales sutiles, sin efecto plástico ni uniforme';
+        $texture = 'tejido barato con caída suelta y movimiento natural, poliéster o viscosa de mercadillo, con arrugas sutiles y aspecto cotidiano';
     } elseif (($pp['fit'] ?? 'ajustado') === 'semi') {
-        $texture = 'tejido opaco refinado con textura sutil, paneles, costuras elegantes y detalles de confección visibles de aspecto premium';
+        $texture = 'tejido económico semi-ajustado, algodón mezcla o punto barato, con textura visible y caída real, nada de acabado perfecto';
     }
 
     $styling = ($color !== '')
@@ -2430,7 +2431,14 @@ function publicista_build_outfit_session_lock($job) {
     $varietyMode = trim((string)($pp['outfit_variety'] ?? 'off'));
     $details = publicista_build_outfit_prompt_details($job);
 
-    $styleKey = trim((string)($pp['style'] ?? 'vaqueros_top'));
+    $styleKey = trim((string)($pp['style'] ?? 'auto_random'));
+    if ($styleKey === 'auto_random') {
+        return array(
+            'strict_summary' => 'Cada imagen lleva un look distinto asignado automáticamente.',
+            'consistency_block' => 'CADA IMAGEN DEBE LLEVAR UN LOOK DIFERENTE asignado en [ROPA PARA ESTA IMAGEN]. No repitas el mismo outfit. La ropa debe ser barata, sexy de barrio, sin lujo. Mira la sección [ROPA PARA ESTA IMAGEN] de cada imagen para saber qué look concreto usar.',
+            'negative_block' => 'NO uses la misma ropa en todas las fotos. Varía entre looks distintos. No uses ropa de lujo ni de pasarela.',
+        );
+    }
     $fitKey = trim((string)($pp['fit'] ?? 'ajustado'));
     $levelKey = trim((string)($pp['level'] ?? 'sexy'));
     $rawComplements = is_array($pp['complements'] ?? null) ? $pp['complements'] : array();
@@ -8423,4 +8431,142 @@ function publicista_generate_candidate_image_pollo($jobId, $candidateIndex, $pro
         'retry_applied' => $workerAttempt > 1,
         'backend' => (string)($resultData['backend'] ?? 'python'),
     ));
+}
+
+// ─── Estados Wasap ─────────────────────────────────────────────────────────
+
+function publicista_estados_wasap_config_defaults() {
+    return array(
+        'enabled' => 0,
+        'frecuencia_tipo' => 'cada_x_horas',
+        'frecuencia_valor' => 6,
+        'hora_inicio' => '08:00',
+        'hora_fin' => '23:00',
+        'formato' => 'chicas_de_hoy',
+        'lineas' => array(),
+        'updated_at' => '',
+    );
+}
+
+function publicista_estados_wasap_format_options() {
+    return array(
+        'chicas_de_hoy' => 'Chicas de hoy (todas con 1 foto)',
+        'chica_del_dia' => 'Chica del día (1 al azar con 2 fotos)',
+        'duo_sexy' => 'Dúo sexy (2 al azar, 1 foto c/u)',
+        'catalogo_rapido' => 'Catálogo rápido (solo nombres)',
+        'estrella_grupo' => 'Estrella + grupo (1 destacada + resto)',
+        'mix_aleatorio' => 'Mix aleatorio (alterna formatos)',
+    );
+}
+
+function publicista_estados_wasap_frecuencia_options() {
+    return array(
+        'cada_x_horas' => 'Cada X horas',
+        'x_veces_al_dia' => 'X veces al día',
+    );
+}
+
+function publicista_estados_wasap_get_config() {
+    $data = storage_read('publicista_estados_wasap.json');
+    $raw = is_array($data) && isset($data['config']) ? $data['config'] : array();
+    return publicista_estados_wasap_config_normalize($raw);
+}
+
+function publicista_estados_wasap_config_normalize($row) {
+    $row = is_array($row) ? $row : array();
+    $cfg = array_merge(publicista_estados_wasap_config_defaults(), $row);
+
+    $cfg['enabled'] = !empty($cfg['enabled']) ? 1 : 0;
+
+    $allowedFreq = array_keys(publicista_estados_wasap_frecuencia_options());
+    $cfg['frecuencia_tipo'] = in_array($cfg['frecuencia_tipo'], $allowedFreq, true)
+        ? $cfg['frecuencia_tipo'] : 'cada_x_horas';
+
+    $cfg['frecuencia_valor'] = max(1, min(24, (int)($cfg['frecuencia_valor'] ?? 6)));
+
+    $cfg['hora_inicio'] = publicista_estados_wasap_normalize_hhmm((string)($cfg['hora_inicio'] ?? '08:00'), '08:00');
+    $cfg['hora_fin']   = publicista_estados_wasap_normalize_hhmm((string)($cfg['hora_fin'] ?? '23:00'), '23:00');
+
+    $allowedFormats = array_keys(publicista_estados_wasap_format_options());
+    $cfg['formato'] = in_array($cfg['formato'], $allowedFormats, true)
+        ? $cfg['formato'] : 'chicas_de_hoy';
+
+    $cfg['lineas'] = array_values(array_unique(array_filter(
+        array_map('trim', (array)($cfg['lineas'] ?? array())),
+        function($id) { return $id !== ''; }
+    )));
+
+    $cfg['updated_at'] = trim((string)($cfg['updated_at'] ?? ''));
+    return $cfg;
+}
+
+function publicista_estados_wasap_normalize_hhmm($value, $default) {
+    $value = trim((string)$value);
+    if (preg_match('/^([01]\d|2[0-3]):([0-5]\d)$/', $value)) {
+        return $value;
+    }
+    return $default;
+}
+
+function publicista_estados_wasap_save_config($row) {
+    $data = storage_read('publicista_estados_wasap.json');
+    if (!is_array($data)) {
+        $data = array();
+    }
+    $cfg = publicista_estados_wasap_config_normalize($row);
+    $cfg['updated_at'] = now_datetime();
+    $data['config'] = $cfg;
+    if (!isset($data['log']) || !is_array($data['log'])) {
+        $data['log'] = array();
+    }
+    storage_write('publicista_estados_wasap.json', $data);
+    return $cfg;
+}
+
+function publicista_estados_wasap_get_log() {
+    $data = storage_read('publicista_estados_wasap.json');
+    if (!is_array($data) || !isset($data['log'])) {
+        return array();
+    }
+    return $data['log'];
+}
+
+function publicista_estados_wasap_add_log_entry($entry) {
+    $data = storage_read('publicista_estados_wasap.json');
+    if (!is_array($data)) {
+        $data = array();
+    }
+    if (!isset($data['log']) || !is_array($data['log'])) {
+        $data['log'] = array();
+    }
+    if (!isset($data['config']) || !is_array($data['config'])) {
+        $data['config'] = publicista_estados_wasap_config_defaults();
+    }
+
+    // Keep last 200 entries max
+    while (count($data['log']) >= 200) {
+        array_shift($data['log']);
+    }
+
+    $data['log'][] = $entry;
+    storage_write('publicista_estados_wasap.json', $data);
+}
+
+function publicista_estados_wasap_get_bot_casa_lines() {
+    $telefonos = storage_read('telefonos.json');
+    $lines = array();
+    foreach ((array)$telefonos as $t) {
+        $uso = trim((string)($t['uso'] ?? ''));
+        $wahaPort = trim((string)($t['waha_port'] ?? ''));
+        if ($uso === 'bot casa' && $wahaPort !== '') {
+            $lines[] = array(
+                'id' => trim((string)($t['id'] ?? '')),
+                'nombre' => trim((string)($t['nombre'] ?? '')),
+                'tfono' => trim((string)($t['tfono'] ?? '')),
+                'waha_port' => $wahaPort,
+                'waha' => trim((string)($t['waha'] ?? '')),
+            );
+        }
+    }
+    return $lines;
 }

@@ -25,6 +25,38 @@
 - [ ] Smoke tests críticos + reapertura.
 - [ ] Rollback operativo (<10 min) validado.
 
+## EstadosWasap — Publicación automática de estados de WhatsApp
+
+### SetupEstados — Datos y configuración
+
+- [x] Crear `data/publicista_estados_wasap.json` con estructura de config y log.
+- [x] Definir defaults: `enabled=0`, `frecuencia_tipo=cada_x_horas`, `frecuencia_valor=6`, `hora_inicio=08:00`, `hora_fin=23:00`, `formato=chicas_de_hoy`, `lineas=[]`.
+- [x] Implementar 6 formatos de publicación (`chicas_de_hoy`, `chica_del_dia`, `duo_sexy`, `catalogo_rapido`, `estrella_grupo`, `mix_aleatorio`).
+- [x] Implementar 2 modos de frecuencia (`cada_x_horas`, `x_veces_al_dia`).
+- [x] Funciones CRUD en `app/publicista.php`: `get_config`, `save_config`, `config_normalize`, `get_log`, `add_log_entry`.
+- [x] Función dinámica `get_bot_casa_lines()` para obtener líneas con `uso=bot casa` y `waha_port` configurado.
+- [x] Validar sintaxis PHP y pruebas funcionales de lectura/escritura/normalización/dedupe.
+
+### MotorEstados — Lógica de negocio
+
+- [ ] Fetch chicas activas desde `girls.json` (con caché local).
+- [ ] Construir texto del estado según formato seleccionado (emojis, enlaces de fotos).
+- [ ] Publicar vía WAHA `POST /api/{session}/status/text` usando `comercial_waha_post_json()`.
+- [ ] Registrar resultado en log.
+- [ ] Acciones: `action_save_estados_wasap_config`, `action_publicar_estado_manual`.
+
+### PanelEstados — Interfaz visual
+
+- [ ] Añadir tab `estados_wasap` en `render_publicista_page()`.
+- [ ] Formulario de configuración (on/off, frecuencia, horario, formato, selector de líneas bot casa).
+- [ ] Botón "Publicar ahora" para prueba manual.
+- [ ] Tabla de log con historial de publicaciones.
+
+### AutoEstados — Publicación automática
+
+- [ ] Worker que evalúa frecuencia y dispara publicaciones.
+- [ ] Integración con sistema de tasks de publicista.
+
 ## CX2 — Desbloqueo SDD bot comercial (F1..F8)
 
 ### CX2-F1 — Modelo base de interés real

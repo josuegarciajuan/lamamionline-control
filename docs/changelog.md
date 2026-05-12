@@ -176,6 +176,25 @@ Cerrar formalmente la fase documental del bloque CX2 con contratos auditados de 
 ### Motivo
 Eliminar el patrón "mismo fondo en las 4 fotos" que delataba IA. Cada foto del pack recibe un fondo natural distinto automáticamente, simulando fotos reales en días y lugares diferentes.
 
+## 2026-05-12 · EstadosWasap SetupEstados — Datos y configuración
+
+### Cambios
+- Se creó `data/publicista_estados_wasap.json` como almacén de configuración y log de publicaciones de estados de WhatsApp.
+- Se implementaron funciones CRUD en `app/publicista.php`: `publicista_estados_wasap_config_defaults()`, `publicista_estados_wasap_get_config()`, `publicista_estados_wasap_save_config()`, `publicista_estados_wasap_config_normalize()`, `publicista_estados_wasap_get_log()`, `publicista_estados_wasap_add_log_entry()`.
+- Se definieron 6 formatos de publicación (`chicas_de_hoy`, `chica_del_dia`, `duo_sexy`, `catalogo_rapido`, `estrella_grupo`, `mix_aleatorio`) y 2 modos de frecuencia (`cada_x_horas`, `x_veces_al_dia`).
+- Se añadió `publicista_estados_wasap_get_bot_casa_lines()` para detectar dinámicamente líneas con `uso="bot casa"` desde `telefonos.json`.
+- Normalización con validación de enums, clamping de valores numéricos, dedupe de IDs de línea y validación HH:MM vía regex.
+- Log con rotación automática (máximo 200 entradas).
+
+### Archivos
+- `data/publicista_estados_wasap.json` (nuevo)
+- `app/publicista.php` (+90 líneas)
+- `spec/tasks.md` (fase SetupEstados)
+- `docs/changelog.md`
+
+### Motivo
+Primera fase de la feature EstadosWasap: establecer el modelo de datos, configuración y funciones base para permitir la publicación automática de estados de WhatsApp con fotos de chicas activas desde las líneas bot casa.
+
 ## 2026-05-12 · Fase planos — Encuadres casuales y no profesionales (Publicista Perfiles)
 
 ### Cambios
