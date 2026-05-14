@@ -8539,16 +8539,29 @@ function publicista_generate_candidate_images_pollo_batch($jobId, $numOutputs, $
             'prompt_guard_applied' => 1,
         ));
 
-        $fullCommand = 'python3 ' . escapeshellarg($worker)
-            . ' generate'
-            . ' --cookie ' . escapeshellarg($cookie)
-            . ' --prompt ' . escapeshellarg($promptToUse)
-            . ' --model ' . escapeshellarg($modelKey)
-            . ' --num-outputs ' . escapeshellarg((string)$numOutputs)
-            . ' --output-dir ' . escapeshellarg($paths['candidates_dir'])
-            . ' --output-prefix ' . escapeshellarg('pollo_batch_')
-            . ' --output-json ' . escapeshellarg($jsonFs)
-            . ' --timeout 420';
+        if ($numOutputs <= 1) {
+            $singleOutput = $paths['candidates_dir'] . '/pollo_batch_01.jpg';
+            $fullCommand = 'python3 ' . escapeshellarg($worker)
+                . ' generate'
+                . ' --cookie ' . escapeshellarg($cookie)
+                . ' --prompt ' . escapeshellarg($promptToUse)
+                . ' --model ' . escapeshellarg($modelKey)
+                . ' --num-outputs 1'
+                . ' --output-image ' . escapeshellarg($singleOutput)
+                . ' --output-json ' . escapeshellarg($jsonFs)
+                . ' --timeout 420';
+        } else {
+            $fullCommand = 'python3 ' . escapeshellarg($worker)
+                . ' generate'
+                . ' --cookie ' . escapeshellarg($cookie)
+                . ' --prompt ' . escapeshellarg($promptToUse)
+                . ' --model ' . escapeshellarg($modelKey)
+                . ' --num-outputs ' . escapeshellarg((string)$numOutputs)
+                . ' --output-dir ' . escapeshellarg($paths['candidates_dir'])
+                . ' --output-prefix ' . escapeshellarg('pollo_batch_')
+                . ' --output-json ' . escapeshellarg($jsonFs)
+                . ' --timeout 420';
+        }
 
         $proc = publicista_proc_command($fullCommand, 520, BASE_PATH);
         publicista_job_log_write($jobId, 'pollo_worker_batch_try' . $workerAttempt, array(
