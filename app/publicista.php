@@ -4038,6 +4038,10 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
         $lastPolloError = '';
         foreach ($variants as $vi => $variantPrompt) {
             $singlePrompt = trim((string)$variantPrompt);
+            // Pequeña pausa entre variantes para no saturar la API de Pollo
+            if ($vi > 0) {
+                sleep(3);
+            }
             list($okOne, $resultOrError) = publicista_generate_candidate_images_pollo_batch(
                 $jobId, 1, $singlePrompt, $pipelineImageModel, $job
             );
