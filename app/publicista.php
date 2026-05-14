@@ -1690,121 +1690,85 @@ function publicista_openai_image_edit($prompt, $imagePath, $options = array()) {
 }
 
 
-function publicista_outpaint_to_phone_ratio($jobId, $squareImagePath, $candidateId) {
-    $job = publicista_job_get($jobId);
+function publicista_crop_to_phone_ratio($squareFsPath, $outputDir, $outputBasename) {
     $result = array(
         'ok' => false,
-        'outpainted_path' => '',
+        'cropped_path' => '',
+        'cropped_fs' => '',
         'ratio' => '',
         'error' => '',
     );
 
-    if (!file_exists($squareImagePath)) {
-        $result['error'] = 'No existe la imagen cuadrada para outpainting.';
+    if (!file_exists($squareFsPath) || !function_exists('imagecreatefromstring')) {
+        $result['error'] = 'Imagen no encontrada o GD no disponible.';
         return $result;
     }
 
-    // Ratios de móvil disponibles
-    $ratios = array('2:3', '3:4', '4:5', '9:16');
-    $targetRatio = $ratios[array_rand($ratios)];
+    $ratios = array(
+        '2:3' => array(2, 3),
+        '3:4' => array(3, 4),
+        '4:5' => array(4, 5),
+        '9:16' => array(9, 16),
+    );
+    $ratioKey = array_rand($ratios);
+    list($rw, $rh) = $ratios[$ratioKey];
 
-    $candidateDir = publicista_job_fs_paths($jobId)['candidates_dir'];
-    if (!is_dir($candidateDir)) {
-        mkdir($candidateDir, 0755, true);
-    }
-    $safeId = preg_replace('/[^a-z0-9_\-]/i', '_', $candidateId);
-    $paddedPath = $candidateDir . '/' . $safeId . '_padded.png';
-    $maskPath = $candidateDir . '/' . $safeId . '_mask.png';
-    $outpaintedPath = $candidateDir . '/' . $safeId . '_outpainted.jpg';
-    $jsonPath = $candidateDir . '/' . $safeId . '_pad_meta.json';
-
-    // Paso 1: Crear lienzo con padding + máscara via Python worker
-    $workerScript = BASE_PATH . '/tools/publicista_image_worker.py';
-    $cmd = 'python3 '
-        . escapeshellarg($workerScript) . ' pad-canvas '
-        . '--input ' . escapeshellarg($squareImagePath) . ' '
-        . '--output-padded ' . escapeshellarg($paddedPath) . ' '
-        . '--output-mask ' . escapeshellarg($maskPath) . ' '
-        . '--ratio ' . escapeshellarg($targetRatio) . ' '
-        . '--base-size 1024 '
-        . '--output-json ' . escapeshellarg($jsonPath);
-
-    $cmdOutput = array();
-    $cmdCode = 0;
-    exec($cmd . ' 2>&1', $cmdOutput, $cmdCode);
-
-    if ($cmdCode !== 0 || !file_exists($paddedPath) || !file_exists($maskPath)) {
-        $result['error'] = 'El worker Python (pad-canvas) falló. Código: ' . $cmdCode . '. Salida: ' . implode("\n", array_slice($cmdOutput, 0, 10));
+    $maxRaw = 10 * 1024 * 1024;
+    $rawBytes = (filesize($squareFsPath) <= $maxRaw) ? file_get_contents($squareFsPath) : false;
+    if ($rawBytes === false) {
+        $result['error'] = 'No se pudo leer la imagen.';
         return $result;
     }
 
-    // Leer dimensiones del lienzo para el size del API
-    $canvasW = 1024;
-    $canvasH = 1024;
-    if (file_exists($jsonPath)) {
-        $meta = json_decode(file_get_contents($jsonPath), true);
-        if (is_array($meta)) {
-            $canvasW = (int)($meta['canvas_width'] ?? 1024);
-            $canvasH = (int)($meta['canvas_height'] ?? 1024);
+    $src = @imagecreatefromstring($rawBytes);
+    if ($src === false) {
+        $result['error'] = 'No se pudo decodificar la imagen.';
+        return $result;
+    }
+
+    $sw = imagesx($src);
+    $sh = imagesy($src);
+
+    // Calcular dimensiones del recorte manteniendo el lado más largo
+    if ($sw >= $sh) {
+        // Horizontal: mantener altura, recortar anchura
+        $cropH = $sh;
+        $cropW = (int)round($sh * $rw / $rh);
+        if ($cropW > $sw) {
+            $cropW = $sw;
+            $cropH = (int)round($sw * $rh / $rw);
+        }
+    } else {
+        // Vertical: mantener anchura, recortar altura
+        $cropW = $sw;
+        $cropH = (int)round($sw * $rh / $rw);
+        if ($cropH > $sh) {
+            $cropH = $sh;
+            $cropW = (int)round($sh * $rw / $rh);
         }
     }
 
-    // Paso 2: Outpainting via OpenAI Image Edit
-    $outpaintPrompt = implode(' ', array(
-        'Extend the background naturally beyond the visible area.',
-        'The person in the center must remain EXACTLY identical — no changes to the person at all.',
-        'Continue the same wall, floor, room, furniture, and environment seamlessly as if the photo was originally taken with a wider angle.',
-        'The result must look like a single unedited photo taken with a phone camera.',
-        'No text, no watermark, no artifacts, no distortion.',
-    ));
+    // Recorte centrado
+    $ox = (int)(($sw - $cropW) / 2);
+    $oy = (int)(($sh - $cropH) / 2);
+    if ($ox < 0) $ox = 0;
+    if ($oy < 0) $oy = 0;
 
-    $editOptions = array(
-        'model' => publicista_ai_config()['image_model'],
-        'size' => $canvasW . 'x' . $canvasH,
-        'n' => 1,
-        'mask_path' => $maskPath,
-    );
+    $cropped = imagecreatetruecolor($cropW, $cropH);
+    imagecopyresampled($cropped, $src, 0, 0, $ox, $oy, $cropW, $cropH, $cropW, $cropH);
+    imagedestroy($src);
 
-    $editResult = publicista_openai_image_edit($outpaintPrompt, $paddedPath, $editOptions);
-
-    if (!$editResult['ok']) {
-        $result['error'] = 'Outpainting GPT falló: ' . ($editResult['error'] ?? 'Error desconocido.');
-        // Limpiar archivos temporales
-        @unlink($paddedPath);
-        @unlink($maskPath);
-        @unlink($jsonPath);
-        return $result;
+    if (!is_dir($outputDir)) {
+        mkdir($outputDir, 0755, true);
     }
-
-    // Paso 3: Guardar imagen outpainted
-    $imageData = publicista_decode_generated_image_bytes($editResult['decoded']);
-    if (!$imageData[0]) {
-        $result['error'] = 'No se pudo decodificar la imagen outpainted: ' . $imageData[1];
-        @unlink($paddedPath);
-        @unlink($maskPath);
-        @unlink($jsonPath);
-        return $result;
-    }
-
-    $bytes = $imageData[1];
-    if (file_put_contents($outpaintedPath, $bytes) === false) {
-        $result['error'] = 'No se pudo guardar la imagen outpainted.';
-        @unlink($paddedPath);
-        @unlink($maskPath);
-        @unlink($jsonPath);
-        return $result;
-    }
-
-    // Limpiar temporales
-    @unlink($paddedPath);
-    @unlink($maskPath);
-    @unlink($jsonPath);
+    $croppedFs = $outputDir . '/' . $outputBasename . '_phone.jpg';
+    imagejpeg($cropped, $croppedFs, 92);
+    imagedestroy($cropped);
 
     $result['ok'] = true;
-    $result['outpainted_path'] = publicista_path_to_web($outpaintedPath);
-    $result['outpainted_fs'] = $outpaintedPath;
-    $result['ratio'] = $targetRatio;
-    $result['generation_id'] = $editResult['request_id'];
+    $result['cropped_fs'] = $croppedFs;
+    $result['cropped_path'] = publicista_path_to_web($croppedFs);
+    $result['ratio'] = $ratioKey;
 
     return $result;
 }
@@ -3813,7 +3777,6 @@ function publicista_build_direct_final_output($jobId, $candidate, $finalIndex, $
         'premium_refined' => 0,
         'premium_refine_error' => 'Final directa: se reutiliza la imagen candidata sin refinado automático.',
         'outpaint_ratio' => '',
-        'outpaint_generation_id' => '',
         'generation' => is_array(publicista_array_get($candidate, 'generation', array())) ? publicista_array_get($candidate, 'generation', array()) : array(),
     );
 
@@ -3835,26 +3798,22 @@ function publicista_build_direct_final_output($jobId, $candidate, $finalIndex, $
         }
     }
 
-    // Outpainting GPT para Pollo: convierte la final 1:1 a ratio de móvil
+    // Crop GD a ratio de móvil para Pollo: recorte centrado, sin API
     $usePolloFinal = $job && function_exists('publicista_job_uses_pollo_model') && publicista_job_uses_pollo_model($job);
     if ($usePolloFinal && $out['final_path'] !== '') {
         $finalFs = BASE_PATH . '/' . ltrim($out['final_path'], '/');
         if (file_exists($finalFs)) {
-            $outpaintResult = publicista_outpaint_to_phone_ratio($jobId, $finalFs, 'final_' . $index);
-            if ($outpaintResult['ok'] && !empty($outpaintResult['outpainted_fs']) && file_exists($outpaintResult['outpainted_fs'])) {
-                // Reemplazar la final con la versión outpainted
-                $out['final_path'] = $outpaintResult['outpainted_path'];
-                $out['square_path'] = $outpaintResult['outpainted_path'];
-                $out['refine_proposal_path'] = $outpaintResult['outpainted_path'];
+            $cropResult = publicista_crop_to_phone_ratio($finalFs, $paths['finals_dir'], 'final_' . $index);
+            if ($cropResult['ok']) {
+                $out['final_path'] = $cropResult['cropped_path'];
+                $out['square_path'] = $cropResult['cropped_path'];
                 $out['premium_refined'] = 1;
                 $out['premium_refine_error'] = '';
-                $out['outpaint_ratio'] = $outpaintResult['ratio'];
-                $out['outpaint_generation_id'] = $outpaintResult['generation_id'];
-                // Generar preview desde la imagen outpainted
+                $out['outpaint_ratio'] = $cropResult['ratio'];
+                // Regenerar preview con la imagen recortada
                 $previewOutFs = $paths['finals_dir'] . '/final_' . $index . '_preview.jpg';
-                if (function_exists('imagecreatefromstring')) {
-                    $maxRaw = 10 * 1024 * 1024;
-                    $rawPrev = (filesize($outpaintResult['outpainted_fs']) <= $maxRaw) ? file_get_contents($outpaintResult['outpainted_fs']) : false;
+                if (function_exists('imagecreatefromstring') && file_exists($cropResult['cropped_fs'])) {
+                    $rawPrev = (filesize($cropResult['cropped_fs']) <= (10*1024*1024)) ? file_get_contents($cropResult['cropped_fs']) : false;
                     if ($rawPrev !== false) {
                         $infoPrev = @getimagesizefromstring($rawPrev);
                         if ($infoPrev && ($infoPrev[0] * $infoPrev[1] <= 50000000)) {
@@ -3876,7 +3835,7 @@ function publicista_build_direct_final_output($jobId, $candidate, $finalIndex, $
                     $out['preview_path'] = publicista_path_to_web($previewOutFs);
                 }
             } else {
-                $out['premium_refine_error'] = 'Outpainting falló: ' . ($outpaintResult['error'] ?? 'desconocido') . '. Se mantiene la imagen 1:1.';
+                $out['premium_refine_error'] = 'Crop a ratio falló: ' . ($cropResult['error'] ?? 'desconocido') . '. Se mantiene 1:1.';
             }
         }
     }
@@ -4030,7 +3989,23 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
     $polloBatchImages = array();
     $polloBatchMeta = array();
     if ($usePollo) {
-        $batchPrompt = trim((string)($variants[0] ?? ''));
+        // Construir prompt compuesto: variante base + instrucciones de variedad
+        // para que Pollo distribuya fondos y ropa distintos entre las 4 imágenes.
+        $varietyLines = array();
+        foreach ($variants as $vi => $vp) {
+            $vpStr = trim((string)$vp);
+            if (preg_match('/\[FONDO PARA ESTA IMAGEN\].*?(?=\[|$)/s', $vpStr, $m)) {
+                $varietyLines[] = 'Imagen ' . ($vi + 1) . ' — ' . trim($m[0]);
+            }
+            if (preg_match('/\[ROPA PARA ESTA IMAGEN\].*?(?=\[|$)/s', $vpStr, $m)) {
+                $varietyLines[] = 'Imagen ' . ($vi + 1) . ' — ' . trim($m[0]);
+            }
+        }
+        $varietyBlock = '';
+        if (!empty($varietyLines)) {
+            $varietyBlock = "\n\n[VARIEDAD ENTRE IMÁGENES] Genera 4 imágenes. Cada una debe usar una combinación DIFERENTE de las siguientes:\n" . implode("\n", $varietyLines);
+        }
+        $batchPrompt = trim((string)($variants[0] ?? '') . $varietyBlock);
         list($okPolloBatch, $polloBatchOrError) = publicista_generate_candidate_images_pollo_batch($jobId, count($variants), $batchPrompt, $pipelineImageModel, $job);
         if (!$okPolloBatch) {
             return array(false, is_string($polloBatchOrError) ? $polloBatchOrError : 'No se pudo generar el lote de candidatas con Pollo.ai.');
