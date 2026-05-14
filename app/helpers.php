@@ -611,6 +611,7 @@ function publicista_setting_type_options() {
         'dormitorio_real' => 'Dormitorio real (habitación normal, objetos cotidianos)',
         'salon_casa'    => 'Salón de casa (ambiente doméstico vivido)',
         'espejo_selfie' => 'Selfie de espejo (baño o habitación con espejo)',
+        'neutro'          => 'Fondo neutro (gris liso, para editar después)',
     );
 }
 

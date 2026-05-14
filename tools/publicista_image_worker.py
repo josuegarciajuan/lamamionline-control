@@ -337,6 +337,64 @@ def pad_canvas_for_outpaint(args: argparse.Namespace) -> Dict:
 
 
 # ---------------------------------------------------------------------------
+# Detección de fondo gris neutro para máscara binaria
+# ---------------------------------------------------------------------------
+
+def extract_mask_for_neutro_bg(args: argparse.Namespace) -> Dict:
+    """Detecta el fondo gris neutro y genera una máscara binaria.
+    Blanco (255) = fondo a reemplazar, Negro (0) = persona a preservar."""
+    img = cv2.imread(args.input)
+    if img is None:
+        raise RuntimeError(f"No se pudo leer la imagen: {args.input}")
+
+    h, w = img.shape[:2]
+
+    # Convertir a HSV para detectar grises (baja saturación, valor medio-alto)
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    
+    # Grises: saturación baja (< 40), valor entre 100 y 240
+    lower = np.array([0, 0, 100])
+    upper = np.array([180, 40, 240])
+    mask_gray = cv2.inRange(hsv, lower, upper)
+
+    # Dilatar ligeramente para capturar bordes suaves
+    kernel = np.ones((5, 5), np.uint8)
+    mask_gray = cv2.dilate(mask_gray, kernel, iterations=2)
+
+    # Invertir: el fondo gris debe ser blanco (editar), persona negra (preservar)
+    # Pero queremos que la máscara para OpenAI sea: blanco=editar, negro=preservar
+    # OpenCV: inRange devuelve 255 para los píxeles que coinciden (grises)
+    # Ya tenemos: gris=255, persona=0 → esto es correcto para OpenAI edit
+    
+    # Suavizar bordes
+    mask_gray = cv2.GaussianBlur(mask_gray, (21, 21), 0)
+
+    os.makedirs(os.path.dirname(args.output_mask), exist_ok=True)
+    cv2.imwrite(args.output_mask, mask_gray)
+
+    # Calcular % de fondo detectado
+    total_pixels = h * w
+    bg_pixels = np.count_nonzero(mask_gray > 128)
+    bg_percent = round(bg_pixels / total_pixels * 100, 1)
+
+    result = {
+        'ok': True,
+        'input_path': args.input,
+        'output_mask': args.output_mask,
+        'width': int(w),
+        'height': int(h),
+        'bg_percent': bg_percent,
+        'bg_detected': bg_percent > 20,
+    }
+
+    if args.output_json:
+        os.makedirs(os.path.dirname(args.output_json), exist_ok=True)
+        with open(args.output_json, 'w', encoding='utf-8') as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+    return result
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -377,6 +435,11 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument('--ratio', default='', help='Ratio destino (ej: 2:3). Si no se especifica, aleatorio.')
     pc.add_argument('--base-size', type=int, default=1024, help='Tamaño base del lado más largo')
 
+    em = sub.add_parser('extract-mask', help='Detecta fondo gris neutro y genera mascara binaria para GPT outpainting')
+    em.add_argument('--input', required=True)
+    em.add_argument('--output-mask', required=True)
+    em.add_argument('--output-json', default='')
+
     return parser
 
 
@@ -392,6 +455,8 @@ def main() -> int:
             result = apply_manual_blur(args)
         elif args.command == 'pad-canvas':
             result = pad_canvas_for_outpaint(args)
+        elif args.command == 'extract-mask':
+            result = extract_mask_for_neutro_bg(args)
         else:
             raise RuntimeError('Comando no soportado')
         print(json.dumps(result, ensure_ascii=False))

@@ -1774,6 +1774,102 @@ function publicista_crop_to_phone_ratio($squareFsPath, $outputDir, $outputBasena
 }
 
 
+function publicista_replace_background($candidateFsPath, $candidateId, $bgDescription) {
+    $result = array(
+        'ok' => false,
+        'replaced_path' => '',
+        'replaced_fs' => '',
+        'error' => '',
+    );
+
+    if (!file_exists($candidateFsPath)) {
+        $result['error'] = 'No existe la imagen candidata.';
+        return $result;
+    }
+
+    $candidateDir = dirname($candidateFsPath);
+    $safeId = preg_replace('/[^a-z0-9_\-]/i', '_', $candidateId);
+    $maskPath = $candidateDir . '/' . $safeId . '_mask.png';
+    $jsonPath = $candidateDir . '/' . $safeId . '_mask_meta.json';
+
+    // Paso 1: Generar máscara con Python worker (detectar fondo gris)
+    $workerScript = BASE_PATH . '/tools/publicista_image_worker.py';
+    $cmd = 'python3 '
+        . escapeshellarg($workerScript) . ' extract-mask '
+        . '--input ' . escapeshellarg($candidateFsPath) . ' '
+        . '--output-mask ' . escapeshellarg($maskPath) . ' '
+        . '--output-json ' . escapeshellarg($jsonPath);
+
+    $cmdOutput = array();
+    $cmdCode = 0;
+    exec($cmd . ' 2>&1', $cmdOutput, $cmdCode);
+
+    if ($cmdCode !== 0 || !file_exists($maskPath)) {
+        $result['error'] = 'El worker Python (extract-mask) falló. Código: ' . $cmdCode;
+        return $result;
+    }
+
+    // Verificar que se detectó fondo (>20% de píxeles son grises)
+    $bgOk = true;
+    if (file_exists($jsonPath)) {
+        $meta = json_decode(file_get_contents($jsonPath), true);
+        if (is_array($meta) && empty($meta['bg_detected'])) {
+            $bgOk = false;
+        }
+    }
+    if (!$bgOk) {
+        $result['error'] = 'No se detectó suficiente fondo gris en la imagen. El fondo neutro no se generó correctamente.';
+        @unlink($maskPath); @unlink($jsonPath);
+        return $result;
+    }
+
+    // Paso 2: Reemplazar fondo via OpenAI Image Edit con máscara
+    $bgPrompt = 'Replace ONLY the gray background with this scene: ' . $bgDescription . '. '
+        . 'The person in the foreground must remain EXACTLY identical — no changes to face, body, clothing, pose, or lighting on the person. '
+        . 'The new background must look natural and photorealistic. '
+        . 'No text, no watermark, no artifacts.';
+
+    $editOptions = array(
+        'model' => publicista_ai_config()['image_model'],
+        'size' => '1024x1024',
+        'n' => 1,
+        'mask_path' => $maskPath,
+    );
+
+    $editResult = publicista_openai_image_edit($bgPrompt, $candidateFsPath, $editOptions);
+
+    if (!$editResult['ok']) {
+        $result['error'] = 'Reemplazo de fondo GPT falló: ' . ($editResult['error'] ?? 'Error desconocido.');
+        @unlink($maskPath); @unlink($jsonPath);
+        return $result;
+    }
+
+    // Paso 3: Guardar imagen con fondo reemplazado
+    $imageData = publicista_decode_generated_image_bytes($editResult['decoded']);
+    if (!$imageData[0]) {
+        $result['error'] = 'No se pudo decodificar la imagen: ' . $imageData[1];
+        @unlink($maskPath); @unlink($jsonPath);
+        return $result;
+    }
+
+    $replacedFs = $candidateDir . '/' . $safeId . '_bg.jpg';
+    if (file_put_contents($replacedFs, $imageData[1]) === false) {
+        $result['error'] = 'No se pudo guardar la imagen con fondo reemplazado.';
+        @unlink($maskPath); @unlink($jsonPath);
+        return $result;
+    }
+
+    @unlink($maskPath);
+    @unlink($jsonPath);
+
+    $result['ok'] = true;
+    $result['replaced_path'] = publicista_path_to_web($replacedFs);
+    $result['replaced_fs'] = $replacedFs;
+
+    return $result;
+}
+
+
 function publicista_openai_download_public_file_bytes($url) {
     $url = trim((string)$url);
     if ($url === '' || !function_exists('curl_init')) {
@@ -2629,6 +2725,7 @@ function publicista_build_setting_description($job) {
         'dormitorio_real' => 'dormitorio normal con la cama deshecha, ropa doblada en una silla, un cargador en la mesilla, ventana con luz natural entrando, espejo apoyado en la pared — aspecto de habitación real vivida, foto tomada con móvil',
         'salon_casa' => 'salón de casa real: sofá con mantas y cojines, mesa de centro con objetos (mando a distancia, taza, revista), televisión o cuadros en la pared, una planta — ambiente doméstico auténtico, no de escaparate',
         'espejo_selfie' => 'selfie frente a un espejo de cuerpo entero en un dormitorio o baño real — el teléfono se intuye en la mano (parte visible en el reflejo), el espejo tiene ligeras marcas o reflejos, se ven objetos de la habitación reflejados detrás de la mujer',
+        'neutro' => 'fondo de pared lisa gris claro uniforme, sin textura, sin objetos, sin ventanas, neutro — para facilitar la extracción de la persona en post-producción',
         'random' => 'entorno natural variado y realista, con profundidad y contexto cotidiano',
     );
     $lightingMap = array(
@@ -2781,7 +2878,10 @@ function publicista_build_pollo_master_prompt($job) {
     $sections[] = '[ENCUADRE] ' . $framingLine . '.';
     // If random mode, use a generic line — specific backgrounds go into variants
     $ambientKey = trim((string)($pp['setting'] ?? 'random'));
-    if ($ambientKey === 'random') {
+    if ($ambientKey === 'neutro') {
+        $sections[] = '[AMBIENTE] Fondo: pared lisa de color gris claro neutro (#D0D0D0), completamente uniforme, sin textura, sin zócalo, sin objetos colgados, sin ventanas, sin puertas, sin muebles. Solo una pared lisa plana detrás de la mujer. El suelo es del mismo tono gris neutro. Iluminación completamente plana y uniforme, sin sombras duras ni gradientes. Este fondo neutro es TEMPORAL — será reemplazado en post-producción.';
+        $lightingLine = 'iluminación completamente plana y uniforme, sin sombras duras, luz difusa neutra';
+    } elseif ($ambientKey === 'random') {
         $sections[] = '[AMBIENTE] Cada imagen de esta serie tendrá un fondo distinto asignado automáticamente por el sistema. La descripción del fondo específico para cada imagen se incluye al final del prompt en [FONDO PARA ESTA IMAGEN].';
     } else {
         $sections[] = '[AMBIENTE] Fondo y entorno: ' . trim((string)($envDesc['setting'] ?? 'entorno interior realista con contexto')) . '. El entorno debe parecer una foto real tomada en un espacio cotidiano, no un montaje de estudio. Incluye objetos personales y algo de desorden sutil: texturas reales en paredes, suelo y muebles. Debe sentirse real, vivido y coherente, nunca fondo liso de estudio genérico salvo que se haya pedido minimalista.';
@@ -4136,8 +4236,48 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
                 'worker_result' => array('mode' => 'pollo_native_ratio', 'no_square_crop' => true),
             );
             $okLocal = true;
-            // Candidata se guarda en 1:1 (raw de Pollo). El outpainting a ratio
-            // de móvil se aplica después en publicista_build_direct_final_output().
+
+            // Reemplazo de fondo neutro por fondos naturales (solo cuando setting=neutro)
+            $ppCheck = function_exists('publicista_job_production_params') ? publicista_job_production_params($job) : array();
+            if (($ppCheck['setting'] ?? '') === 'neutro') {
+                $squareFs = BASE_PATH . '/' . ltrim((string)$localOrError['square_path'], '/');
+                if (file_exists($squareFs)) {
+                    $bgPool = publicista_natural_background_pool();
+                    $bgKeys = array_keys($bgPool);
+                    $bgKey = $bgKeys[$idx % count($bgKeys)];
+                    $bgDesc = $bgPool[$bgKey];
+                    $bgResult = publicista_replace_background($squareFs, $candidateId, $bgDesc);
+                    if ($bgResult['ok']) {
+                        $localOrError['square_path'] = $bgResult['replaced_path'];
+                        $localOrError['worker_result']['bg_replaced'] = true;
+                        $localOrError['worker_result']['bg_key'] = $bgKey;
+                        // Regenerar preview
+                        $previewBgFs = $candidateDir . '/' . $safeBasename . '_preview.jpg';
+                        if (function_exists('imagecreatefromstring') && file_exists($bgResult['replaced_fs'])) {
+                            $rawPrev = (filesize($bgResult['replaced_fs']) <= (10*1024*1024)) ? file_get_contents($bgResult['replaced_fs']) : false;
+                            if ($rawPrev !== false) {
+                                $infoPrev = @getimagesizefromstring($rawPrev);
+                                if ($infoPrev && ($infoPrev[0] * $infoPrev[1] <= 50000000)) {
+                                    $srcPrev = @imagecreatefromstring($rawPrev);
+                                    if ($srcPrev !== false) {
+                                        $swP = imagesx($srcPrev); $shP = imagesy($srcPrev);
+                                        $rP = min(320 / $swP, 320 / $shP);
+                                        $pwP = max(1, (int)round($swP * $rP));
+                                        $phP = max(1, (int)round($shP * $rP));
+                                        $prevImg = imagecreatetruecolor($pwP, $phP);
+                                        imagecopyresampled($prevImg, $srcPrev, 0, 0, 0, 0, $pwP, $phP, $swP, $shP);
+                                        imagejpeg($prevImg, $previewBgFs, 85);
+                                        imagedestroy($prevImg); imagedestroy($srcPrev);
+                                    }
+                                }
+                            }
+                        }
+                        if (file_exists($previewBgFs)) {
+                            $localOrError['preview_path'] = publicista_path_to_web($previewBgFs);
+                        }
+                    }
+                }
+            }
         } else {
             list($okLocal, $localOrError) = publicista_prepare_arbitrary_image_locally($jobId, $genOrError['raw_fs_path'], preg_replace('/[^a-z0-9_\-]/i', '_', $candidateId), 'candidates_dir');
         }
@@ -8306,7 +8446,9 @@ function publicista_build_pollo_environment_guard($job, $maxChars = 0) {
     $setting = trim((string)($envDesc['setting'] ?? 'entorno realista con contexto'));
     $lighting = trim((string)($envDesc['lighting'] ?? 'luz realista y coherente'));
 
-    if ($settingKey === 'random') {
+    if ($settingKey === 'neutro') {
+        $guard = '[AMBIENTE Y FONDO] Fondo temporal de trabajo: pared gris claro uniforme (#D0D0D0) sin ningún detalle, sin textura, sin objetos. Este fondo será reemplazado en post-producción. La iluminación debe ser completamente plana y uniforme.';
+    } elseif ($settingKey === 'random') {
         $guard = '[AMBIENTE Y FONDO] El fondo de cada imagen se describe individualmente en [FONDO PARA ESTA IMAGEN] al final del prompt. Usa exactamente ese entorno descrito. Asegúrate de que el fondo sea coherente con la iluminación indicada y tenga profundidad natural y elementos de contexto reales.';
     } elseif ($settingKey === 'minimalista') {
         $guard = '[AMBIENTE Y FONDO] Mantén el ambiente minimalista solicitado, pero con textura y profundidad reales. Fondo limpio y controlado, nunca un color plano vacío ni un recorte de estudio artificial. Iluminación: ' . $lighting . '.';

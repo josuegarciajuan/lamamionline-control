@@ -3595,7 +3595,7 @@ function publicista_render_production_params_fields($params) {
     echo '<div class="field">';
     echo '<label>Tipo de espacio / fondo</label>';
     echo '<select name="setting_type">';
-    $currentSetting = $params['setting'] ?? 'random';
+    $currentSetting = $params['setting'] ?? 'neutro';
     foreach (publicista_setting_type_options() as $value => $label) {
         $sel = ($currentSetting === $value) ? ' selected' : '';
         echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
