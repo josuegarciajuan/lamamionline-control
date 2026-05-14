@@ -4030,43 +4030,32 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
     $polloBatchImages = array();
     $polloBatchMeta = array();
     if ($usePollo) {
-        // Generar CADA variante como llamada individual a Pollo para que cada imagen
-        // tenga su propio fondo, ropa y encuadre distintos.
-        $polloBatchImages = array();
-        $polloBatchMeta = array();
-        $allPolloOk = true;
-        $lastPolloError = '';
-        foreach ($variants as $vi => $variantPrompt) {
-            $singlePrompt = trim((string)$variantPrompt);
-            // Pequeña pausa entre variantes para no saturar la API de Pollo
-            if ($vi > 0) {
-                sleep(3);
+        // Construir prompt compuesto: master + instrucciones de variedad
+        // para que Pollo genere 4 imágenes con fondos y ropa distintos.
+        $varietyInstructions = array();
+        foreach ($variants as $vi => $vp) {
+            $vpStr = trim((string)$vp);
+            // Extraer solo las secciones [FONDO...] y [ROPA...] de cada variante
+            if (preg_match('/\[FONDO PARA ESTA IMAGEN\].*?(?=\[|$)/s', $vpStr, $mFondo)) {
+                $varietyInstructions[] = trim($mFondo[0]);
             }
-            list($okOne, $resultOrError) = publicista_generate_candidate_images_pollo_batch(
-                $jobId, 1, $singlePrompt, $pipelineImageModel, $job, 'v' . ($vi + 1)
-            );
-            if (!$okOne) {
-                $allPolloOk = false;
-                $lastPolloError = is_string($resultOrError) ? $resultOrError : ('Variante ' . ($vi + 1) . ' falló.');
-                break;
-            }
-            $oneMeta = is_array($resultOrError) ? $resultOrError : array();
-            $oneImages = array_values((array)($oneMeta['images'] ?? array()));
-            if (empty($oneImages)) {
-                $allPolloOk = false;
-                $lastPolloError = 'Variante ' . ($vi + 1) . ' no produjo imagen.';
-                break;
-            }
-            $polloBatchImages[] = $oneImages[0];
-            if (empty($polloBatchMeta)) {
-                $polloBatchMeta = $oneMeta;
+            if (preg_match('/\[ROPA PARA ESTA IMAGEN\].*?(?=\[|$)/s', $vpStr, $mRopa)) {
+                $varietyInstructions[] = trim($mRopa[0]);
             }
         }
-        if (!$allPolloOk) {
-            return array(false, $lastPolloError);
+        $varietyBlock = '';
+        if (!empty($varietyInstructions)) {
+            $varietyBlock = "\n\n[VARIEDAD ENTRE IMÁGENES — OBLIGATORIO] Genera 4 imágenes DIFERENTES. "
+                . "Cada imagen debe usar una combinación distinta de las siguientes:\n"
+                . implode("\n", $varietyInstructions);
         }
-        $polloBatchMeta['generated_via'] = 'individual_per_variant';
-        $polloBatchMeta['variant_count'] = count($variants);
+        $batchPrompt = trim((string)($variants[0] ?? '') . $varietyBlock);
+        list($okPolloBatch, $polloBatchOrError) = publicista_generate_candidate_images_pollo_batch($jobId, count($variants), $batchPrompt, $pipelineImageModel, $job);
+        if (!$okPolloBatch) {
+            return array(false, is_string($polloBatchOrError) ? $polloBatchOrError : 'No se pudo generar el lote de candidatas con Pollo.ai.');
+        }
+        $polloBatchMeta = is_array($polloBatchOrError) ? $polloBatchOrError : array();
+        $polloBatchImages = array_values((array)($polloBatchMeta['images'] ?? array()));
     }
 
     foreach ($variants as $idx => $variantPrompt) {
