@@ -3643,7 +3643,7 @@ function publicista_render_production_params_fields($params) {
     echo '<div class="field">';
     echo '<label>Postura preferida</label>';
     echo '<select name="pose_pref">';
-    $currentPose = $params['pose'] ?? 'casual';
+    $currentPose = $params['pose'] ?? 'sugerente';
     foreach (publicista_pose_options() as $value => $label) {
         $sel = ($currentPose === $value) ? ' selected' : '';
         echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';

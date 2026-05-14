@@ -2750,11 +2750,12 @@ function publicista_build_pollo_master_prompt($job) {
 
     $poseLine = 'pose femenina, segura, fotogénica y natural, evitando brazos muertos pegados al torso y evitando postura rígida de pasaporte';
     $poseMap = array(
-        'pie_estatica' => 'pose de pie firme y segura, con peso bien repartido, una cadera ligeramente marcada y brazos colocados con naturalidad',
-        'pie_dinamica' => 'pose de pie con movimiento sutil, cadera viva, asimetría natural y sensación de espontaneidad',
-        'sentada' => 'pose sentada elegante y favorecedora, relajada pero llamativa, con actitud segura',
-        'apoyada' => 'pose apoyada en pared, espejo o mueble de forma natural, confiada y muy fotogénica',
-        'casual' => 'pose totalmente espontánea y natural, como si un amigo tomara la foto sin avisar — brazos relajados, postura cotidiana, nada de pose de modelo ni postureo, gesto natural de estar en casa o en la calle',
+        'pie_estatica' => 'pose de pie firme y sensual, con peso sobre una pierna, cadera marcada, hombros girados, mirada directa y magnética — presencia sexy natural, nada rígido',
+        'pie_dinamica' => 'pose de pie con movimiento sensual, cadera viva, cuerpo torcido favorecedor, actitud segura y provocativa — como modelo de anuncio pero natural',
+        'sentada' => 'pose sentada con piernas cruzadas o ligeramente abiertas, espalda ligeramente arqueada, mirada insinuante — sexy y elegante sin ser vulgar',
+        'apoyada' => 'pose apoyada en pared o marco de puerta con el cuerpo ligeramente arqueado, pecho hacia fuera, mirada sugerente — provocativa pero natural',
+        'casual' => 'pose cotidiana pero sexy: cuerpo relajado, una mano en la cadera, caderas ligeramente giradas, mirada cómplice — como una foto espontánea pero favorecedora y sugerente',
+        'sugerente' => 'pose muy femenina, insinuante y provocativa: cuerpo torcido, pecho realzado, caderas marcadas, labios entreabiertos, mirada magnética directa a cámara — sexy de anuncio SIN cruzar a lo sexual. Brazos que enmarcan el cuerpo, manos cerca del escote o la cadera, postura que invita a mirar.',
     );
     if (isset($poseMap[$pose])) $poseLine = $poseMap[$pose];
 
@@ -2768,7 +2769,7 @@ function publicista_build_pollo_master_prompt($job) {
     );
     if (isset($framingMap[$framing])) $framingLine = $framingMap[$framing];
 
-    $expressionLine = 'expresión atractiva, segura y viva';
+    $expressionLine = 'expresión sugerente, magnética y muy atractiva — sexy sin ser explícita, mirada que seduce';
     $expressionMap = array(
         'sonrisa' => 'expresión cálida con sonrisa natural y creíble',
         'seria' => 'expresión seria, segura y elegante',
@@ -3055,6 +3056,7 @@ function publicista_build_prompt_variants($masterPrompt, $count = 6, $retryMode 
         'sentada'       => 'Postura: sentada elegantemente, cruce de piernas suave, espalda erguida, manos bien colocadas y actitud segura.',
         'apoyada'       => 'Postura: apoyada en la pared o en un mueble, pose relajada, confiada, editorial y con asimetría natural del cuerpo.',
         'casual'        => 'Postura: completamente natural y espontánea, como si un amigo tomara la foto — brazos relajados, postura cotidiana, nada de pose.',
+        'sugerente'     => 'Postura: insinuante y provocativa — cuerpo torcido, pecho realzado, caderas marcadas, mirada magnética — sexy sin ser explícita.',
         'variado'       => '',
     );
     $poseStr = $poseExtra[$posePref] ?? '';
@@ -3111,20 +3113,21 @@ function publicista_build_prompt_variants($masterPrompt, $count = 6, $retryMode 
 
         // Casual pose extra for Pollo
         $poseExtra = array(
-            'pie_estatica'  => 'Postura: de pie pero relajada, como esperando algo, peso sobre una pierna, brazos sueltos — postura cotidiana, no de modelo.',
-            'pie_dinamica'  => 'Postura: caminando o en movimiento ligero, foto espontánea — no posada.',
-            'sentada'       => 'Postura: sentada de forma natural en una silla, sofá o borde de cama, como estarías en tu casa — nada de pose editorial.',
-            'apoyada'       => 'Postura: apoyada en la pared o marco de puerta de manera relajada y cotidiana, como quien espera — informal.',
-            'casual'        => 'Postura: completamente natural y espontánea, como si no supieras que te están haciendo la foto. NADA de pose de modelo. Manos en los bolsillos, mirando el móvil, ajustándose el pelo — gestos cotidianos reales.',
+            'pie_estatica'  => 'Postura: de pie con peso en una pierna, cadera marcada, cuerpo ligeramente girado — presencia femenina y sensual, como quien posa sin posar.',
+            'pie_dinamica'  => 'Postura: caminando con movimiento de caderas, mirada sugerente — sexy y natural a la vez.',
+            'sentada'       => 'Postura: sentada con piernas cruzadas mostrando pierna, torso ligeramente inclinado hacia delante — insinuante y favorecedora.',
+            'apoyada'       => 'Postura: apoyada en pared o mueble con el cuerpo arqueado, pecho hacia fuera, caderas hacia un lado — muy provocativa y femenina.',
+            'casual'        => 'Postura: cotidiana pero sexy — una mano cerca del cuerpo, caderas giradas, mirada cómplice, natural pero insinuante.',
+            'sugerente'     => 'Postura: muy femenina e insinuante — cuerpo en S, pecho realzado, caderas marcadas, brazos que enmarcan la silueta, postura que atrae la mirada SIN ser explícita. Provocativa pero vestida.',
             'variado'       => '',
         );
         $poseStr = $poseExtra[$posePref] ?? '';
 
         // Casual expression for Pollo
         $expressionExtra = array(
-            'sonrisa'   => 'Expresión: sonrisa natural y espontánea, como cuando te hace gracia algo — no sonrisa de anuncio.',
-            'seria'     => 'Expresión: seria pero relajada, como mirando el móvil o pensando en algo — no pose de modelo.',
-            'sugerente' => 'Expresión: mirada segura pero natural, gesto cotidiano no forzado, como cuando alguien te mira con interés — sin cara de anuncio.',
+            'sonrisa'   => 'Expresión: sonrisa sugerente y cómplice, labios ligeramente entreabiertos, mirada que invita — sexy pero natural, no forzada.',
+            'seria'     => 'Expresión: seria y magnética, mirada directa y penetrante, gesto seguro y seductor — como una modelo que sabe lo que quiere.',
+            'sugerente' => 'Expresión: muy insinuante, mirada magnética y provocativa, labios entreabiertos, ceja ligeramente arqueada — sexy de anuncio SIN ser explícita. Mirada que atrae y seduce.',
             'variado'   => '',
         );
         $expressionStr = $expressionExtra[$expressionPref] ?? '';

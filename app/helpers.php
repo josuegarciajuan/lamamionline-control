@@ -525,18 +525,22 @@ function publicista_outfit_style_options() {
 
 function publicista_cheap_sexy_outfit_pool() {
     return array(
-        'vaqueros_camiseta' => 'vaqueros baratos muy ceñidos de Primark con camiseta de tirantes blanca de algodón fino de mercadillo, ajustada al cuerpo, look de calle económico y sexy',
-        'minifalda_top' => 'minifalda vaquera barata con top corto ajustado de lycra que deja ver un poco de cintura, conjunto de mercadillo favorecedor',
-        'vestido_corto_ceñido' => 'vestido corto de punto barato, muy ceñido, color liso, escote en V moderado, tejido de poliéster de mercadillo con caída natural y alguna arruga visible — sexy sin ser lujoso',
-        'shorts_camiseta' => 'shorts vaqueros cortos desgastados con camiseta básica ajustada de algodón fino, look de verano económico y provocador',
-        'falda_tubo_blusa' => 'falda de tubo barata de imitación cuero con blusa ajustada de tejido fino, look de discoteca de barrio',
-        'leggings_top' => 'leggings negros baratos muy ceñidos con top largo de lycra que cubre hasta la cadera, look deportivo sexy de gimnasio económico',
-        'mono_corto' => 'mono corto barato con escote en V moderado, tela elástica de poliéster de mercadillo, ceñido al cuerpo, una sola pieza favorecedora',
-        'body_vaqueros' => 'body de manga larga muy ceñido de licra barata con vaqueros ajustados y rotos en las rodillas, look de calle atrevido y económico',
-        'falda_crop_top' => 'falda plisada corta barata con crop top que deja ver un poco de abdomen, conjunto de imitación colegiala sexy de tienda económica',
-        'vestido_camiseta' => 'vestido camiseta ceñido de algodón barato, por encima de la rodilla, escote redondo normal, cómodo y sexy de diario',
-        'conjunto_deportivo' => 'conjunto de chándal barato muy ceñido, chaqueta abierta con top debajo, pantalón ajustado, look de gimnasio económico y sexy',
-        'vestido_saten' => 'vestido corto imitación satén barato, tirantes finos, escote moderado en pico, ceñido — imitación lencería pero es un vestido real, NO lencería',
+        'minifalda_top_ceñido' => 'minifalda vaquera barata muy corta con top ceñido de tirantes finos que marca el pecho, cintura al aire — sexy de barrio, provocador sin ser explícito',
+        'vestido_corto_escote' => 'vestido corto de punto barato muy ceñido con escote en V profundo pero sin mostrar sujetador, por encima de la rodilla, poliéster de mercadillo — elegante y sexy',
+        'shorts_ceñidos_top' => 'shorts vaqueros muy cortos y ceñidos con camiseta de tirantes ajustada y fina, ombros al aire, look veraniego provocador de tienda barata',
+        'leggings_top_largo' => 'leggings negros muy ceñidos que marcan toda la silueta, con top largo de licra ajustado — look deportivo sexy de gimnasio low-cost',
+        'body_vaqueros_rotos' => 'body escotado de licra barata muy ceñido con vaqueros ajustados rotos en los muslos, look de discoteca económico y muy llamativo',
+        'vestido_lencero_falso' => 'vestido corto imitación satén con tirantes finos y escote en pico, ceñido al cuerpo — parece lencero pero es un VESTIDO real, NO ropa interior',
+        'mono_escotado_ceñido' => 'mono corto barato con escote pronunciado en V, sin mangas, tela elástica de poliéster muy ceñido al cuerpo — una sola pieza ultra favorecedora',
+        'falda_tubo_top' => 'falda de tubo de imitación cuero barata muy ceñida con top corto de licra que deja ver la cintura, look de noche económico y provocador',
+        'conjunto_deportivo_abierto' => 'conjunto de chándal barato con chaqueta abierta sin nada debajo y pantalón muy ceñido de cintura baja — look sporty sexy de barrio',
+        'vestido_transparencia_controlada' => 'vestido corto ceñido con mangas translúcidas de gasa barata pero cuerpo opaco — insinuante sin enseñar de más, elegante low-cost',
+        'falda_cruzada_top' => 'falda cruzada corta barata con abertura lateral y top halter ajustado de licra que realza el escote — sexy de noche económico',
+        'camiseta_mojada_falsa' => 'camiseta blanca ceñida de algodón fino ligeramente húmeda marcando la silueta con vaqueros cortos — efecto mojado sensual sin ser explícito',
+        'vestido_escote_espalda' => 'vestido corto barato con escote en la espalda, ceñido al cuerpo, sin mangas — elegante y muy sexy de fiesta low-cost',
+        'top_palabra_honor_falda' => 'top palabra de honor ajustado sin tirantes con minifalda de tubo barata — hombros y escote al aire, muy favorecedor',
+        'body_transparente_parcial' => 'body de manga larga con paneles de gasa translúcida en mangas y costados pero opaco en zonas íntimas — sugerente sin enseñar',
+        'vestido_punto_ceñido' => 'vestido de punto barato muy ceñido tipo venda, escote redondo, largo midi ajustado que marca toda la silueta — look de alfombra roja low-cost',
     );
 }
 
@@ -639,6 +643,7 @@ function publicista_pose_options() {
         'sentada'       => 'Sentada elegante',
         'apoyada'       => 'Apoyada en pared o mueble',
         'casual'        => 'Casual / espontánea (como foto de amigo)',
+        'sugerente'     => 'Sugerente / insinuante (sexy sin ser explícita)',
     );
 }
 

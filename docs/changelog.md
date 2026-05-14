@@ -313,3 +313,19 @@ pollo-image-v2 es el mejor modelo pero genera 1:1. El outpainting con GPT añade
 
 ### Archivos
 - `app/publicista.php`, `app/views.php`, `docs/changelog.md`
+
+## 2026-05-14 · Sexify — Pool de outfits ampliado + poses/expresiones sexys
+
+### Cambios
+- Pool de outfits ampliado de 12 a **16** combinaciones, todas sexys/sugerentes sin cruzar el límite sexual. Añadidos: vestido lencero falso, transparencia controlada, camiseta mojada, escote espalda, top palabra de honor, body transparencia parcial, vestido punto ceñido.
+- Nueva opción de pose `sugerente` (muy femenina, insinuante, provocativa sin ser explícita) en `publicista_pose_options()`.
+- Poses Pollo actualizadas: lenguaje más sexy/sensual en `poseMap` y `poseExtra` (cuerpo en S, pecho realzado, caderas marcadas, mirada magnética).
+- Expresiones Pollo actualizadas: mirada sugerente, labios entreabiertos, ceja arqueada — sexy de anuncio sin ser explícita.
+- Default del form cambiado a pose `sugerente`.
+- Añadido `sugerente` al non-Pollo `$poseExtra` para consistencia.
+
+### Archivos
+- `app/helpers.php`, `app/publicista.php`, `app/views.php`, `docs/changelog.md`
+
+### Motivo
+Las fotos se publican en portales de anuncios y necesitan ser sexys/sugerentes para llamar la atención, sin cruzar el límite que hace que algunas webs las rechacen.
