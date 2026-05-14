@@ -160,6 +160,7 @@ function publicista_batch_status_label($status) {
 }
 
 function publicista_notify_job_generation_finished($job) {
+    return false; // Deshabilitado: no generar avisos de campaña finalizada
     if (!function_exists('avisos_create_active') || !function_exists('aviso_exists_any_status')) {
         return false;
     }
@@ -218,6 +219,7 @@ function publicista_notify_job_generation_finished($job) {
 
 
 function publicista_notify_final_refresh_finished($job, $finalId, $mode, $ok, $resultOrError = null) {
+    return false; // Deshabilitado: no generar avisos de campaña finalizada
     if (!function_exists('avisos_create_active') || !function_exists('aviso_exists_any_status')) {
         return false;
     }
@@ -272,6 +274,7 @@ function publicista_notify_final_refresh_finished($job, $finalId, $mode, $ok, $r
 }
 
 function publicista_notify_candidate_regeneration_finished($job, $candidateId, $ok, $resultOrError = null) {
+    return false; // Deshabilitado: no generar avisos de campaña finalizada
     if (!function_exists('avisos_create_active')) {
         return false;
     }
@@ -324,6 +327,7 @@ function publicista_notify_candidate_regeneration_finished($job, $candidateId, $
 }
 
 function publicista_notify_copy_pack_finished($job, $ok, $resultOrError = null) {
+    return false; // Deshabilitado: no generar avisos de campaña finalizada
     if (!function_exists('avisos_create_active')) {
         return false;
     }
@@ -3805,6 +3809,8 @@ function publicista_build_direct_final_output($jobId, $candidate, $finalIndex, $
         'manual_blur_shape' => array(),
         'premium_refined' => 0,
         'premium_refine_error' => 'Final directa: se reutiliza la imagen candidata sin refinado automático.',
+        'outpaint_ratio' => '',
+        'outpaint_generation_id' => '',
         'generation' => is_array(publicista_array_get($candidate, 'generation', array())) ? publicista_array_get($candidate, 'generation', array()) : array(),
     );
 
@@ -3823,6 +3829,52 @@ function publicista_build_direct_final_output($jobId, $candidate, $finalIndex, $
         if (@copy($src, $dest)) {
             $out['preview_path'] = publicista_path_to_web($dest);
             $out['candidate_preview_path'] = publicista_path_to_web($dest);
+        }
+    }
+
+    // Outpainting GPT para Pollo: convierte la final 1:1 a ratio de móvil
+    $usePolloFinal = $job && function_exists('publicista_job_uses_pollo_model') && publicista_job_uses_pollo_model($job);
+    if ($usePolloFinal && $out['final_path'] !== '') {
+        $finalFs = BASE_PATH . '/' . ltrim($out['final_path'], '/');
+        if (file_exists($finalFs)) {
+            $outpaintResult = publicista_outpaint_to_phone_ratio($jobId, $finalFs, 'final_' . $index);
+            if ($outpaintResult['ok'] && !empty($outpaintResult['outpainted_fs']) && file_exists($outpaintResult['outpainted_fs'])) {
+                // Reemplazar la final con la versión outpainted
+                $out['final_path'] = $outpaintResult['outpainted_path'];
+                $out['square_path'] = $outpaintResult['outpainted_path'];
+                $out['refine_proposal_path'] = $outpaintResult['outpainted_path'];
+                $out['premium_refined'] = 1;
+                $out['premium_refine_error'] = '';
+                $out['outpaint_ratio'] = $outpaintResult['ratio'];
+                $out['outpaint_generation_id'] = $outpaintResult['generation_id'];
+                // Generar preview desde la imagen outpainted
+                $previewOutFs = $paths['finals_dir'] . '/final_' . $index . '_preview.jpg';
+                if (function_exists('imagecreatefromstring')) {
+                    $maxRaw = 10 * 1024 * 1024;
+                    $rawPrev = (filesize($outpaintResult['outpainted_fs']) <= $maxRaw) ? file_get_contents($outpaintResult['outpainted_fs']) : false;
+                    if ($rawPrev !== false) {
+                        $infoPrev = @getimagesizefromstring($rawPrev);
+                        if ($infoPrev && ($infoPrev[0] * $infoPrev[1] <= 50000000)) {
+                            $srcPrev = @imagecreatefromstring($rawPrev);
+                            if ($srcPrev !== false) {
+                                $swP = imagesx($srcPrev); $shP = imagesy($srcPrev);
+                                $rP = min(320 / $swP, 320 / $shP);
+                                $pwP = max(1, (int)round($swP * $rP));
+                                $phP = max(1, (int)round($shP * $rP));
+                                $prevImg = imagecreatetruecolor($pwP, $phP);
+                                imagecopyresampled($prevImg, $srcPrev, 0, 0, 0, 0, $pwP, $phP, $swP, $shP);
+                                imagejpeg($prevImg, $previewOutFs, 85);
+                                imagedestroy($prevImg); imagedestroy($srcPrev);
+                            }
+                        }
+                    }
+                }
+                if (file_exists($previewOutFs)) {
+                    $out['preview_path'] = publicista_path_to_web($previewOutFs);
+                }
+            } else {
+                $out['premium_refine_error'] = 'Outpainting falló: ' . ($outpaintResult['error'] ?? 'desconocido') . '. Se mantiene la imagen 1:1.';
+            }
         }
     }
 
@@ -3975,13 +4027,39 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
     $polloBatchImages = array();
     $polloBatchMeta = array();
     if ($usePollo) {
-        $batchPrompt = trim((string)($variants[0] ?? ''));
-        list($okPolloBatch, $polloBatchOrError) = publicista_generate_candidate_images_pollo_batch($jobId, count($variants), $batchPrompt, $pipelineImageModel, $job);
-        if (!$okPolloBatch) {
-            return array(false, is_string($polloBatchOrError) ? $polloBatchOrError : 'No se pudo generar el lote de candidatas con Pollo.ai.');
+        // Generar CADA variante como llamada individual a Pollo para que cada imagen
+        // tenga su propio fondo, ropa y encuadre distintos.
+        $polloBatchImages = array();
+        $polloBatchMeta = array();
+        $allPolloOk = true;
+        $lastPolloError = '';
+        foreach ($variants as $vi => $variantPrompt) {
+            $singlePrompt = trim((string)$variantPrompt);
+            list($okOne, $resultOrError) = publicista_generate_candidate_images_pollo_batch(
+                $jobId, 1, $singlePrompt, $pipelineImageModel, $job
+            );
+            if (!$okOne) {
+                $allPolloOk = false;
+                $lastPolloError = is_string($resultOrError) ? $resultOrError : ('Variante ' . ($vi + 1) . ' falló.');
+                break;
+            }
+            $oneMeta = is_array($resultOrError) ? $resultOrError : array();
+            $oneImages = array_values((array)($oneMeta['images'] ?? array()));
+            if (empty($oneImages)) {
+                $allPolloOk = false;
+                $lastPolloError = 'Variante ' . ($vi + 1) . ' no produjo imagen.';
+                break;
+            }
+            $polloBatchImages[] = $oneImages[0];
+            if (empty($polloBatchMeta)) {
+                $polloBatchMeta = $oneMeta;
+            }
         }
-        $polloBatchMeta = is_array($polloBatchOrError) ? $polloBatchOrError : array();
-        $polloBatchImages = array_values((array)($polloBatchMeta['images'] ?? array()));
+        if (!$allPolloOk) {
+            return array(false, $lastPolloError);
+        }
+        $polloBatchMeta['generated_via'] = 'individual_per_variant';
+        $polloBatchMeta['variant_count'] = count($variants);
     }
 
     foreach ($variants as $idx => $variantPrompt) {
@@ -4106,45 +4184,8 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
                 'worker_result' => array('mode' => 'pollo_native_ratio', 'no_square_crop' => true),
             );
             $okLocal = true;
-
-            // Paso extra: Outpainting GPT para convertir 1:1 a ratio de móvil
-            $squareFs = BASE_PATH . '/' . ltrim((string)$localOrError['square_path'], '/');
-            if (file_exists($squareFs)) {
-                $outpaintResult = publicista_outpaint_to_phone_ratio($jobId, $squareFs, $candidateId);
-                if ($outpaintResult['ok']) {
-                    // Reemplazar el square_path con la imagen outpainted (ratio de móvil)
-                    $localOrError['square_path'] = $outpaintResult['outpainted_path'];
-                    $localOrError['worker_result']['outpainted'] = true;
-                    $localOrError['worker_result']['outpaint_ratio'] = $outpaintResult['ratio'];
-                    // Regenerar preview con la imagen outpainted
-                    $previewTarget = $candidateDir . '/' . $safeBasename . '_preview.jpg';
-                    if (function_exists('imagecreatefromstring') && file_exists($outpaintResult['outpainted_fs'])) {
-                        $maxRawBytes = 10 * 1024 * 1024;
-                        $rawBytes = (filesize($outpaintResult['outpainted_fs']) <= $maxRawBytes) ? file_get_contents($outpaintResult['outpainted_fs']) : false;
-                        if ($rawBytes !== false) {
-                            $imgInfo = @getimagesizefromstring($rawBytes);
-                            if ($imgInfo && ($imgInfo[0] * $imgInfo[1] <= 50000000)) {
-                                $src = @imagecreatefromstring($rawBytes);
-                                if ($src !== false) {
-                                    $sw2 = imagesx($src);
-                                    $sh2 = imagesy($src);
-                                    $maxSide = 320;
-                                    $ratio2 = min($maxSide / $sw2, $maxSide / $sh2);
-                                    $pw = max(1, (int)round($sw2 * $ratio2));
-                                    $ph = max(1, (int)round($sh2 * $ratio2));
-                                    $preview = imagecreatetruecolor($pw, $ph);
-                                    imagecopyresampled($preview, $src, 0, 0, 0, 0, $pw, $ph, $sw2, $sh2);
-                                    imagejpeg($preview, $previewTarget, 85);
-                                    imagedestroy($preview);
-                                    imagedestroy($src);
-                                }
-                            }
-                        }
-                    }
-                    $localOrError['preview_path'] = file_exists($previewTarget) ? publicista_path_to_web($previewTarget) : $localOrError['preview_path'];
-                }
-                // Si outpainting falla, mantenemos la imagen 1:1 sin cambios
-            }
+            // Candidata se guarda en 1:1 (raw de Pollo). El outpainting a ratio
+            // de móvil se aplica después en publicista_build_direct_final_output().
         } else {
             list($okLocal, $localOrError) = publicista_prepare_arbitrary_image_locally($jobId, $genOrError['raw_fs_path'], preg_replace('/[^a-z0-9_\-]/i', '_', $candidateId), 'candidates_dir');
         }

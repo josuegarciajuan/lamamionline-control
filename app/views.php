@@ -253,7 +253,7 @@ function render_avisos_panel() {
         if (aviso_whatsapp_has_failure($aviso)) {
             echo '<a class="btn-secondary-mini" href="' . e(aviso_whatsapp_log_url($aviso['id'] ?? '')) . '">Ver log WA</a>';
         }
-        echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Descartar este aviso?\')">';
+        echo '<form method="post" class="inline-form">';
         echo '<input type="hidden" name="action" value="dismiss_aviso">';
         echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
         echo '<input type="hidden" name="id" value="' . e($aviso['id'] ?? '') . '">';
@@ -266,7 +266,7 @@ function render_avisos_panel() {
 
     if ($newCount > 0) {
         echo '<div class="aviso-actions" style="margin-top:10px;">';
-        echo '<form method="post" class="inline-form">';
+        echo '<form method="post" class="inline-form js-mark-all-read">';
         echo '<input type="hidden" name="action" value="mark_avisos_read">';
         echo '<input type="hidden" name="scope" value="active_unread">';
         echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
@@ -399,7 +399,7 @@ function render_avisos_section($baseUrl = 'index.php?page=avisos') {
                 if (aviso_whatsapp_has_failure($aviso)) {
                     echo '<a class="btn-secondary-mini" href="' . e(aviso_whatsapp_log_url($aviso['id'] ?? '')) . '">Ver log WA</a>';
                 }
-                echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Descartar este aviso?\')">';
+                echo '<form method="post" class="inline-form">';
                 echo '<input type="hidden" name="action" value="dismiss_aviso">';
                 echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
                 echo '<input type="hidden" name="id" value="' . e($aviso['id'] ?? '') . '">';
@@ -503,7 +503,7 @@ function render_publicista_page() {
     }
     $accountsUnlocked = !empty($_SESSION['publicista_accounts_unlocked']);
 
-    page_header('💋 Publicista', '💕 Crea productos publicitarios, calcula estrategia, gestiona cuentas, genera campañas y ejecuta la automatización disponible. 🔥😈');
+    page_header('Publicista', 'Crea productos publicitarios, calcula estrategia, gestiona cuentas, genera campañas y ejecuta la automatización disponible.');
 
     echo '<section class="panel panel-space">';
     echo '<div class="subtabs">';
@@ -1750,8 +1750,24 @@ function render_publicista_campanas_page() {
                             if ($currentCount !== $storedCount) {
                                 $hasDistributionMismatch = true;
                                 break 2;
-                            }
-                        }
+            }
+
+            $activeUnreadCount = 0;
+            foreach ($active as $a) {
+                if (empty($a['read_at'])) $activeUnreadCount++;
+            }
+            if ($activeUnreadCount > 0) {
+                echo '<div class="aviso-actions" style="margin-top:10px;">';
+                echo '<form method="post" class="inline-form js-mark-all-read">';
+                echo '<input type="hidden" name="action" value="mark_avisos_read">';
+                echo '<input type="hidden" name="scope" value="active_unread">';
+                echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
+                echo '<input type="hidden" name="redirect" value="' . e($baseUrl . '&avtab=active') . '">';
+                echo '<button class="btn-secondary-mini">Marcar ' . e((string)$activeUnreadCount) . ' nuevos como leídos</button>';
+                echo '</form>';
+                echo '</div>';
+            }
+        }
                     }
                 }
                 if ($hasDistributionMismatch) {
@@ -2376,7 +2392,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     $selectedJob = $selectedJobId !== '' ? publicista_job_get($selectedJobId) : null;
 
     if (!$embedded) {
-        page_header('💋 Publicista', '💖 Sube la foto, genera el pack y revisa candidatas/finales sin salir del CRM 💦🔥');
+        page_header('Publicista', 'Sube la foto, genera el pack y revisa candidatas/finales sin salir del CRM');
     }
 
     if ($clientaFilter !== '') {
@@ -2389,7 +2405,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
 
     if ($showOnlyJobDetail) {
         echo '<section class="panel panel-space">';
-        echo '<div class="section-head"><div><h2>💗 Ficha de producto</h2><p>👄 Vista centrada en un único producto publicitario. 💋</p></div>';
+        echo '<div class="section-head"><div><h2>Ficha de producto</h2><p>Vista centrada en un único producto publicitario.</p></div>';
         echo '<div class="section-head-actions" style="display:flex;gap:10px;flex-wrap:wrap;">';
         echo '<a class="btn-secondary-mini" href="' . e(publicista_tab_url()) . '">← Volver al listado de productos</a>';
         echo '</div></div>';
@@ -2399,7 +2415,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     if (!$showOnlyJobDetail) {
 
         echo '<section class="panel panel-space">';
-        echo '<div class="section-head"><div><h2>🌶️ Nuevo producto publicitario</h2><p>💘 Flujo rápido: sube foto, genera pack del producto, revisa y acepta. 💦</p></div></div>';
+        echo '<div class="section-head"><div><h2>Nuevo producto publicitario</h2><p>Flujo rápido: sube foto, genera pack del producto, revisa y acepta.</p></div></div>';
         if (empty($clientas)) {
             echo '<div class="empty">No hay clientas todavía. Primero necesitas al menos una clienta en LaMami o Jostal.</div>';
         } else {
@@ -2421,7 +2437,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
             field_textarea('restrictions_text', 'Restricciones libres (imagen)', '', 2);
             echo '<div class="field full">';
             echo '<label>Restricciones rápidas</label>';
-            publicista_render_restriction_checkboxes(array());
+            publicista_render_restriction_checkboxes(array('keep_hair_color', 'keep_body_build', 'avoid_visible_tattoos'));
             echo '</div>';
 
             echo '<div class="field full"><hr style="margin:4px 0;border:none;border-top:1px solid #e5e7eb;"><strong style="font-size:13px;color:#6b7280;">Brief libre (prioridad máxima)</strong></div>';
@@ -2468,7 +2484,8 @@ function render_publicista_crear_perfiles_page($embedded = false) {
             echo '<option value="gpt">GPT (OpenAI · configurado en sistema)</option>';
             if (function_exists('publicista_pollo_models')) {
                 foreach (publicista_pollo_models() as $polloKey => $polloCfg) {
-                    echo '<option value="' . e($polloKey) . '">' . e($polloCfg['name']) . '</option>';
+                    $sel = ($polloKey === 'pollo-image-v2') ? ' selected' : '';
+                    echo '<option value="' . e($polloKey) . '"' . $sel . '>' . e($polloCfg['name']) . '</option>';
                 }
             }
             echo '</select>';
@@ -2535,7 +2552,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
 
         echo '<section class="panel panel-space">';
 
-        echo '<div class="branch-panel-head"><h2>🍑 Productos creados</h2><span class="summary-badge">' . e(count($jobs)) . '</span></div>';
+        echo '<div class="branch-panel-head"><h2>Productos creados</h2><span class="summary-badge">' . e(count($jobs)) . '</span></div>';
         if (empty($jobs)) {
             echo '<div class="empty">Todavía no hay trabajos creados en Publicista.</div>';
         } else {

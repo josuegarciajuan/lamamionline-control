@@ -302,3 +302,14 @@ Las imágenes 1:1 parecen editadas profesionalmente. Las fotos reales de móvil 
 
 ### Motivo
 pollo-image-v2 es el mejor modelo pero genera 1:1. El outpainting con GPT añade bordes de forma natural, convirtiendo la imagen cuadrada en una foto con proporción de móvil sin perder la calidad base.
+
+## 2026-05-14 · Fix integración — 4 llamadas Pollo individuales + outpainting en finales
+
+### Bugs corregidos
+- **BUG CRÍTICO**: Pollo ahora genera 4 llamadas individuales (una por variant) en vez de 1 batch con `$variants[0]`. Cada imagen recibe su propio fondo, ropa y encuadre distinto.
+- **BUG**: Outpainting GPT movido de candidatas a `publicista_build_direct_final_output()`. Las candidatas muestran el raw 1:1 de Pollo; las finales reciben el outpainting a ratio de móvil.
+- **BUG**: Default de framing corregido a `lejano` (estaba `variado`).
+- **BUG**: Añadido log de error cuando el outpainting falla (`premium_refine_error` en la final).
+
+### Archivos
+- `app/publicista.php`, `app/views.php`, `docs/changelog.md`
