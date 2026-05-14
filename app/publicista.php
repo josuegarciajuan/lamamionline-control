@@ -4043,7 +4043,7 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
                 sleep(3);
             }
             list($okOne, $resultOrError) = publicista_generate_candidate_images_pollo_batch(
-                $jobId, 1, $singlePrompt, $pipelineImageModel, $job
+                $jobId, 1, $singlePrompt, $pipelineImageModel, $job, 'v' . ($vi + 1)
             );
             if (!$okOne) {
                 $allPolloOk = false;
@@ -8479,7 +8479,7 @@ function publicista_pollo_batch_is_retryable_error($error) {
     return false;
 }
 
-function publicista_generate_candidate_images_pollo_batch($jobId, $numOutputs, $prompt, $modelName, $job = null) {
+function publicista_generate_candidate_images_pollo_batch($jobId, $numOutputs, $prompt, $modelName, $job = null, $outputSuffix = '') {
     $cookie = publicista_pollo_session_cookie();
     if ($cookie === '') {
         return array(false, 'Pollo.ai: cookie de sesion no configurada. Guardala en Josue > ConfigM > Cookie Pollo.ai.');
@@ -8525,8 +8525,11 @@ function publicista_generate_candidate_images_pollo_batch($jobId, $numOutputs, $
         }
 
         @unlink($jsonFs);
-        foreach ((array)glob($paths['candidates_dir'] . '/pollo_batch_*') as $oldBatchFile) {
-            @unlink($oldBatchFile);
+        // En modo individual no borramos archivos de otras variantes
+        if ($numOutputs > 1) {
+            foreach ((array)glob($paths['candidates_dir'] . '/pollo_batch_*') as $oldBatchFile) {
+                @unlink($oldBatchFile);
+            }
         }
 
         publicista_job_log_write($jobId, 'pollo_prompt_prepare_batch_try' . $workerAttempt, array(
@@ -8544,7 +8547,7 @@ function publicista_generate_candidate_images_pollo_batch($jobId, $numOutputs, $
         ));
 
         if ($numOutputs <= 1) {
-            $singleOutput = $paths['candidates_dir'] . '/pollo_batch_01.jpg';
+            $singleOutput = $paths['candidates_dir'] . '/pollo_variant_' . ($outputSuffix !== '' ? $outputSuffix . '_' : '') . '01.jpg';
             $fullCommand = 'python3 ' . escapeshellarg($worker)
                 . ' generate'
                 . ' --cookie ' . escapeshellarg($cookie)
