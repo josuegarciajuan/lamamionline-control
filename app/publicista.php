@@ -2750,12 +2750,12 @@ function publicista_build_pollo_master_prompt($job) {
 
     $poseLine = 'pose femenina, segura, fotogénica y natural, evitando brazos muertos pegados al torso y evitando postura rígida de pasaporte';
     $poseMap = array(
-        'pie_estatica' => 'pose de pie firme y sensual, con peso sobre una pierna, cadera marcada, hombros girados, mirada directa y magnética — presencia sexy natural, nada rígido',
-        'pie_dinamica' => 'pose de pie con movimiento sensual, cadera viva, cuerpo torcido favorecedor, actitud segura y provocativa — como modelo de anuncio pero natural',
-        'sentada' => 'pose sentada con piernas cruzadas o ligeramente abiertas, espalda ligeramente arqueada, mirada insinuante — sexy y elegante sin ser vulgar',
-        'apoyada' => 'pose apoyada en pared o marco de puerta con el cuerpo ligeramente arqueado, pecho hacia fuera, mirada sugerente — provocativa pero natural',
-        'casual' => 'pose cotidiana pero sexy: cuerpo relajado, una mano en la cadera, caderas ligeramente giradas, mirada cómplice — como una foto espontánea pero favorecedora y sugerente',
-        'sugerente' => 'pose muy femenina, insinuante y provocativa: cuerpo torcido, pecho realzado, caderas marcadas, labios entreabiertos, mirada magnética directa a cámara — sexy de anuncio SIN cruzar a lo sexual. Brazos que enmarcan el cuerpo, manos cerca del escote o la cadera, postura que invita a mirar.',
+        'pie_estatica' => 'pose de pie femenina y segura, con peso sobre una pierna, cadera marcada, hombros girados, mirada directa y magnética — presencia atractiva natural',
+        'pie_dinamica' => 'pose de pie con movimiento sutil, cadera viva, cuerpo torcido favorecedor, actitud segura y llamativa — como modelo de anuncio pero natural',
+        'sentada' => 'pose sentada con piernas cruzadas, espalda ligeramente arqueada, mirada atractiva — elegante y femenina sin ser vulgar',
+        'apoyada' => 'pose apoyada en pared o marco de puerta con el cuerpo ligeramente arqueado, silueta favorecida, mirada sugerente — llamativa pero natural',
+        'casual' => 'pose cotidiana pero atractiva: cuerpo relajado, una mano en la cadera, caderas ligeramente giradas, mirada cómplice — como una foto espontánea pero favorecedora',
+        'sugerente' => 'pose muy femenina y atractiva: cuerpo torcido, silueta realzada, caderas marcadas, gesto atractivo, mirada magnética directa a cámara — sexy de anuncio SIN cruzar a lo sexual. Brazos que enmarcan el cuerpo, postura que invita a mirar.',
     );
     if (isset($poseMap[$pose])) $poseLine = $poseMap[$pose];
 
@@ -2769,7 +2769,7 @@ function publicista_build_pollo_master_prompt($job) {
     );
     if (isset($framingMap[$framing])) $framingLine = $framingMap[$framing];
 
-    $expressionLine = 'expresión sugerente, magnética y muy atractiva — sexy sin ser explícita, mirada que seduce';
+    $expressionLine = 'expresión atractiva, magnética y segura — mirada que cautiva, sin ser explícita';
     $expressionMap = array(
         'sonrisa' => 'expresión cálida con sonrisa natural y creíble',
         'seria' => 'expresión seria, segura y elegante',
@@ -2794,7 +2794,7 @@ function publicista_build_pollo_master_prompt($job) {
     if ($styleKey === 'auto_random') {
         $outfitLine = 'Cada imagen de esta serie lleva un look diferente asignado automáticamente en [ROPA PARA ESTA IMAGEN] al final del prompt. NO uses la misma ropa en todas las imágenes.';
         $outfitLine .= ' Toda la ropa debe ser BARATA y de clase humilde: poliéster de mercadillo, licra, algodón fino, denim desgastado, imitación cuero. NADA de lujo, nada de diseño, nada de marca.';
-        $outfitLine .= ' La ropa debe ser SEXY y PROVOCATIVA pero SIN cruzar el límite sexual: ceñida, escotes moderados, algo de piel (piernas, hombros, cintura). NUNCA lencería visible, NUNCA transparencias, NUNCA desnudo. Sexy de barrio, no de pasarela.';
+        $outfitLine .= ' La ropa debe ser favorecedora y atractiva pero SIN cruzar el límite sexual: ceñida, escotes moderados, algo de piel (piernas, hombros, cintura). NUNCA lencería visible, NUNCA transparencias, NUNCA desnudo. Atractiva y accesible, no de pasarela.';
     } else {
         $outfitLine = 'La ropa debe basarse en lo elegido en el formulario: ' . trim((string)($outfitDetails['summary'] ?? 'look casual de calle realista'));
         $outfitLine .= '. La ropa debe verse natural, de calle, como la que llevaría una persona normal en su día a día, no ropa de pasarela ni de sesión de fotos profesional.';
@@ -3113,21 +3113,21 @@ function publicista_build_prompt_variants($masterPrompt, $count = 6, $retryMode 
 
         // Casual pose extra for Pollo
         $poseExtra = array(
-            'pie_estatica'  => 'Postura: de pie con peso en una pierna, cadera marcada, cuerpo ligeramente girado — presencia femenina y sensual, como quien posa sin posar.',
-            'pie_dinamica'  => 'Postura: caminando con movimiento de caderas, mirada sugerente — sexy y natural a la vez.',
-            'sentada'       => 'Postura: sentada con piernas cruzadas mostrando pierna, torso ligeramente inclinado hacia delante — insinuante y favorecedora.',
-            'apoyada'       => 'Postura: apoyada en pared o mueble con el cuerpo arqueado, pecho hacia fuera, caderas hacia un lado — muy provocativa y femenina.',
-            'casual'        => 'Postura: cotidiana pero sexy — una mano cerca del cuerpo, caderas giradas, mirada cómplice, natural pero insinuante.',
-            'sugerente'     => 'Postura: muy femenina e insinuante — cuerpo en S, pecho realzado, caderas marcadas, brazos que enmarcan la silueta, postura que atrae la mirada SIN ser explícita. Provocativa pero vestida.',
+            'pie_estatica'  => 'Postura: de pie con peso en una pierna, cadera marcada, cuerpo ligeramente girado — presencia femenina y atractiva.',
+            'pie_dinamica'  => 'Postura: caminando con movimiento natural, mirada atractiva — favorecedora y espontánea.',
+            'sentada'       => 'Postura: sentada con piernas cruzadas, torso ligeramente inclinado — favorecedora y femenina.',
+            'apoyada'       => 'Postura: apoyada en pared o mueble con el cuerpo ligeramente arqueado, silueta marcada — llamativa y femenina.',
+            'casual'        => 'Postura: cotidiana pero favorecedora — una mano cerca del cuerpo, caderas giradas, mirada cómplice, natural.',
+            'sugerente'     => 'Postura: muy femenina y atractiva — cuerpo en S, silueta realzada, caderas marcadas, brazos que enmarcan la silueta, postura que atrae la mirada SIN ser explícita.',
             'variado'       => '',
         );
         $poseStr = $poseExtra[$posePref] ?? '';
 
         // Casual expression for Pollo
         $expressionExtra = array(
-            'sonrisa'   => 'Expresión: sonrisa sugerente y cómplice, labios ligeramente entreabiertos, mirada que invita — sexy pero natural, no forzada.',
-            'seria'     => 'Expresión: seria y magnética, mirada directa y penetrante, gesto seguro y seductor — como una modelo que sabe lo que quiere.',
-            'sugerente' => 'Expresión: muy insinuante, mirada magnética y provocativa, labios entreabiertos, ceja ligeramente arqueada — sexy de anuncio SIN ser explícita. Mirada que atrae y seduce.',
+            'sonrisa'   => 'Expresión: sonrisa atractiva y cómplice, gesto natural, mirada que invita — favorecedora y espontánea.',
+            'seria'     => 'Expresión: seria y magnética, mirada directa, gesto seguro — como una modelo profesional.',
+            'sugerente' => 'Expresión: muy atractiva, mirada magnética y llamativa, ceja ligeramente arqueada — sensual SIN ser explícita.',
             'variado'   => '',
         );
         $expressionStr = $expressionExtra[$expressionPref] ?? '';
@@ -4030,26 +4030,7 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
     $polloBatchImages = array();
     $polloBatchMeta = array();
     if ($usePollo) {
-        // Construir prompt compuesto: master + instrucciones de variedad
-        // para que Pollo genere 4 imágenes con fondos y ropa distintos.
-        $varietyInstructions = array();
-        foreach ($variants as $vi => $vp) {
-            $vpStr = trim((string)$vp);
-            // Extraer solo las secciones [FONDO...] y [ROPA...] de cada variante
-            if (preg_match('/\[FONDO PARA ESTA IMAGEN\].*?(?=\[|$)/s', $vpStr, $mFondo)) {
-                $varietyInstructions[] = trim($mFondo[0]);
-            }
-            if (preg_match('/\[ROPA PARA ESTA IMAGEN\].*?(?=\[|$)/s', $vpStr, $mRopa)) {
-                $varietyInstructions[] = trim($mRopa[0]);
-            }
-        }
-        $varietyBlock = '';
-        if (!empty($varietyInstructions)) {
-            $varietyBlock = "\n\n[VARIEDAD ENTRE IMÁGENES — OBLIGATORIO] Genera 4 imágenes DIFERENTES. "
-                . "Cada imagen debe usar una combinación distinta de las siguientes:\n"
-                . implode("\n", $varietyInstructions);
-        }
-        $batchPrompt = trim((string)($variants[0] ?? '') . $varietyBlock);
+        $batchPrompt = trim((string)($variants[0] ?? ''));
         list($okPolloBatch, $polloBatchOrError) = publicista_generate_candidate_images_pollo_batch($jobId, count($variants), $batchPrompt, $pipelineImageModel, $job);
         if (!$okPolloBatch) {
             return array(false, is_string($polloBatchOrError) ? $polloBatchOrError : 'No se pudo generar el lote de candidatas con Pollo.ai.');
