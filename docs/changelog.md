@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-05-15 · Mundosex F5 — ROTATION_BLOCK (Excluir de auto-rotación)
+
+### Cambios
+- Añadido filtro en `publicista_campaign_execute()`: en modo auto-rotación, los items con `portal_code='mundosex'` se excluyen del bucle de ejecución.
+- Los items Mundosex se suben solo en la primera publicación; las rotaciones posteriores solo afectan a Destacamos.
+- Añadida nota informativa en la UI de auto-rotación: "Los anuncios de MundosexAnuncio se suben una sola vez y no rotan."
+- Verificado: free-bump y página "Subir anuncios" ya excluyen Mundosex (sin cambios necesarios).
+
+### Motivo
+Quinta y última fase de la integración MundosexAnuncio. Asegura que la auto-rotación no reintenta subir anuncios de Mundosex (que se publican solo una vez), cumpliendo el requisito de que solo Destacamos rota.
+
+### Archivos
+- `app/storage.php` (+8 líneas, filtro de rotación)
+- `app/views.php` (+1 línea, nota UI)
+
+---
+
 ## 2026-05-15 · Mundosex F4 — EXECUTION (Ejecutar subida con humanización)
 
 ### Cambios

@@ -41,9 +41,9 @@
 
 ### MUNDOSEX-F5 — ROTATION_BLOCK (Excluir de auto-rotación)
 
-- [ ] Filtrar items `mundosex` de la auto-rotación.
-- [ ] Verificar que free bump solo aplica a `destacamos`.
-- [ ] UI: nota informativa sobre que Mundosex no rota.
+- [x] Filtrar items `mundosex` de la auto-rotación (solo Destacamos rota).
+- [x] Verificar que free bump solo aplica a `destacamos` (ya filtrado, sin cambios).
+- [x] UI: nota informativa sobre que Mundosex no rota.
 
 ---
 

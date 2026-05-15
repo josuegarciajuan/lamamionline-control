@@ -7284,6 +7284,17 @@ function publicista_campaign_execute($campaignId, $options = array()) {
         }
     }
 
+    // Auto-rotación: solo rotan anuncios de Destacamos. Los de Mundosex se suben una sola vez.
+    if ($autoRotationMode) {
+        $itemsBefore = count($items);
+        $items = array_values(array_filter($items, function($item) {
+            return trim((string)($item['portal_code'] ?? 'destacamos')) !== 'mundosex';
+        }));
+        if (count($items) < $itemsBefore) {
+            $savedRun['summary'] = ($savedRun['summary'] ?? '') . ' [Auto-rotación: ' . ($itemsBefore - count($items)) . ' items Mundosex omitidos]';
+        }
+    }
+
     $results = array();
     $published = 0;
     $failed = 0;

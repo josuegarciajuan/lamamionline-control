@@ -1839,6 +1839,7 @@ function render_publicista_campanas_page() {
 
             echo '<section class="panel panel-space" style="margin-bottom:12px;">';
             echo '<div class="branch-panel-head"><h2>Auto-rotación de campaña</h2><span class="summary-badge">Programación</span></div>';
+            echo '<p style="margin:6px 0 0 0;padding:6px 10px;background:#fff3cd;border-radius:4px;font-size:0.85em;">ℹ️ La auto-rotación solo aplica a anuncios de <strong>Destacamos</strong>. Los anuncios de <strong>MundosexAnuncio</strong> se suben una sola vez y no rotan.</p>';
             echo '<div class="cards four" style="margin-top:12px;">';
             echo '<div class="info-strip"><strong>Estado</strong><br>' . e($autoRotationStatus === 'active' ? 'Activa' : 'Inactiva') . '</div>';
             echo '<div class="info-strip"><strong>Próxima ejecución</strong><br>' . e($autoRotationNextRunAt !== '' ? format_created_at($autoRotationNextRunAt) : 'Sin programar') . '</div>';
