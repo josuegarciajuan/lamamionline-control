@@ -6865,7 +6865,10 @@ function publicista_campaign_execute_item($campaign, $item, $options = array()) 
     $item['updated_at'] = now_datetime();
     list($_ok, $savedItem) = publicista_campaign_item_save($item);
 
-    if (!empty($result['ok'])) publicista_task_ensure_free_bump_for_item($campaign, $savedItem);
+    // Free-bump tasks solo para Destacamos (Mundosex no tiene soporte de subir-gratis)
+    if (!empty($result['ok']) && ($item['portal_code'] ?? 'destacamos') !== 'mundosex') {
+        publicista_task_ensure_free_bump_for_item($campaign, $savedItem);
+    }
 
     return array(!empty($result['ok']), $savedItem, $result);
 }
@@ -7542,7 +7545,7 @@ function publicista_campaign_execute($campaignId, $options = array()) {
 
     // Sync to girlsconf after successful publish
     $portalCode = trim((string)($campaign['planning_snapshot']['data']['portal_code'] ?? 'destacamos'));
-    if ($published > 0 && $portalCode === 'destacamos') {
+    if ($published > 0 && in_array($portalCode, array('destacamos', 'mundosex'), true)) {
         if (function_exists('publicista_sync_girlsconf_to_girlsconf')) {
             try {
                 publicista_sync_girlsconf_to_girlsconf($campaignId);

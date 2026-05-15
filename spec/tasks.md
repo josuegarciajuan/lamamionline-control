@@ -32,10 +32,12 @@
 
 ### MUNDOSEX-F4 — EXECUTION (Ejecutar subida con humanización)
 
-- [ ] Verificar que los delays de humanización aplican a items `mundosex`.
-- [ ] Asegurar que el bucle de retry de copy funciona sin hardcodeos.
-- [ ] Payload builder: verificar que el mapping de campos ocurre en el adaptador.
-- [ ] Post-upload sync (si necesario para `mundosex`).
+- [x] Verificar que los delays de humanización aplican a items `mundosex` (genéricos, OK).
+- [x] Asegurar que el bucle de retry de copy funciona sin hardcodeos (genérico, OK).
+- [x] Payload builder: verificar que el mapping de campos ocurre en el adaptador (OK).
+- [x] Corregir: no crear free-bump tasks para mundosex (rompían con undefined function).
+- [x] Ampliar post-upload sync a girlsconf para incluir mundosex.
+- [x] Test E2E real con browser (login OK, rate-limit esperado, pipeline funciona).
 
 ### MUNDOSEX-F5 — ROTATION_BLOCK (Excluir de auto-rotación)
 

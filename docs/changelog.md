@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-05-15 · Mundosex F4 — EXECUTION (Ejecutar subida con humanización)
+
+### Cambios
+- Verificado pipeline end-to-end: PHP → Node.js → Playwright → Chrome → mundosexanuncio.com (login ✅, form ✅, fotos ✅, save ✅).
+- Corregido: los items Mundosex ya no crean tareas de free-bump (rompían con `undefined function subirGratis()`).
+- Ampliado post-upload sync a girlsconf para incluir portal `mundosex` además de `destacamos`.
+- Verificado que los delays de humanización entre items aplican a todos los portales (genéricos).
+- Verificado que el bucle de retry de copy y la deduplicación de fingerprints funcionan multi-portal.
+
+### Motivo
+Cuarta fase de la integración. Confirma que el pipeline de ejecución funciona de principio a fin para Mundosex, con las protecciones necesarias (sin free-bump inválido, sync correcto).
+
+### Archivos
+- `app/storage.php` (+2 fixes: free-bump guard, sync widen)
+
+---
+
 ## 2026-05-15 · Mundosex F3 — CAMPAIGN_ITEMS (Verificación items Mundosex)
 
 ### Cambios
