@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-05-15 · Mundosex F1 — PORTAL_REGISTRY (Portal Registry)
+
+### Cambios
+- Añadido `mundosex` como opción de portal en `publicista_account_portal_options()`.
+- El formulario de guardar estrategia ahora muestra un `<select>` de portal en lugar de un `<input type="hidden">` hardcodeado a `destacamos`.
+- Validación allowlist de `portal_code` en `action_save_publicista_planning` (rechaza códigos no registrados, cae a `destacamos`).
+- El sistema acepta cuentas con `portal_code=mundosex` en la validación de campañas (el matching `portal_code === portal_code` ya funciona sin cambios adicionales).
+
+### Motivo
+Primera fase de la integración de MundosexAnuncio como portal automatizado. Registra el portal en el sistema para que aparezca en los desplegables de cuentas y estrategias, preparando el terreno para el adaptador de automatización.
+
+### Archivos
+- `app/storage.php` (+1)
+- `app/views.php` (+7)
+- `app/actions.php` (+5)
+
+---
+
 ## 2026-05-05 · Fase 1 — Rendimiento Inmediato (Online)
 
 ### Cambios

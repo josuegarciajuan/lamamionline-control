@@ -26,7 +26,7 @@ function handle_post_actions() {
         redirect_to('index.php?page=login');
     }
 
-    if (in_array($action, array('create_manual_aviso', 'delete_planned_aviso', 'mark_avisos_read'), true)) {
+    if (in_array($action, array('create_manual_aviso', 'delete_planned_aviso', 'mark_avisos_read', 'comercial_export_threads_csv'), true)) {
         if (!csrf_validate((string)request_post('csrf_token'))) {
             set_flash('error', 'La sesión del formulario ha caducado. Recarga la página e inténtalo de nuevo.');
             redirect_to(trim((string)request_post('redirect', 'index.php?page=dashboard')));
@@ -277,6 +277,9 @@ function handle_post_actions() {
             break;
         case 'comercial_promote_thread':
             action_comercial_promote_thread();
+            break;
+        case 'comercial_export_threads_csv':
+            action_comercial_export_threads_csv();
             break;
         case 'save_estados_wasap_config':
             action_save_estados_wasap_config();
@@ -2402,8 +2405,13 @@ function action_save_publicista_planning() {
     $row['estado'] = 'saved';
     $row['version'] = max(1, (int)request_post('version', (int)($existing['version'] ?? 1)));
     $row['parent_planning_id'] = trim((string)request_post('parent_planning_id', (string)($existing['parent_planning_id'] ?? '')));
-    $row['portal_code'] = trim((string)request_post('portal_code', 'destacamos'));
-    $row['portal_label'] = trim((string)request_post('portal_label', 'Destacamos'));
+    $portalCode = trim((string)request_post('portal_code', 'destacamos'));
+    $validPortals = array_keys(publicista_account_portal_options());
+    if (!in_array($portalCode, $validPortals, true)) {
+        $portalCode = 'destacamos';
+    }
+    $row['portal_code'] = $portalCode;
+    $row['portal_label'] = trim((string)request_post('portal_label', $validPortals[$portalCode] ?? 'Destacamos'));
     $row['portal_url'] = trim((string)request_post('portal_url', ''));
     $row['city'] = $city;
     $row['province'] = $province;
@@ -3298,6 +3306,7 @@ function action_dismiss_aviso() {
 function action_mark_avisos_read() {
     $scope = trim((string)request_post('scope', 'active_unread'));
     $redirect = trim((string)request_post('redirect', 'index.php?page=dashboard'));
+    $isAjax = strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest';
     $ids = array();
 
     if ($scope === 'active_unread') {
@@ -3311,6 +3320,15 @@ function action_mark_avisos_read() {
 
     if (!empty($ids)) {
         avisos_mark_as_read(array_values(array_unique($ids)));
+    }
+
+    if ($isAjax) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('ok' => true, 'count' => count($ids)));
+        exit;
+    }
+
+    if (!empty($ids)) {
         set_flash('ok', 'Avisos marcados como leídos.');
     } else {
         set_flash('ok', 'No había avisos nuevos para marcar.');
@@ -3477,8 +3495,9 @@ function action_set_eureka_estado() {
 function action_regenerate_publicista_copy_title() {
     $id = trim((string)request_post('id'));
     $titleIndex = (int)request_post('title_index', -1);
+    $extraConcepts = publicista_normalize_copy_extra_concepts_input(request_post('copy_extra_concepts'));
 
-    list($ok, $result) = publicista_regenerate_copy_title_option($id, $titleIndex);
+    list($ok, $result) = publicista_regenerate_copy_title_option($id, $titleIndex, $extraConcepts);
     if (!$ok) {
         set_flash('error', is_string($result) ? $result : 'No se pudo regenerar el título.');
         redirect_to(publicista_tab_url(array('job' => $id)));
@@ -3491,8 +3510,9 @@ function action_regenerate_publicista_copy_title() {
 function action_regenerate_publicista_copy_ad() {
     $id = trim((string)request_post('id'));
     $slot = trim((string)request_post('slot'));
+    $extraConcepts = publicista_normalize_copy_extra_concepts_input(request_post('copy_extra_concepts'));
 
-    list($ok, $result) = publicista_regenerate_copy_ad_slot($id, $slot);
+    list($ok, $result) = publicista_regenerate_copy_ad_slot($id, $slot, $extraConcepts);
     if (!$ok) {
         set_flash('error', is_string($result) ? $result : 'No se pudo regenerar el anuncio.');
         redirect_to(publicista_tab_url(array('job' => $id)));
@@ -3504,6 +3524,7 @@ function action_regenerate_publicista_copy_ad() {
 
 function action_generate_publicista_copy_pack() {
     $id = trim((string)request_post('id'));
+    $extraConcepts = publicista_normalize_copy_extra_concepts_input(request_post('copy_extra_concepts'));
     $job = $id !== '' ? publicista_job_get($id) : null;
     if (!$job) {
         set_flash('error', 'No se encontró el trabajo de Publicista.');
@@ -3515,7 +3536,7 @@ function action_generate_publicista_copy_pack() {
     publicista_finish_redirect_response($targetUrl);
 
     try {
-        list($ok, $result) = publicista_generate_copy_pack($id, true);
+        list($ok, $result) = publicista_generate_copy_pack($id, true, $extraConcepts);
         $latestJob = publicista_job_get($id) ?: $job;
         if (function_exists('publicista_notify_copy_pack_finished')) {
             publicista_notify_copy_pack_finished($latestJob, $ok, $result);
@@ -3530,6 +3551,24 @@ function action_generate_publicista_copy_pack() {
     }
 
     exit;
+}
+
+function publicista_normalize_copy_extra_concepts_input($raw) {
+    $text = trim((string)$raw);
+    if ($text === '') return '';
+
+    $text = str_replace(array("\r\n", "\r"), "\n", $text);
+    if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+        if (mb_strlen($text) > 1200) {
+            $text = mb_substr($text, 0, 1200);
+        }
+    } else {
+        if (strlen($text) > 1200) {
+            $text = substr($text, 0, 1200);
+        }
+    }
+
+    return trim($text);
 }
 
 function action_save_comercial_settings() {
@@ -3782,6 +3821,262 @@ function action_comercial_promote_thread() {
     }
     set_flash('error', is_string($result) ? $result : 'No se pudo crear el lead.');
     redirect_to(comercial_page_url('conversaciones'));
+}
+
+function action_comercial_export_threads_csv() {
+    $stageFilter = trim((string)request_post('stage_filter', 'all'));
+    $allowedFilters = array('all', 'opened', 'responded', 'qualified', 'very_hot', 'discarded');
+
+    if (!in_array($stageFilter, $allowedFilters, true)) {
+        set_flash('error', 'Filtro de exportación no válido.');
+        redirect_to(comercial_page_url('conversaciones'));
+    }
+
+    $threads = comercial_get_threads();
+    $linesIndexed = comercial_list_lines_indexed();
+
+    $filteredThreads = array();
+    foreach ($threads as $thread) {
+        if (comercial_thread_matches_filter($thread, $stageFilter)) {
+            $filteredThreads[] = $thread;
+        }
+    }
+
+    $safeFilter = preg_replace('/[^a-z0-9_\-]/i', '_', $stageFilter);
+    $filename = 'comercial_conversaciones_' . $safeFilter . '_' . date('Ymd_His') . '.xlsx';
+
+    $xlsxPath = comercial_build_threads_xlsx_export($filteredThreads, $linesIndexed, $stageFilter);
+    if ($xlsxPath === '') {
+        set_flash('error', 'No se pudo generar el fichero XLSX.');
+        redirect_to(comercial_page_url('conversaciones', array('stage_filter' => $stageFilter)));
+    }
+
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . (string)filesize($xlsxPath));
+    header('Pragma: no-cache');
+    header('Expires: 0');
+
+    readfile($xlsxPath);
+    @unlink($xlsxPath);
+    exit;
+}
+
+function comercial_build_threads_xlsx_export($threads, $linesIndexed, $stageFilter) {
+    $tmpFile = tempnam(sys_get_temp_dir(), 'comercial_threads_xlsx_');
+    if ($tmpFile === false) {
+        return '';
+    }
+    $xlsxPath = $tmpFile . '.xlsx';
+    @unlink($xlsxPath);
+
+    $zip = new ZipArchive();
+    if ($zip->open($xlsxPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+        @unlink($tmpFile);
+        return '';
+    }
+
+    $row = 1;
+    $sheetRowsXml = '';
+
+    $sheetRowsXml .= comercial_xlsx_row($row++, array(
+        array('v' => 'Exportación conversaciones comercial', 's' => 1),
+        array('v' => '', 's' => 0),
+    ));
+    $sheetRowsXml .= comercial_xlsx_row($row++, array(
+        array('v' => 'Filtro', 's' => 2),
+        array('v' => (string)$stageFilter, 's' => 0),
+    ));
+    $sheetRowsXml .= comercial_xlsx_row($row++, array(
+        array('v' => 'Generado', 's' => 2),
+        array('v' => (string)now_datetime(), 's' => 0),
+    ));
+    $sheetRowsXml .= comercial_xlsx_row($row++, array(
+        array('v' => 'Total conversaciones', 's' => 2),
+        array('v' => (string)count((array)$threads), 's' => 0),
+    ));
+    $sheetRowsXml .= comercial_xlsx_row($row++, array(
+        array('v' => '', 's' => 0),
+        array('v' => '', 's' => 0),
+    ));
+
+    foreach ((array)$threads as $thread) {
+        $stage = trim((string)($thread['stage'] ?? ''));
+        $lineId = trim((string)($thread['line_id'] ?? ''));
+        $lineName = isset($linesIndexed[$lineId]) ? trim((string)($linesIndexed[$lineId]['nombre'] ?? '')) : '';
+
+        $sheetRowsXml .= comercial_xlsx_row($row++, array(
+            array('v' => 'line_name', 's' => 3),
+            array('v' => $lineName, 's' => 4),
+        ));
+        $sheetRowsXml .= comercial_xlsx_row($row++, array(
+            array('v' => 'target_phone', 's' => 3),
+            array('v' => (string)($thread['target_phone'] ?? ''), 's' => 4),
+        ));
+        $sheetRowsXml .= comercial_xlsx_row($row++, array(
+            array('v' => 'stage_label', 's' => 3),
+            array('v' => comercial_thread_stage_label($stage), 's' => 4),
+        ));
+        $sheetRowsXml .= comercial_xlsx_row($row++, array(
+            array('v' => 'created_at', 's' => 3),
+            array('v' => (string)($thread['created_at'] ?? ''), 's' => 4),
+        ));
+        $sheetRowsXml .= comercial_xlsx_row($row++, array(
+            array('v' => 'updated_at', 's' => 3),
+            array('v' => (string)($thread['updated_at'] ?? ''), 's' => 4),
+        ));
+
+        $sheetRowsXml .= comercial_xlsx_row($row++, array(
+            array('v' => 'fecha del mensaje', 's' => 5),
+            array('v' => 'mensaje', 's' => 5),
+        ));
+
+        $history = comercial_thread_history($thread, 5000);
+        foreach ((array)$history as $entry) {
+            $direction = strtolower(trim((string)($entry['direction'] ?? '')));
+            $isInbound = in_array($direction, array('inbound', 'in', 'incoming', 'entrada', 'received', 'reply'), true);
+            $messageStyle = $isInbound ? 6 : 7;
+            $sheetRowsXml .= comercial_xlsx_row($row++, array(
+                array('v' => (string)($entry['ts'] ?? ''), 's' => $messageStyle),
+                array('v' => (string)($entry['text'] ?? ''), 's' => $messageStyle),
+            ));
+        }
+
+        $sheetRowsXml .= comercial_xlsx_row($row++, array(
+            array('v' => '', 's' => 0),
+            array('v' => '', 's' => 0),
+        ));
+    }
+
+    $contentTypesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        . '<Default Extension="xml" ContentType="application/xml"/>'
+        . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        . '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        . '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+        . '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
+        . '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>'
+        . '</Types>';
+
+    $relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+        . '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>'
+        . '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>'
+        . '</Relationships>';
+
+    $workbookXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        . '<sheets><sheet name="Conversaciones" sheetId="1" r:id="rId1"/></sheets>'
+        . '</workbook>';
+
+    $workbookRelsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        . '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+        . '</Relationships>';
+
+    $stylesXml = comercial_threads_xlsx_styles_xml();
+
+    $sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        . '<sheetViews><sheetView workbookViewId="0"/></sheetViews>'
+        . '<sheetFormatPr defaultRowHeight="18"/>'
+        . '<cols><col min="1" max="1" width="28" customWidth="1"/><col min="2" max="2" width="110" customWidth="1"/></cols>'
+        . '<sheetData>' . $sheetRowsXml . '</sheetData>'
+        . '</worksheet>';
+
+    $createdIso = gmdate('Y-m-d\TH:i:s\Z');
+    $coreXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+        . '<dc:title>Exportación Conversaciones Comercial</dc:title>'
+        . '<dc:creator>Lamamionline Control</dc:creator>'
+        . '<cp:lastModifiedBy>Lamamionline Control</cp:lastModifiedBy>'
+        . '<dcterms:created xsi:type="dcterms:W3CDTF">' . $createdIso . '</dcterms:created>'
+        . '<dcterms:modified xsi:type="dcterms:W3CDTF">' . $createdIso . '</dcterms:modified>'
+        . '</cp:coreProperties>';
+
+    $appXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">'
+        . '<Application>Lamamionline Control</Application>'
+        . '</Properties>';
+
+    $zip->addFromString('[Content_Types].xml', $contentTypesXml);
+    $zip->addFromString('_rels/.rels', $relsXml);
+    $zip->addFromString('xl/workbook.xml', $workbookXml);
+    $zip->addFromString('xl/_rels/workbook.xml.rels', $workbookRelsXml);
+    $zip->addFromString('xl/styles.xml', $stylesXml);
+    $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
+    $zip->addFromString('docProps/core.xml', $coreXml);
+    $zip->addFromString('docProps/app.xml', $appXml);
+    $zip->close();
+    @unlink($tmpFile);
+
+    return $xlsxPath;
+}
+
+function comercial_threads_xlsx_styles_xml() {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        . '<fonts count="2">'
+        . '<font><sz val="11"/><color rgb="FF1F2937"/><name val="Calibri"/><family val="2"/></font>'
+        . '<font><b/><sz val="11"/><color rgb="FF111827"/><name val="Calibri"/><family val="2"/></font>'
+        . '</fonts>'
+        . '<fills count="6">'
+        . '<fill><patternFill patternType="none"/></fill>'
+        . '<fill><patternFill patternType="gray125"/></fill>'
+        . '<fill><patternFill patternType="solid"><fgColor rgb="FFF3F4F6"/><bgColor indexed="64"/></patternFill></fill>'
+        . '<fill><patternFill patternType="solid"><fgColor rgb="FFDCEBFF"/><bgColor indexed="64"/></patternFill></fill>'
+        . '<fill><patternFill patternType="solid"><fgColor rgb="FFECFDF5"/><bgColor indexed="64"/></patternFill></fill>'
+        . '<fill><patternFill patternType="solid"><fgColor rgb="FFFEF3C7"/><bgColor indexed="64"/></patternFill></fill>'
+        . '</fills>'
+        . '<borders count="2">'
+        . '<border><left/><right/><top/><bottom/><diagonal/></border>'
+        . '<border><left style="thin"><color rgb="FFE5E7EB"/></left><right style="thin"><color rgb="FFE5E7EB"/></right><top style="thin"><color rgb="FFE5E7EB"/></top><bottom style="thin"><color rgb="FFE5E7EB"/></bottom><diagonal/></border>'
+        . '</borders>'
+        . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+        . '<cellXfs count="8">'
+        . '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'
+        . '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>'
+        . '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>'
+        . '<xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>'
+        . '<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>'
+        . '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>'
+        . '<xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'
+        . '<xf numFmtId="0" fontId="0" fillId="5" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'
+        . '</cellXfs>'
+        . '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+        . '</styleSheet>';
+}
+
+function comercial_xlsx_cell_ref($column, $row) {
+    $letters = '';
+    $n = (int)$column;
+    while ($n > 0) {
+        $mod = ($n - 1) % 26;
+        $letters = chr(65 + $mod) . $letters;
+        $n = (int)(($n - $mod) / 26);
+    }
+    return $letters . (string)$row;
+}
+
+function comercial_xlsx_escape($value) {
+    return htmlspecialchars((string)$value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+}
+
+function comercial_xlsx_row($rowIndex, $cells) {
+    $rowXml = '<row r="' . (int)$rowIndex . '">';
+    $column = 1;
+    foreach ((array)$cells as $cell) {
+        $ref = comercial_xlsx_cell_ref($column, (int)$rowIndex);
+        $style = isset($cell['s']) ? (int)$cell['s'] : 0;
+        $value = isset($cell['v']) ? (string)$cell['v'] : '';
+        $rowXml .= '<c r="' . $ref . '" t="inlineStr" s="' . $style . '"><is><t xml:space="preserve">' . comercial_xlsx_escape($value) . '</t></is></c>';
+        $column++;
+    }
+    $rowXml .= '</row>';
+    return $rowXml;
 }
 
 // ─── Estados Wasap ────────────────────────────────────────────────────────

@@ -1293,6 +1293,7 @@ function publicista_account_defaults($id = '') {
 function publicista_account_portal_options() {
     return array(
         'destacamos' => 'Destacamos',
+        'mundosex' => 'MundosexAnuncio',
         'otro' => 'Otro / manual',
     );
 }
@@ -1625,11 +1626,61 @@ function publicista_campaign_defaults($id = '') {
         'automation_plan' => array(),
         'approval_snapshot' => array(),
         'recalculation_snapshot' => array(),
+        'auto_rotation_schedule' => array(),
         'execution_summary' => array(),
         'notes' => '',
         'created_at' => '',
         'updated_at' => '',
     );
+}
+
+function publicista_campaign_auto_rotation_schedule_defaults() {
+    return array(
+        'enabled' => false,
+        'daily_start_time' => '08:00',
+        'daily_end_time' => '23:00',
+        'every_hours' => 6,
+        'run_immediately_once' => false,
+        'last_run_at' => '',
+        'next_run_at' => '',
+        'status' => 'disabled',
+        'last_error' => '',
+        'updated_at' => '',
+    );
+}
+
+function publicista_campaign_auto_rotation_schedule_normalize($row) {
+    $row = is_array($row) ? $row : array();
+    $base = publicista_campaign_auto_rotation_schedule_defaults();
+    $merged = array_merge($base, $row);
+
+    $enabledRaw = $merged['enabled'] ?? false;
+    $merged['enabled'] = !empty($enabledRaw) && !in_array(strtolower(trim((string)$enabledRaw)), array('0', 'false', 'no', 'off'), true);
+
+    $normalizeHhmm = function($value, $fallback) {
+        $value = trim((string)$value);
+        if (preg_match('/^(2[0-3]|[01]?\d):([0-5]\d)$/', $value)) {
+            $parts = explode(':', $value, 2);
+            return str_pad((string)((int)$parts[0]), 2, '0', STR_PAD_LEFT) . ':' . $parts[1];
+        }
+        return $fallback;
+    };
+
+    $merged['daily_start_time'] = $normalizeHhmm($merged['daily_start_time'] ?? '', $base['daily_start_time']);
+    $merged['daily_end_time'] = $normalizeHhmm($merged['daily_end_time'] ?? '', $base['daily_end_time']);
+    $legacyFrequency = (int)($merged['frequency_hours'] ?? 0);
+    $merged['every_hours'] = max(1, (int)($merged['every_hours'] ?? ($legacyFrequency > 0 ? $legacyFrequency : $base['every_hours'])));
+    $runNowRaw = $merged['run_immediately_once'] ?? false;
+    $merged['run_immediately_once'] = !empty($runNowRaw) && !in_array(strtolower(trim((string)$runNowRaw)), array('0', 'false', 'no', 'off'), true);
+    $merged['frequency_hours'] = $merged['every_hours'];
+    $merged['last_run_at'] = trim((string)($merged['last_run_at'] ?? ''));
+    $merged['next_run_at'] = trim((string)($merged['next_run_at'] ?? ''));
+    $merged['status'] = trim((string)($merged['status'] ?? ($merged['enabled'] ? 'active' : 'disabled')));
+    if ($merged['status'] === '') $merged['status'] = $merged['enabled'] ? 'active' : 'disabled';
+    $merged['last_error'] = trim((string)($merged['last_error'] ?? ''));
+    $merged['updated_at'] = trim((string)($merged['updated_at'] ?? ''));
+
+    return $merged;
 }
 
 function publicista_campaign_item_defaults($id = '') {
@@ -1899,12 +1950,13 @@ function publicista_campaign_normalize($row) {
     foreach (array('product_ids','account_ids','selected_listing_refs','products_snapshot','accounts_snapshot') as $k) {
         if (!isset($merged[$k]) || !is_array($merged[$k])) $merged[$k] = array();
     }
-    foreach (array('planning_snapshot','composition_plan','automation_plan','approval_snapshot','recalculation_snapshot','execution_summary','strategy_option_snapshot') as $k) {
+    foreach (array('planning_snapshot','composition_plan','automation_plan','approval_snapshot','recalculation_snapshot','execution_summary','strategy_option_snapshot','auto_rotation_schedule') as $k) {
         if (!isset($merged[$k]) || !is_array($merged[$k])) $merged[$k] = array();
     }
     $merged['strategy_option_code'] = trim((string)($merged['strategy_option_code'] ?? 'recommended')) !== '' ? trim((string)$merged['strategy_option_code']) : 'recommended';
     $merged['strategy_option_label'] = trim((string)($merged['strategy_option_label'] ?? ''));
     $merged['automation_plan'] = publicista_campaign_compact_automation_plan($merged['automation_plan'] ?? array());
+    $merged['auto_rotation_schedule'] = publicista_campaign_auto_rotation_schedule_normalize($merged['auto_rotation_schedule'] ?? array());
     $merged['min_products'] = max(0, (int)($merged['min_products'] ?? 0));
     $merged['max_products'] = max(0, (int)($merged['max_products'] ?? 0));
     if ($merged['max_products'] > 0 && $merged['min_products'] > $merged['max_products']) {
@@ -2151,6 +2203,204 @@ function publicista_campaign_save($row) {
     $normalized['updated_at'] = now_datetime();
     storage_upsert('publicista_campaigns.json', $normalized);
     return array(true, $normalized);
+}
+
+function publicista_campaign_auto_rotation_is_in_window($schedule, $refTs = null) {
+    $schedule = publicista_campaign_auto_rotation_schedule_normalize($schedule);
+    $refTs = $refTs ?: time();
+    $day = date('Y-m-d', $refTs);
+    $startTs = strtotime($day . ' ' . $schedule['daily_start_time'] . ':00');
+    $endTs = strtotime($day . ' ' . $schedule['daily_end_time'] . ':00');
+    if ($startTs === false || $endTs === false) return false;
+    if ($startTs <= $endTs) {
+        return $refTs >= $startTs && $refTs <= $endTs;
+    }
+    return $refTs >= $startTs || $refTs <= $endTs;
+}
+
+function publicista_campaign_auto_rotation_next_window_start_ts($schedule, $refTs = null) {
+    $schedule = publicista_campaign_auto_rotation_schedule_normalize($schedule);
+    $refTs = $refTs ?: time();
+    $today = date('Y-m-d', $refTs);
+    $startToday = strtotime($today . ' ' . $schedule['daily_start_time'] . ':00');
+    if ($startToday === false) return $refTs;
+    if ($refTs <= $startToday) return $startToday;
+    return strtotime('+1 day', $startToday);
+}
+
+function publicista_campaign_auto_rotation_next_due_ts($schedule, $fromTs = null) {
+    $schedule = publicista_campaign_auto_rotation_schedule_normalize($schedule);
+    $fromTs = $fromTs ?: time();
+    $candidateTs = $fromTs + (max(1, (int)$schedule['every_hours']) * 3600);
+    if (publicista_campaign_auto_rotation_is_in_window($schedule, $candidateTs)) {
+        return $candidateTs;
+    }
+    return publicista_campaign_auto_rotation_next_window_start_ts($schedule, $candidateTs);
+}
+
+function publicista_campaign_auto_rotation_run_due($options = array()) {
+    $options = is_array($options) ? $options : array();
+    $nowTs = time();
+    $nowDt = now_datetime();
+
+    $activeCampaign = null;
+    foreach (publicista_campaigns_get() as $campaign) {
+        $schedule = publicista_campaign_auto_rotation_schedule_normalize((array)($campaign['auto_rotation_schedule'] ?? array()));
+        if (!empty($schedule['enabled'])) {
+            $activeCampaign = $campaign;
+            break;
+        }
+    }
+    if (!$activeCampaign) {
+        return array('status' => 'no_active_schedule', 'next_run_at' => '');
+    }
+
+    $campaignId = trim((string)($activeCampaign['id'] ?? ''));
+    publicista_campaign_recover_stuck_run($campaignId, array('stale_seconds' => 900));
+    $activeCampaign = publicista_campaign_get($campaignId) ?: $activeCampaign;
+    $schedule = publicista_campaign_auto_rotation_schedule_normalize((array)($activeCampaign['auto_rotation_schedule'] ?? array()));
+    if (trim((string)$schedule['next_run_at']) === '') {
+        $schedule['next_run_at'] = $nowDt;
+    }
+
+    $campaignStatus = trim((string)($activeCampaign['estado'] ?? ''));
+    if ($campaignStatus === 'uploading' || publicista_campaign_running_run($campaignId)) {
+        $schedule['status'] = 'running';
+        $activeCampaign['auto_rotation_schedule'] = $schedule;
+        $activeCampaign['execution_summary'] = array_merge((array)($activeCampaign['execution_summary'] ?? array()), array(
+            'auto_rotation_status' => 'running',
+            'auto_rotation_next_run_at' => trim((string)$schedule['next_run_at']),
+            'auto_rotation_last_status' => 'Campaña en ejecución, se omite auto-disparo.',
+        ));
+        publicista_campaign_save($activeCampaign);
+        return array('status' => 'already_running', 'campaign_id' => $campaignId, 'next_run_at' => trim((string)$schedule['next_run_at']));
+    }
+
+    $forceImmediate = !empty($schedule['run_immediately_once']);
+
+    $nextTs = strtotime((string)$schedule['next_run_at']);
+    if ($nextTs === false) $nextTs = $nowTs;
+    if (!$forceImmediate && $nextTs > $nowTs) {
+        return array('status' => 'not_due', 'campaign_id' => $campaignId, 'next_run_at' => trim((string)$schedule['next_run_at']));
+    }
+
+    if (!$forceImmediate && !publicista_campaign_auto_rotation_is_in_window($schedule, $nowTs)) {
+        $nextWindowTs = publicista_campaign_auto_rotation_next_window_start_ts($schedule, $nowTs);
+        $schedule['status'] = 'outside_window';
+        $schedule['next_run_at'] = date('Y-m-d H:i:s', $nextWindowTs);
+        $activeCampaign['auto_rotation_schedule'] = $schedule;
+        $activeCampaign['execution_summary'] = array_merge((array)($activeCampaign['execution_summary'] ?? array()), array(
+            'auto_rotation_status' => 'outside_window',
+            'auto_rotation_next_run_at' => $schedule['next_run_at'],
+            'auto_rotation_last_status' => 'Fuera de ventana diaria.',
+        ));
+        publicista_campaign_save($activeCampaign);
+        return array('status' => 'outside_window', 'campaign_id' => $campaignId, 'next_run_at' => $schedule['next_run_at']);
+    }
+
+    list($okDispatch, $savedCampaign, $meta) = publicista_campaign_dispatch_async($campaignId);
+    $targetCampaign = $savedCampaign ?: $activeCampaign;
+    $targetCampaign = publicista_campaign_normalize($targetCampaign);
+    $targetSchedule = publicista_campaign_auto_rotation_schedule_normalize((array)($targetCampaign['auto_rotation_schedule'] ?? array()));
+    $targetSchedule['run_immediately_once'] = false;
+    $targetSchedule['last_run_at'] = $nowDt;
+    $nextDueTs = publicista_campaign_auto_rotation_next_due_ts($targetSchedule, $nowTs);
+    $targetSchedule['next_run_at'] = date('Y-m-d H:i:s', $nextDueTs);
+    $targetSchedule['status'] = $okDispatch ? 'dispatched' : 'error';
+    $targetSchedule['last_error'] = $okDispatch ? '' : trim((string)($meta['error'] ?? 'No se pudo lanzar auto-rotación.'));
+    $targetSchedule['updated_at'] = $nowDt;
+    $targetCampaign['auto_rotation_schedule'] = $targetSchedule;
+    $targetCampaign['execution_summary'] = array_merge((array)($targetCampaign['execution_summary'] ?? array()), array(
+        'auto_rotation_status' => $targetSchedule['status'],
+        'auto_rotation_next_run_at' => $targetSchedule['next_run_at'],
+        'auto_rotation_last_run_at' => $targetSchedule['last_run_at'],
+        'auto_rotation_last_status' => $okDispatch ? 'Auto-disparo lanzado.' : 'Error al lanzar auto-disparo.',
+        'auto_rotation_last_error' => $targetSchedule['last_error'],
+    ));
+    publicista_campaign_save($targetCampaign);
+
+    // En cron no hay redirección asíncrona como en la acción web:
+    // lanzamos la ejecución real del run inmediatamente.
+    if ($okDispatch) {
+        $runId = trim((string)($meta['run_id'] ?? ''));
+        try {
+            list($okRun, $finalCampaign, $run, $runMeta) = publicista_campaign_execute($campaignId, array(
+                'run_id' => $runId,
+                'auto_rotation' => true,
+            ));
+            $notifyCampaign = $finalCampaign ?: (publicista_campaign_get($campaignId) ?: $targetCampaign);
+            $notifyRun = $run ?: ($runId !== '' ? publicista_run_get($runId) : array());
+            publicista_campaign_notify_execution_finished($notifyCampaign, $notifyRun, $runMeta, $okRun);
+        } catch (Throwable $e) {
+            $failedCampaign = publicista_campaign_get($campaignId) ?: $targetCampaign;
+            if ($failedCampaign) {
+                $failedCampaign['estado'] = 'error';
+                $failedCampaign['updated_at'] = now_datetime();
+                $failedCampaign['execution_summary'] = array_merge((array)($failedCampaign['execution_summary'] ?? array()), array(
+                    'last_phase' => 'error',
+                    'last_run_id' => $runId,
+                    'last_run_status' => 'failed',
+                    'last_run_error' => $e->getMessage(),
+                    'last_upload_finished_at' => now_datetime(),
+                    'auto_rotation_last_error' => $e->getMessage(),
+                ));
+                publicista_campaign_save($failedCampaign);
+            }
+        }
+    }
+
+    return array(
+        'status' => $targetSchedule['status'],
+        'campaign_id' => $campaignId,
+        'run_id' => trim((string)($meta['run_id'] ?? '')),
+        'next_run_at' => $targetSchedule['next_run_at'],
+        'error' => $targetSchedule['last_error'],
+    );
+}
+
+function publicista_campaign_force_auto_rotation_now($campaignId, $options = array()) {
+    $campaignId = trim((string)$campaignId);
+    $campaign = $campaignId !== '' ? publicista_campaign_get($campaignId) : null;
+    publicista_campaign_recover_stuck_run($campaignId, array('stale_seconds' => 900));
+    $campaign = $campaignId !== '' ? publicista_campaign_get($campaignId) : $campaign;
+    if (!$campaign) {
+        return array(false, array('error' => 'No se encontró la campaña.'));
+    }
+
+    $items = publicista_campaign_items_for_campaign($campaignId);
+    if (empty($items)) {
+        return array(false, array('error' => 'La campaña no tiene items generados.'));
+    }
+
+    if (publicista_campaign_running_run($campaignId) || trim((string)($campaign['estado'] ?? '')) === 'uploading') {
+        return array(false, array('error' => 'Ya hay una subida en curso para esta campaña.'));
+    }
+
+    list($okDispatch, $savedCampaign, $meta) = publicista_campaign_dispatch_async($campaignId);
+    if (!$okDispatch) {
+        return array(false, array('error' => trim((string)($meta['error'] ?? 'No se pudo lanzar la subida.'))));
+    }
+
+    $runId = trim((string)($meta['run_id'] ?? ''));
+    try {
+        list($okRun, $finalCampaign, $run, $runMeta) = publicista_campaign_execute($campaignId, array(
+            'run_id' => $runId,
+            'auto_rotation' => true,
+        ));
+        $notifyCampaign = $finalCampaign ?: (publicista_campaign_get($campaignId) ?: $campaign);
+        $notifyRun = $run ?: ($runId !== '' ? publicista_run_get($runId) : array());
+        publicista_campaign_notify_execution_finished($notifyCampaign, $notifyRun, $runMeta, $okRun);
+
+        return array($okRun, array(
+            'run_id' => $runId,
+            'published' => (int)($runMeta['published'] ?? 0),
+            'failed' => (int)($runMeta['failed'] ?? 0),
+            'stopped' => !empty($runMeta['stopped']),
+            'error' => $okRun ? '' : trim((string)($runMeta['error'] ?? 'La ejecución terminó con incidencias.')),
+        ));
+    } catch (Throwable $e) {
+        return array(false, array('run_id' => $runId, 'error' => 'Error forzando la subida: ' . $e->getMessage()));
+    }
 }
 
 function publicista_campaign_delete($id) {
@@ -2858,7 +3108,7 @@ function publicista_campaign_dedupe_body_suffixes() {
     );
 }
 
-function publicista_campaign_prepare_unique_copy(&$seenByScope, $item, $baseTitle, $baseBody) {
+function publicista_campaign_prepare_unique_copy(&$seenByScope, $item, $baseTitle, $baseBody, $retryContext = array()) {
     $scope = publicista_campaign_copy_scope_key($item);
     $portalCode = publicista_campaign_copy_portal_code($item);
     if (!isset($seenByScope[$scope]) || !is_array($seenByScope[$scope])) {
@@ -2887,6 +3137,37 @@ function publicista_campaign_prepare_unique_copy(&$seenByScope, $item, $baseTitl
     $baseBody = trim((string)$baseBody);
     $product = is_array($item['product_snapshot']['data'] ?? null) ? $item['product_snapshot']['data'] : array();
     $variants = publicista_campaign_extract_copy_variants($product);
+    
+    // Si hay contexto de retry (error previo), generamos variantes específicas
+    $retryAttempt = max(0, (int)($retryContext['attempt'] ?? 0));
+    $retryErrorCode = trim((string)($retryContext['error_code'] ?? ''));
+    
+    if ($retryAttempt > 0 && function_exists('destacamos_generate_text_variant')) {
+        // Generar variantes automáticas basadas en el tipo de error
+        $errorType = $retryErrorCode;
+        if ($errorType === '') {
+            $errorType = 'duplicate_copy';
+        }
+        
+        // Variantes automáticas para el cuerpo
+        $autoVariants = array();
+        for ($v = 1; $v <= 6; $v++) {
+            $variantText = destacamos_generate_text_variant($baseBody, $v, $errorType);
+            if ($variantText !== $baseBody && $variantText !== '') {
+                $autoVariants[] = $variantText;
+            }
+        }
+        
+        // Si hay variantes automáticas, añadirlas como candidatos prioritarios
+        foreach ($autoVariants as $vIdx => $variantBody) {
+            $addCandidate(
+                $baseTitle !== '' ? $baseTitle : 'Perfil activo',
+                $variantBody,
+                'auto_variant:' . ($vIdx + 1) . ':' . $errorType
+            );
+        }
+    }
+    
     foreach (publicista_campaign_recombined_copy_candidates($item, $baseTitle, $baseBody, $variants) as $candidate) {
         $addCandidate($candidate['title'] ?? '', $candidate['body'] ?? '', $candidate['reason'] ?? 'variant_mix');
     }
@@ -4436,6 +4717,70 @@ function publicista_campaign_running_run($campaignId, $staleSeconds = 21600) {
     return null;
 }
 
+function publicista_campaign_recover_stuck_run($campaignId, $options = array()) {
+    $campaignId = trim((string)$campaignId);
+    if ($campaignId === '') {
+        return array(false, null, null, array('error' => 'Campaign ID vacío.'));
+    }
+
+    $options = is_array($options) ? $options : array();
+    $staleSeconds = max(600, (int)($options['stale_seconds'] ?? 900));
+    $threshold = time() - $staleSeconds;
+
+    $staleRun = null;
+    foreach (publicista_runs_for_campaign($campaignId) as $run) {
+        $estado = trim((string)($run['estado'] ?? ''));
+        if (!in_array($estado, array('pending', 'running'), true)) continue;
+
+        $updatedTs = strtotime((string)($run['updated_at'] ?? ($run['started_at'] ?? ($run['created_at'] ?? ''))));
+        if ($updatedTs === false || $updatedTs >= $threshold) continue;
+
+        $staleRun = $run;
+        break;
+    }
+
+    if (!$staleRun) {
+        return array(false, null, null, array('reason' => 'no_stale_run', 'stale_seconds' => $staleSeconds));
+    }
+
+    $now = now_datetime();
+    $runId = trim((string)($staleRun['id'] ?? ''));
+    $lastHeartbeat = trim((string)($staleRun['updated_at'] ?? ($staleRun['started_at'] ?? ($staleRun['created_at'] ?? ''))));
+    $recoverMsg = 'Run recuperado por atasco: sin progreso/heartbeat durante más de ' . $staleSeconds . 's.';
+
+    $staleRun['estado'] = 'failed';
+    $staleRun['summary'] = $recoverMsg;
+    $staleRun['finished_at'] = $now;
+    $staleRun['pipeline'] = array_merge((array)($staleRun['pipeline'] ?? array()), array(
+        'status' => 'error',
+        'stage' => 'stuck_recovered',
+        'summary' => $recoverMsg,
+        'last_heartbeat_at' => $lastHeartbeat,
+    ));
+    $staleRun['updated_at'] = $now;
+    list($_okRun, $savedRun) = publicista_run_save($staleRun);
+
+    $campaign = publicista_campaign_get($campaignId);
+    if ($campaign) {
+        $campaign['estado'] = 'error';
+        $campaign['updated_at'] = $now;
+        $campaign['execution_summary'] = array_merge((array)($campaign['execution_summary'] ?? array()), array(
+            'last_phase' => 'stuck_recovered',
+            'last_run_id' => $runId,
+            'last_run_status' => 'failed',
+            'last_run_error' => $recoverMsg,
+            'last_upload_finished_at' => $now,
+        ));
+        list($_okCampaign, $campaign) = publicista_campaign_save($campaign);
+    }
+
+    return array(true, $campaign, $savedRun, array(
+        'stale_seconds' => $staleSeconds,
+        'last_heartbeat_at' => $lastHeartbeat,
+        'reason' => 'stuck_run_recovered',
+    ));
+}
+
 function publicista_run_stop_requested($run) {
     $run = is_array($run) ? $run : array();
     return trim((string)($run['stop_requested_at'] ?? '')) !== '';
@@ -5813,6 +6158,7 @@ function publicista_free_bump_execute_cycle($options = array()) {
     $force = !empty($options['force']);
     $trigger = trim((string)($options['trigger'] ?? ($force ? 'manual' : 'scheduler')));
     $requestId = trim((string)($options['request_id'] ?? generate_id('pfbreq')));
+    $forcedAccountId = trim((string)($options['forced_account_id'] ?? ''));
     $nowTs = time();
     $cfg = publicista_free_bump_config();
     $state = publicista_free_bump_state_prepare_today(publicista_free_bump_state());
@@ -5846,14 +6192,56 @@ function publicista_free_bump_execute_cycle($options = array()) {
         return $result;
     }
 
-    // Build per-group ready accounts (only from enabled groups)
-    $allSelectedAccounts = publicista_free_bump_selected_accounts($cfg);
+    // Build selected accounts (including skipped when forcing a specific account)
+    $allSelectedAccounts = publicista_free_bump_selected_accounts($cfg, $forcedAccountId !== '');
     $readyGroupAccounts = array();
+    $selectedAccountsById = array();
     foreach ($allSelectedAccounts as $account) {
+        $currentAccountId = trim((string)($account['id'] ?? ''));
+        if ($currentAccountId !== '') {
+            $selectedAccountsById[$currentAccountId] = $account;
+        }
         if (empty($account['_free_bump_ready'])) continue;
         $groupName = trim((string)($account['_group_name'] ?? ''));
         if ($groupName === '') continue;
         $readyGroupAccounts[$groupName][] = $account;
+    }
+
+    if ($forcedAccountId !== '') {
+        if (!isset($selectedAccountsById[$forcedAccountId])) {
+            $state['last_status'] = 'forced_account_not_found';
+            $state['last_error'] = 'La cuenta forzada no forma parte de los grupos activos de automatización.';
+            $state['last_run_at'] = now_datetime();
+            publicista_free_bump_save_state($state);
+            $result['status'] = 'forced_account_not_found';
+            $result['error'] = $state['last_error'];
+            if ($force) {
+                publicista_free_bump_append_cycle_log($result, $state, array(
+                    'trigger' => $trigger,
+                    'request_id' => $requestId,
+                ));
+            }
+            return $result;
+        }
+
+        $forcedAccount = $selectedAccountsById[$forcedAccountId];
+        if (empty($forcedAccount['_free_bump_ready'])) {
+            $state['last_status'] = 'forced_account_not_ready';
+            $state['last_error'] = trim((string)($forcedAccount['_free_bump_skip_reason'] ?? 'La cuenta forzada no está lista para ejecutar.'));
+            $state['last_run_at'] = now_datetime();
+            publicista_free_bump_save_state($state);
+            $result['status'] = 'forced_account_not_ready';
+            $result['error'] = $state['last_error'];
+            $result['account_id'] = $forcedAccountId;
+            $result['account_label'] = trim((string)($forcedAccount['display_name'] ?? ($forcedAccount['login_user'] ?? $forcedAccountId)));
+            if ($force) {
+                publicista_free_bump_append_cycle_log($result, $state, array(
+                    'trigger' => $trigger,
+                    'request_id' => $requestId,
+                ));
+            }
+            return $result;
+        }
     }
     if (empty($readyGroupAccounts)) {
         $state['next_run_at'] = '';
@@ -5925,6 +6313,25 @@ function publicista_free_bump_execute_cycle($options = array()) {
         }
     }
     if (empty($inWindowGroups)) {
+        if ($forcedAccountId !== '') {
+            $forced = $selectedAccountsById[$forcedAccountId] ?? null;
+            $state['last_status'] = 'forced_account_outside_window';
+            $state['last_run_at'] = now_datetime();
+            $state['last_error'] = 'La cuenta forzada está fuera de su ventana horaria.';
+            $state['next_run_at'] = '';
+            publicista_free_bump_save_state($state);
+            $result['status'] = 'forced_account_outside_window';
+            $result['error'] = $state['last_error'];
+            $result['account_id'] = $forcedAccountId;
+            $result['account_label'] = trim((string)($forced['display_name'] ?? ($forced['login_user'] ?? $forcedAccountId)));
+            if ($force) {
+                publicista_free_bump_append_cycle_log($result, $state, array(
+                    'trigger' => $trigger,
+                    'request_id' => $requestId,
+                ));
+            }
+            return $result;
+        }
         $scheduleTs = publicista_free_bump_schedule_next_ts($cfg, $plan, $nowTs, 'normal');
         $state['next_run_at'] = $scheduleTs > 0 ? date('Y-m-d H:i:s', $scheduleTs) : '';
         $state['last_status'] = 'waiting_window';
@@ -5943,11 +6350,25 @@ function publicista_free_bump_execute_cycle($options = array()) {
         return $result;
     }
 
-    // Pick a random group from those in window
-    $groupKeys = array_keys($inWindowGroups);
-    $selectedGroupName = $groupKeys[array_rand($groupKeys)];
-    $selectedGroup = $inWindowGroups[$selectedGroupName];
-    $orderedAccounts = publicista_free_bump_account_order($selectedGroup['accounts'], $plan, $state, $nowTs);
+    $orderedAccounts = array();
+    if ($forcedAccountId !== '') {
+        foreach ($inWindowGroups as $groupMeta) {
+            foreach ((array)($groupMeta['accounts'] ?? array()) as $accountCandidate) {
+                if (trim((string)($accountCandidate['id'] ?? '')) === $forcedAccountId) {
+                    $orderedAccounts = array($accountCandidate);
+                    break 2;
+                }
+            }
+        }
+    }
+
+    // Pick a random group from those in window when there is no account force
+    if (empty($orderedAccounts)) {
+        $groupKeys = array_keys($inWindowGroups);
+        $selectedGroupName = $groupKeys[array_rand($groupKeys)];
+        $selectedGroup = $inWindowGroups[$selectedGroupName];
+        $orderedAccounts = publicista_free_bump_account_order($selectedGroup['accounts'], $plan, $state, $nowTs);
+    }
     $result['executed'] = true;
     $result['status'] = 'no_available';
 
@@ -6540,23 +6961,24 @@ function publicista_campaign_notify_execution_finished($campaign, $run, $meta, $
         $message .= ' Informe: ' . str_replace("\n", ' ', $humanReport);
     }
 
-    avisos_create_active(
-        $title,
-        $message,
-        $severity,
-        'publicista_campaign_upload',
-        array(
-            'campaign_id' => $campaignId,
-            'campaign_name' => $campaignName,
-            'run_id' => $runId,
-            'published' => $published,
-            'failed' => $failed,
-            'ok' => $ok ? true : false,
-            'human_report' => $humanReport,
-        ),
-        false,
-        'publicista_campaign_upload_' . ($runId !== '' ? $runId : generate_id('pubnotice'))
-    );
+    // NOTIFICACIONES DESACTIVADAS: no generar avisos al finalizar campañas
+    //avisos_create_active(
+    //    $title,
+    //    $message,
+    //    $severity,
+    //    'publicista_campaign_upload',
+    //    array(
+    //        'campaign_id' => $campaignId,
+    //        'campaign_name' => $campaignName,
+    //        'run_id' => $runId,
+    //        'published' => $published,
+    //        'failed' => $failed,
+    //        'ok' => $ok ? true : false,
+    //        'human_report' => $humanReport,
+    //    ),
+    //    false,
+    //    'publicista_campaign_upload_' . ($runId !== '' ? $runId : generate_id('pubnotice'))
+    //);
 }
 
 function publicista_campaign_dispatch_async($campaignId) {
@@ -6565,6 +6987,9 @@ function publicista_campaign_dispatch_async($campaignId) {
     if (!$campaign) {
         return array(false, null, array('error' => 'No se encontró la campaña a subir.'));
     }
+
+    publicista_campaign_recover_stuck_run($campaignId, array('stale_seconds' => 900));
+    $campaign = publicista_campaign_get($campaignId) ?: $campaign;
 
     $runningRun = publicista_campaign_running_run($campaignId);
     if ($runningRun) {
@@ -6791,7 +7216,16 @@ function publicista_campaign_execute($campaignId, $options = array()) {
     ));
     publicista_campaign_save($campaign);
 
-    $items = publicista_campaign_items_round_robin_by_account($items);
+    $autoRotationMode = !empty($options['auto_rotation']);
+    if ($autoRotationMode) {
+        $rotationSeed = trim((string)($savedRun['id'] ?? ''));
+        if ($rotationSeed === '') {
+            $rotationSeed = (string)microtime(true);
+        }
+        $items = publicista_campaign_items_round_robin_by_account_randomized($items, $rotationSeed);
+    } else {
+        $items = publicista_campaign_items_round_robin_by_account($items);
+    }
 
     // --- Auto-aplicar reparto si hay distribution_matrix guardada ---
     $storedMatrix = is_array($campaign['distribution_matrix'] ?? null) ? $campaign['distribution_matrix'] : array();
@@ -6800,7 +7234,15 @@ function publicista_campaign_execute($campaignId, $options = array()) {
         if ($rebalanceOk) {
             $campaign = $rebalancedCampaign;
             $items = publicista_campaign_items_for_campaign($campaignId);
-            $items = publicista_campaign_items_round_robin_by_account($items);
+            if ($autoRotationMode) {
+                $rotationSeed = trim((string)($savedRun['id'] ?? ''));
+                if ($rotationSeed === '') {
+                    $rotationSeed = (string)microtime(true);
+                }
+                $items = publicista_campaign_items_round_robin_by_account_randomized($items, $rotationSeed);
+            } else {
+                $items = publicista_campaign_items_round_robin_by_account($items);
+            }
             // Actualizar el progress total con el nuevo count
             $savedRun['progress']['total_items'] = count($items);
             $savedRun['updated_at'] = now_datetime();
@@ -6890,14 +7332,29 @@ function publicista_campaign_execute($campaignId, $options = array()) {
         $result = array('ok' => false, 'error' => 'No se pudo ejecutar el item.');
 
         try {
+            $lastErrorCode = '';
             while (true) {
                 $attemptNumber++;
+                $retryContext = array(
+                    'attempt' => $attemptNumber - 1,
+                    'error_code' => $lastErrorCode,
+                );
                 $copyPlan = publicista_campaign_prepare_unique_copy(
                     $seenCopyFingerprints,
                     $item,
                     $baseTitle,
-                    $baseBody
+                    $baseBody,
+                    $retryContext
                 );
+                
+                // Pre-check: si es content_moderation y tenemos la función de filtrado
+                if ($lastErrorCode === 'content_moderation' && function_exists('destacamos_filter_moderation_words')) {
+                    $filterMode = $attemptNumber >= 4 ? 'strict' : 'moderate';
+                    $copyPlan['body'] = destacamos_filter_moderation_words($copyPlan['body'], $filterMode);
+                    $copyPlan['title'] = destacamos_filter_moderation_words($copyPlan['title'], $filterMode);
+                    $copyPlan['reason'] = $copyPlan['reason'] . ':moderation_filtered:' . $filterMode;
+                }
+                
                 $itemOptions['field_overrides'] = array(
                     'title' => $copyPlan['title'],
                     'description' => $copyPlan['body'],
@@ -6918,9 +7375,10 @@ function publicista_campaign_execute($campaignId, $options = array()) {
                     break;
                 }
 
+                $lastErrorCode = trim((string)($result['error_code'] ?? 'duplicate_copy'));
                 $retryHistory[] = array(
                     'attempt' => $attemptNumber,
-                    'reason' => trim((string)($result['error_code'] ?? 'duplicate_copy')),
+                    'reason' => $lastErrorCode,
                     'error' => trim((string)($result['error'] ?? '')),
                     'validation_errors' => array_values((array)($result['validation_errors'] ?? array())),
                     'copy_adjustment' => $copyPlan,
@@ -7059,6 +7517,20 @@ function publicista_campaign_execute($campaignId, $options = array()) {
     $campaign['updated_at'] = now_datetime();
     publicista_campaign_save($campaign);
 
+    // Sync to girlsconf after successful publish
+    $portalCode = trim((string)($campaign['planning_snapshot']['data']['portal_code'] ?? 'destacamos'));
+    if ($published > 0 && $portalCode === 'destacamos') {
+        if (function_exists('publicista_sync_girlsconf_to_girlsconf')) {
+            try {
+                publicista_sync_girlsconf_to_girlsconf($campaignId);
+            } catch (Throwable $e) {
+                if (function_exists('bootstrap_runtime_log_exception')) {
+                    bootstrap_runtime_log_exception('publicista_sync_girlsconf', $e);
+                }
+            }
+        }
+    }
+
     $savedRun['estado'] = $runStatus;
     $savedRun['finished_at'] = now_datetime();
     $savedRun['summary'] = $runSummary;
@@ -7175,6 +7647,57 @@ function publicista_campaign_items_round_robin_by_account($items) {
         if (!$advanced) {
             break;
         }
+    }
+
+    return $out;
+}
+
+function publicista_campaign_items_round_robin_by_account_randomized($items, $seed = null) {
+    $ordered = publicista_campaign_items_round_robin_by_account($items);
+    if (!is_array($ordered) || count($ordered) <= 1) {
+        return is_array($ordered) ? $ordered : array();
+    }
+
+    $accountBuckets = array();
+    $accountOrder = array();
+    foreach ($ordered as $item) {
+        $accountId = trim((string)($item['account_id'] ?? ''));
+        if (!isset($accountBuckets[$accountId])) {
+            $accountBuckets[$accountId] = array();
+            $accountOrder[] = $accountId;
+        }
+        $accountBuckets[$accountId][] = $item;
+    }
+
+    $seedInt = null;
+    if ($seed !== null) {
+        $seedInt = abs((int)crc32((string)$seed));
+    }
+    if ($seedInt !== null) {
+        mt_srand($seedInt);
+    }
+
+    shuffle($accountOrder);
+    foreach ($accountBuckets as $aid => $bucket) {
+        shuffle($bucket);
+        $accountBuckets[$aid] = $bucket;
+    }
+
+    if ($seedInt !== null) {
+        mt_srand();
+    }
+
+    $out = array();
+    while (true) {
+        $advanced = false;
+        foreach ($accountOrder as $aid) {
+            if (empty($accountBuckets[$aid])) {
+                continue;
+            }
+            $advanced = true;
+            $out[] = array_shift($accountBuckets[$aid]);
+        }
+        if (!$advanced) break;
     }
 
     return $out;

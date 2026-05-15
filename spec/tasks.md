@@ -1,5 +1,45 @@
 # Tasks por fases
 
+## Mundosex — Integración portal MundosexAnuncio en Publicista
+
+### MUNDOSEX-F1 — PORTAL_REGISTRY (Portal Registry)
+
+- [x] Añadir `mundosex` a `publicista_account_portal_options()` en storage.php.
+- [x] Cambiar `<input hidden>` de portal en estrategias por `<select>` con onchange.
+- [x] Validación allowlist de `portal_code` en `action_save_publicista_planning`.
+- [x] Verificación funcional (portal options, validación, planning normalize).
+- [x] Auditoría de seguridad (0 críticos, 0 altos, 2 medios corregidos).
+- [x] Actualizar changelog.
+
+### MUNDOSEX-F2 — ADAPTER_LOADER (Cablear adaptador)
+
+- [ ] Crear `subirPublicidad/mundosex.php` (wrapper PHP → exec node mundosex_browser.js).
+- [ ] Cablear `publicista_require_automation_adapter()` para `mundosex`.
+- [ ] Cablear `publicista_campaign_item_ready_for_execution()` para `mundosex`.
+- [ ] Adapter code en `publicista_campaign_execute_item()`.
+- [ ] Session management (mundosex no reusa sesiones HTTP).
+
+### MUNDOSEX-F3 — CAMPAIGN_ITEMS (Generar y mostrar items)
+
+- [ ] Verificar que `publicista_campaign_generate_items()` asigna `external_ad_id` correctamente.
+- [ ] Verificar que la tabla de items en UI muestra correctamente items `mundosex`.
+- [ ] Verificar que `publicista_campaign_resolve_location()` funciona para `mundosex`.
+
+### MUNDOSEX-F4 — EXECUTION (Ejecutar subida con humanización)
+
+- [ ] Verificar que los delays de humanización aplican a items `mundosex`.
+- [ ] Asegurar que el bucle de retry de copy funciona sin hardcodeos.
+- [ ] Payload builder: verificar que el mapping de campos ocurre en el adaptador.
+- [ ] Post-upload sync (si necesario para `mundosex`).
+
+### MUNDOSEX-F5 — ROTATION_BLOCK (Excluir de auto-rotación)
+
+- [ ] Filtrar items `mundosex` de la auto-rotación.
+- [ ] Verificar que free bump solo aplica a `destacamos`.
+- [ ] UI: nota informativa sobre que Mundosex no rota.
+
+---
+
 ## Fase 1 — Rendimiento Inmediato (Online)
 
 - [x] Sacar compacción de bootstrap y moverla a cron/mantenimiento.

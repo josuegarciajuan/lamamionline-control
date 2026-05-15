@@ -1121,6 +1121,13 @@ function render_publicista_calculo_publicidad_page() {
     }
     echo '<input type="hidden" name="portal_code" value="destacamos">';
     echo '<input type="hidden" name="portal_label" value="Destacamos">';
+    // Portal selector visible para poder elegir entre portales al guardar la estrategia
+    echo '<div class="field"><label>Portal</label><select name="portal_code_visible" onchange="this.form.portal_code.value=this.value;this.form.portal_label.value=this.options[this.selectedIndex].text;">';
+    foreach (publicista_account_portal_options() as $value => $label) {
+        $sel = ($value === 'destacamos') ? ' selected' : '';
+        echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
+    }
+    echo '</select></div>';
     echo '<input type="hidden" name="portal_url" value="' . e((string)($comp['url'] ?? '')) . '">';
     echo '<input type="hidden" name="city" value="' . e((string)$result['city']) . '">';
     echo '<input type="hidden" name="province" value="' . e((string)$result['province']) . '">';
@@ -3049,11 +3056,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
 
     echo '<section class="panel panel-space" id="publicistaCopyPack">';
     echo '<div class="section-head"><div><h3>Títulos, textos y export</h3><p>Genera el pack de copy, revisa variantes y exporta todo para publicar.</p></div><div class="section-head-actions">';
-    echo '<form method="post" class="inline-form">';
-    echo '<input type="hidden" name="action" value="generate_publicista_copy_pack">';
-    echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-    echo '<button class="btn-primary">Generar / regenerar textos</button>';
-    echo '</form>';
+    echo '<button type="button" class="btn-primary" onclick="openRegenerateCopyPackModal(\'' . e($selectedJob['id'] ?? '') . '\')">Generar / regenerar textos</button>';
     echo '</div></div>';
     echo '<div class="cards three">';
     echo '<div class="info-strip"><strong>Versión actual</strong><br>' . e($copyPack['current_version_id'] ?? 'Pendiente') . '</div>';
@@ -3216,9 +3219,30 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     echo '</section>';
 
     // -----------------------------------------------------------------------
-    // Modal de regenerado de candidata + Modal de blur manual
+    // Modal de regenerado de textos + candidata + Modal de blur manual
     // -----------------------------------------------------------------------
     echo <<<'HTML'
+<div id="regenerateCopyPackModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10000;align-items:center;justify-content:center;flex-direction:column;">
+  <div style="background:#fff;border-radius:14px;padding:20px;max-width:720px;width:96vw;max-height:90vh;overflow:auto;box-shadow:0 8px 40px rgba(0,0,0,0.35);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;">
+      <strong style="font-size:16px;">Regenerar textos con conceptos extra</strong>
+      <button type="button" onclick="closeRegenerateCopyPackModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;">&times;</button>
+    </div>
+    <p style="margin:0 0 10px;font-size:13px;color:#6b7280;">Se reutiliza el contexto actual de textos y, si quieres, se añaden nuevos conceptos para esta regeneración puntual.</p>
+    <form method="post" id="regenerateCopyPackForm">
+      <input type="hidden" name="action" value="generate_publicista_copy_pack">
+      <input type="hidden" name="id" id="regenCopyPackJobId" value="">
+      <label for="regenCopyPackExtraConcepts" style="display:block;font-size:13px;color:#374151;margin-bottom:6px;">Conceptos extra para el prompt (opcional)</label>
+      <textarea name="copy_extra_concepts" id="regenCopyPackExtraConcepts" rows="6" maxlength="1200" placeholder="Ejemplo: más enfoque elegante y exclusivo, gancho de novedad, CTA más directo y tono cercano..." style="width:100%;"></textarea>
+      <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <button type="submit" class="btn-primary">Generar / regenerar textos</button>
+        <button type="button" class="btn-secondary" onclick="closeRegenerateCopyPackModal()">Cancelar</button>
+        <span style="font-size:12px;color:#6b7280;">Este texto se aplica solo en esta ejecución; no sustituye tu brief libre guardado.</span>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div id="regenerateCandidateModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10000;align-items:center;justify-content:center;flex-direction:column;">
   <div style="background:#fff;border-radius:14px;padding:20px;max-width:720px;width:96vw;max-height:90vh;overflow:auto;box-shadow:0 8px 40px rgba(0,0,0,0.35);">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;">
@@ -3273,6 +3297,17 @@ function render_publicista_crear_perfiles_page($embedded = false) {
 (function() {
   var _mbJobId = '', _mbFinalId = '', _mbEllipse = null, _mbDragging = false, _mbStartX = 0, _mbStartY = 0;
   var _mbImg = new Image();
+
+  window.openRegenerateCopyPackModal = function(jobId) {
+    document.getElementById('regenCopyPackJobId').value = jobId || '';
+    document.getElementById('regenCopyPackExtraConcepts').value = '';
+    document.getElementById('regenerateCopyPackModal').style.display = 'flex';
+    document.getElementById('regenCopyPackExtraConcepts').focus();
+  };
+
+  window.closeRegenerateCopyPackModal = function() {
+    document.getElementById('regenerateCopyPackModal').style.display = 'none';
+  };
 
   window.openRegenerateCandidateModal = function(jobId, candidateId) {
     document.getElementById('regenCandidateJobId').value = jobId || '';
@@ -3595,7 +3630,7 @@ function publicista_render_production_params_fields($params) {
     echo '<div class="field">';
     echo '<label>Tipo de espacio / fondo</label>';
     echo '<select name="setting_type">';
-    $currentSetting = $params['setting'] ?? 'neutro';
+    $currentSetting = $params['setting'] ?? 'random';
     foreach (publicista_setting_type_options() as $value => $label) {
         $sel = ($currentSetting === $value) ? ' selected' : '';
         echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
