@@ -1,5 +1,132 @@
 # Changelog
 
+## 2026-05-15 · Publiscort F6 — CIERRE_ENTREGA
+
+### Resumen de archivos tocados (F1→F5)
+- `app/comercial.php`
+- `spec/tasks.md`
+- `docs/changelog.md`
+
+### Resumen de decisiones clave
+- Identidad de rama: `slug=publiscort`, `id=comproc_publiscort`, `nombre=Publiscort`.
+- Arranque conservador: `enabled=0` por defecto.
+- Fuente y operación: `jsonl_queue`, colas `publiscort_1..3.jsonl`, ventana `10:00-19:00`, intervalos `5400-7200s`.
+- Copy comercial: enfoque en publicista profesional de alta efectividad, cobertura en Destacamos/Mundosex/Nuevapasion, estrategia TOP+pago y precio fijo `50€/semana`.
+- Compatibilidad de existentes: autoinserción no destructiva de `publiscort` si falta en `comercial_processes.json`.
+- Hardening de seguridad: no persistir `source_mysql_pass` en JSON local.
+
+### Estado de entrega
+- Bloque Publiscort completo en fases `F1..F6` con validación técnica y funcional cerrada.
+- Siguiente iteración lista: afinado de copy/operativa en piloto controlado antes de activar en producción.
+
+---
+
+## 2026-05-15 · Publiscort F5 — VALIDACION_TECNICA_FUNCIONAL
+
+### Cambios
+- Validada aparición de `publiscort` en el listado de procesos comerciales y estado por defecto apagado (`enabled=0`).
+- Validada carga de plantillas `message_templates` y `followup_templates` de `publiscort`.
+- Ejecutada regresión mínima de ramas existentes (`plaza`, `lamami`, `publicista`, `casawasap`) sin pérdida de slugs.
+- Ejecutado lint PHP en módulo comercial.
+
+### Seguridad
+- Corregido hallazgo HIGH de exposición de secreto en persistencia local de procesos: `source_mysql_pass` deja de persistirse en `comercial_processes.json`.
+- El password MySQL pasa a resolverse por configuración segura global (env/settings), evitando almacenarlo en claro por proceso.
+
+### Motivo
+Cerrar la validación técnica/funcional de Publiscort con evidencia reproducible y sin degradar ramas existentes, incorporando además hardening de seguridad en almacenamiento de credenciales.
+
+### Archivos
+- `app/comercial.php`
+- `spec/tasks.md`
+- `docs/changelog.md`
+
+---
+
+## 2026-05-15 · Publiscort F4 — MIGRACION_SEGURA_EXISTENTES
+
+### Cambios
+- Implementada migración segura en `comercial_get_processes()` para instalaciones existentes: si falta el proceso `publiscort` en `comercial_processes.json`, se inserta automáticamente desde seed.
+- La inserción es no destructiva: no altera configuración de procesos ya existentes.
+- Guardrail explícito de seguridad operativa: el proceso autoinsertado se fuerza con `enabled=0`.
+
+### Motivo
+Evitar que Publiscort solo aparezca en instalaciones nuevas. Con esta migración, también queda disponible en entornos ya inicializados sin romper configuraciones previas ni activar envíos por error.
+
+### Archivos
+- `app/comercial.php`
+- `spec/tasks.md`
+- `docs/changelog.md`
+
+---
+
+## 2026-05-15 · Publiscort F3 — COPY_COMERCIAL
+
+### Cambios
+- Añadidas variantes iniciales de `message_templates` para el slug `publiscort` en `comercial_default_process_templates()`.
+- Añadidas variantes iniciales de `followup_templates` para `publiscort`.
+- Añadido fallback de compatibilidad en `comercial_legacy_process_templates()` para `publiscort`.
+- `publiscort` incluido en `comercial_hardcoded_process_slugs()` para mantener el mismo patrón de plantillas hardcodeadas que el resto de ramas comerciales nativas.
+
+### Copy aplicado
+- Posicionamiento: **publicista profesional** con **alta efectividad**.
+- Portales mencionados: **Destacamos, Mundosex y Nuevapasion**.
+- Estrategia comunicada: combinación de **anuncios TOP** y **anuncios de pago**.
+- Precio incluido en todos los textos: **50€ / semana**.
+
+### Motivo
+Dejar Publiscort con copy operativo de salida para arranque comercial controlado, manteniendo coherencia con la lógica de plantillas y tono del módulo comercial actual.
+
+### Archivos
+- `app/comercial.php`
+- `spec/tasks.md`
+- `docs/changelog.md`
+
+---
+
+## 2026-05-15 · Publiscort F2 — SEMILLA_CONFIG_CORE
+
+### Cambios
+- Añadido `publiscort` al constructor de procesos por defecto del módulo comercial.
+- Añadido seed `publiscort` en `comercial_default_process_seed()` con arranque conservador:
+  - `enabled=0` (apagado por defecto)
+  - `source_type=jsonl_queue`
+  - ventana `10:00-19:00`
+  - intervalos `5400-7200` segundos
+  - líneas sugeridas por `comercial_guess_line_ids(['jostal dulce', 'nuria-jostal', 'publi10'])`
+  - `ia_context_prompt` específico para Publiscort.
+- Añadidas colas por defecto `publiscort_1..3.jsonl` y su inclusión en el agregador global de colas para bootstrap automático de archivos.
+
+### Motivo
+Materializar la base técnica de Publiscort con riesgo bajo y trazabilidad clara, dejando el proceso configurado pero inactivo hasta ajustar copy y activación en fases posteriores.
+
+### Archivos
+- `app/comercial.php`
+- `spec/tasks.md`
+- `docs/changelog.md`
+
+---
+
+## 2026-05-15 · Publiscort F1 — MAPA_Y_ENCAJE
+
+### Cambios
+- Formalizada la fase `PUBLISCORT-F1` en `spec/tasks.md` con trazabilidad SDD y checklist explícito.
+- Definida la identidad técnica objetivo de la nueva rama comercial:
+  - `slug`: `publiscort`
+  - `id`: `comproc_publiscort`
+  - `nombre`: `Publiscort`
+  - `source_type`: `jsonl_queue` (criterio conservador)
+- Documentado el criterio de visualización en panel: aparecerá apagada por defecto (`enabled=0`) tras su alta técnica en F2 y la compatibilidad de existentes en F4.
+
+### Motivo
+Cerrar la fase de encaje y definición antes de tocar runtime, reduciendo riesgo y dejando contrato operativo claro para implementar la rama en fases posteriores.
+
+### Archivos
+- `spec/tasks.md`
+- `docs/changelog.md`
+
+---
+
 ## 2026-05-15 · Mundosex F5 — ROTATION_BLOCK (Excluir de auto-rotación)
 
 ### Cambios

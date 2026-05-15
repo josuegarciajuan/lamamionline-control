@@ -19,6 +19,18 @@ function comercial_bootstrap_storage() {
         }
     }
 
+    // ── Fix #4: inicializar archivos de enviados por rama ──
+    $processes = comercial_get_processes();
+    foreach ($processes as $process) {
+        $slug = trim((string)($process['slug'] ?? ''));
+        if ($slug === '') continue;
+        $branchFile = 'comercial_sent_phones_' . preg_replace('/[^a-z0-9_\-]/i', '_', $slug) . '.json';
+        $branchPath = DATA_PATH . '/' . $branchFile;
+        if (!file_exists($branchPath)) {
+            file_put_contents($branchPath, json_encode(array(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        }
+    }
+
     $jsonlFiles = array(
         DATA_PATH . '/comercial_events.jsonl',
         DATA_PATH . '/comercial_webhook_log.jsonl',
@@ -36,6 +48,18 @@ function comercial_bootstrap_storage() {
         if (!file_exists($path)) {
             file_put_contents($path, '');
         }
+    }
+
+    // ── Fix #4: reconstruir global de enviados periódicamente (1/día) ──
+    $dailyStats = storage_read('comercial_daily_stats.json');
+    $lastRebuild = trim((string)(is_array($dailyStats) ? ($dailyStats['_sent_phones_rebuild_at'] ?? '') : ''));
+    if ($lastRebuild === '' || strtotime($lastRebuild) < time() - 86400) {
+        $count = comercial_rebuild_global_sent_phones();
+        $stats = storage_read('comercial_daily_stats.json');
+        if (!is_array($stats)) $stats = array();
+        $stats['_sent_phones_rebuild_at'] = now_datetime();
+        $stats['_sent_phones_rebuild_count'] = $count;
+        storage_write('comercial_daily_stats.json', $stats);
     }
 }
 
@@ -123,6 +147,12 @@ function comercial_queue_base_dir() {
 function comercial_default_queue_files($slug) {
     $base = comercial_queue_base_dir();
     switch (trim((string)$slug)) {
+        case 'publiscort':
+            return array(
+                $base . '/publiscort_1.jsonl',
+                $base . '/publiscort_2.jsonl',
+                $base . '/publiscort_3.jsonl',
+            );
         case 'publicista':
             return array(
                 $base . '/publicista_1.jsonl',
@@ -141,7 +171,7 @@ function comercial_default_queue_files($slug) {
 }
 
 function comercial_hardcoded_process_slugs() {
-    return array('plaza', 'lamami', 'publicista', 'casawasap');
+    return array('plaza', 'lamami', 'publicista', 'casawasap', 'publiscort');
 }
 
 function comercial_process_has_hardcoded_templates($slug) {
@@ -169,6 +199,12 @@ function comercial_default_process_templates($slug, $field = 'message_templates'
             case 'casawasap':
                 return array(
                     "CasaWasap contesta los telefonos de tu casa todo el día (24/7), mantiene el hilo y filtra curiosos: a ti te llega solo aviso de los que tienen intención real de ir ✅\nAl ser algo tan novedoso, esto se entiende mejor en voz. Si te va bien, hacemos una llamada de 5 min y te explico todo un poco más"
+                );
+            case 'publiscort':
+                return array(
+                    "¡Perfecto! 🙌\nPubliscort es servicio de publicista profesional con alta efectividad: te posicionamos en portales con tráfico real (Destacamos, Mundosex y Nuevapasion), combinando anuncios TOP y formatos de pago para que no te pierdas entre miles de perfiles.\n\n💶 Coste: 50€ por semana.\nSi quieres, te explico en 3 pasos cómo lo montamos para tu caso.",
+                    "Genial 😊\nPara que lo tengas claro: en Publiscort trabajamos con estrategia de visibilidad real en Destacamos, Mundosex y Nuevapasion. Mezclamos publicaciones destacadas + anuncios de pago para mantenerte arriba y generar más contactos útiles.\n\n💶 Son 50€/semana.\nSi te va bien, te paso ahora qué necesitamos para arrancar.",
+                    "Te cuento rápido 👇\nPubliscort = publicista profesional + enfoque en resultados. Publicamos en Destacamos, Mundosex y Nuevapasion, usando anuncios TOP y opciones de pago para maximizar alcance cada semana.\n\n💶 Tarifa cerrada: 50€ / semana.\n¿Quieres que te pase el formato exacto de trabajo y tiempos de arranque?"
                 );
         }
         return array();
@@ -249,6 +285,13 @@ function comercial_default_process_templates($slug, $field = 'message_templates'
                 "Buenas! 👋 Te lo dejo fácil: ¿tienes algún contacto con casas de citas? (RRPP, fotógrafo, comercial, agencia, taxi, publicista…)\n\nCasaWasap es un “telefonista” con IA que atiende el WhatsApp 24/7 como si fuera alguien de la casa, mantiene el tono humano, calienta la charla y solo avisa cuando hay una visita seria con ETA.\n\n💸 Tú solo abres la puerta con el contacto y cobras comisión alta + comisión mensual recurrente por cada casa activa.\n✅ Tú no das soporte • ✅ No necesitas herramientas • ✅ Nosotros cerramos, configuramos y damos soporte\n\n📌 Mira esto en 1 minuto (comisiones incluidas):\n👉 https://casawasap.com/seller.html\n\nDemo para probarlo como cliente:\n👉 https://casawasap.com\n\nSi te interesa, responde “INFO” ☺️",
                 "Hola qué tal! 👋 ¿Tienes algún conocido que mueva casas de citas? (agencia, RRPP, fotógrafo, comercial, taxista, publicista…)\n\nTe presento CasaWasap: un “telefonista” con IA que gestiona el WhatsApp 24/7 con tono natural, sabe llevar la conversación y solo avisa cuando hay una visita seria con tiempo de llegada.\n\n💸 Tú solo haces de puente (presentación) y te llevas comisión alta + comisión mensual recurrente por cada casa activa.\n✅ Sin soporte • ✅ Sin herramientas • ✅ Nosotros cerramos, configuramos y damos soporte\n\n📌 Aquí lo tienes explicado en 1 minuto + comisiones:\n👉 https://casawasap.com/seller.html\n\nY aquí la demo para que lo pruebes tú mismo:\n👉 https://casawasap.com\n\nSi te encaja, dime “INFO” y te lo detallo ☺️"
             );
+        case 'publiscort':
+            return array(
+                "Hola 👋 Soy de Publiscort.\nSomos publicista profesional con alta efectividad y te damos visibilidad en portales clave: Destacamos, Mundosex y Nuevapasion.\n\nTrabajamos con anuncios TOP + formatos de pago para colocarte arriba y generar más contactos de calidad.\n\n💶 Coste: 50€ por semana.\nSi te interesa, te explico cómo empezar en 1 minuto.",
+                "Buenas 😊 Te escribo de Publiscort.\nNos dedicamos a publicar de forma profesional para que tengas más alcance real: Destacamos, Mundosex y Nuevapasion, con estrategia de anuncios destacados y de pago.\n\nLa idea es simple: mayor visibilidad + más mensajes útiles.\n💶 Precio cerrado: 50€/semana.\n¿Quieres que te pase el plan exacto para tu perfil?",
+                "¡Hola! 👋 Publiscort por aquí.\nSi quieres que te lleven la publi con enfoque serio y efectivo, te puede encajar: publicamos en Destacamos, Mundosex y Nuevapasion, usando posiciones TOP y opciones premium de pago.\n\n💶 Son 50€ por semana.\nSi te va bien, te paso ahora qué datos necesitamos para activarlo.",
+                "Hola 😊\nSoy publicista de Publiscort.\nTe ayudamos a destacar en portales de anuncios (Destacamos, Mundosex y Nuevapasion) combinando campañas TOP y anuncios de pago para aumentar visibilidad semanal.\n\n💶 Tarifa: 50€/semana.\n¿Te interesa que te lo explique rápido y sin compromiso?"
+            );
     }
 
     return array();
@@ -283,6 +326,12 @@ function comercial_legacy_process_templates($slug, $field = 'message_templates')
                 "CasaWasap es un “telefonista” con IA que contesta 24/7, mantiene la conversacion y cierra al cliente como una telefonista real.",
                 "Si quieres, dime “INFO” y te lo adapto a tu caso en 3 lineas. 📲"
             );
+        case 'publiscort':
+            return array(
+                "Hola 👋 Te escribo de Publiscort, servicio de publicista profesional con alta efectividad.",
+                "Publicamos en Destacamos, Mundosex y Nuevapasion con anuncios TOP y opciones de pago para darte más visibilidad.",
+                "Precio: 50€ por semana. Si te interesa, responde INFO y te cuento cómo arrancamos."
+            );
     }
 
     return array();
@@ -309,7 +358,7 @@ function comercial_legacy_queue_files($slug) {
 
 function comercial_all_queue_files() {
     $all = array();
-    foreach (array('publicista', 'casawasap') as $slug) {
+    foreach (array('publiscort', 'publicista', 'casawasap') as $slug) {
         foreach (comercial_default_queue_files($slug) as $path) {
             $all[] = $path;
         }
@@ -431,6 +480,7 @@ function comercial_build_default_processes() {
     return array(
         comercial_default_process_seed('plaza'),
         comercial_default_process_seed('lamami'),
+        comercial_default_process_seed('publiscort'),
         comercial_default_process_seed('publicista'),
         comercial_default_process_seed('casawasap'),
     );
@@ -504,6 +554,21 @@ function comercial_default_process_seed($slug) {
         $base['followup_templates'] = comercial_default_process_templates($slug, 'followup_templates');
         $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal'));
         $base['ia_context_prompt'] = "Eres La Mami Online, un servicio de publicista digital. Tono: cercano, profesional, entusiasta. Objetivo: conseguir que la clienta se dé de alta (29€) para recibir clientes extra.";
+        return $base;
+    }
+
+    if ($slug === 'publiscort') {
+        $base['nombre'] = 'Publiscort';
+        $base['source_type'] = 'jsonl_queue';
+        $base['source_queue_files'] = comercial_default_queue_files('publiscort');
+        $base['window_start_hour'] = 10;
+        $base['window_end_hour'] = 19;
+        $base['min_interval_seconds'] = 5400;
+        $base['max_interval_seconds'] = 7200;
+        $base['message_templates'] = comercial_default_process_templates($slug, 'message_templates');
+        $base['followup_templates'] = comercial_default_process_templates($slug, 'followup_templates');
+        $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal', 'publi10'));
+        $base['ia_context_prompt'] = "Eres comercial de Publiscort. Tono: cercano, profesional y breve. Objetivo: validar interés real, resolver dudas básicas y llevar la conversación a una siguiente acción clara (pedir info adicional o propuesta), sin insistencia agresiva.";
         return $base;
     }
 
@@ -679,6 +744,25 @@ function comercial_get_processes() {
     foreach ($rows as $row) {
         $out[] = comercial_normalize_process($row);
     }
+
+    // Migración segura para instalaciones existentes:
+    // asegurar procesos requeridos sin tocar configuraciones ya presentes.
+    $requiredSlugs = array('publiscort');
+    $existingBySlug = array();
+    foreach ($out as $row) {
+        $slug = trim((string)($row['slug'] ?? ''));
+        if ($slug !== '') {
+            $existingBySlug[$slug] = true;
+        }
+    }
+    foreach ($requiredSlugs as $requiredSlug) {
+        if (!isset($existingBySlug[$requiredSlug])) {
+            $seed = comercial_default_process_seed($requiredSlug);
+            $seed['enabled'] = 0; // guardrail explícito de migración
+            $out[] = comercial_normalize_process($seed);
+        }
+    }
+
     usort($out, function ($a, $b) {
         return strcmp((string)($a['nombre'] ?? ''), (string)($b['nombre'] ?? ''));
     });
@@ -707,6 +791,9 @@ function comercial_save_processes($rows) {
 
 function comercial_prepare_process_for_storage($row) {
     $row = is_array($row) ? $row : array();
+    // No persistir credenciales sensibles por proceso en JSON local.
+    // El password de conexión debe resolverse por configuración segura global (env/settings).
+    $row['source_mysql_pass'] = '';
     return $row;
 }
 
@@ -953,17 +1040,96 @@ function comercial_register_sent_phone($phone, $processSlug = '') {
     $phoneDigits = comercial_only_digits($phone);
     if ($phoneDigits === '') return null;
 
-    // Evitar duplicados: si ya existe, no volver a registrar
+    // ── Fix #4: deduplicación global + por rama ──
+
+    // Evitar duplicados en el registro global
     if (comercial_phone_was_contacted($phoneDigits)) return null;
 
+    $processSlug = trim((string)$processSlug);
     $entry = array(
         'id' => generate_id('cmsent'),
         'phone' => $phoneDigits,
-        'process_slug' => trim((string)$processSlug),
+        'process_slug' => $processSlug,
         'sent_at' => now_datetime(),
     );
+
+    // 1. Registrar en el archivo global
     storage_upsert('comercial_sent_phones.json', $entry);
+
+    // 2. Registrar en el archivo específico de la rama (si hay slug)
+    if ($processSlug !== '') {
+        $branchFile = 'comercial_sent_phones_' . preg_replace('/[^a-z0-9_\-]/i', '_', $processSlug) . '.json';
+        $branchEntry = $entry;
+        $branchEntry['branch_file'] = $branchFile;
+        storage_upsert($branchFile, $branchEntry);
+    }
+
     return $entry;
+}
+
+function comercial_get_sent_phones_by_branch($processSlug) {
+    $processSlug = trim((string)$processSlug);
+    if ($processSlug === '') return array();
+    $branchFile = 'comercial_sent_phones_' . preg_replace('/[^a-z0-9_\-]/i', '_', $processSlug) . '.json';
+    $rows = storage_read($branchFile);
+    $out = array();
+    foreach ((array)$rows as $row) {
+        $phone = comercial_only_digits((string)($row['phone'] ?? ''));
+        if ($phone === '') continue;
+        $out[] = array(
+            'id' => trim((string)($row['id'] ?? '')),
+            'phone' => $phone,
+            'process_slug' => $processSlug,
+            'sent_at' => trim((string)($row['sent_at'] ?? '')),
+        );
+    }
+    return $out;
+}
+
+function comercial_get_sent_phones_by_branch_count($processSlug) {
+    return count(comercial_get_sent_phones_by_branch($processSlug));
+}
+
+function comercial_rebuild_global_sent_phones() {
+    // Reconstruye el archivo global desde todos los archivos por rama
+    $allPhones = array();
+    $seen = array();
+    $branchFiles = glob(DATA_PATH . '/comercial_sent_phones_*.json');
+    if (empty($branchFiles)) $branchFiles = array();
+
+    foreach ($branchFiles as $file) {
+        $basename = basename($file);
+        if ($basename === 'comercial_sent_phones.json') continue;
+        $rows = storage_read($basename);
+        foreach ((array)$rows as $row) {
+            $phone = comercial_only_digits((string)($row['phone'] ?? ''));
+            if ($phone === '' || isset($seen[$phone])) continue;
+            $seen[$phone] = true;
+            $allPhones[] = array(
+                'id' => trim((string)($row['id'] ?? generate_id('cmsent'))),
+                'phone' => $phone,
+                'process_slug' => trim((string)($row['process_slug'] ?? '')),
+                'sent_at' => trim((string)($row['sent_at'] ?? now_datetime())),
+            );
+        }
+    }
+
+    // También incluir entradas que ya estén en el global pero no en branch files
+    $globalRows = storage_read('comercial_sent_phones.json');
+    foreach ((array)$globalRows as $row) {
+        $phone = comercial_only_digits((string)($row['phone'] ?? ''));
+        if ($phone === '' || isset($seen[$phone])) continue;
+        $seen[$phone] = true;
+        $allPhones[] = array(
+            'id' => trim((string)($row['id'] ?? generate_id('cmsent'))),
+            'phone' => $phone,
+            'process_slug' => trim((string)($row['process_slug'] ?? '')),
+            'sent_at' => trim((string)($row['sent_at'] ?? now_datetime())),
+        );
+    }
+
+    storage_write('comercial_sent_phones.json', array_values($allPhones));
+    return count($allPhones);
 }
 
 // ─── Fin registro global de enviados ───
@@ -1854,7 +2020,7 @@ function comercial_decide_inbound_action($thread, $process, $classification, $te
     if ($classification === 'negative') {
         return array('action' => 'defer', 'confidence' => $confidence, 'risk' => false, 'reason' => 'negative_intent_defer');
     }
-    if (in_array((string)$classification, array('responded', 'very_hot', 'qualified'), true)) {
+    if (in_array((string)$classification, array('responded', 'very_hot', 'qualified', 'greeting', 'curious'), true)) {
         return array('action' => 'auto_reply_second_turn', 'confidence' => $confidence, 'risk' => false, 'reason' => 'eligible');
     }
     return array('action' => 'auto_reply_second_turn', 'confidence' => $confidence, 'risk' => false, 'reason' => 'default_reply');
@@ -2566,6 +2732,28 @@ function comercial_text_fold($text) {
     return trim((string)$text);
 }
 
+// ── Fix #1: similitud de texto para detección de duplicados ──
+function comercial_text_similarity($a, $b) {
+    $a = comercial_text_fold($a);
+    $b = comercial_text_fold($b);
+    if ($a === '' || $b === '') return 0;
+    if ($a === $b) return 1.0;
+
+    // Jaccard simple sobre palabras
+    $wordsA = array_unique(array_filter(explode(' ', $a), function($w) { return $w !== ''; }));
+    $wordsB = array_unique(array_filter(explode(' ', $b), function($w) { return $w !== ''; }));
+    if (empty($wordsA) || empty($wordsB)) return 0;
+
+    $intersection = count(array_intersect($wordsA, $wordsB));
+    $union = count(array_unique(array_merge($wordsA, $wordsB)));
+    if ($union === 0) return 0;
+
+    // También considerar longitud similar
+    $lenRatio = min(comercial_safe_len($a), comercial_safe_len($b)) / max(comercial_safe_len($a), comercial_safe_len($b), 1);
+
+    return ($intersection / $union) * 0.7 + $lenRatio * 0.3;
+}
+
 function comercial_phone_identity($value) {
     $digits = comercial_only_digits($value);
     if ($digits === '') {
@@ -2743,6 +2931,20 @@ function comercial_reply_positive_reason($text, $process) {
     return '';
 }
 
+function comercial_reply_is_high_intent_after_followup($text) {
+    $text = trim((string)$text);
+    if ($text === '') {
+        return false;
+    }
+
+    // Evitar marcar como very_hot respuestas demasiado cortas o ambiguas
+    if (comercial_safe_len($text) < 10) {
+        return false;
+    }
+
+    return (bool)preg_match('/\b(me interesa|quiero|quiero info|quiero empezar|agendar|agenda|llamame|ll[aá]mame|cuando puedo|cu[aá]ndo puedo|precio|cuanto|cu[aá]nto|horario|ubicaci[oó]n|d[oó]nde|direcci[oó]n|pasame|p[aá]same)\b/ui', $text);
+}
+
 function comercial_generic_inbound_process() {
     return array(
         'positive_keywords' => array('info', 'interesa', 'precio', 'como', 'cómo', 'vale', 'ok', 'si', 'sí', 'dale', 'claro', 'perfecto'),
@@ -2760,6 +2962,12 @@ function comercial_create_reply_aviso($thread, $classification, $text, $intentRe
     $thread = comercial_normalize_thread($thread);
     $classification = trim((string)$classification);
     $text = trim((string)$text);
+
+    // ── Fix #3: las conversaciones muy calientes NO generan aviso del sistema ──
+    // Se notifican directamente al dueño via comercial_send_hot_summary_to_owner()
+    if ($classification === 'very_hot') {
+        return;
+    }
 
     $dedupe = comercial_reply_aviso_dedupe_check($thread, $classification, $intentReason);
     if (!empty($dedupe['suppressed'])) {
@@ -2804,6 +3012,155 @@ function comercial_create_reply_aviso($thread, $classification, $text, $intentRe
 
     comercial_reply_aviso_mark_emitted($thread, $classification, $intentReason);
 }
+
+// ── Fix #3: notificación directa al dueño para conversaciones muy calientes ──
+function comercial_send_hot_summary_to_owner($thread, $inboundText, $messageId = '') {
+    $thread = comercial_normalize_thread($thread);
+    $threadId = (string)($thread['id'] ?? '');
+    if ($threadId === '') return false;
+
+    // Dedup: no notificar dos veces el mismo hilo en 30 minutos
+    $lastNotifiedAt = trim((string)($thread['hot_notified_at'] ?? ''));
+    $lastNotifiedTs = $lastNotifiedAt !== '' ? strtotime($lastNotifiedAt) : 0;
+    if ($lastNotifiedTs > 0 && (time() - $lastNotifiedTs) < 1800) {
+        return false; // ya notificado recientemente
+    }
+
+    $phone = (string)($thread['target_phone'] ?? '');
+    $processSlug = trim((string)($thread['process_slug'] ?? 'inbound'));
+    $linePhone = trim((string)($thread['line_phone'] ?? ''));
+    // Resolver nombre de la línea desde su id
+    $lineName = '';
+    $lineId = trim((string)($thread['line_id'] ?? ''));
+    if ($lineId !== '') {
+        $lines = comercial_list_lines();
+        foreach ($lines as $l) {
+            if ((string)($l['id'] ?? '') === $lineId) {
+                $lineName = trim((string)($l['nombre'] ?? ''));
+                break;
+            }
+        }
+    }
+    $history = comercial_thread_history($thread, 20);
+
+    // Construir resumen de la conversación
+    $summaryLines = array();
+    foreach ($history as $entry) {
+        $dir = (string)($entry['direction'] ?? '') === 'in' ? '📥' : '📤';
+        $txt = trim((string)($entry['text'] ?? ''));
+        if ($txt !== '') {
+            $summaryLines[] = $dir . ' ' . mb_substr($txt, 0, 120, 'UTF-8');
+        }
+    }
+    $conversationSummary = !empty($summaryLines) ? implode("\n", array_slice($summaryLines, -8)) : '(sin historial)';
+
+    // Generar sugerencias para el dueño
+    $suggestions = comercial_generate_hot_suggestions($thread, $processSlug, $inboundText);
+
+    // Construir mensaje
+    $ownerPhone = '654464023'; // teléfono del dueño
+
+    $msg = "🔥 *CONVERSACIÓN MUY CALIENTE*\n\n";
+    $lineInfo = $linePhone;
+    if ($lineName !== '') {
+        $lineInfo = $lineName . ' (' . $linePhone . ')';
+    } elseif ($linePhone === '') {
+        $lineInfo = 'desconocida';
+    }
+    $msg .= "📱 *Línea:* " . $lineInfo . "\n";
+    $msg .= "📞 *Cliente:* " . $phone . "\n";
+    $msg .= "🏷️ *Proceso:* " . $processSlug . "\n";
+    $msg .= "💬 *Último mensaje:* " . (mb_strlen($inboundText, 'UTF-8') > 100 ? mb_substr($inboundText, 0, 100, 'UTF-8') . '...' : $inboundText) . "\n\n";
+    $msg .= "*Resumen de la conversación:*\n" . $conversationSummary . "\n\n";
+    $msg .= "*Sugerencias para seguirla:*\n" . $suggestions;
+
+    // Enviar por WhatsApp al dueño usando una línea comercial disponible
+    $sent = comercial_send_hot_notification_whatsapp($ownerPhone, $msg);
+
+    // Marcar el hilo como notificado
+    $thread['hot_notified_at'] = now_datetime();
+    comercial_upsert_thread($thread);
+
+    comercial_event_append('hot_summary_sent_to_owner', array(
+        'thread_id' => $threadId,
+        'target_phone' => $phone,
+        'owner_phone' => $ownerPhone,
+        'sent_ok' => $sent,
+    ));
+
+    return $sent;
+}
+
+function comercial_generate_hot_suggestions($thread, $processSlug, $inboundText) {
+    $text = comercial_text_fold($inboundText);
+    $suggestions = array();
+
+    // Detectar intención de compra/precio
+    if (preg_match('/\b(precio|cuanto|cuesta|valor|euros|€|dinero|pagar|coste|tarifa)\b/ui', $text)) {
+        $suggestions[] = "💰 El cliente pregunta por precio. Responde con tarifas claras y ofrece una llamada para explicarlo mejor.";
+    }
+
+    // Detectar urgencia
+    if (preg_match('/\b(urgente|rapido|ya|ahora|hoy|cuanto antes|enseguida)\b/ui', $text)) {
+        $suggestions[] = "⏰ El cliente muestra urgencia. Prioriza esta conversación y ofrece contacto inmediato.";
+    }
+
+    // Detectar interés genérico
+    if (preg_match('/\b(interesa|quiero|me gusta|genial|perfecto|dale|vale)\b/ui', $text)) {
+        $suggestions[] = "✅ El cliente muestra interés claro. Haz una pregunta abierta para mantener la conversación.";
+    }
+
+    // Detectar preguntas
+    if (preg_match('/\b(c[oó]mo|cu[aá]ndo|d[oó]nde|qui[ée]n|por qu[ée]|cu[aá]l)\b/ui', $text)) {
+        $suggestions[] = "❓ El cliente hace una pregunta. Responde directamente y ofrece más información.";
+    }
+
+    // Sugerencia por proceso
+    switch ($processSlug) {
+        case 'plaza':
+            $suggestions[] = "🏠 Proceso Plaza: habla de las ventajas de la ubicación, horarios y ambiente. Ofrece una visita.";
+            break;
+        case 'lamami':
+            $suggestions[] = "💇 Proceso LaMami: menciona los 29€ de activación y la visibilidad que tendrá su negocio.";
+            break;
+        case 'publicista':
+            $suggestions[] = "📣 Proceso Publicista: explícale las comisiones por venta y el soporte que recibe.";
+            break;
+        case 'casawasap':
+            $suggestions[] = "🤖 Proceso CasaWasap: destaca el ahorro de tiempo con la telefonista IA 24/7.";
+            break;
+    }
+
+    // Siempre añadir sugerencia genérica
+    $suggestions[] = "📲 *Acción recomendada:* toma tú el control manual de esta conversación desde la pestaña Conversaciones del CRM. Responde de forma personal y natural.";
+
+    return implode("\n", $suggestions);
+}
+
+function comercial_send_hot_notification_whatsapp($ownerPhone, $message) {
+    // Usar cualquier línea comercial disponible para enviar la notificación
+    $lines = comercial_list_lines();
+    $processMeta = array(
+        'id' => 'hot_notify',
+        'slug' => 'hot_notify',
+        'nombre' => 'Notificación caliente',
+    );
+
+    foreach ($lines as $line) {
+        if (trim((string)($line['waha_port'] ?? '')) === '') continue;
+        $state = isset($line['comercial_state']) ? $line['comercial_state'] : array();
+        $status = trim((string)($state['status'] ?? 'active'));
+        $health = trim((string)($state['health_status'] ?? ''));
+        if ($status === 'paused') continue;
+        if ($health === 'down') continue;
+
+        $send = comercial_send_text_via_line($line, $ownerPhone, $message, $processMeta);
+        if (!empty($send['ok'])) return true;
+    }
+    return false;
+}
+
+// ─── Fin Fix #3 ───
 
 function comercial_reply_aviso_dedupe_window_seconds() {
     return 900;
@@ -4085,15 +4442,49 @@ function comercial_classify_reply($process, $text, $thread = null) {
         return array('classification' => 'empty', 'reason' => 'empty_text');
     }
 
-    // Si ya se envió la respuesta automática, clasificar siempre como very_hot sin importar el stage actual
-    // (el stage puede haber cambiado a 'responded' por un mensaje genérico intermedio, pero eso no debe
-    // permitir que el bot vuelva a enviar el mismo texto predeterminado)
+    // Si ya se envió la respuesta automática, NO escalar siempre a very_hot:
+    // solo hacerlo cuando haya señales fuertes de intención.
     if ($thread && trim((string)($thread['qualified_reply_sent_at'] ?? '')) !== '' && (string)($thread['stage'] ?? '') !== 'discarded') {
-        return array('classification' => 'very_hot', 'reason' => 'reply_after_auto_followup');
+        if (comercial_reply_is_high_intent_after_followup($text)) {
+            return array('classification' => 'very_hot', 'reason' => 'reply_after_auto_followup_high_intent');
+        }
     }
 
     if (comercial_reply_is_negative_intent($text, $process)) {
         return array('classification' => 'negative', 'reason' => 'negative_intent');
+    }
+
+    // ── Fix #2: detectar saludos y frases conversacionales ──
+    $normalizedText = comercial_text_fold($text);
+    $greetings = array('hola', 'hola buenas', 'buenos dias', 'buenas tardes', 'buenas noches', 'buenas',
+        'hey', 'holi', 'saludos', 'que tal', 'como estas', 'como va', 'todo bien',
+        'como te va', 'que hay', 'como andas', 'hola que tal', 'epale', 'ola',
+        'buen dia', 'buenas vibras', 'hola buenas tardes', 'hola buenos dias');
+    foreach ($greetings as $greeting) {
+        if ($normalizedText === comercial_text_fold($greeting) || comercial_text_contains_keyword($normalizedText, $greeting)) {
+            return array('classification' => 'greeting', 'reason' => 'greeting_detected');
+        }
+    }
+
+    // Preguntas genéricas que muestran interés mínimo
+    $curiosityPhrases = array('quien eres', 'de donde', 'como conseguiste', 'como me encontraste',
+        'por que me escribes', 'que es esto', 'que ofreces', 'de que va',
+        'no entiendo', 'explicame', 'a que te dedicas', 'cual es el tema');
+    foreach ($curiosityPhrases as $phrase) {
+        if (comercial_text_contains_keyword($normalizedText, $phrase)) {
+            return array('classification' => 'curious', 'reason' => 'curiosity_detected');
+        }
+    }
+
+    // Preguntas sobre información específica (casi qualified)
+    $infoQuestions = array('cuanto', 'precio', 'cuota', 'cuotas', 'pago', 'cuesta',
+        'valor', 'tarifa', 'gratis', 'coste', 'inversion', 'inversión',
+        'requisitos', 'necesito', 'hace falta', 'como funciona', 'como es',
+        'cuando', 'donde', 'ubicacion', 'direccion', 'horario', 'hora');
+    foreach ($infoQuestions as $word) {
+        if (comercial_text_contains_keyword($normalizedText, $word)) {
+            return array('classification' => 'qualified', 'reason' => 'info_question:' . $word);
+        }
     }
 
     $positiveReason = comercial_reply_positive_reason($text, $process);
@@ -4101,6 +4492,8 @@ function comercial_classify_reply($process, $text, $thread = null) {
         return array('classification' => 'qualified', 'reason' => $positiveReason);
     }
 
+    // Si es un mensaje corto que no encaja en nada, al menos clasificarlo como responded
+    // para que el bot intente mantener la conversación
     return array('classification' => 'responded', 'reason' => 'generic_reply');
 }
 
@@ -4165,6 +4558,28 @@ function comercial_handle_inbound_message($payload) {
     $thread['last_contact_at'] = now_datetime();
     $thread['updated_at'] = now_datetime();
 
+    // ── Fix #1: cooldown anti-duplicado ──
+    // Si el bot ya contestó hace menos de 90s y el texto entrante es similar al anterior,
+    // no volvemos a enviar otra respuesta automática.
+    $botCooldownSec = 90;
+    $lastBotReplyAt = trim((string)($thread['last_bot_reply_at'] ?? ''));
+    $lastBotReplyTs = $lastBotReplyAt !== '' ? strtotime($lastBotReplyAt) : 0;
+    $inCooldown = ($lastBotReplyTs > 0 && (time() - $lastBotReplyTs) < $botCooldownSec);
+    $priorInboundText = trim((string)($thread['prior_inbound_text'] ?? ''));
+    $textSimilar = $priorInboundText !== '' && comercial_text_similarity($text, $priorInboundText) >= 0.60;
+    if ($inCooldown && $textSimilar) {
+        $thread['prior_inbound_text'] = $text;
+        comercial_upsert_thread($thread);
+        return array(
+            'ok' => true,
+            'thread_id' => $thread['id'],
+            'classification' => 'cooldown_skip',
+            'intent_reason' => 'bot_reply_cooldown',
+            'action' => 'skipped_duplicate',
+            'target_phone' => (string)$thread['target_phone'],
+        );
+    }
+
     $classificationData = comercial_classify_reply($process, $text, $thread);
     $classification = (string)($classificationData['classification'] ?? 'responded');
     $intentReason = (string)($classificationData['reason'] ?? '');
@@ -4212,6 +4627,46 @@ function comercial_handle_inbound_message($payload) {
 
     $autoFollowup = !empty($process['auto_followup']) && !empty(comercial_get_settings()['auto_followup_enabled']);
 
+    // ── Fix #2: greeting y curious → misma lógica que responded pero con mensaje adaptado ──
+    if ($classification === 'greeting' || $classification === 'curious') {
+        $autoFollowup = !empty($process['auto_followup']) && !empty(comercial_get_settings()['auto_followup_enabled']);
+        if ($autoFollowup && ($decision['action'] ?? '') === 'auto_reply_second_turn' && trim((string)$thread['qualified_reply_sent_at']) === '') {
+            // Para greetings y curiosidad, usar un mensaje más conversacional
+            if ($classification === 'greeting') {
+                $followup = "¡Hola! 👋 Soy LaMami, tu asistente virtual. Cuéntame, ¿en qué puedo ayudarte? ¿Te interesa recibir más información?";
+            } else {
+                $followup = comercial_pick_message($process, 'followup_templates');
+                if ($followup === '') {
+                    $followup = "¡Claro! Te cuento un poco más. Soy LaMami y estamos ayudando a negocios y profesionales a conseguir más visibilidad y clientes. ¿Te interesaría saber más?";
+                }
+            }
+            $lastBotText = trim((string)($thread['last_bot_reply_text'] ?? ''));
+            if ($lastBotText !== '' && comercial_text_fold($lastBotText) === comercial_text_fold($followup)) {
+                comercial_event_append('auto_reply_duplicate_skipped', array('thread_id' => $thread['id'], 'reason' => 'same_text_as_previous'));
+            } else {
+                $send = comercial_send_thread_message($thread, $followup, array('event_type' => 'greeting_reply_sent'));
+                if (!empty($send['ok'])) {
+                    $thread = comercial_normalize_thread((array)($send['thread'] ?? $thread));
+                    $thread['last_bot_reply_at'] = now_datetime();
+                    $thread['last_bot_reply_text'] = $followup;
+                    $thread['prior_inbound_text'] = $text;
+                }
+            }
+        }
+        $thread = comercial_thread_apply_stage($thread, 'responded');
+        comercial_upsert_thread($thread);
+        return array(
+            'ok' => true,
+            'thread_id' => $thread['id'],
+            'classification' => $classification,
+            'intent_reason' => $intentReason,
+            'action' => 'greeting_or_curious_handled',
+            'target_phone' => (string)$thread['target_phone'],
+            'test_probe' => comercial_thread_is_test_probe($thread) ? 1 : 0,
+            'test_key' => trim((string)($thread['test_key'] ?? '')),
+        );
+    }
+
     if ($classification === 'responded') {
         if (($decision['action'] ?? '') === 'defer') {
             $thread['defer_count'] = (int)$thread['defer_count'] + 1;
@@ -4245,12 +4700,25 @@ function comercial_handle_inbound_message($payload) {
             $followup = comercial_pick_message($process, 'followup_templates');
             $replied = false;
             if ($followup !== '') {
-                $send = comercial_send_thread_message($thread, $followup, array('event_type' => 'qualified_auto_reply_sent'));
-                if (!empty($send['ok'])) {
-                    $thread = comercial_normalize_thread((array)($send['thread'] ?? $thread));
-                    $thread['qualified_reply_sent_at'] = now_datetime();
-                    $thread['auto_turn_count'] = (int)$thread['auto_turn_count'] + 1;
-                    $replied = true;
+                // ── Fix #1: evitar enviar el mismo texto que ya se envió antes ──
+                $lastBotText = trim((string)($thread['last_bot_reply_text'] ?? ''));
+                if ($lastBotText !== '' && comercial_text_fold($lastBotText) === comercial_text_fold($followup)) {
+                    // Mismo texto: no reenviar, pero registrar el intento
+                    comercial_event_append('auto_reply_duplicate_skipped', array(
+                        'thread_id' => $thread['id'],
+                        'reason' => 'same_text_as_previous',
+                    ));
+                } else {
+                    $send = comercial_send_thread_message($thread, $followup, array('event_type' => 'qualified_auto_reply_sent'));
+                    if (!empty($send['ok'])) {
+                        $thread = comercial_normalize_thread((array)($send['thread'] ?? $thread));
+                        $thread['qualified_reply_sent_at'] = now_datetime();
+                        $thread['last_bot_reply_at'] = now_datetime();
+                        $thread['last_bot_reply_text'] = $followup;
+                        $thread['prior_inbound_text'] = $text;
+                        $thread['auto_turn_count'] = (int)$thread['auto_turn_count'] + 1;
+                        $replied = true;
+                    }
                 }
             }
             $thread = comercial_thread_apply_stage($thread, 'responded');
@@ -4298,6 +4766,9 @@ function comercial_handle_inbound_message($payload) {
                     $thread = comercial_normalize_thread((array)($sendAi['thread'] ?? $thread));
                     $thread['auto_turn_count'] = (int)$thread['auto_turn_count'] + 1;
                     $thread['defer_count'] = 0;
+                    $thread['last_bot_reply_at'] = now_datetime();
+                    $thread['last_bot_reply_text'] = $thread['last_ai_suggested_reply'];
+                    $thread['prior_inbound_text'] = $text;
                     $aiSecondTurnSent = true;
                 } else {
                     $aiSecondTurnError = trim((string)($sendAi['error'] ?? 'ai_second_turn_send_failed'));
@@ -4308,7 +4779,10 @@ function comercial_handle_inbound_message($payload) {
         }
         $thread = comercial_thread_apply_stage($thread, 'very_hot');
         comercial_upsert_thread($thread);
-        comercial_create_reply_aviso($thread, $classification, $text, $intentReason, $messageId);
+
+        // ── Fix #3: notificación directa al dueño en vez de avisos del sistema ──
+        $hotNotified = comercial_send_hot_summary_to_owner($thread, $text, $messageId);
+
         return array(
             'ok' => true,
             'thread_id' => $thread['id'],
@@ -4316,6 +4790,7 @@ function comercial_handle_inbound_message($payload) {
             'intent_reason' => $intentReason,
             'action' => $aiSecondTurnSent ? 'very_hot_ai_second_turn_sent' : 'very_hot',
             'followup_error' => $aiSecondTurnError,
+            'hot_notified' => $hotNotified,
             'target_phone' => (string)$thread['target_phone'],
             'test_probe' => comercial_thread_is_test_probe($thread) ? 1 : 0,
             'test_key' => trim((string)($thread['test_key'] ?? '')),
@@ -4337,6 +4812,9 @@ function comercial_handle_inbound_message($payload) {
                     $thread = comercial_normalize_thread((array)($send['thread'] ?? $thread));
                     $thread['last_ai_suggested_reply'] = trim((string)$followup);
                     $thread['last_ai_suggested_at'] = now_datetime();
+                    $thread['last_bot_reply_at'] = now_datetime();
+                    $thread['last_bot_reply_text'] = $followup;
+                    $thread['prior_inbound_text'] = $text;
                     $qualifiedReplySent = true;
                 } else {
                     $followupError = trim((string)($send['error'] ?? 'No se pudo enviar el seguimiento automático.'));
@@ -5090,7 +5568,16 @@ HTML;
                 }
             }
             $activeClass = $stageFilter === $filterKey ? ' active' : '';
-            echo '<a class="commercial-filter-chip' . $activeClass . '" href="' . e(comercial_page_url('conversaciones', array('stage_filter' => $filterKey))) . '">' . e($filterLabel) . ' · ' . e((string)$count) . '</a>';
+            echo '<span class="commercial-filter-chip' . $activeClass . '">';
+            echo '<a href="' . e(comercial_page_url('conversaciones', array('stage_filter' => $filterKey))) . '">' . e($filterLabel) . ' · ' . e((string)$count) . '</a>';
+            echo ' <form method="post" style="display:inline-block; margin-left:6px;">';
+            echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
+            echo '<input type="hidden" name="action" value="comercial_export_threads_csv">';
+            echo '<input type="hidden" name="stage_filter" value="' . e($filterKey) . '">';
+            echo '<input type="hidden" name="redirect" value="' . e(comercial_page_url('conversaciones', array('stage_filter' => $filterKey))) . '">';
+            echo '<button type="submit" class="btn-secondary-mini">Exportar a Excel</button>';
+            echo '</form>';
+            echo '</span>';
         }
         echo '</div>';
         $lineFilterOptions = array('all' => 'Todas las líneas');

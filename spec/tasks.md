@@ -1,5 +1,47 @@
 # Tasks por fases
 
+## Publiscort — Nueva rama comercial
+
+### PUBLISCORT-F1 — MAPA_Y_ENCAJE (Mapa y Encaje de Rama)
+
+- [x] Confirmar encaje funcional de `publiscort` dentro del módulo comercial (como proceso paralelo a `plaza`, `lamami`, `publicista`, `casawasap`).
+- [x] Definir identidad técnica de rama:
+  - `slug`: `publiscort`
+  - `id`: `comproc_publiscort`
+  - `nombre`: `Publiscort`
+  - `source_type`: `jsonl_queue` (elección conservadora y trazable)
+- [x] Confirmar criterio operativo para panel: debe visualizarse en procesos con estado inicial apagado (`enabled=0`) una vez ejecutada la semilla/alta técnica de Fase 2 y migración segura de Fase 4 en instalaciones existentes.
+
+### PUBLISCORT-F2 — SEMILLA_CONFIG_CORE
+
+- [x] Añadir `publiscort` al constructor de procesos por defecto.
+- [x] Crear seed específico en `comercial_default_process_seed()` con `enabled=0`, ventanas/intervalos y `ia_context_prompt`.
+- [x] Añadir colas por defecto para `jsonl_queue` si aplica.
+
+### PUBLISCORT-F3 — COPY_COMERCIAL
+
+- [x] Crear variantes iniciales de `message_templates` para `publiscort`.
+- [x] Crear variantes iniciales de `followup_templates` para `publiscort`.
+- [x] Alinear copy con briefing: publicista profesional, alta efectividad, portales (`destacamos`, `mundosex`, `nuevapasion`), anuncios top/de pago, precio `50€/semana`.
+
+### PUBLISCORT-F4 — MIGRACION_SEGURA_EXISTENTES
+
+- [x] Implementar alta automática no destructiva si falta `publiscort` en `comercial_processes.json`.
+- [x] Garantizar `enabled=0` por defecto para la nueva rama en instalaciones ya iniciadas.
+- [x] Mantener intactos los procesos existentes (`plaza`, `lamami`, `publicista`, `casawasap`).
+
+### PUBLISCORT-F5 — VALIDACION_TECNICA_FUNCIONAL
+
+- [x] Verificar aparición en pestaña procesos y estado apagado por defecto.
+- [x] Verificar carga de plantillas de mensaje y seguimiento.
+- [x] Ejecutar checks relevantes (lint/tests aplicables) y validar no regresión en ramas existentes.
+
+### PUBLISCORT-F6 — CIERRE_ENTREGA
+
+- [x] Resumir archivos tocados.
+- [x] Resumir decisiones de copy y parámetros de rama.
+- [x] Dejar lista la siguiente iteración de afinado.
+
 ## Mundosex — Integración portal MundosexAnuncio en Publicista
 
 ### MUNDOSEX-F1 — PORTAL_REGISTRY (Portal Registry)

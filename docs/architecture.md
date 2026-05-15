@@ -21,6 +21,21 @@
 ### Fase 3 (pendiente)
 - Cutover con ventana corta a backend MySQL y rollback rápido.
 
+### Publiscort — F2 (semilla core completada)
+- Se incorpora `publiscort` como proceso comercial nativo (quinto proceso) en `comercial_build_default_processes()`.
+- Modelo de origen alineado a colas JSONL (`source_type=jsonl_queue`) con ficheros dedicados `publiscort_1..3.jsonl`.
+- Configuración inicial conservadora y desactivada (`enabled=0`) para evitar impacto operativo accidental durante el despliegue.
+- Seed con ventana e intervalos propios para arranque controlado (`10:00-19:00`, `5400-7200s`) y contexto IA específico.
+
+### Publiscort — F4 (compatibilidad en instalaciones existentes)
+- Se añade una migración no destructiva en `comercial_get_processes()` para asegurar que `publiscort` exista también en `comercial_processes.json` ya creado históricamente.
+- La migración sólo inserta si falta el slug y preserva la configuración de los procesos existentes.
+- El proceso insertado por migración se fuerza con `enabled=0` como guardrail de operación segura.
+
+### Publiscort — F5 (validación y hardening)
+- Se valida técnicamente la presencia de `publiscort` desactivado por defecto y la carga de sus plantillas operativas.
+- Se añade hardening de persistencia en `comercial_prepare_process_for_storage()`: `source_mysql_pass` no se guarda en JSON local para evitar exposición de secretos en claro.
+
 ### Bloque CX2
 - **CX2-F1 (completada):** modelo base de interés real (estados canónicos, score y reglas de escalado documental).
 - **CX2-F2 (completada):** catálogo de señales por canal, taxonomía cerrada de clases y contrato de normalización mínima para alimentar scoring en CX2-F3.
