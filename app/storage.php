@@ -6703,6 +6703,13 @@ function publicista_campaign_item_ready_for_execution($item) {
         if (!$phone) {
             $errors[] = 'No hay teléfono vinculado ni teléfono por defecto en la cuenta.';
         }
+    } elseif ($portal === 'mundosex') {
+        if (trim((string)($item['external_ad_id'] ?? '')) === '') {
+            $errors[] = 'Falta el listing ID / external_ad_id para ejecutar el adaptador de Mundosex.';
+        }
+        if (!$phone) {
+            $errors[] = 'No hay teléfono vinculado ni teléfono por defecto en la cuenta.';
+        }
     } else {
         $errors[] = 'No existe adaptador automático implementado para este portal todavía.';
     }
@@ -6714,6 +6721,10 @@ function publicista_require_automation_adapter($portalCode, $taskType = 'publish
     if ($portalCode === 'destacamos') {
         if ($taskType === 'free_bump') require_once BASE_PATH . '/subirPublicidad/subir-gratis.php';
         else require_once BASE_PATH . '/subirPublicidad/destacamos.php';
+        return true;
+    }
+    if ($portalCode === 'mundosex') {
+        require_once BASE_PATH . '/subirPublicidad/mundosex.php';
         return true;
     }
     return false;
@@ -6746,7 +6757,7 @@ function publicista_campaign_execute_item($campaign, $item, $options = array()) 
     if (count($imagePaths) > 1) {
         shuffle($imagePaths);
     }
-    $adapterCode = $portalCode === 'destacamos' ? 'destacamos_php_http' : ($portalCode !== '' ? $portalCode . '_unknown_adapter' : 'unknown_adapter');
+    $adapterCode = $portalCode === 'destacamos' ? 'destacamos_php_http' : ($portalCode === 'mundosex' ? 'mundosex_browser' : ($portalCode !== '' ? $portalCode . '_unknown_adapter' : 'unknown_adapter'));
     $location = publicista_destacamos_resolve_location($campaign, $item);
     $resolvedPhone = publicista_digits_only(trim((string)($phone['tfono'] ?? '')));
     if (strlen($resolvedPhone) > 9) {
@@ -6769,6 +6780,10 @@ function publicista_campaign_execute_item($campaign, $item, $options = array()) 
     );
 
     $allowProtectedFieldOverrides = !empty($options['allow_contact_location_updates']);
+    // Mundosex requiere provincia y ciudad en el formulario siempre
+    if ($portalCode === 'mundosex') {
+        $allowProtectedFieldOverrides = true;
+    }
     if ($allowProtectedFieldOverrides) {
         if ($protectedSnapshot['telefono'] !== '') {
             $payloadFields['telefono'] = $protectedSnapshot['telefono'];
@@ -6799,7 +6814,11 @@ function publicista_campaign_execute_item($campaign, $item, $options = array()) 
         $payload['session'] = $options['session'];
     }
 
-    $result = ejecutarAutomatizacion($payload);
+    if ($portalCode === 'mundosex' && function_exists('mundosex_ejecutar_automatizacion')) {
+        $result = mundosex_ejecutar_automatizacion($payload);
+    } else {
+        $result = ejecutarAutomatizacion($payload);
+    }
     $result['executed_at'] = now_datetime();
     $result['adapter'] = $adapterCode;
     $result['payload_summary'] = array(

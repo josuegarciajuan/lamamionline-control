@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-05-15 · Mundosex F2 — ADAPTER_LOADER (Cablear adaptador)
+
+### Cambios
+- Creado `subirPublicidad/mundosex.php`: adaptador PHP que ejecuta `mundosex_browser.js` (Playwright + Chrome headless) vía fichero temporal (sin credenciales en línea de comandos).
+- Cableado `publicista_require_automation_adapter()` con branch `mundosex`.
+- Cableado `publicista_campaign_item_ready_for_execution()` con validación específica para Mundosex (listing ID y teléfono requeridos).
+- Dispatch en `publicista_campaign_execute_item()`: llama a `mundosex_ejecutar_automatizacion()` para portal `mundosex`.
+- Forzado `$allowProtectedFieldOverrides = true` para Mundosex (provincia y ciudad requeridos por el formulario).
+- Arreglado conflicto de nombres: `mundosex_ejecutar_automatizacion()` vs `ejecutarAutomatizacion()` de Destacamos (coexisten sin colisión).
+
+### Motivo
+Segunda fase de la integración. Conecta el script de automatización Playwright al CRM, permitiendo que las campañas con portal `mundosex` ejecuten subidas automáticas.
+
+### Archivos
+- `subirPublicidad/mundosex.php` (nuevo, 190 líneas)
+- `subirPublicidad/mundosex_browser.js` (modificado, soporte `--file=`)
+- `app/storage.php` (+15 líneas)
+
+---
+
 ## 2026-05-15 · Mundosex F1 — PORTAL_REGISTRY (Portal Registry)
 
 ### Cambios

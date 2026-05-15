@@ -13,11 +13,15 @@
 
 ### MUNDOSEX-F2 — ADAPTER_LOADER (Cablear adaptador)
 
-- [ ] Crear `subirPublicidad/mundosex.php` (wrapper PHP → exec node mundosex_browser.js).
-- [ ] Cablear `publicista_require_automation_adapter()` para `mundosex`.
-- [ ] Cablear `publicista_campaign_item_ready_for_execution()` para `mundosex`.
-- [ ] Adapter code en `publicista_campaign_execute_item()`.
-- [ ] Session management (mundosex no reusa sesiones HTTP).
+- [x] Crear `subirPublicidad/mundosex.php` (wrapper PHP → exec node mundosex_browser.js).
+- [x] Cablear `publicista_require_automation_adapter()` para `mundosex`.
+- [x] Cablear `publicista_campaign_item_ready_for_execution()` para `mundosex`.
+- [x] Adapter code en `publicista_campaign_execute_item()`.
+- [x] Session management (mundosex no reusa sesiones HTTP).
+- [x] Forzar provincia/ciudad para Mundosex.
+- [x] Arreglar conflicto de nombres `ejecutarAutomatizacion`.
+- [x] Auditoría de seguridad (1 HIGH corregido: credenciales en línea de comandos → fichero temporal).
+- [x] Actualizar changelog.
 
 ### MUNDOSEX-F3 — CAMPAIGN_ITEMS (Generar y mostrar items)
 
