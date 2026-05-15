@@ -6600,7 +6600,7 @@ function publicista_destacamos_guess_zip($city, $province = '') {
     return '';
 }
 
-function publicista_destacamos_resolve_location($campaign, $item) {
+function publicista_campaign_resolve_location($campaign, $item) {
     $campaign = publicista_campaign_normalize($campaign);
     $item = publicista_campaign_item_normalize($item);
     $planningData = is_array($campaign['planning_snapshot']['data'] ?? null) ? $campaign['planning_snapshot']['data'] : array();
@@ -6641,6 +6641,10 @@ function publicista_destacamos_resolve_location($campaign, $item) {
         'province' => $province,
         'zip' => $zip,
     );
+}
+// Alias retrocompatible
+function publicista_destacamos_resolve_location($campaign, $item) {
+    return publicista_campaign_resolve_location($campaign, $item);
 }
 
 function publicista_campaign_item_copy_title($item) {
@@ -6758,7 +6762,7 @@ function publicista_campaign_execute_item($campaign, $item, $options = array()) 
         shuffle($imagePaths);
     }
     $adapterCode = $portalCode === 'destacamos' ? 'destacamos_php_http' : ($portalCode === 'mundosex' ? 'mundosex_browser' : ($portalCode !== '' ? $portalCode . '_unknown_adapter' : 'unknown_adapter'));
-    $location = publicista_destacamos_resolve_location($campaign, $item);
+    $location = publicista_campaign_resolve_location($campaign, $item);
     $resolvedPhone = publicista_digits_only(trim((string)($phone['tfono'] ?? '')));
     if (strlen($resolvedPhone) > 9) {
         $resolvedPhone = substr($resolvedPhone, -9);

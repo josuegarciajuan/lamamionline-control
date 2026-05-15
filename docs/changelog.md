@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-05-15 · Mundosex F3 — CAMPAIGN_ITEMS (Verificación items Mundosex)
+
+### Cambios
+- Verificado que `publicista_campaign_generate_items()` asigna correctamente `external_ad_id` desde `portal_listing_ids` de cuentas Mundosex.
+- Verificado que la tabla de items en UI muestra correctamente `portal_label` y `portal_code` para Mundosex (genérico, sin hardcodeos).
+- Verificado que `publicista_campaign_resolve_location()` (antes `publicista_destacamos_resolve_location`) devuelve ciudad/provincia/ZIP para Mundosex sin depender del portal.
+- Renombrado `publicista_destacamos_resolve_location()` → `publicista_campaign_resolve_location()` (el nombre anterior inducía a error, la función es portal-agnóstica).
+- Añadido alias retrocompatible `publicista_destacamos_resolve_location()`.
+
+### Motivo
+Tercera fase de la integración. Confirma que la generación de items, la UI y la resolución de ubicación funcionan para Mundosex sin modificaciones estructurales, solo mejoras de nomenclatura.
+
+### Archivos
+- `app/storage.php` (rename + alias, +8 líneas)
+
+---
+
 ## 2026-05-15 · Mundosex F2 — ADAPTER_LOADER (Cablear adaptador)
 
 ### Cambios

@@ -25,9 +25,10 @@
 
 ### MUNDOSEX-F3 — CAMPAIGN_ITEMS (Generar y mostrar items)
 
-- [ ] Verificar que `publicista_campaign_generate_items()` asigna `external_ad_id` correctamente.
-- [ ] Verificar que la tabla de items en UI muestra correctamente items `mundosex`.
-- [ ] Verificar que `publicista_campaign_resolve_location()` funciona para `mundosex`.
+- [x] Verificar que `publicista_campaign_generate_items()` asigna `external_ad_id` correctamente para mundosex.
+- [x] Verificar que la tabla de items en UI muestra correctamente items `mundosex`.
+- [x] Verificar que `publicista_campaign_resolve_location()` funciona para `mundosex`.
+- [x] Renombrar `publicista_destacamos_resolve_location()` → `publicista_campaign_resolve_location()` + alias.
 
 ### MUNDOSEX-F4 — EXECUTION (Ejecutar subida con humanización)
 
