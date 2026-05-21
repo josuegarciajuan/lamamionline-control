@@ -217,6 +217,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'get_thread_conversation
     exit;
 }
 
+// ── action=get_telefonos_lines (GET, JSON response) ─────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'get_telefonos_lines') {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => true, 'lines' => getTelefonosLines()], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 // ─────────────────────────────────────────────────────────────────────
 //  Save config handler
 // ─────────────────────────────────────────────────────────────────────
@@ -403,6 +410,8 @@ function handleSaveConfig(\WasapBot\Core\Config $config, array $postData): void
         'telegram.alert_enabled',
         'routing.default_enabled_if_not_found',
         'bot.auto_off_on_lead',
+        'cron.followup.enabled',
+        'cron.reminder.enabled',
     ];
 
     foreach ($checkboxKeys as $ck) {
@@ -551,6 +560,70 @@ function getThreadConversation(\WasapBot\Core\Config $config, string $threadId):
             $result[] = $record;
         }
     }
+    return $result;
+}
+
+/**
+ * Load all lines from telefonos.json (CRM phone registry).
+ * Returns every entry that has a phone number, regardless of 'uso'.
+ *
+ * @return list<array{id:string, nombre:string, tfono:string, uso:string, waha_port:string, waha:string}>
+ */
+function getTelefonosLines(): array
+{
+    // telefonos.json lives two levels up from bot-casa/ (project root /data/)
+    $candidates = [
+        WASAPBOT_ROOT . '/../../data/telefonos.json',
+        WASAPBOT_ROOT . '/../data/telefonos.json',
+        WASAPBOT_ROOT . '/data/telefonos.json',
+        dirname(WASAPBOT_ROOT, 3) . '/data/telefonos.json',
+    ];
+
+    $raw = null;
+    foreach ($candidates as $path) {
+        $real = realpath($path);
+        if ($real !== false && file_exists($real)) {
+            $contents = @file_get_contents($real);
+            if ($contents !== false) {
+                $raw = $contents;
+                break;
+            }
+        }
+    }
+
+    if ($raw === null) {
+        return [];
+    }
+
+    try {
+        $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+    } catch (\JsonException) {
+        return [];
+    }
+
+    if (!is_array($decoded)) {
+        return [];
+    }
+
+    $result = [];
+    foreach ($decoded as $t) {
+        if (!is_array($t)) {
+            continue;
+        }
+        $tfono = trim((string) ($t['tfono'] ?? ''));
+        if ($tfono === '') {
+            continue;
+        }
+        $result[] = [
+            'id'        => (string) ($t['id'] ?? ''),
+            'nombre'    => (string) ($t['nombre'] ?? ''),
+            'tfono'     => $tfono,
+            'uso'       => (string) ($t['uso'] ?? ''),
+            'waha_port' => (string) ($t['waha_port'] ?? ''),
+            'waha'      => (string) ($t['waha'] ?? ''),
+        ];
+    }
+
     return $result;
 }
 
@@ -1364,14 +1437,32 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
     <div class="card">
         <h2>Routing de Números</h2>
 
-        <h3>Líneas de enrutamiento</h3>
+        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:14px">
+            Selecciona qué líneas (teléfonos del sistema) deben ser atendidas por este bot.
+            Las líneas disponibles se cargan desde el registro de teléfonos del CRM. Para cada línea activa,
+            el bot interceptará los mensajes WhatsApp que lleguen a ese número y los procesará.
+        </p>
+
+        <!-- Selector para añadir línea desde telefonos.json -->
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;padding:12px 14px;background:var(--bg-surface);border:1px solid var(--border-soft);border-radius:var(--radius-sm)">
+            <div style="flex:1;min-width:200px">
+                <label style="font-size:.8rem;color:var(--text-muted);display:block;margin-bottom:4px">Añadir línea desde el registro de teléfonos</label>
+                <select id="telefonoSelector" style="width:100%;padding:8px 10px;background:var(--input-bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:.9rem">
+                    <option value="">— Cargando teléfonos… —</option>
+                </select>
+            </div>
+            <button type="button" class="btn btn-primary" id="addFromSelectorBtn" onclick="addRoutingRowFromSelector()">+ Añadir línea seleccionada</button>
+            <button type="button" class="btn btn-sm" onclick="addRoutingRowManual()" style="background:var(--input-bg);color:var(--text-muted);font-size:.78rem">+ Añadir manualmente</button>
+        </div>
+
+        <h3>Líneas activas en el routing</h3>
         <table class="routing-table" id="routingTable">
             <thead>
                 <tr>
-                    <th>last9</th>
-                    <th>port</th>
-                    <th>label</th>
-                    <th>enabled</th>
+                    <th>Teléfono (last9)</th>
+                    <th>Puerto WAHA</th>
+                    <th>Etiqueta</th>
+                    <th>Activa</th>
                     <th></th>
                 </tr>
             </thead>
@@ -1379,11 +1470,10 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
                 <?php echo renderRoutingLines($routingLines); ?>
             </tbody>
         </table>
-        <button type="button" class="btn btn-sm btn-primary" onclick="addRoutingRow()" style="margin-top:8px">+ Añadir línea</button>
 
-        <h3>Sender Blacklist</h3>
+        <h3 style="margin-top:18px">Sender Blacklist</h3>
         <div class="form-group">
-            <label>Números bloqueados (uno por línea)</label>
+            <label>Números bloqueados — el bot no responderá a estos remitentes (uno por línea)</label>
             <textarea name="routing[sender_blacklist]" rows="8" class="code-area" spellcheck="false"><?php
                 $blacklist = config_val_array('routing.sender_blacklist');
                 echo h(implode("\n", $blacklist));
@@ -1394,7 +1484,7 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
             <label class="checkbox-label">
                 <input type="hidden" name="routing[default_enabled_if_not_found]" value="0">
                 <input type="checkbox" name="routing[default_enabled_if_not_found]" value="1" <?php echo checked((bool) $config->get('routing.default_enabled_if_not_found', false)); ?>>
-                Enrutar por defecto si no se encuentra el número (default_enabled_if_not_found)
+                Responder a todos los números aunque no estén en la lista (default_enabled_if_not_found)
             </label>
         </div>
 
@@ -1408,53 +1498,161 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
 <div class="tab-content" id="tab-delays">
     <div class="card">
         <h2>Human Delays — Retrasos humanos simulados</h2>
+        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">
+            Estos parámetros controlan cuánto tiempo simula el bot que está leyendo y escribiendo antes de responder,
+            para que la respuesta no parezca instantánea (lo que delataría que es un bot). Ajusta con cuidado:
+            valores muy bajos son poco creíbles, valores muy altos harán esperar demasiado al usuario.
+        </p>
 
-        <h3>Seen (marcar como visto)</h3>
-        <div class="form-row">
-            <div class="form-group"><label>fallback_sec</label><input type="number" step="0.1" name="human_delays[seen][fallback_sec]" value="<?php echo config_val('human_delays.seen.fallback_sec', '1'); ?>"></div>
-            <div class="form-group"><label>random_min_sec</label><input type="number" step="0.1" name="human_delays[seen][random_min_sec]" value="<?php echo config_val('human_delays.seen.random_min_sec', '1'); ?>"></div>
-            <div class="form-group"><label>random_max_sec</label><input type="number" step="0.1" name="human_delays[seen][random_max_sec]" value="<?php echo config_val('human_delays.seen.random_max_sec', '3'); ?>"></div>
-        </div>
-
-        <h3>Typing (escribiendo...)</h3>
-        <div class="form-row">
-            <div class="form-group"><label>fallback_sec</label><input type="number" step="0.1" name="human_delays[typing][fallback_sec]" value="<?php echo config_val('human_delays.typing.fallback_sec', '4'); ?>"></div>
-            <div class="form-group"><label>chars_per_sec_min</label><input type="number" name="human_delays[typing][chars_per_sec_min]" value="<?php echo config_val('human_delays.typing.chars_per_sec_min', '38'); ?>"></div>
-            <div class="form-group"><label>chars_per_sec_max</label><input type="number" name="human_delays[typing][chars_per_sec_max]" value="<?php echo config_val('human_delays.typing.chars_per_sec_max', '85'); ?>"></div>
-        </div>
-        <div class="form-row">
-            <div class="form-group"><label>chunk_size</label><input type="number" name="human_delays[typing][chunk_size]" value="<?php echo config_val('human_delays.typing.chunk_size', '24'); ?>"></div>
-            <div class="form-group"><label>chunk_pause_factor</label><input type="number" step="0.01" name="human_delays[typing][chunk_pause_factor]" value="<?php echo config_val('human_delays.typing.chunk_pause_factor', '0.65'); ?>"></div>
-            <div class="form-group"><label>start_min_ms</label><input type="number" name="human_delays[typing][start_min_ms]" value="<?php echo config_val('human_delays.typing.start_min_ms', '350'); ?>"></div>
-        </div>
-        <div class="form-row">
-            <div class="form-group"><label>start_max_ms</label><input type="number" name="human_delays[typing][start_max_ms]" value="<?php echo config_val('human_delays.typing.start_max_ms', '1200'); ?>"></div>
-            <div class="form-group"><label>max_incoming_chars</label><input type="number" name="human_delays[typing][max_incoming_chars]" value="<?php echo config_val('human_delays.typing.max_incoming_chars', '180'); ?>"></div>
-        </div>
-
-        <h3>Read (lectura del mensaje)</h3>
-        <div class="form-row">
-            <div class="form-group"><label>base_min_ms</label><input type="number" name="human_delays[read][base_min_ms]" value="<?php echo config_val('human_delays.read.base_min_ms', '900'); ?>"></div>
-            <div class="form-group"><label>base_max_ms</label><input type="number" name="human_delays[read][base_max_ms]" value="<?php echo config_val('human_delays.read.base_max_ms', '2200'); ?>"></div>
-            <div class="form-group"><label>per_char_ms</label><input type="number" name="human_delays[read][per_char_ms]" value="<?php echo config_val('human_delays.read.per_char_ms', '22'); ?>"></div>
-        </div>
-        <div class="form-row">
-            <div class="form-group"><label>clamp_min_ms</label><input type="number" name="human_delays[read][clamp_min_ms]" value="<?php echo config_val('human_delays.read.clamp_min_ms', '1200'); ?>"></div>
-            <div class="form-group"><label>clamp_max_ms</label><input type="number" name="human_delays[read][clamp_max_ms]" value="<?php echo config_val('human_delays.read.clamp_max_ms', '22000'); ?>"></div>
+        <!-- Seen -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px">
+            <h3 style="margin:0 0 4px">👁️ Seen — Marcar mensaje como "visto"</h3>
+            <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:12px">
+                Tiempo que espera el bot antes de marcar el mensaje entrante como leído (doble check azul en WhatsApp).
+                Demasiado rápido resulta sospechoso. <strong>Recomendado: min=1s, max=3s.</strong>
+            </p>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Fallback (seg) <span style="color:var(--text-muted);font-weight:400">— si falla el cálculo aleatorio</span></label>
+                    <input type="number" step="0.1" name="human_delays[seen][fallback_sec]" value="<?php echo config_val('human_delays.seen.fallback_sec', '1'); ?>" placeholder="1">
+                </div>
+                <div class="form-group">
+                    <label>Mínimo aleatorio (seg) <span style="color:var(--text-muted);font-weight:400">— límite inferior</span></label>
+                    <input type="number" step="0.1" name="human_delays[seen][random_min_sec]" value="<?php echo config_val('human_delays.seen.random_min_sec', '1'); ?>" placeholder="1">
+                </div>
+                <div class="form-group">
+                    <label>Máximo aleatorio (seg) <span style="color:var(--text-muted);font-weight:400">— límite superior</span></label>
+                    <input type="number" step="0.1" name="human_delays[seen][random_max_sec]" value="<?php echo config_val('human_delays.seen.random_max_sec', '3'); ?>" placeholder="3">
+                </div>
+            </div>
         </div>
 
-        <h3>Habituation</h3>
-        <div class="form-row">
-            <div class="form-group"><label>start_boost</label><input type="number" step="0.01" name="human_delays[habituation][start_boost]" value="<?php echo config_val('human_delays.habituation.start_boost', '6.2'); ?>"></div>
-            <div class="form-group"><label>decay</label><input type="number" step="0.01" name="human_delays[habituation][decay]" value="<?php echo config_val('human_delays.habituation.decay', '0.92'); ?>"></div>
-            <div class="form-group"><label>floor</label><input type="number" step="0.01" name="human_delays[habituation][floor]" value="<?php echo config_val('human_delays.habituation.floor', '1.25'); ?>"></div>
+        <!-- Read -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px">
+            <h3 style="margin:0 0 4px">📖 Read — Tiempo de lectura del mensaje</h3>
+            <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:12px">
+                Tiempo que el bot "simula leer" el mensaje antes de empezar a escribir. Se calcula como:
+                <code>base_aleatorio + (longitud_mensaje × per_char_ms)</code>, luego ajustado entre clamp_min y clamp_max.
+                <strong>Recomendado: base 900–2200 ms, 22 ms/carácter, clamp 1200–22000 ms.</strong>
+            </p>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Base mínima (ms) <span style="color:var(--text-muted);font-weight:400">— tiempo mínimo de lectura base</span></label>
+                    <input type="number" name="human_delays[read][base_min_ms]" value="<?php echo config_val('human_delays.read.base_min_ms', '900'); ?>" placeholder="900">
+                </div>
+                <div class="form-group">
+                    <label>Base máxima (ms) <span style="color:var(--text-muted);font-weight:400">— tiempo máximo de lectura base</span></label>
+                    <input type="number" name="human_delays[read][base_max_ms]" value="<?php echo config_val('human_delays.read.base_max_ms', '2200'); ?>" placeholder="2200">
+                </div>
+                <div class="form-group">
+                    <label>Por carácter (ms) <span style="color:var(--text-muted);font-weight:400">— ms extra por cada carácter del mensaje</span></label>
+                    <input type="number" name="human_delays[read][per_char_ms]" value="<?php echo config_val('human_delays.read.per_char_ms', '22'); ?>" placeholder="22">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Clamp mínimo (ms) <span style="color:var(--text-muted);font-weight:400">— nunca menos de esto</span></label>
+                    <input type="number" name="human_delays[read][clamp_min_ms]" value="<?php echo config_val('human_delays.read.clamp_min_ms', '1200'); ?>" placeholder="1200">
+                </div>
+                <div class="form-group">
+                    <label>Clamp máximo (ms) <span style="color:var(--text-muted);font-weight:400">— nunca más de esto (≈22 seg)</span></label>
+                    <input type="number" name="human_delays[read][clamp_max_ms]" value="<?php echo config_val('human_delays.read.clamp_max_ms', '22000'); ?>" placeholder="22000">
+                </div>
+            </div>
         </div>
 
-        <h3>Generales</h3>
-        <div class="form-row">
-            <div class="form-group"><label>presend_sleep_sec</label><input type="number" step="0.1" name="human_delays[presend_sleep_sec]" value="<?php echo config_val('human_delays.presend_sleep_sec', '15'); ?>"></div>
-            <div class="form-group"><label>short_typing_sec</label><input type="number" step="0.1" name="human_delays[short_typing_sec]" value="<?php echo config_val('human_delays.short_typing_sec', '0.8'); ?>"></div>
-            <div class="form-group"><label>after_send_fallback_sec</label><input type="number" step="0.1" name="human_delays[after_send_fallback_sec]" value="<?php echo config_val('human_delays.after_send_fallback_sec', '0.4'); ?>"></div>
+        <!-- Typing -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px">
+            <h3 style="margin:0 0 4px">⌨️ Typing — Indicador "escribiendo…"</h3>
+            <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:12px">
+                Cuánto tiempo aparece el indicador "escribiendo…" antes de enviar la respuesta.
+                Se calcula en función de la longitud de la respuesta y una velocidad de tipeo aleatoria.
+                La "habituación" hace que el bot escriba más rápido en conversaciones largas (más natural).
+                <strong>Recomendado: 38–85 chars/seg, chunk_size 24, start_delay 350–1200 ms.</strong>
+            </p>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Velocidad mínima (chars/seg) <span style="color:var(--text-muted);font-weight:400">— tipeo lento</span></label>
+                    <input type="number" name="human_delays[typing][chars_per_sec_min]" value="<?php echo config_val('human_delays.typing.chars_per_sec_min', '38'); ?>" placeholder="38">
+                </div>
+                <div class="form-group">
+                    <label>Velocidad máxima (chars/seg) <span style="color:var(--text-muted);font-weight:400">— tipeo rápido</span></label>
+                    <input type="number" name="human_delays[typing][chars_per_sec_max]" value="<?php echo config_val('human_delays.typing.chars_per_sec_max', '85'); ?>" placeholder="85">
+                </div>
+                <div class="form-group">
+                    <label>Fallback (seg) <span style="color:var(--text-muted);font-weight:400">— si falla el cálculo</span></label>
+                    <input type="number" step="0.1" name="human_delays[typing][fallback_sec]" value="<?php echo config_val('human_delays.typing.fallback_sec', '4'); ?>" placeholder="4">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Delay inicio mínimo (ms) <span style="color:var(--text-muted);font-weight:400">— pausa antes de empezar a "escribir"</span></label>
+                    <input type="number" name="human_delays[typing][start_min_ms]" value="<?php echo config_val('human_delays.typing.start_min_ms', '350'); ?>" placeholder="350">
+                </div>
+                <div class="form-group">
+                    <label>Delay inicio máximo (ms) <span style="color:var(--text-muted);font-weight:400"></span></label>
+                    <input type="number" name="human_delays[typing][start_max_ms]" value="<?php echo config_val('human_delays.typing.start_max_ms', '1200'); ?>" placeholder="1200">
+                </div>
+                <div class="form-group">
+                    <label>Chars entrantes máx. <span style="color:var(--text-muted);font-weight:400">— límite chars del mensaje para calcular delays</span></label>
+                    <input type="number" name="human_delays[typing][max_incoming_chars]" value="<?php echo config_val('human_delays.typing.max_incoming_chars', '180'); ?>" placeholder="180">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Chunk size (chars) <span style="color:var(--text-muted);font-weight:400">— divide la escritura en bloques para pausas intermedias</span></label>
+                    <input type="number" name="human_delays[typing][chunk_size]" value="<?php echo config_val('human_delays.typing.chunk_size', '24'); ?>" placeholder="24">
+                </div>
+                <div class="form-group">
+                    <label>Chunk pause factor <span style="color:var(--text-muted);font-weight:400">— fracción del tiempo chunk para pausar (0.65 = 65%)</span></label>
+                    <input type="number" step="0.01" name="human_delays[typing][chunk_pause_factor]" value="<?php echo config_val('human_delays.typing.chunk_pause_factor', '0.65'); ?>" placeholder="0.65">
+                </div>
+            </div>
+        </div>
+
+        <!-- Habituation -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px">
+            <h3 style="margin:0 0 4px">📉 Habituation — Reducción progresiva de delays</h3>
+            <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:12px">
+                Simula que el bot "se adapta" a la conversación y responde más rápido con el tiempo.
+                Al inicio de una conversación los delays se multiplican por <code>start_boost</code>.
+                Cada turno ese multiplicador se reduce multiplicándolo por <code>decay</code>,
+                hasta llegar al mínimo <code>floor</code>. Nunca bajará de ahí.
+                <strong>Recomendado: boost=6.2, decay=0.92, floor=1.25.</strong>
+            </p>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Start boost <span style="color:var(--text-muted);font-weight:400">— multiplicador inicial (primer mensaje muy lento)</span></label>
+                    <input type="number" step="0.01" name="human_delays[habituation][start_boost]" value="<?php echo config_val('human_delays.habituation.start_boost', '6.2'); ?>" placeholder="6.2">
+                </div>
+                <div class="form-group">
+                    <label>Decay <span style="color:var(--text-muted);font-weight:400">— cuánto se reduce el boost por turno (0.92 = baja un 8%)</span></label>
+                    <input type="number" step="0.01" name="human_delays[habituation][decay]" value="<?php echo config_val('human_delays.habituation.decay', '0.92'); ?>" placeholder="0.92">
+                </div>
+                <div class="form-group">
+                    <label>Floor <span style="color:var(--text-muted);font-weight:400">— multiplicador mínimo (nunca será más rápido que esto)</span></label>
+                    <input type="number" step="0.01" name="human_delays[habituation][floor]" value="<?php echo config_val('human_delays.habituation.floor', '1.25'); ?>" placeholder="1.25">
+                </div>
+            </div>
+        </div>
+
+        <!-- Generales -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px">
+            <h3 style="margin:0 0 4px">⚙️ Generales</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Pre-send sleep (seg) <span style="color:var(--text-muted);font-weight:400">— pausa entre mensajes cuando hay varios (ej: fotos). <strong>Recom: 15</strong></span></label>
+                    <input type="number" step="0.1" name="human_delays[presend_sleep_sec]" value="<?php echo config_val('human_delays.presend_sleep_sec', '15'); ?>" placeholder="15">
+                </div>
+                <div class="form-group">
+                    <label>Short typing (seg) <span style="color:var(--text-muted);font-weight:400">— typing para respuestas de audio. <strong>Recom: 0.8</strong></span></label>
+                    <input type="number" step="0.1" name="human_delays[short_typing_sec]" value="<?php echo config_val('human_delays.short_typing_sec', '0.8'); ?>" placeholder="0.8">
+                </div>
+                <div class="form-group">
+                    <label>After send fallback (seg) <span style="color:var(--text-muted);font-weight:400">— pausa mínima tras enviar. <strong>Recom: 0.4</strong></span></label>
+                    <input type="number" step="0.1" name="human_delays[after_send_fallback_sec]" value="<?php echo config_val('human_delays.after_send_fallback_sec', '0.4'); ?>" placeholder="0.4">
+                </div>
+            </div>
         </div>
 
         <div style="margin-top:10px">
@@ -1506,45 +1704,91 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
     <div class="card">
         <h2>Cron Follow-up — Configuración</h2>
 
-        <h3>Parámetros</h3>
-        <div class="form-row">
-            <div class="form-group"><label>max_leads_per_run</label><input type="number" name="cron[followup][max_leads_per_run]" value="<?php echo config_val('cron.followup.max_leads_per_run', '10'); ?>"></div>
-            <div class="form-group"><label>curl_timeout_sec</label><input type="number" name="cron[followup][curl_timeout_sec]" value="<?php echo config_val('cron.followup.curl_timeout_sec', '20'); ?>"></div>
-            <div class="form-group"><label>girls_cache_ttl_sec</label><input type="number" name="cron[followup][girls_cache_ttl_sec]" value="<?php echo config_val('cron.followup.girls_cache_ttl_sec', '3600'); ?>"></div>
-        </div>
-        <div class="form-row">
-            <div class="form-group"><label>send_window_start</label><input type="text" name="cron[followup][send_window_start]" value="<?php echo config_val('cron.followup.send_window_start', '10:00'); ?>"></div>
-            <div class="form-group"><label>send_window_end</label><input type="text" name="cron[followup][send_window_end]" value="<?php echo config_val('cron.followup.send_window_end', '22:00'); ?>"></div>
-        </div>
-        <div class="form-row">
-            <div class="form-group"><label>min_interval_hours_min</label><input type="number" name="cron[followup][min_interval_hours_min]" value="<?php echo config_val('cron.followup.min_interval_hours_min', '48'); ?>"></div>
-            <div class="form-group"><label>min_interval_hours_max</label><input type="number" name="cron[followup][min_interval_hours_max]" value="<?php echo config_val('cron.followup.min_interval_hours_max', '72'); ?>"></div>
-        </div>
-        <div class="form-row">
-            <div class="form-group"><label>inter_lead_wait_min_sec</label><input type="number" name="cron[followup][inter_lead_wait_min_sec]" value="<?php echo config_val('cron.followup.inter_lead_wait_min_sec', '60'); ?>"></div>
-            <div class="form-group"><label>inter_lead_wait_max_sec</label><input type="number" name="cron[followup][inter_lead_wait_max_sec]" value="<?php echo config_val('cron.followup.inter_lead_wait_max_sec', '180'); ?>"></div>
+        <!-- Toggle enabled -->
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:var(--radius-sm);margin-bottom:16px;<?php echo (bool)$config->get('cron.followup.enabled', true) ? 'background:var(--ok-bg);border:1px solid var(--ok)' : 'background:var(--danger-bg);border:1px solid var(--danger)'; ?>">
+            <label class="checkbox-label" style="font-size:1rem;font-weight:700;gap:10px">
+                <input type="hidden" name="cron[followup][enabled]" value="0">
+                <input type="checkbox" name="cron[followup][enabled]" value="1"
+                    <?php echo checked((bool) $config->get('cron.followup.enabled', true)); ?>
+                    style="width:18px;height:18px"
+                    onchange="this.closest('div').style.background=this.checked?'var(--ok-bg)':'var(--danger-bg)';this.closest('div').style.borderColor=this.checked?'var(--ok)':'var(--danger)'">
+                <?php if ((bool)$config->get('cron.followup.enabled', true)): ?>
+                    <span style="color:var(--ok)">✅ Cron Follow-up ACTIVADO</span>
+                <?php else: ?>
+                    <span style="color:var(--danger)">⏸️ Cron Follow-up DESACTIVADO</span>
+                <?php endif; ?>
+            </label>
+            <span style="color:var(--text-muted);font-size:.82rem">
+                Cuando está activado, cada ~6 horas re-contacta automáticamente a leads pasados enviándoles fotos de las chicas disponibles.
+            </span>
         </div>
 
-        <h3>Timings (microsegundos)</h3>
+        <h3>Parámetros</h3>
         <div class="form-row">
-            <div class="form-group"><label>intro_typing_min_us</label><input type="number" name="cron[followup][intro_typing_min_us]" value="<?php echo config_val('cron.followup.intro_typing_min_us', '2000000'); ?>"></div>
-            <div class="form-group"><label>intro_typing_max_us</label><input type="number" name="cron[followup][intro_typing_max_us]" value="<?php echo config_val('cron.followup.intro_typing_max_us', '5000000'); ?>"></div>
+            <div class="form-group">
+                <label>Máx. leads por ejecución <span style="color:var(--text-muted);font-weight:400">— cuántos leads procesa cada vez que corre el cron. <strong>Recom: 10</strong></span></label>
+                <input type="number" name="cron[followup][max_leads_per_run]" value="<?php echo config_val('cron.followup.max_leads_per_run', '10'); ?>" placeholder="10">
+            </div>
+            <div class="form-group">
+                <label>Timeout cURL (seg) <span style="color:var(--text-muted);font-weight:400">— tiempo máx. para cada llamada a WAHA. <strong>Recom: 20</strong></span></label>
+                <input type="number" name="cron[followup][curl_timeout_sec]" value="<?php echo config_val('cron.followup.curl_timeout_sec', '20'); ?>" placeholder="20">
+            </div>
+            <div class="form-group">
+                <label>TTL caché girls (seg) <span style="color:var(--text-muted);font-weight:400">— cuánto se guarda el catálogo en caché local. <strong>Recom: 3600</strong></span></label>
+                <input type="number" name="cron[followup][girls_cache_ttl_sec]" value="<?php echo config_val('cron.followup.girls_cache_ttl_sec', '3600'); ?>" placeholder="3600">
+            </div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label>intro_to_girls_pause_min_us</label><input type="number" name="cron[followup][intro_to_girls_pause_min_us]" value="<?php echo config_val('cron.followup.intro_to_girls_pause_min_us', '5000000'); ?>"></div>
-            <div class="form-group"><label>intro_to_girls_pause_max_us</label><input type="number" name="cron[followup][intro_to_girls_pause_max_us]" value="<?php echo config_val('cron.followup.intro_to_girls_pause_max_us', '12000000'); ?>"></div>
+            <div class="form-group">
+                <label>Ventana envío — inicio <span style="color:var(--text-muted);font-weight:400">— no envía antes de esta hora (Europe/Madrid)</span></label>
+                <input type="text" name="cron[followup][send_window_start]" value="<?php echo config_val('cron.followup.send_window_start', '10:00'); ?>" placeholder="10:00">
+            </div>
+            <div class="form-group">
+                <label>Ventana envío — fin <span style="color:var(--text-muted);font-weight:400">— no envía después de esta hora</span></label>
+                <input type="text" name="cron[followup][send_window_end]" value="<?php echo config_val('cron.followup.send_window_end', '22:00'); ?>" placeholder="22:00">
+            </div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label>per_girl_typing_min_us</label><input type="number" name="cron[followup][per_girl_typing_min_us]" value="<?php echo config_val('cron.followup.per_girl_typing_min_us', '3000000'); ?>"></div>
-            <div class="form-group"><label>per_girl_typing_max_us</label><input type="number" name="cron[followup][per_girl_typing_max_us]" value="<?php echo config_val('cron.followup.per_girl_typing_max_us', '7000000'); ?>"></div>
+            <div class="form-group">
+                <label>Intervalo mínimo entre followups (h) <span style="color:var(--text-muted);font-weight:400">— mínimo tiempo entre re-contactos al mismo lead. <strong>Recom: 48</strong></span></label>
+                <input type="number" name="cron[followup][min_interval_hours_min]" value="<?php echo config_val('cron.followup.min_interval_hours_min', '48'); ?>" placeholder="48">
+            </div>
+            <div class="form-group">
+                <label>Intervalo máximo entre followups (h) <span style="color:var(--text-muted);font-weight:400">— aleatorio hasta este máximo. <strong>Recom: 72</strong></span></label>
+                <input type="number" name="cron[followup][min_interval_hours_max]" value="<?php echo config_val('cron.followup.min_interval_hours_max', '72'); ?>" placeholder="72">
+            </div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label>inter_girl_pause_min_us</label><input type="number" name="cron[followup][inter_girl_pause_min_us]" value="<?php echo config_val('cron.followup.inter_girl_pause_min_us', '5000000'); ?>"></div>
-            <div class="form-group"><label>inter_girl_pause_max_us</label><input type="number" name="cron[followup][inter_girl_pause_max_us]" value="<?php echo config_val('cron.followup.inter_girl_pause_max_us', '15000000'); ?>"></div>
+            <div class="form-group">
+                <label>Espera entre leads mínima (seg) <span style="color:var(--text-muted);font-weight:400">— pausa entre enviar followup a un lead y el siguiente</span></label>
+                <input type="number" name="cron[followup][inter_lead_wait_min_sec]" value="<?php echo config_val('cron.followup.inter_lead_wait_min_sec', '60'); ?>" placeholder="60">
+            </div>
+            <div class="form-group">
+                <label>Espera entre leads máxima (seg) <span style="color:var(--text-muted);font-weight:400">— <strong>Recom: 180</strong></span></label>
+                <input type="number" name="cron[followup][inter_lead_wait_max_sec]" value="<?php echo config_val('cron.followup.inter_lead_wait_max_sec', '180'); ?>" placeholder="180">
+            </div>
+        </div>
+
+        <h3>Timings (microsegundos — 1 seg = 1.000.000 µs)</h3>
+        <div class="form-row">
+            <div class="form-group"><label>Typing intro mín (µs)</label><input type="number" name="cron[followup][intro_typing_min_us]" value="<?php echo config_val('cron.followup.intro_typing_min_us', '2000000'); ?>"></div>
+            <div class="form-group"><label>Typing intro máx (µs)</label><input type="number" name="cron[followup][intro_typing_max_us]" value="<?php echo config_val('cron.followup.intro_typing_max_us', '5000000'); ?>"></div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label>closing_typing_min_us</label><input type="number" name="cron[followup][closing_typing_min_us]" value="<?php echo config_val('cron.followup.closing_typing_min_us', '2000000'); ?>"></div>
-            <div class="form-group"><label>closing_typing_max_us</label><input type="number" name="cron[followup][closing_typing_max_us]" value="<?php echo config_val('cron.followup.closing_typing_max_us', '4000000'); ?>"></div>
+            <div class="form-group"><label>Pausa intro→fotos mín (µs)</label><input type="number" name="cron[followup][intro_to_girls_pause_min_us]" value="<?php echo config_val('cron.followup.intro_to_girls_pause_min_us', '5000000'); ?>"></div>
+            <div class="form-group"><label>Pausa intro→fotos máx (µs)</label><input type="number" name="cron[followup][intro_to_girls_pause_max_us]" value="<?php echo config_val('cron.followup.intro_to_girls_pause_max_us', '12000000'); ?>"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Typing por chica mín (µs)</label><input type="number" name="cron[followup][per_girl_typing_min_us]" value="<?php echo config_val('cron.followup.per_girl_typing_min_us', '3000000'); ?>"></div>
+            <div class="form-group"><label>Typing por chica máx (µs)</label><input type="number" name="cron[followup][per_girl_typing_max_us]" value="<?php echo config_val('cron.followup.per_girl_typing_max_us', '7000000'); ?>"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Pausa entre chicas mín (µs)</label><input type="number" name="cron[followup][inter_girl_pause_min_us]" value="<?php echo config_val('cron.followup.inter_girl_pause_min_us', '5000000'); ?>"></div>
+            <div class="form-group"><label>Pausa entre chicas máx (µs)</label><input type="number" name="cron[followup][inter_girl_pause_max_us]" value="<?php echo config_val('cron.followup.inter_girl_pause_max_us', '15000000'); ?>"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Typing cierre mín (µs)</label><input type="number" name="cron[followup][closing_typing_min_us]" value="<?php echo config_val('cron.followup.closing_typing_min_us', '2000000'); ?>"></div>
+            <div class="form-group"><label>Typing cierre máx (µs)</label><input type="number" name="cron[followup][closing_typing_max_us]" value="<?php echo config_val('cron.followup.closing_typing_max_us', '4000000'); ?>"></div>
         </div>
 
         <h3>Variantes de intro</h3>
@@ -1568,20 +1812,66 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
     <div class="card">
         <h2>Cron Reminder — Configuración</h2>
 
+        <!-- Toggle enabled -->
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:var(--radius-sm);margin-bottom:16px;<?php echo (bool)$config->get('cron.reminder.enabled', true) ? 'background:var(--ok-bg);border:1px solid var(--ok)' : 'background:var(--danger-bg);border:1px solid var(--danger)'; ?>">
+            <label class="checkbox-label" style="font-size:1rem;font-weight:700;gap:10px">
+                <input type="hidden" name="cron[reminder][enabled]" value="0">
+                <input type="checkbox" name="cron[reminder][enabled]" value="1"
+                    <?php echo checked((bool) $config->get('cron.reminder.enabled', true)); ?>
+                    style="width:18px;height:18px"
+                    onchange="this.closest('div').style.background=this.checked?'var(--ok-bg)':'var(--danger-bg)';this.closest('div').style.borderColor=this.checked?'var(--ok)':'var(--danger)'">
+                <?php if ((bool)$config->get('cron.reminder.enabled', true)): ?>
+                    <span style="color:var(--ok)">✅ Cron Reminder ACTIVADO</span>
+                <?php else: ?>
+                    <span style="color:var(--danger)">⏸️ Cron Reminder DESACTIVADO</span>
+                <?php endif; ?>
+            </label>
+            <span style="color:var(--text-muted);font-size:.82rem">
+                Cuando está activado, cada minuto revisa si algún usuario dijo que venía en X minutos y, cuando ese tiempo expira, le envía un recordatorio automático.
+            </span>
+        </div>
+
         <div class="form-row">
-            <div class="form-group"><label>max_per_run</label><input type="number" name="cron[reminder][max_per_run]" value="<?php echo config_val('cron.reminder.max_per_run', '5'); ?>"></div>
-            <div class="form-group"><label>curl_timeout_sec</label><input type="number" name="cron[reminder][curl_timeout_sec]" value="<?php echo config_val('cron.reminder.curl_timeout_sec', '15'); ?>"></div>
-            <div class="form-group"><label>cleanup_interval</label><input type="number" name="cron[reminder][cleanup_interval]" value="<?php echo config_val('cron.reminder.cleanup_interval', '5'); ?>"></div>
-            <div class="form-group"><label>cleanup_max_age_sec</label><input type="number" name="cron[reminder][cleanup_max_age_sec]" value="<?php echo config_val('cron.reminder.cleanup_max_age_sec', '86400'); ?>"></div>
+            <div class="form-group">
+                <label>Máx. por ejecución <span style="color:var(--text-muted);font-weight:400">— cuántos recordatorios envía como máximo cada vez. <strong>Recom: 5</strong></span></label>
+                <input type="number" name="cron[reminder][max_per_run]" value="<?php echo config_val('cron.reminder.max_per_run', '5'); ?>" placeholder="5">
+            </div>
+            <div class="form-group">
+                <label>Timeout cURL (seg) <span style="color:var(--text-muted);font-weight:400">— tiempo máx. para cada llamada a WAHA. <strong>Recom: 15</strong></span></label>
+                <input type="number" name="cron[reminder][curl_timeout_sec]" value="<?php echo config_val('cron.reminder.curl_timeout_sec', '15'); ?>" placeholder="15">
+            </div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label>sleep_between_min_us</label><input type="number" name="cron[reminder][sleep_between_min_us]" value="<?php echo config_val('cron.reminder.sleep_between_min_us', '3000000'); ?>"></div>
-            <div class="form-group"><label>sleep_between_max_us</label><input type="number" name="cron[reminder][sleep_between_max_us]" value="<?php echo config_val('cron.reminder.sleep_between_max_us', '8000000'); ?>"></div>
-            <div class="form-group"><label>sleep_typing_min_us</label><input type="number" name="cron[reminder][sleep_typing_min_us]" value="<?php echo config_val('cron.reminder.sleep_typing_min_us', '1000000'); ?>"></div>
-            <div class="form-group"><label>sleep_typing_max_us</label><input type="number" name="cron[reminder][sleep_typing_max_us]" value="<?php echo config_val('cron.reminder.sleep_typing_max_us', '4000000'); ?>"></div>
+            <div class="form-group">
+                <label>Intervalo limpieza <span style="color:var(--text-muted);font-weight:400">— cada cuántas ejecuciones elimina recordatorios enviados viejos. <strong>Recom: 5</strong></span></label>
+                <input type="number" name="cron[reminder][cleanup_interval]" value="<?php echo config_val('cron.reminder.cleanup_interval', '5'); ?>" placeholder="5">
+            </div>
+            <div class="form-group">
+                <label>Edad máx. limpieza (seg) <span style="color:var(--text-muted);font-weight:400">— elimina enviados más viejos que esto. <strong>Recom: 86400 (1 día)</strong></span></label>
+                <input type="number" name="cron[reminder][cleanup_max_age_sec]" value="<?php echo config_val('cron.reminder.cleanup_max_age_sec', '86400'); ?>" placeholder="86400">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Pausa entre envíos mín (µs) <span style="color:var(--text-muted);font-weight:400">— 3000000 = 3 seg</span></label>
+                <input type="number" name="cron[reminder][sleep_between_min_us]" value="<?php echo config_val('cron.reminder.sleep_between_min_us', '3000000'); ?>" placeholder="3000000">
+            </div>
+            <div class="form-group">
+                <label>Pausa entre envíos máx (µs) <span style="color:var(--text-muted);font-weight:400">— 8000000 = 8 seg</span></label>
+                <input type="number" name="cron[reminder][sleep_between_max_us]" value="<?php echo config_val('cron.reminder.sleep_between_max_us', '8000000'); ?>" placeholder="8000000">
+            </div>
+            <div class="form-group">
+                <label>Typing mín (µs) <span style="color:var(--text-muted);font-weight:400">— 1000000 = 1 seg</span></label>
+                <input type="number" name="cron[reminder][sleep_typing_min_us]" value="<?php echo config_val('cron.reminder.sleep_typing_min_us', '1000000'); ?>" placeholder="1000000">
+            </div>
+            <div class="form-group">
+                <label>Typing máx (µs) <span style="color:var(--text-muted);font-weight:400">— 4000000 = 4 seg</span></label>
+                <input type="number" name="cron[reminder][sleep_typing_max_us]" value="<?php echo config_val('cron.reminder.sleep_typing_max_us', '4000000'); ?>" placeholder="4000000">
+            </div>
         </div>
 
         <h3>Variantes de mensajes de reminder</h3>
+        <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:8px">Un mensaje por línea. Se elige aleatoriamente sin repetir el anterior.</p>
         <textarea name="cron[reminder][message_variants]" rows="12" class="code-area" spellcheck="false"><?php
             echo h(implode("\n", config_val_array('cron.reminder.message_variants')));
         ?></textarea>
@@ -1705,9 +1995,9 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
     });
 })();
 
-// ── Routing lines: add row ──
+// ── Routing lines: add row manually ──
 var routingRowCount = <?php echo count($routingLines); ?>;
-function addRoutingRow() {
+function addRoutingRowManual() {
     var tbody = document.querySelector('#routingTable tbody');
     var idx = routingRowCount;
     routingRowCount++;
@@ -1723,6 +2013,68 @@ function addRoutingRow() {
     ].join('');
     tbody.appendChild(tr);
 }
+
+// ── Routing lines: add row from selector ──
+var _telefonosData = [];
+
+function loadTelefonosIntoSelector() {
+    var sel = document.getElementById('telefonoSelector');
+    if (!sel) return;
+    fetch('?action=get_telefonos_lines')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            _telefonosData = data.lines || [];
+            sel.innerHTML = '<option value="">— Seleccionar línea del CRM —</option>';
+            _telefonosData.forEach(function(line, i) {
+                var label = line.nombre + ' · ' + line.tfono;
+                if (line.uso) label += ' (' + line.uso + ')';
+                if (line.waha_port) label += ' — Puerto ' + line.waha_port;
+                var opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = label;
+                sel.appendChild(opt);
+            });
+        })
+        .catch(function() {
+            sel.innerHTML = '<option value="">— Error al cargar teléfonos —</option>';
+        });
+}
+
+function addRoutingRowFromSelector() {
+    var sel = document.getElementById('telefonoSelector');
+    if (!sel || sel.value === '') {
+        alert('Selecciona primero una línea del desplegable.');
+        return;
+    }
+    var line = _telefonosData[parseInt(sel.value, 10)];
+    if (!line) return;
+
+    var tfono = line.tfono.replace(/\D/g, '');
+    var last9  = tfono.length >= 9 ? tfono.slice(-9) : tfono;
+    var port   = line.waha_port || '';
+    var lbl    = (line.nombre || 'linea').toLowerCase().replace(/[^a-z0-9_]/g, '_') + (port ? '_' + port : '');
+
+    var tbody = document.querySelector('#routingTable tbody');
+    var idx = routingRowCount;
+    routingRowCount++;
+
+    var tr = document.createElement('tr');
+    tr.className = 'routing-row';
+    tr.innerHTML = [
+        '<td><input type="text" name="routing[lines][' + idx + '][last9]" value="' + escH(last9) + '" placeholder="Últimos 9 dígitos" class="input-cell"></td>',
+        '<td><input type="number" name="routing[lines][' + idx + '][port]" value="' + escH(port) + '" placeholder="3000" class="input-cell" style="width:80px"></td>',
+        '<td><input type="text" name="routing[lines][' + idx + '][label]" value="' + escH(lbl) + '" placeholder="linea_3000" class="input-cell"></td>',
+        '<td style="text-align:center"><input type="hidden" name="routing[lines][' + idx + '][enabled]" value="0"><input type="checkbox" name="routing[lines][' + idx + '][enabled]" value="1" checked></td>',
+        '<td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove()">X</button></td>'
+    ].join('');
+    tbody.appendChild(tr);
+
+    // Reset selector
+    sel.value = '';
+}
+
+// Load telefonos on page load (only when routing tab is visible or eagerly)
+loadTelefonosIntoSelector();
 
 // ── Conversation modal ──
 var convModal = document.getElementById('convModal');
