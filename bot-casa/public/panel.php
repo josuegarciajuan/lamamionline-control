@@ -377,6 +377,17 @@ function castNumericValue(string $key, string $value): mixed
     if (in_array($key, $floatKeys, true)) {
         return (float) $value;
     }
+    // Boolean keys: store as proper bool (not string "0"/"1")
+    static $boolKeys = [
+        'telegram.alert_enabled',
+        'routing.default_enabled_if_not_found',
+        'bot.auto_off_on_lead',
+        'cron.followup.enabled',
+        'cron.reminder.enabled',
+    ];
+    if (in_array($key, $boolKeys, true)) {
+        return (bool) $value;
+    }
     return $value;
 }
 
@@ -1059,6 +1070,11 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
 </div>
 
 <!-- ── Main config form ── -->
+<!-- Form separado para toggle bot (no puede anidarse dentro del main form) -->
+<form id="form-toggle-bot-status" method="post" action="<?php echo h($baseUrl); ?>?action=toggle_bot" style="display:none">
+    <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
+</form>
+
 <form method="post" action="<?php echo h($baseUrl); ?>?action=save_config" class="main-form">
 <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
 
@@ -1074,12 +1090,10 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
             Archivo de control: <code style="background:var(--input-bg);padding:2px 6px;border-radius:3px"><?php echo h($modeFilePath); ?></code>
         </p>
         <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
-            <form method="post" action="<?php echo h($baseUrl); ?>?action=toggle_bot" style="display:inline">
-                <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
-                <button type="submit" class="btn btn-lg <?php echo $botMode === 'start' ? 'btn-danger' : 'btn-success'; ?>">
-                    <?php echo $botMode === 'start' ? 'DETENER Bot' : 'ARRANCAR Bot'; ?>
-                </button>
-            </form>
+            <button type="submit" form="form-toggle-bot-status"
+                class="btn btn-lg <?php echo $botMode === 'start' ? 'btn-danger' : 'btn-success'; ?>">
+                <?php echo $botMode === 'start' ? 'DETENER Bot' : 'ARRANCAR Bot'; ?>
+            </button>
         </div>
     </div>
 
