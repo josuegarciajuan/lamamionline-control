@@ -3405,6 +3405,15 @@ function action_toggle_comercial_process_enabled() {
     $row['next_run_at'] = '';
     comercial_upsert_process($row);
 
+    // Verificar que el cambio se persistió realmente en disco.
+    // Si el archivo JSON no es escribible por el servidor (permisos/propietario),
+    // storage_write falla silenciosamente y la página recargada muestra el estado antiguo.
+    $reloaded = comercial_get_process($id);
+    if ($reloaded && (int)($reloaded['enabled'] ?? 0) !== $newEnabled) {
+        set_flash('error', 'No se pudo guardar el cambio. El archivo de procesos no es escribible por el servidor. Contacta con el administrador del sistema.');
+        redirect_to(comercial_page_url('procesos', array('edit' => $row['id'])));
+    }
+
     $accion = $newEnabled ? 'encendido' : 'apagado';
     set_flash('ok', 'Proceso "' . $nombre . '" ' . $accion . ' correctamente.');
     redirect_to(comercial_page_url('procesos', array('edit' => $row['id'])));

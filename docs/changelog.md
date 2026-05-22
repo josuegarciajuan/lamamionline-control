@@ -1,6 +1,54 @@
 # Changelog
 
-## 2026-05-22 · Fase 3 — Publicista-perfiles: reintentos Pollo.ai y error desconocido
+## 2026-05-22 · Fase 2b — Fix real de permisos: toggle encender/apagar no persistía
+
+### Bug corregido (segunda iteración)
+- **Comercial → Procesos**: el botón "Encender" no encendía el proceso. La página se recargaba pero el proceso seguía apagado.
+
+### Causa raíz real
+El archivo `comercial_processes.json` pertenecía a `root:root` con permisos `644`.
+PHP-FPM ejecuta como `www-data`, que no podía escribir en el archivo. `storage_write()`
+fallaba silenciosamente (usa `@file_put_contents()` que suprime errores) y el cambio
+nunca se persistía en disco. Al recargar la página tras el redirect, se leía el
+archivo sin modificar y el estado aparecía igual.
+
+El problema era sistémico: múltiples JSON en `data/` tenían propietario `root:root`
+en lugar de `www-data:www-data`, lo que impedía la escritura desde PHP-FPM.
+
+### Solución aplicada
+
+#### Fix 1 — Permisos (raíz del problema)
+```bash
+chown www-data:www-data data/comercial_processes.json
+```
+
+#### Fix 2 — Detección de fallo (defensivo)
+En `action_toggle_comercial_process_enabled()` en `app/actions.php`: tras ejecutar
+`comercial_upsert_process()`, se re-lee el proceso desde disco y se compara el
+campo `enabled` con el valor esperado. Si no coinciden, se muestra un flash de
+error explicativo en lugar del falso "ok".
+
+### Archivos modificados
+- `data/comercial_processes.json` — propietario `root:root` → `www-data:www-data`
+- `app/actions.php` — verificación post-write en `action_toggle_comercial_process_enabled()`
+
+### Nota importante
+Otros archivos JSON en `data/` también pertenecen a `root:root`:
+`bots.json`, `avisos.json`, `avisos_runs.json`, `avisos_active_snapshot.json`,
+`comercial_line_state.json`, `comercial_runtime.json`, `comercial_sent_phones.json`,
+`comercial_sent_phones_casawasap.json`, `comercial_sent_phones_lamami.json`,
+`comercial_sent_phones_plaza.json`, `agenda.json`, `anuncios.json`.
+Si estos archivos necesitan ser escritos por la aplicación en runtime,
+también requerirán cambio de propietario.
+
+### Tests
+- `php -l actions.php` → OK
+- Simulación toggle encender + verificación post-write como www-data → OK
+- Verificación de escritura real en disco como www-data → OK
+
+---
+
+
 
 ### Problemas abordados
 - **Publicista → Perfiles → Regenerar candidata**: a veces fallaba con "Error desconocido" sin posibilidad de depuración.
