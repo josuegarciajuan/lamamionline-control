@@ -31,9 +31,14 @@
 - [x] T3.5 — Guardado de formulario (processValue extiende CRLF→LF a prompt.template y prompt.sections.*).
 - [x] T3.6 — Cache-busting verificado (panel.php es standalone, no requiere).
 
-### NOVA-TONEBUILDER — FASE 4: Ajustes en ToneBuilder (pendiente)
+### NOVA-TONEBUILDER — FASE 4: Ajustes en ToneBuilder + ContextAssembler
 
-- [ ] T4.1–T4.5 — Nuevas directivas de cierre suave, escasez, ETA rotativa.
+- [x] T4.1 — ToneBuilder: directiva POST-MAPS ETA rotativa (6 variantes, bot_msg_count_recent % 6).
+- [x] T4.2 — ToneBuilder: directiva cierre suave progresivo (info_pack_ready + !eta_from_user).
+- [x] T4.3 — ToneBuilder: directiva indecisión + escasez suave (choose_loop_count >= 2, solo 1 vez).
+- [x] T4.4 — ContextAssembler: detección ya_enviado['escasez'] en historial de replies.
+- [x] T4.5 — ContextAssembler: nuevos flags eta_from_user_minutes, choose_loop_count, info_pack_ready, is_image_sent_by_user.
+- [x] Config: eta_request_variants en message_variants.
 
 ### QA-VALIDACION — FASE 5: Validación integral (pendiente)
 

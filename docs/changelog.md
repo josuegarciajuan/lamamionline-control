@@ -1,5 +1,47 @@
 # Changelog
 
+## 2026-05-22 · NOVA-TONEBUILDER — Ajustes en ToneBuilder + ContextAssembler (Fase 4)
+
+### Objetivo
+Añadir directivas dinámicas en ToneBuilder que exploten el nuevo system prompt (F2),
+y nuevos flags en ContextAssembler para alimentar esas directivas.
+
+### Cambios implementados
+
+**ToneBuilder.php** — 4 nuevas directivas dinámicas:
+- **POST-MAPS ETA rotativa**: cuando maps_sent=true y sin ETA del usuario, inyecta
+  directiva con una de 6 variantes rotativas (seleccionada por `bot_msg_count_recent % 6`).
+- **Cierre suave progresivo**: cuando info_pack_ready=true y sin ETA, indica al LLM
+  que termine cada mensaje con variante de cierre sin alargar la charla.
+- **Escasez suave**: cuando choose_loop_count >= 2 sin chica elegida, activa
+  táctica de escasez UNA sola vez por conversación (verifica `ya_enviado['escasez']`).
+- **Imagen del cliente**: cuando el usuario manda una foto, directiva para reaccionar
+  con 1 emoji + frase ultra-corta.
+
+**ContextAssembler.php** — 5 nuevos flags:
+- `eta_from_user_minutes` / `eta_from_user_flag`: extrae ETA del mensaje (ej: "en 20 min")
+- `choose_loop_count`: cuenta mensajes consecutivos pidiendo ubicación sin elegir chica
+- `info_pack_ready`: derivado (chica elegida + precios enviados + maps enviado)
+- `is_image_sent_by_user`: el mensaje actual es solo una imagen
+- `ya_enviado['escasez']`: detecta si ya se usó la táctica de escasez en la conversación
+
+**config.dist.json / config.local.json**:
+- `message_variants.eta_request_variants`: 6 variantes para pedir ETA
+
+### Tests
+- PHP lint: ToneBuilder.php, ContextAssembler.php, Bot.php, Config.php, panel.php → OK
+- ToneBuilder unit tests: 8/8 OK (POST-MAPS, cierre suave, escasez, imagen, regresión)
+- Prompt assembly regression: 14233 chars, 0 tags, 10/10 headers → OK
+- Seguridad: 0 secretos expuestos en archivos modificados
+
+### Archivos modificados
+- `bot-casa/src/Pipeline/ToneBuilder.php` — +4 directivas (líneas 187–250)
+- `bot-casa/src/Pipeline/ContextAssembler.php` — +5 flags + 3 helpers (líneas 248–275, 853–910)
+- `bot-casa/config.dist.json` — eta_request_variants
+- `bot-casa/config.local.json` — idem
+
+---
+
 ## 2026-05-22 · ORION-UI — Panel de administración del prompt parametrizado (Fase 3)
 
 ### Objetivo

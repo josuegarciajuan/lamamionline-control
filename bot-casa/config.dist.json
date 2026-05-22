@@ -161,7 +161,15 @@
         "fallback_empty_text": "vale cari",
         "dedup_suffix": "(asi queda mas claro)",
         "no_text_placeholder": "[SIN_TEXTO]",
-        "audio_placeholder": "[AUDIO]"
+        "audio_placeholder": "[AUDIO]",
+        "eta_request_variants": [
+            "cuanto tardas amor?",
+            "avisame cuando salgas",
+            "en cuantos min vienes?",
+            "cuando llegas papi?",
+            "me dices cuanto tardas?",
+            "sal y avisame que te espero"
+        ]
     },
     "cron": {
         "timezone": "Europe/Madrid",
