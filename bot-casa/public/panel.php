@@ -300,7 +300,12 @@ function recursiveSave(\WasapBot\Core\Config $config, array $data, string $prefi
         }
 
         // nested associative arrays — recurse
+        // Guard: skip empty arrays for known structural keys to avoid wiping config sections
         if (is_array($value) && array_keys($value) !== range(0, count($value) - 1)) {
+            if (empty($value)) {
+                // Empty associative array — do not overwrite existing config section
+                continue;
+            }
             $nested = recursiveSave($config, $value, $fullKey);
             $savedKeys = array_merge($savedKeys, $nested);
             continue;
@@ -649,7 +654,6 @@ function getMemoryDisplayLines(\WasapBot\Core\Memory $memory): array
     $displayLines = [];
 
     foreach ($rawLines as $i => $rawLine) {
-        $record = null;
         try {
             $decoded = json_decode($rawLine, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
@@ -668,21 +672,27 @@ function getMemoryDisplayLines(\WasapBot\Core\Memory $memory): array
             continue;
         }
 
-        $record = $decoded;
-        $threadId = (string) ($record['thread_id'] ?? '');
-        $phone    = (string) ($record['phone'] ?? '');
-        $timestamp = (string) ($record['timestamp'] ?? '');
+        $record    = $decoded;
+        $threadId  = (string) ($record['thread_id'] ?? '');
+        $phone     = (string) ($record['phone'] ?? '');
+        // Support both new format (ts) and legacy (timestamp)
+        $timestamp = (string) ($record['ts'] ?? $record['timestamp'] ?? '');
 
-        // Build preview from the most relevant message key
+        // Build preview — new format uses user_msg/bot_reply; legacy uses '| B:' / 'body'
         $previewText = '';
-        if (isset($record['| B:'])) {
-            $previewText = '[BOT] ' . (string) $record['| B:'];
+        if (!empty($record['bot_reply'])) {
+            $previewText = '[Bot] ' . (string) $record['bot_reply'];
+        } elseif (!empty($record['user_msg'])) {
+            $previewText = '[User] ' . (string) $record['user_msg'];
+        } elseif (isset($record['| B:'])) {
+            $previewText = '[Bot] ' . (string) $record['| B:'];
         } elseif (isset($record['body'])) {
-            $previewText = '[USER] ' . (string) $record['body'];
+            $previewText = '[User] ' . (string) $record['body'];
         } else {
-            // Try any string value that's not metadata
             foreach ($record as $k => $v) {
-                if (in_array($k, ['thread_id', 'phone', 'timestamp', 'line_index'], true)) {
+                if (in_array($k, ['thread_id', 'phone', 'ts', 'timestamp', 'line_index', '_seq',
+                                  'speaker_girl_id', 'speaker_girl_name', 'speaker_mode',
+                                  'selected_girl_id', 'selected_girl_name'], true)) {
                     continue;
                 }
                 if (is_string($v) && $v !== '') {
@@ -692,17 +702,82 @@ function getMemoryDisplayLines(\WasapBot\Core\Memory $memory): array
             }
         }
 
+        // Build full preview: show both user and bot messages on one line
+        $userMsg = !empty($record['user_msg']) ? (string) $record['user_msg'] : ((string) ($record['body'] ?? ''));
+        $botMsg  = !empty($record['bot_reply']) ? (string) $record['bot_reply'] : ((string) ($record['| B:'] ?? ''));
+        $fullPreview = '';
+        if ($userMsg !== '') {
+            $fullPreview = '[U] ' . $userMsg;
+        }
+        if ($botMsg !== '') {
+            if ($fullPreview !== '') {
+                $fullPreview .= '  →  ';
+            }
+            $fullPreview .= '[B] ' . $botMsg;
+        }
+        if ($fullPreview === '') {
+            $fullPreview = $previewText;
+        }
+
         $displayLines[] = [
             'line_index' => $i,
             'thread_id'  => $threadId,
-            'phone'      => (strlen($phone) >= 4) ? '...' . substr($phone, -4) : $phone,
+            'phone'      => $phone,
             'timestamp'  => $timestamp,
-            'preview'    => h(mb_substr($previewText, 0, 80)),
+            'preview'    => h(mb_substr($fullPreview, 0, 120)),
             'raw_json'   => h($rawLine),
         ];
     }
 
     return $displayLines;
+}
+
+/**
+ * Group memory display lines by phone → thread_id.
+ *
+ * @param list<array{line_index:int, thread_id:string, phone:string, timestamp:string, preview:string, raw_json:string}> $lines
+ * @return list<array{phone:string, threads:list<array{thread_id:string, lines:list<array>, last_ts:string}>}>
+ */
+function getMemoryGroups(array $lines): array
+{
+    $byPhone = [];
+    foreach ($lines as $ml) {
+        $phone = $ml['phone'];
+        $tid   = $ml['thread_id'];
+        if ($phone === '') {
+            $phone = '(sin teléfono)';
+        }
+        if ($tid === '') {
+            $tid = '(sin thread)';
+        }
+        if (!isset($byPhone[$phone])) {
+            $byPhone[$phone] = [];
+        }
+        if (!isset($byPhone[$phone][$tid])) {
+            $byPhone[$phone][$tid] = ['thread_id' => $tid, 'lines' => [], 'last_ts' => ''];
+        }
+        $byPhone[$phone][$tid]['lines'][] = $ml;
+        $ts = $ml['timestamp'];
+        if ($ts > $byPhone[$phone][$tid]['last_ts']) {
+            $byPhone[$phone][$tid]['last_ts'] = $ts;
+        }
+    }
+
+    // Sort groups: most recent phone first
+    $result = [];
+    foreach ($byPhone as $phone => $threads) {
+        // Sort threads within phone by last_ts descending
+        uasort($threads, static fn(array $a, array $b): int => strcmp($b['last_ts'], $a['last_ts']));
+        $result[] = ['phone' => $phone, 'threads' => array_values($threads)];
+    }
+    // Sort phones: max last_ts across threads descending
+    usort($result, static function (array $a, array $b): int {
+        $maxA = array_reduce($a['threads'], static fn(string $carry, array $t): string => max($carry, $t['last_ts']), '');
+        $maxB = array_reduce($b['threads'], static fn(string $carry, array $t): string => max($carry, $t['last_ts']), '');
+        return strcmp($maxB, $maxA);
+    });
+
+    return $result;
 }
 
 /**
@@ -767,9 +842,25 @@ if (isset($_GET['cleared'])) {
 
 // ─── Data for the view ───
 $memoryLines  = getMemoryDisplayLines($memory);
+$memoryGroups = getMemoryGroups($memoryLines);
 $routingLines = config_val_array('routing.lines');
 $botStats     = getBotStats($config);
 $leadsDisplay = getLeadsForDisplay($config);
+
+// ─── Log file: read last 300 lines ───
+$logLines = [];
+$logFilePath = WASAPBOT_ROOT . '/' . ltrim((string) $config->get('files.bot_log', 'data/bot.log'), '/');
+if (file_exists($logFilePath) && is_readable($logFilePath)) {
+    $fp = @fopen($logFilePath, 'rb');
+    if ($fp !== false) {
+        $allLogLines = [];
+        while (($line = fgets($fp)) !== false) {
+            $allLogLines[] = rtrim($line);
+        }
+        fclose($fp);
+        $logLines = array_slice($allLogLines, -300);
+    }
+}
 
 // ─── Now render ───
 ?><!DOCTYPE html>
@@ -1067,6 +1158,7 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
     <button data-tab="tab-reminder">Cron Reminder</button>
     <button data-tab="tab-urls">URLs</button>
     <button data-tab="tab-memory">Memoria</button>
+    <button data-tab="tab-logs">Logs</button>
 </div>
 
 <!-- ── Main config form ── -->
@@ -1185,7 +1277,7 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
                 ['✍️', 'Processor 3 — ToneBuilder', 'Construye las directivas de tono para el system prompt: qué registro usar, si ya saludó (no repetir saludo), si hay urgencia, si mostrar catálogo, si la conversación está muerta (silencio total)…'],
                 ['💬', 'Processor 4 — OpenAI Chat (gpt-5.1)', 'Llama al modelo principal con el system prompt completo + historial + directivas de tono. La respuesta es siempre un JSON con: texto visible, si se detectó un lead, confianza, ETA en minutos, chica seleccionada, modo de la hablante, etc.'],
                 ['🔍', 'Processor 5 — ResponseNormalizer', 'Parsea el JSON devuelto por OpenAI y extrae todos los campos estructurados para su uso en las siguientes fases.'],
-                ['📸', 'Processor 6 — CatalogFormatter', 'Si el mensaje menciona chicas o fotos, añade al texto respuesta las fotos del catálogo activo (obtenidas de la URL de girls.json). Si pide "todas" → catálogo completo; si no → máximo N chicas aleatorias.'],
+                ['📸', 'Processor 6 — CatalogFormatter', 'Si el mensaje menciona chicas o fotos, añade al texto respuesta las fotos del catálogo activo (obtenidas de la URL de girls.json). Lógica de selección: (1) Si hay chica seleccionada y pide fotos → todas las fotos de esa chica. (2) Si hay chica seleccionada y pregunta por amigas/más chicas → 1 foto aleatoria de cada chica activa. (3) Sin chica seleccionada y pide fotos → 1 foto aleatoria de cada chica activa. (4) wants_more_girls explícito → igual que caso 3.'],
                 ['🔄', 'Processor 7 — DedupeReply', 'Compara la respuesta generada con los últimos 5 mensajes del bot. Si es casi idéntica, la reformula añadiendo un prefijo/sufijo de variación para que no parezca un bucle.'],
                 ['🖼️', 'Processor 8 — ImageSplitter', 'Si la respuesta contiene URLs de imágenes junto con texto, las divide en mensajes separados (uno por imagen) para enviarlas como mensajes individuales en WhatsApp.'],
                 ['📤', 'Envío humanizado (WAHA)', 'Envía cada mensaje simulando comportamiento humano: 1) marca como leído, 2) espera un tiempo proporcional a la longitud del mensaje entrante, 3) muestra "escribiendo…", 4) espera el tiempo de escritura simulado, 5) envía el texto, 6) para "escribiendo…". Si hay varios mensajes (fotos), espera ~15 segundos entre ellos.'],
@@ -1941,52 +2033,181 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
             </form>
         </div>
 
-        <div style="overflow-x:auto">
-            <table class="memory-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Thread ID</th>
-                        <th>Timestamp</th>
-                        <th>Teléfono</th>
-                        <th>Mensaje</th>
-                        <th>Acción</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($memoryLines)): ?>
-                    <tr>
-                        <td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">
-                            Sin entradas de memoria.
-                        </td>
-                    </tr>
-                    <?php else: ?>
-                    <?php foreach ($memoryLines as $ml): ?>
-                    <tr>
-                        <td class="mono"><?php echo $ml['line_index']; ?></td>
-                        <td class="mono"><?php echo h(strlen($ml['thread_id']) > 8 ? substr($ml['thread_id'], 0, 8) . '..' : $ml['thread_id']); ?></td>
-                        <td class="mono" style="white-space:nowrap"><?php echo h($ml['timestamp']); ?></td>
-                        <td class="mono"><?php echo h($ml['phone']); ?></td>
-                        <td class="preview"><?php echo $ml['preview']; ?></td>
-                        <td>
-                            <form method="post" action="<?php echo h($baseUrl); ?>?action=delete_memory_line" style="display:inline" onsubmit="return confirm('¿Eliminar línea <?php echo $ml['line_index']; ?>?')">
+        <p style="color:var(--text-muted);font-size:.8rem;margin-bottom:16px">
+            Agrupado por teléfono. Pulsa sobre cualquier línea para ver la conversación completa.
+        </p>
+
+        <?php if (empty($memoryGroups)): ?>
+        <div style="text-align:center;color:var(--text-muted);padding:20px">
+            Sin entradas de memoria.
+        </div>
+        <?php else: ?>
+        <div class="memory-phone-groups">
+            <?php foreach ($memoryGroups as $group): ?>
+            <div class="memory-phone-group" style="margin-bottom:16px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+                <div class="memory-phone-header" style="background:var(--input-bg);padding:8px 14px;font-weight:600;font-size:.88rem;color:var(--accent);cursor:pointer;display:flex;justify-content:space-between;align-items:center"
+                     onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none'">
+                    <span>📱 <?php echo h($group['phone']); ?></span>
+                    <span style="font-size:.75rem;color:var(--text-muted);font-weight:400"><?php echo count($group['threads']); ?> hilo(s) · <?php echo array_sum(array_map(fn($t) => count($t['lines']), $group['threads'])); ?> mensajes</span>
+                </div>
+                <div class="memory-phone-body" style="display:block">
+                    <?php foreach ($group['threads'] as $thread): ?>
+                    <div class="memory-thread-group" style="border-top:1px solid var(--border-soft);padding:4px 0">
+                        <div class="memory-thread-header" style="padding:4px 14px;font-size:.78rem;color:var(--text-muted);display:flex;justify-content:space-between">
+                            <span>🧵 Thread: <code style="font-size:.72rem"><?php echo h(strlen($thread['thread_id']) > 14 ? substr($thread['thread_id'], 0, 14) . '…' : $thread['thread_id']); ?></code></span>
+                            <span><?php echo count($thread['lines']); ?> msgs</span>
+                        </div>
+                        <?php foreach ($thread['lines'] as $ml): ?>
+                        <div class="memory-line-row js-memory-line"
+                             style="display:flex;justify-content:space-between;align-items:center;padding:4px 14px;font-size:.82rem;cursor:pointer;border-left:2px solid transparent"
+                             data-thread-id="<?php echo h($ml['thread_id']); ?>"
+                             onmouseover="this.style.background='rgba(245,158,11,.06)';this.style.borderLeftColor='var(--accent)'"
+                             onmouseout="this.style.background='';this.style.borderLeftColor='transparent'"
+                             onclick="openConversationModal('<?php echo h($ml['thread_id']); ?>')">
+                            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:10px">
+                                <span class="mono" style="font-size:.72rem;color:var(--text-muted);margin-right:6px"><?php
+                                    $ts = $ml['timestamp'];
+                                    if ($ts && ($tstamp = strtotime(str_replace('T',' ',$ts)))) {
+                                        echo h(date('d/m H:i', $tstamp));
+                                    } else {
+                                        echo h($ts);
+                                    }
+                                ?></span>
+                                <span class="memory-preview-text"><?php echo $ml['preview']; ?></span>
+                            </span>
+                            <form method="post" action="<?php echo h($baseUrl); ?>?action=delete_memory_line" style="display:inline;flex-shrink:0" onsubmit="event.stopPropagation(); return confirm('¿Eliminar línea <?php echo $ml['line_index']; ?>?')">
                                 <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
                                 <input type="hidden" name="line_index" value="<?php echo $ml['line_index']; ?>">
-                                <button type="submit" class="btn btn-danger btn-sm">X</button>
+                                <button type="submit" class="btn btn-danger btn-sm" style="font-size:.7rem;padding:2px 6px">X</button>
                             </form>
-                        </td>
-                    </tr>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
                     <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+                </div>
+            </div>
+            <?php endforeach; ?>
         </div>
+        <?php endif; ?>
 
         <p style="margin-top:10px;color:var(--text-muted);font-size:.8rem">
-            Total: <?php echo count($memoryLines); ?> líneas de memoria.
+            Total: <?php echo count($memoryLines); ?> líneas de memoria en <?php echo count($memoryGroups); ?> teléfonos.
         </p>
     </div>
 </div>
+
+<!-- ===== MODAL: Conversación Completa ===== -->
+<div id="conversationModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);max-width:700px;width:90%;max-height:85vh;display:flex;flex-direction:column;box-shadow:var(--shadow-md)">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border)">
+            <h3 style="margin:0;font-size:1rem">Conversación — <span id="convModalPhone" style="color:var(--accent)"></span></h3>
+            <button onclick="closeConversationModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1">&times;</button>
+        </div>
+        <div id="conversationContent" style="flex:1;overflow-y:auto;padding:14px 18px;font-size:.84rem;line-height:1.6;max-height:60vh">
+            <p style="color:var(--text-muted);text-align:center">Cargando conversación…</p>
+        </div>
+    </div>
+</div>
+
+<script>
+function openConversationModal(threadId) {
+    var modal = document.getElementById('conversationModal');
+    modal.style.display = 'flex';
+    document.getElementById('convModalPhone').textContent = threadId;
+    document.getElementById('conversationContent').innerHTML = '<p style="color:var(--text-muted);text-align:center">Cargando conversación…</p>';
+
+    fetch('<?php echo h($baseUrl); ?>?action=get_thread_conversation&thread_id=' + encodeURIComponent(threadId))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var html = '';
+            if (!data.ok || !data.records || data.records.length === 0) {
+                html = '<p style="color:var(--text-muted);text-align:center">Sin registros para este hilo.</p>';
+            } else {
+                data.records.forEach(function(rec) {
+                    var ts = rec.ts || rec.timestamp || '';
+                    var dateStr = '';
+                    if (ts) {
+                        try { var d = new Date(ts.replace(' ', 'T')); dateStr = d.toLocaleString('es-ES', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); } catch(e) {}
+                    }
+                    var userMsg = rec.user_msg || rec.body || '';
+                    var botMsg  = rec.bot_reply || (rec['| B:'] || '');
+                    html += '<div style="margin-bottom:10px;padding:8px 10px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-soft)">';
+                    if (dateStr) html += '<div style="font-size:.7rem;color:var(--text-muted);margin-bottom:4px">' + dateStr + '</div>';
+                    if (userMsg) html += '<div style="margin-bottom:4px"><span style="color:var(--info);font-size:.72rem">📥 Usuario:</span><br>' + escHtml(userMsg) + '</div>';
+                    if (botMsg)  html += '<div><span style="color:var(--ok);font-size:.72rem">📤 Bot:</span><br>' + escHtml(botMsg) + '</div>';
+                    html += '</div>';
+                });
+            }
+            document.getElementById('conversationContent').innerHTML = html;
+        })
+        .catch(function() {
+            document.getElementById('conversationContent').innerHTML = '<p style="color:var(--danger);text-align:center">Error al cargar la conversación.</p>';
+        });
+}
+
+function closeConversationModal() {
+    document.getElementById('conversationModal').style.display = 'none';
+}
+
+function escHtml(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+}
+
+// Cerrar modal con Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeConversationModal();
+});
+// Cerrar modal click fuera
+document.getElementById('conversationModal').addEventListener('click', function(e) {
+    if (e.target === this) closeConversationModal();
+});
+</script>
+
+<!-- ===== TAB 13: Logs ===== -->
+<div class="tab-content" id="tab-logs">
+    <div class="card">
+        <h2>Logs del bot <span style="font-weight:400;font-size:.82rem;color:var(--text-muted)">(últimas <?php echo count($logLines); ?> líneas de <code>data/bot.log</code>)</span></h2>
+
+        <?php if (empty($logLines)): ?>
+        <p style="color:var(--text-muted);font-size:.9rem;padding:20px 0;text-align:center">
+            No hay logs todavía. El archivo <code><?php echo h($logFilePath); ?></code>
+            <?php echo file_exists($logFilePath) ? 'existe pero está vacío.' : 'aún no existe (se creará al procesar el primer mensaje).'; ?>
+        </p>
+        <?php else: ?>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+            <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('logBox').scrollTop=document.getElementById('logBox').scrollHeight">↓ Ir al final</button>
+            <button type="button" class="btn btn-sm btn-warning" onclick="location.reload()">Refrescar</button>
+            <span style="color:var(--text-muted);font-size:.78rem">Se muestran las últimas 300 líneas. Se rota automáticamente al superar 5 MB.</span>
+        </div>
+        <pre id="logBox" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;font-family:'SF Mono','Fira Code','Consolas',monospace;font-size:.78rem;line-height:1.55;color:var(--text-muted);overflow:auto;max-height:600px;white-space:pre-wrap;word-break:break-all"><?php
+        foreach ($logLines as $ll) {
+            // Color coding by level
+            $levelColor = 'var(--text-muted)';
+            if (strpos($ll, '] ERROR:') !== false || strpos($ll, '] CRITICAL:') !== false || strpos($ll, '] EMERGENCY:') !== false) {
+                $levelColor = 'var(--danger)';
+            } elseif (strpos($ll, '] WARNING:') !== false) {
+                $levelColor = 'var(--warn)';
+            } elseif (strpos($ll, '] INFO:') !== false) {
+                $levelColor = 'var(--info)';
+            } elseif (strpos($ll, '] DEBUG:') !== false) {
+                $levelColor = '#6b7280';
+            }
+            echo '<span style="color:' . $levelColor . '">' . h($ll) . '</span>' . "\n";
+        }
+        ?></pre>
+        <?php endif; ?>
+    </div>
+</div>
+
+<script>
+// Auto-scroll log to bottom on load
+(function() {
+    var logBox = document.getElementById('logBox');
+    if (logBox) { logBox.scrollTop = logBox.scrollHeight; }
+})();
+</script>
 
 <script>
 // ── Tab switching ──

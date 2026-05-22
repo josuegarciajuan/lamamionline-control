@@ -1,6 +1,44 @@
 # Changelog
 
-## 2026-05-22 · Fase 2b — Fix real de permisos: toggle encender/apagar no persistía
+## 2026-05-22 · Memoria bot-casa + envío de fotos
+
+### Bug 1 corregido — Memoria: teléfono completo, agrupado y clickeable
+- **Antes**: solo mostraba últimos 4 dígitos del teléfono, sin agrupar, sin click.
+- **Ahora**: 
+  - Teléfono completo visible.
+  - Agrupado por teléfono → hilo (thread_id), con conteo de mensajes.
+  - Cada línea muestra `[U] mensaje usuario → [B] respuesta bot`.
+  - Click en cualquier línea abre un modal con la **conversación completa**
+    del hilo (vía `get_thread_conversation`), con fecha, mensajes de usuario y bot.
+  - Modal se cierra con Escape o click fuera.
+
+### Bug 2 corregido — Fotos: detección ampliada de URLs de imagen
+- **Antes**: `isLikelyImageUrl()` en `ImageSplitter.php` solo detectaba URLs
+  con extensión de imagen (.jpg, .png) o patrones muy restringidos. Las URLs
+  del catálogo de chicas que no tuvieran extensión explícita no se detectaban
+  como imágenes y se quedaban en el primer mensaje de texto, pudiendo causar
+  que WAHA rechazara el mensaje por longitud.
+- **Ahora**: la detección incluye:
+  - Query params de formato (`?format=jpg`, `&type=png`, `?fm=webp`)
+  - Paths con `/fotos/`, `/girls/`, `/photos/`, `/images/`, `/uploads/`
+  - Parámetros CDN de resize (`?w=`, `?width=`, `?h=`, `?size=`)
+  - Hosts CDN comunes (CloudFront, S3, Cloudinary, ImageKit, Supabase, etc.)
+  - Cada URL de foto se envía en **un mensaje separado** (ya lo hacía `ImageSplitter`,
+    ahora la detección mejorada asegura que todas las URLs del catálogo se traten como fotos).
+
+### Archivos modificados
+- `bot-casa/public/panel.php` — nueva vista agrupada + modal conversación + JS
+- `bot-casa/src/Pipeline/ImageSplitter.php` — `isLikelyImageUrl()` ampliado
+
+### Tests
+- `php -l panel.php` → OK
+- `php -l ImageSplitter.php` → OK
+- Test unitario `getMemoryGroups()` → agrupación correcta por teléfono/hilo
+- Test `isLikelyImageUrl()` con 10 URLs → 10/10 correctas
+
+---
+
+
 
 ### Bug corregido (segunda iteración)
 - **Comercial → Procesos**: el botón "Encender" no encendía el proceso. La página se recargaba pero el proceso seguía apagado.
