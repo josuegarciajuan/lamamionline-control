@@ -1,5 +1,46 @@
 # Changelog
 
+## 2026-05-22 · NOVA-PROMPT — Mejora integral del system prompt (Fase 2)
+
+### Objetivo
+Reescribir las 10 secciones externalizadas del system prompt aplicando todas las
+mejoras de humanidad, conversión y robustez identificadas en el brainstorming.
+
+### Mejoras por sección (20 mejoras aplicadas)
+
+| # | Sección | Mejora |
+|---|---------|--------|
+| 1 | `rol` | Contexto de negocio sexual al inicio del prompt (el LLM lo pondera más). Reglas unificadas n8n↔PHP. |
+| 2 | `estilo` | Errores tipográficos deliberados (1 de cada 5-6 msgs) con ejemplos concretos. Menús rígidos PROHIBIDOS con ejemplos malos explícitos. Respuestas a monosílabos: máx 4 palabras. |
+| 3 | `tarifas` | Estructura completa: 30/50/100€ + oferta urgencia 90€/1h si en 30 min. Anti-regateo con 3 niveles (haggle_count_recent). Rapidito 30€ no se ofrece de primeras. Tríos NO. No salidas. |
+| 4 | `servicios` | Preservativo por defecto (no mencionar). Francés natural solo 1h + solo si pide. Griego solo si pregunta. Fiesta blanca: no se vende, el cliente trae. |
+| 5 | `ubicacion` | Anti-invención reforzada (SOLO "Burriana centro"). Post-maps modo ETA con 6 variantes rotativas. |
+| 6 | `instrucciones_fotos` | Reglas claras de cuándo y cómo el sistema adjunta fotos. No URLs en respuesta. Variantes para cuando ya se enviaron fotos. |
+| 7 | `identidad_chicas` | Anti-bot con 4 variantes rotativas + 2 variantes para insistencia. Speaker/selected girl logic preservada. |
+| 8 | `seguridad` | 6 variantes off-topic (antes solo 1). Respuesta a foto de cliente añadida. Respuesta a "dame el número de X". Tono agresivo: warning + silencio. |
+| 9 | `ejemplos` | Ampliado de 6 a 18 ejemplos cubriendo: regateo (2 niveles), audio, indeciso, saludo web automático, post-maps ETA, foto cliente, otro número, descuento primera vez, ETA concreta. |
+| 10 | `formato_respuesta` | Recordatorio NO URLs en user_visible_reply. Reglas lead_detection claras. Validación de JSON sin comentarios. |
+
+### Contradicciones resueltas n8n ↔ PHP
+- Rapidito 30€: ahora explícitamente "no ofrecer de primeras"
+- Oferta urgencia 90€: añadida al prompt del bot PHP (ya existía en n8n)
+- Preservativo: unificado — por defecto con, francés natural solo 1h
+- Tríos: explícitamente prohibidos (ya lo estaba en n8n)
+- No salidas: explícito
+
+### Tests
+- PHP lint: 5/5 OK
+- JSON validation: dist + local OK
+- Prompt assembly: 14233 chars, 0 tags sin reemplazar, 10/10 headers
+- Content checks: 20/20 mejoras verificadas
+
+### Archivos modificados
+- `bot-casa/config.dist.json` — secciones mejoradas
+- `bot-casa/config.local.json` — secciones mejoradas (mismo contenido)
+- `docs/changelog.md` — esta entrada
+
+---
+
 ## 2026-05-22 · ORION-CORE — Parametrización del system prompt del bot (Fase 1)
 
 ### Objetivo

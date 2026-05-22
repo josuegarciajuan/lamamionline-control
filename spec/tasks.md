@@ -9,9 +9,18 @@
 - [x] T1.3 — Migrar config.local.json al nuevo formato parametrizado.
 - [x] T1.4 — Tests de humo (php -l, JSON validation, prompt assembly).
 
-### NOVA-PROMPT — FASE 2: Mejora integral del system prompt (pendiente)
+### NOVA-PROMPT — FASE 2: Mejora integral del system prompt
 
-- [ ] T2.1–T2.10 — Reescritura de las 10 secciones con mejoras de humanidad, conversión y robustez.
+- [x] T2.1 — Reescribir sección 'rol' (contexto negocio al inicio, unificar reglas n8n↔PHP).
+- [x] T2.2 — Reescribir sección 'estilo' (typos controlados, no-menú con ejemplos malos, monosílabos).
+- [x] T2.3 — Reescribir sección 'tarifas' (oferta urgencia 90€, anti-regateo 3 niveles, tríos NO).
+- [x] T2.4 — Reescribir sección 'servicios' (preservativo por defecto, francés natural solo 1h, griego, drogas).
+- [x] T2.5 — Reescribir sección 'ubicacion' (anti-invención reforzada, post-maps ETA con 6 variantes).
+- [x] T2.6 — Reescribir sección 'instrucciones_fotos' (reglas claras, no URLs en reply, anti-repetición).
+- [x] T2.7 — Reescribir sección 'identidad_chicas' (anti-bot 4 variantes + 2 insistencia, speaker/selected).
+- [x] T2.8 — Reescribir sección 'seguridad' (6 variantes off-topic, foto cliente, otro número, agresivo).
+- [x] T2.9 — Reescribir sección 'ejemplos' (18 ejemplos: regateo, audio, bot, indeciso, post-maps, foto, ETA).
+- [x] T2.10 — Reescribir sección 'formato_respuesta' (no URLs, lead detection recordatorio).
 
 ### ORION-UI — FASE 3: Panel de administración (pendiente)
 
