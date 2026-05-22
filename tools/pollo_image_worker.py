@@ -20,6 +20,13 @@ import urllib.parse
 import urllib.request
 
 try:
+    from PIL import Image
+    import numpy as np
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+
+try:
     from curl_cffi import requests as cffi_requests
     HTTP_BACKEND = "curl-cffi"
 except ImportError:
@@ -32,7 +39,7 @@ except ImportError:
 BASE_URL = "https://pollo.ai/api/trpc"
 POLL_INTERVAL = 4
 SUCCESS_GRACE_SECONDS = 36
-UNKNOWN_FAILURE_GRACE_POLLS = 3
+UNKNOWN_FAILURE_GRACE_POLLS = 6  # tolerancia a flapping de Pollo.ai: 6 polls × 4s = 24s de gracia antes de rendirse
 MAX_PROMPT_CHARS = 2000
 COMMON_HEADERS = {
     "Content-Type": "application/json",
@@ -412,6 +419,21 @@ def detect_ext(raw, content_type):
     return "bin"
 
 
+def apply_realism_postprocess(image_path):
+    if not HAS_PIL:
+        return
+    try:
+        img = Image.open(image_path).convert("RGB")
+        arr = np.array(img, dtype=np.float32)
+        noise = np.random.normal(0, 1.2, arr.shape).astype(np.float32)
+        arr = arr + noise
+        arr = np.clip(arr, 0, 255).astype(np.uint8)
+        img = Image.fromarray(arr)
+        img.save(image_path, "JPEG", quality=92, optimize=True)
+    except Exception:
+        pass
+
+
 def fetch_url_bytes(url, client=None):
     req = urllib.request.Request(
         url,
@@ -451,6 +473,7 @@ def save_single_output(url, output_path, client=None):
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     with open(output_path, "wb") as fh:
         fh.write(raw)
+    apply_realism_postprocess(output_path)
     return output_path, len(raw), detect_ext(raw, content_type)
 
 
@@ -497,6 +520,7 @@ def save_multiple_outputs(client, result, generation_id, output_dir, output_pref
             output_path = os.path.join(output_dir, "%s%02d.%s" % (output_prefix, index, ext))
             with open(output_path, "wb") as fh:
                 fh.write(raw)
+            apply_realism_postprocess(output_path)
             saved.append({
                 "index": index,
                 "path": output_path,

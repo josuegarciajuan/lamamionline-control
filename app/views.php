@@ -2906,6 +2906,8 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     // SECCIÓN 2: CANDIDATAS GENERADAS
     // -----------------------------------------------------------------------
     echo '<section class="panel panel-space" id="publicistaCandidates">';
+    // Elemento oculto para que el polling JS sepa el job actual
+    echo '<span id="publicistaRegenPollJobId" data-job-id="' . e($selectedJob['id'] ?? '') . '" style="display:none;"></span>';
     echo '<div class="branch-panel-head"><h3>② Candidatas generadas</h3><span class="summary-badge">' . e((string)count($candidates)) . '</span></div>';
     if (!empty($candidates)) {
         echo '<div class="cards two" style="margin-top:14px;">';
@@ -2915,7 +2917,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
         foreach ($candidates as $cand) {
             $isSelected = !empty($cand['selected']);
             $cardBorder = $isSelected ? 'border:2px solid #6366f1;' : '';
-            echo '<div class="panel" style="padding:12px;' . $cardBorder . '">';
+            echo '<div class="panel" style="padding:12px;' . $cardBorder . '" data-candidate-id="' . e($cand['id'] ?? '') . '">';
             echo '<div class="branch-panel-head"><h4 style="margin:0;">' . e($cand['id'] ?? 'candidate') . ($isSelected ? ' <span style="color:#6366f1;font-size:11px;">★ TOP 4</span>' : '') . '</h4><span class="summary-badge">' . e((string)($cand['effective_score'] ?? 0)) . '</span></div>';
             // Mostrar imagen sin blur: square_path si existe, si no preview_path, si no raw
             $imgToShow = '';
@@ -2981,6 +2983,11 @@ function render_publicista_crear_perfiles_page($embedded = false) {
             $squareSrc = !empty($finalRow['square_path']) ? $finalRow['square_path'] : (!empty($finalRow['final_path']) ? $finalRow['final_path'] : '');
             $blurSrc = !empty($finalRow['final_path']) ? $finalRow['final_path'] : $squareSrc;
             $proposalSrc = !empty($finalRow['refine_proposal_path']) ? $finalRow['refine_proposal_path'] : '';
+            // Cache-busting: añadir filemtime para forzar recarga si el archivo cambia
+            $bustSrc = function($p) { if ($p === '') return ''; $fs = BASE_PATH . '/' . ltrim($p, '/'); $m = @filemtime($fs); return ($m > 0) ? $p . '?t=' . $m : $p; };
+            $squareSrcBust  = $bustSrc($squareSrc);
+            $blurSrcBust    = $bustSrc($blurSrc);
+            $proposalSrcBust = $bustSrc($proposalSrc);
             echo '<div class="panel" style="padding:12px;" id="finalCard_' . e($fId) . '">';
             $manualBlurApplied = !empty($finalRow['manual_blur_applied']);
             $manualBlurIntensity = (int)($finalRow['manual_blur_intensity'] ?? 0);
@@ -2993,14 +3000,15 @@ function render_publicista_crear_perfiles_page($embedded = false) {
             echo '<div>';
             echo '<div style="font-size:11px;color:#9ca3af;margin-bottom:4px;text-align:center;">Definitiva actual</div>';
             if ($blurSrc !== '') {
-                echo '<img id="finalBlurImg_' . e($fId) . '" src="' . e($blurSrc) . '" alt="Definitiva actual" style="width:100%;border-radius:8px;border:1px solid #e5e7eb;display:block;">';
+                echo '<img id="finalBlurImg_' . e($fId) . '" src="' . e($blurSrcBust) . '" alt="Definitiva actual" style="width:100%;border-radius:8px;border:1px solid #e5e7eb;display:block;">';
             }
             echo '</div>';
             echo '<div id="finalProposalCol_' . e($fId) . '">';
             echo '<div style="font-size:11px;color:#9ca3af;margin-bottom:4px;text-align:center;">' . ($usesPolloVisualFlow ? 'Propuesta refinada' : 'Candidata elegida') . '</div>';
             $secondSrc = $usesPolloVisualFlow ? $proposalSrc : $squareSrc;
+            $secondSrcBust = $usesPolloVisualFlow ? $proposalSrcBust : $squareSrcBust;
             if ($secondSrc !== '') {
-                echo '<img src="' . e($secondSrc) . '" alt="Propuesta" style="width:100%;border-radius:8px;border:1px solid #e5e7eb;display:block;">';
+                echo '<img src="' . e($secondSrcBust) . '" alt="Propuesta" style="width:100%;border-radius:8px;border:1px solid #e5e7eb;display:block;">';
             } else {
                 echo '<div style="text-align:center;font-size:12px;color:#9ca3af;padding:20px 0;">' . ($usesPolloVisualFlow ? 'Todavía no hay propuesta refinada para esta final.' : 'Sin imagen adicional') . '</div>';
             }
@@ -3529,6 +3537,225 @@ function render_publicista_crear_perfiles_page($embedded = false) {
       });
   };
 })();
+
+// ── Polling automático de estado de regeneraciones ──────────────────────────
+(function() {
+  var POLL_INTERVAL_MS  = 8000;  // cada 8 segundos
+  var POLL_IDLE_MS      = 30000; // cuando no hay cola activa, cada 30s
+  var _pollTimer        = null;
+  var _jobId            = '';
+  var _knownMtimes      = {};    // candidateId -> mtime visto
+  var _knownAvisosCount = -1;
+  var _hasActiveQueue   = false;
+
+  function initPoll() {
+    // Leer el job id de un atributo del DOM inyectado por PHP
+    var el = document.getElementById('publicistaRegenPollJobId');
+    if (!el) return;
+    _jobId = el.getAttribute('data-job-id') || '';
+    if (!_jobId) return;
+    schedulePoll(1500); // primer poll al cargar
+  }
+
+  function schedulePoll(delay) {
+    if (_pollTimer) clearTimeout(_pollTimer);
+    _pollTimer = setTimeout(doPoll, delay || POLL_INTERVAL_MS);
+  }
+
+  function doPoll() {
+    fetch('index.php?page=publicista&action=poll_publicista_regen_status&id=' + encodeURIComponent(_jobId), {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'same-origin'
+    })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data || !data.ok) { schedulePoll(POLL_IDLE_MS); return; }
+
+      _hasActiveQueue = false;
+      var hasQueued = false;
+      var queue = data.queue || {};
+      // Detectar si hay algo en cola activo
+      for (var cid in queue) {
+        var s = queue[cid] ? queue[cid].status : '';
+        if (s === 'queued' || s === 'running') { _hasActiveQueue = true; }
+        if (s === 'queued') { hasQueued = true; }
+      }
+
+      // Mostrar/ocultar botón de cancelar cola global
+      updateCancelQueueButton(hasQueued);
+
+      // Actualizar imágenes de candidatas que hayan cambiado
+      var candidates = data.candidates || {};
+      for (var candId in candidates) {
+        var cand = candidates[candId];
+        var newMtime = cand.mtime || 0;
+        if (newMtime > 0 && newMtime !== (_knownMtimes[candId] || 0)) {
+          _knownMtimes[candId] = newMtime;
+          // Actualizar src de la imagen si existe en el DOM
+          var imgs = document.querySelectorAll('[data-candidate-id="' + candId + '"] img, #candidateCard_' + candId + ' img');
+          if (!imgs.length) {
+            // Fallback: buscar por src que contenga el path base sin ?t=
+            var basePath = cand.square_path.replace(/\?.*$/, '');
+            imgs = document.querySelectorAll('img[src*="' + basePath.split('/').pop().replace(/\.[^.]+$/, '') + '"]');
+          }
+          if (imgs.length) {
+            for (var i = 0; i < imgs.length; i++) {
+              imgs[i].src = cand.src;
+            }
+          }
+          // Mostrar badge de "Actualizada" si estaba en error o queued
+          var qStatus = queue[candId] ? queue[candId].status : '';
+          if (qStatus === 'done' || (_knownMtimes[candId] && newMtime)) {
+            showCandidateUpdatedBadge(candId);
+          }
+        }
+        // Mostrar estado de cola en el botón si está en progreso
+        updateQueueBadge(candId, queue[candId] || null, cand);
+      }
+
+      // Avisos: si hay nuevos, pulsar el sistema de avisos para refrescar badge
+      var newAvisosCount = parseInt(data.avisos_count || 0, 10);
+      if (_knownAvisosCount >= 0 && newAvisosCount > _knownAvisosCount) {
+        refreshAvisosBadge();
+      }
+      _knownAvisosCount = newAvisosCount;
+
+      // Próximo poll: rápido si hay cola activa, lento si todo quieto
+      schedulePoll(_hasActiveQueue ? POLL_INTERVAL_MS : POLL_IDLE_MS);
+    })
+    .catch(function() { schedulePoll(POLL_IDLE_MS); });
+  }
+
+  function showCandidateUpdatedBadge(candId) {
+    // Añade un badge temporal verde sobre la tarjeta de candidata
+    var selector = '[data-candidate-id="' + candId + '"]';
+    var card = document.querySelector(selector);
+    if (!card) return;
+    var existing = card.querySelector('.js-regen-done-badge');
+    if (existing) existing.remove();
+    var badge = document.createElement('div');
+    badge.className = 'js-regen-done-badge';
+    badge.style.cssText = 'position:absolute;top:8px;right:8px;background:#059669;color:#fff;font-size:11px;padding:3px 8px;border-radius:6px;font-weight:600;z-index:10;pointer-events:none;';
+    badge.textContent = '✓ Imagen actualizada';
+    card.style.position = 'relative';
+    card.appendChild(badge);
+    setTimeout(function() { if (badge.parentNode) badge.parentNode.removeChild(badge); }, 6000);
+  }
+
+  function updateQueueBadge(candId, queueEntry, cand) {
+    var btn = document.querySelector('.js-open-regenerate-candidate-modal[data-candidate-id="' + candId + '"]');
+    if (!btn) return;
+    if (!queueEntry) return;
+    var s = queueEntry.status || '';
+    var updatedAt = queueEntry.updated_at || '';
+    if (s === 'queued') {
+      btn.textContent = '⏳ En cola…';
+      btn.disabled = true;
+    } else if (s === 'running') {
+      btn.textContent = '⚙ Generando…';
+      btn.disabled = true;
+    } else if (s === 'done') {
+      btn.textContent = 'Regenerar esta';
+      btn.disabled = false;
+    } else if (s === 'cancelled') {
+      btn.textContent = 'Regenerar esta';
+      btn.disabled = false;
+    } else if (s === 'error') {
+      btn.textContent = 'Regenerar esta';
+      btn.disabled = false;
+      // Mostrar error brevemente — solo si no estaba ya mostrado
+      var errMsg = queueEntry.error || 'Error desconocido.';
+      // Simplificar mensajes de error de Pollo para el usuario final
+      if (errMsg.indexOf('generacion fallo') !== -1 || errMsg.indexOf('generación falló') !== -1) {
+        if (errMsg.indexOf('desconocido') !== -1 || errMsg.indexOf('unknown') !== -1) {
+          errMsg = 'Pollo.ai devolvió un error sin explicación tras varios reintentos automáticos. La cuenta puede estar temporalmente saturada. Espera 3-5 minutos y vuelve a intentarlo.';
+        } else {
+          errMsg = 'Pollo.ai rechazó la generación (cuenta ocupada). Espera unos minutos y vuelve a intentarlo.';
+        }
+      } else if (errMsg.indexOf('timeout') !== -1 || errMsg.indexOf('Timeout') !== -1) {
+        errMsg = 'La generación tardó demasiado y se agotó el tiempo de espera. Vuelve a intentarlo en unos minutos.';
+      }
+      var card = btn.closest('.panel');
+      if (card) {
+        var existing = card.querySelector('.js-regen-error-inline');
+        if (!existing) {
+          var errDiv = document.createElement('div');
+          errDiv.className = 'js-regen-error-inline';
+          errDiv.style.cssText = 'margin-top:6px;font-size:11px;color:#b91c1c;background:#fee2e2;padding:4px 8px;border-radius:5px;';
+          errDiv.textContent = '✗ ' + errMsg;
+          btn.parentNode.appendChild(errDiv);
+          setTimeout(function() { if (errDiv.parentNode) errDiv.parentNode.removeChild(errDiv); }, 30000);
+        }
+      }
+    }
+  }
+
+  function updateCancelQueueButton(hasQueued) {
+    var section = document.getElementById('publicistaCandidates');
+    if (!section) return;
+    var existing = document.getElementById('js-cancel-regen-queue-btn');
+    if (!hasQueued) {
+      if (existing) existing.remove();
+      return;
+    }
+    if (existing) return; // ya existe
+    var btn = document.createElement('button');
+    btn.id = 'js-cancel-regen-queue-btn';
+    btn.type = 'button';
+    btn.style.cssText = 'margin:0 0 10px 0;font-size:12px;padding:4px 12px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:6px;cursor:pointer;';
+    btn.textContent = '✕ Cancelar regeneraciones en cola';
+    btn.onclick = function() {
+      btn.disabled = true;
+      btn.textContent = 'Cancelando…';
+      fetch('index.php?page=publicista&action=cancel_publicista_regen_queue&id=' + encodeURIComponent(_jobId), {
+        method: 'GET', credentials: 'same-origin'
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (existing) existing.remove();
+        btn.remove();
+        doPoll(); // actualizar UI inmediatamente
+      })
+      .catch(function() { btn.disabled = false; btn.textContent = '✕ Cancelar regeneraciones en cola'; });
+    };
+    // Insertar justo antes de la grid de candidatas
+    var grid = section.querySelector('.cards.two');
+    if (grid) section.insertBefore(btn, grid);
+    else section.appendChild(btn);
+  }
+
+  function refreshAvisosBadge() {
+    // Recarga solo el panel de avisos vía fetch para mostrar el nuevo aviso sin recargar página
+    var avisosPanel = document.getElementById('avisosPanel');
+    if (!avisosPanel) return;
+    fetch(window.location.href, { credentials: 'same-origin' })
+      .then(function(r) { return r.ok ? r.text() : null; })
+      .then(function(html) {
+        if (!html) return;
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(html, 'text/html');
+        var newPanel = doc.getElementById('avisosPanel');
+        if (newPanel) {
+          avisosPanel.innerHTML = newPanel.innerHTML;
+        }
+        // Actualizar badge de contador
+        var newBadge = doc.querySelector('.aviso-new-count, .summary-badge.aviso-badge');
+        var curBadge = document.querySelector('.aviso-new-count, .summary-badge.aviso-badge');
+        if (newBadge && curBadge) {
+          curBadge.textContent = newBadge.textContent;
+          curBadge.style.display = newBadge.style.display || '';
+        }
+      })
+      .catch(function() {});
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initPoll);
+  } else {
+    initPoll();
+  }
+})();
 </script>
 HTML;
 }
@@ -3715,9 +3942,12 @@ function publicista_render_production_params_fields($params) {
 function publicista_render_job_image_card($relativePath, $label) {
     $relativePath = trim((string)$relativePath);
     if ($relativePath === '') return;
+    $fsPath = BASE_PATH . '/' . ltrim($relativePath, '/');
+    $mtime = file_exists($fsPath) ? filemtime($fsPath) : 0;
+    $srcWithBust = $mtime > 0 ? $relativePath . '?t=' . $mtime : $relativePath;
     echo '<div class="publicista-preview-card">';
     echo '<div class="muted" style="margin-bottom:8px;">' . e($label) . '</div>';
-    echo '<img src="' . e($relativePath) . '" alt="' . e($label) . '" style="width:100%;max-width:340px;border-radius:12px;border:1px solid #e5e7eb;display:block;">';
+    echo '<img src="' . e($srcWithBust) . '" alt="' . e($label) . '" style="width:100%;max-width:340px;border-radius:12px;border:1px solid #e5e7eb;display:block;">';
     echo '<div class="muted small" style="margin-top:8px;word-break:break-all;">' . e($relativePath) . '</div>';
     echo '</div>';
 }
@@ -3965,6 +4195,7 @@ function render_sidebar($page) {
         'jostal' => 'Jostal',
         'lamami' => 'LaMami',
         'casawasap' => 'Casawasap',
+        'bot-casa' => 'Bot Casa',
         'gastos' => 'Gastos',
         'informes' => 'Informes',
         'avisos' => 'AvisosWasap',
@@ -3978,11 +4209,10 @@ function render_sidebar($page) {
     $lamamiPages = array('lamami', 'interesadas', 'clientas', 'lamamibot');
 
     echo '<aside id="appSidebar" class="sidebar">';
-    echo '<div class="brand brand-with-voice">';
-    echo '<a class="brand-home" href="index.php?page=dashboard">LaMami <span>CRM</span></a>';
+    echo '<div class="sidebar-top brand-with-voice">';
+    echo '<a class="sidebar-emblem" href="index.php?page=dashboard" title="Dashboard" aria-label="Ir al Dashboard"></a>';
     echo '<button type="button" id="voiceCommandToggleDesktop" class="brand-voice-btn" data-voice-command-toggle aria-expanded="false" aria-controls="voiceCommandPanel" aria-label="Abrir voz CRM" title="Abrir voz CRM">🎙</button>';
     echo '</div>';
-    echo '<div class="userbox">Hola, ' . e($name) . '</div>';
     echo '<nav class="nav">';
 
     foreach ($menu as $slug => $label) {
@@ -4016,6 +4246,14 @@ function dashboard_card($title, $value, $money = false) {
     echo '<div class="stat-label">' . e($title) . '</div>';
     echo '<div class="stat-value ' . ($money ? 'money' : '') . '">' . e($value) . '</div>';
     echo '</section>';
+}
+
+function render_bot_casa_page() {
+    page_header('Bot Casa', 'Panel de control del bot de WhatsApp');
+    $panelUrl = 'bot-casa/public/panel.php';
+    echo '<div class="panel panel-space" style="padding:0;overflow:hidden;border-radius:var(--radius-md)">';
+    echo '<iframe src="' . e($panelUrl) . '" style="width:100%;height:calc(100vh - 200px);border:none;display:block" title="Panel Bot Casa"></iframe>';
+    echo '</div>';
 }
 
 function render_dashboard_page() {
@@ -4070,6 +4308,10 @@ function render_dashboard_page() {
     $currentMonth = business_current_month_key();
 
     $dashboardMonth = request_get('dashboard_month', $currentMonth);
+    $dashboardDensity = request_get('dashboard_density', 'comfortable');
+    if (!in_array($dashboardDensity, array('comfortable', 'compact'), true)) {
+        $dashboardDensity = 'comfortable';
+    }
     $dashboardMonthOptions = get_dashboard_activity_months();
     if ($dashboardMonth !== 'all' && !in_array($dashboardMonth, $dashboardMonthOptions, true)) {
         $dashboardMonth = $currentMonth;
@@ -4308,9 +4550,20 @@ function render_dashboard_page() {
     $beneficioRealGlobal = $ingresosGlobales - $gastosTotal;
 
     $monthReal = array();
+    $monthIngresos = array();
     foreach ($monthKeys as $i => $k) {
-        $monthReal[] = ($monthIncomeLamami[$i] + $monthIncomeCasa[$i] + $monthIncomeJostal[$i]) - $monthExpenses[$i];
+        $ingresoMes = $monthIncomeLamami[$i] + $monthIncomeCasa[$i] + $monthIncomeJostal[$i];
+        $monthIngresos[] = $ingresoMes;
+        $monthReal[] = $ingresoMes - $monthExpenses[$i];
     }
+
+    // Dual Y-axis range for Beneficio real chart (15% padding, floor 100)
+    $realYMin = !empty($monthReal) ? min($monthReal) : 0;
+    $realYMax = !empty($monthReal) ? max($monthReal) : 0;
+    $realRange = $realYMax - $realYMin;
+    $realPadding = max($realRange * 0.15, 100);
+    $realYMin -= $realPadding;
+    $realYMax += $realPadding;
 
     $mixIncomeLamami = array_sum($monthIncomeLamami);
     $mixIncomeCasa = array_sum($monthIncomeCasa);
@@ -4427,6 +4680,61 @@ function render_dashboard_page() {
     $prevReal = isset($monthReal[$prevMonthIdx]) ? $monthReal[$prevMonthIdx] : 0;
     $deltaText = $prevReal != 0 ? round((($beneficioRealMes - $prevReal) / abs($prevReal)) * 100, 1) . '%' : 'N/A';
 
+    $prevIngresos = $monthIngresos[$prevMonthIdx] ?? 0;
+    $prevGastos = $monthExpenses[$prevMonthIdx] ?? 0;
+    $prevMov = ($monthOpsLamami[$prevMonthIdx] ?? 0) + ($monthOpsCasa[$prevMonthIdx] ?? 0) + ($monthOpsJostal[$prevMonthIdx] ?? 0) + ($monthOpsGastos[$prevMonthIdx] ?? 0);
+    $formatDelta = function ($current, $prev) {
+        if ((float)$prev === 0.0) {
+            return '—';
+        }
+        $pct = round((($current - $prev) / abs($prev)) * 100, 1);
+        $arrow = $pct > 0 ? '↑' : ($pct < 0 ? '↓' : '→');
+        return $arrow . ' ' . abs($pct) . '%';
+    };
+    $ingresosDelta = $formatDelta($ingresosMesGlobal, $prevIngresos);
+    $gastosDelta = $formatDelta($gastosMesGlobal, $prevGastos);
+    $beneficioDelta = $formatDelta($beneficioRealMes, $prevReal);
+    $movDelta = $formatDelta($movimientosMes, $prevMov);
+
+    $pendingLeads = $lamamiNuevas + $lamamiAtendidas;
+    $statusEmoji = '🟢';
+    $statusLabel = 'Ritmo sólido';
+    if ($beneficioRealMes < 0 || $pendingLeads > 20) {
+        $statusEmoji = '🔴';
+        $statusLabel = 'Atención prioritaria';
+    } elseif ($beneficioRealMes < ($ingresosMesGlobal * 0.2) || $pendingLeads > 12) {
+        $statusEmoji = '🟡';
+        $statusLabel = 'Vigilar hoy';
+    }
+
+    $autoTips = array();
+    if ($dashboardLamamiConvertidas < $dashboardLamamiAtendidas) {
+        $autoTips[] = '💡 Sugerencia: hay margen de cierre en LaMami; revisa seguimientos de atendidas primero.';
+    }
+    if ($gastosMesGlobal > 0 && $ingresosMesGlobal > 0 && ($gastosMesGlobal / max(1, $ingresosMesGlobal)) > 0.45) {
+        $autoTips[] = '⚠️ Consejo: los gastos del periodo superan el 45% de ingresos. Conviene revisar partidas grandes.';
+    }
+    if ($dashboardBotsOn < $dashboardBotsTotal) {
+        $autoTips[] = '🤖 Curiosidad operativa: activar todos los bots puede subir velocidad de respuesta comercial.';
+    }
+    if (empty($autoTips)) {
+        $autoTips[] = '✨ Buen trabajo: balance y actividad estables. Mantén foco en cierres del top canal.';
+    }
+
+    $autoAlerts = array();
+    if ($beneficioRealMes < 0) {
+        $autoAlerts[] = '🚨 El beneficio real del periodo es negativo.';
+    }
+    if ($pendingLeads > 15) {
+        $autoAlerts[] = '📬 Hay ' . $pendingLeads . ' leads pendientes en LaMami.';
+    }
+    if ($dashboardJostalVentasCount === 0 && $dashboardMonth !== 'all') {
+        $autoAlerts[] = '🛍️ Jostal no registra ventas en el periodo seleccionado.';
+    }
+
+    $curiosityText = '🧠 ¿Sabías que? La rama más fuerte ahora es ' . $topBranch . ' y tu mejor mes reciente fue ' . $bestRealLabel . '.';
+
+    echo '<div class="brand" style="margin-bottom:4px;font-size:28px;">LaMami <span>CRM</span></div>';
     page_header('Dashboard', 'Vista de pájaro del negocio completo');
     render_dashboard_external_bot_panel();
 
@@ -4440,18 +4748,60 @@ function render_dashboard_page() {
         echo '<option value="' . e($m) . '"' . $sel . '>' . e(date('m/Y', strtotime($m . '-01'))) . '</option>';
     }
     echo '</select></div>';
+    echo '<div class="field"><label>Vista</label><select name="dashboard_density">';
+    echo '<option value="comfortable"' . ($dashboardDensity === 'comfortable' ? ' selected' : '') . '>Normal</option>';
+    echo '<option value="compact"' . ($dashboardDensity === 'compact' ? ' selected' : '') . '>Ejecutiva compacta</option>';
+    echo '</select></div>';
     echo '<div class="field field-btn"><label>&nbsp;</label><button class="btn-primary">Aplicar</button></div>';
     echo '</form>';
     echo '</section>';
 
-    echo '<div class="cards four">';
-    dashboard_card('Ingresos · ' . $dashboardMonthLabel, euro($ingresosMesGlobal), true);
-    dashboard_card('Gastos · ' . $dashboardMonthLabel, euro($gastosMesGlobal), true);
-    dashboard_card('Beneficio real · ' . $dashboardMonthLabel, euro($beneficioRealMes), true);
-    dashboard_card('Movimientos · ' . $dashboardMonthLabel, $movimientosMes);
+    echo '<div class="db-dashboard' . ($dashboardDensity === 'compact' ? ' db-density-compact' : '') . '">';
+
+    echo '<section class="panel db-hero db-section">';
+    echo '<div class="db-hero-bg"></div>';
+    echo '<div class="db-hero-top">';
+    echo '<div><div class="db-kicker">Dashboard inteligente</div><h2>🚀 Centro de control del negocio</h2><p class="muted">Todo lo importante en una sola vista: resultados, actividad, alertas y recomendaciones automáticas.</p></div>';
+    echo '<div class="db-health-pill">' . e($statusEmoji) . ' ' . e($statusLabel) . '</div>';
+    echo '</div>';
+    echo '<div class="db-chip-row">';
+    echo '<span class="db-chip db-chip-cyan">📍 Periodo: ' . e($dashboardMonthLabel) . '</span>';
+    echo '<span class="db-chip db-chip-green">💶 Beneficio: ' . e(euro($beneficioRealMes)) . '</span>';
+    echo '<span class="db-chip db-chip-amber">📈 Variación: ' . e($deltaText) . '</span>';
+    echo '<span class="db-chip db-chip-pink">🤖 Bots: ' . e($dashboardBotsOn . '/' . $dashboardBotsTotal) . '</span>';
+    echo '</div>';
+    echo '</section>';
+
+    echo '<div class="db-kpi-visual-grid db-section db-section--kpi">';
+    echo '<section class="panel db-kpi-card db-kpi-cyan"><div class="db-kpi-head"><span>💰 Ingresos</span><small>' . e($dashboardMonthLabel) . '</small></div><div class="db-kpi-value">' . e(euro($ingresosMesGlobal)) . '</div><div class="db-kpi-delta">' . e($ingresosDelta) . ' vs periodo anterior</div></section>';
+    echo '<section class="panel db-kpi-card db-kpi-red"><div class="db-kpi-head"><span>🧾 Gastos</span><small>' . e($dashboardMonthLabel) . '</small></div><div class="db-kpi-value">' . e(euro($gastosMesGlobal)) . '</div><div class="db-kpi-delta">' . e($gastosDelta) . ' vs periodo anterior</div></section>';
+    echo '<section class="panel db-kpi-card db-kpi-gold"><div class="db-kpi-head"><span>🏆 Beneficio real</span><small>' . e($dashboardMonthLabel) . '</small></div><div class="db-kpi-value">' . e(euro($beneficioRealMes)) . '</div><div class="db-kpi-delta">' . e($beneficioDelta) . ' vs periodo anterior</div></section>';
+    echo '<section class="panel db-kpi-card db-kpi-purple"><div class="db-kpi-head"><span>⚙️ Movimientos</span><small>Actividad</small></div><div class="db-kpi-value">' . e($movimientosMes) . '</div><div class="db-kpi-delta">' . e($movDelta) . ' vs periodo anterior</div></section>';
     echo '</div>';
 
     echo '<div class="dashboard-note">Los gastos son globales para todo el negocio y solo se restan en el beneficio real global.</div>';
+
+    echo '<div class="cards two db-section db-section--alerts">';
+    echo '<section class="panel db-insights-auto">';
+    echo '<div class="branch-panel-head"><h2>🧭 Insights automáticos</h2><span class="summary-badge">LIVE</span></div>';
+    if (empty($autoAlerts)) {
+        echo '<div class="db-alert db-alert-ok">✅ Sin alertas críticas ahora mismo.</div>';
+    } else {
+        foreach ($autoAlerts as $alertItem) {
+            $isCriticalAlert = (strpos($alertItem, '🚨') !== false);
+            echo '<div class="db-alert db-alert-warn' . ($isCriticalAlert ? ' is-critical' : '') . '">' . e($alertItem) . '</div>';
+        }
+    }
+    echo '<div class="db-tip">' . e($curiosityText) . '</div>';
+    echo '</section>';
+
+    echo '<section class="panel db-insights-auto">';
+    echo '<div class="branch-panel-head"><h2>📝 Tips y anotaciones automáticas</h2><span class="summary-badge">Auto</span></div>';
+    foreach ($autoTips as $tipItem) {
+        echo '<div class="db-tip">' . e($tipItem) . '</div>';
+    }
+    echo '</section>';
+    echo '</div>';
 
    
     echo '<div class="cards three">';
@@ -4496,19 +4846,24 @@ function render_dashboard_page() {
 
 
 
-    echo '<div class="cards one dashboard-main-chart-row">';
-    echo '<section class="panel">';
-    echo '<div class="branch-panel-head"><h2>Ingresos, gastos y beneficio real</h2><span class="summary-badge">12 meses</span></div>';
+    echo '<div class="cards one dashboard-main-chart-row db-section">';
+    echo '<section class="panel db-main-chart-panel">';
+    echo '<div class="branch-panel-head"><h2>🌈 Evolución financiera · Ingresos, gastos y beneficio real</h2><span class="summary-badge">12 meses</span></div>';
+    echo '<div class="db-series-chips"><span class="db-series-chip db-series-income">Ingresos</span><span class="db-series-chip db-series-expense">Gastos</span><span class="db-series-chip db-series-profit">Beneficio real</span></div>';
+    echo '<div class="db-chart-notes"><div>📌 Mejor mes de beneficio: <strong>' . e($bestRealLabel) . '</strong></div><div>🏁 Rama líder actual: <strong>' . e($topBranch) . '</strong></div><div>🧮 Beneficio global: <strong>' . e(euro($beneficioRealGlobal)) . '</strong></div></div>';
     echo '<div class="chart-box chart-box-xl"><canvas id="chartRealGlobal12"></canvas></div>';
     echo '</section>';
     echo '</div>';
 
-    echo '<div class="cards four">';
-    echo '<section class="panel"><h2>Ingresos por rama (12 meses)</h2><div class="chart-box"><canvas id="chartIncomeByBranch12"></canvas></div></section>';
-    echo '<section class="panel"><h2>Peso actual del negocio</h2><div class="chart-box"><canvas id="chartBusinessMix12"></canvas></div></section>';
-    echo '<section class="panel"><h2>Actividad por rama (12 meses)</h2><div class="chart-box"><canvas id="chartOps12"></canvas></div></section>';
-    echo '<section class="panel dashboard-mini-panel">';
-    echo '<div class="branch-panel-head"><h2>Estado operativo</h2><span class="summary-badge">Ahora</span></div>';
+    echo '<div class="cards three db-lower-charts db-section">';
+    echo '<section class="panel db-glow-panel"><h2>💎 Ingresos por rama (12 meses)</h2><div class="chart-box"><canvas id="chartIncomeByBranch12"></canvas></div></section>';
+    echo '<section class="panel db-glow-panel"><h2>🧲 Peso actual del negocio</h2><div class="chart-box"><canvas id="chartBusinessMix12"></canvas></div></section>';
+    echo '<section class="panel db-glow-panel"><h2>⚡ Actividad por rama (12 meses)</h2><div class="chart-box"><canvas id="chartOps12"></canvas></div></section>';
+    echo '</div>';
+
+    echo '<div class="cards two db-insights-row db-section">';
+    echo '<section class="panel dashboard-mini-panel db-glow-panel">';
+    echo '<div class="branch-panel-head"><h2>🛡️ Estado operativo</h2><span class="summary-badge">Ahora</span></div>';
     echo '<div class="dashboard-mini-grid">';
     echo '<div><strong>Bots encendidos</strong><span>' . e($dashboardBotsOn . ' / ' . $dashboardBotsTotal) . '</span></div>';
     echo '<div><strong>LamamiBot</strong><span>' . e($dashboardLamamibotOn ? 'Encendido' : 'Apagado') . '</span></div>';
@@ -4518,10 +4873,21 @@ function render_dashboard_page() {
     echo '<div><strong>Leads pendientes</strong><span>' . e($lamamiNuevas + $lamamiAtendidas) . '</span></div>';
     echo '</div>';
     echo '</section>';
+
+    echo '<section class="panel db-glow-panel">';
+    echo '<div class="branch-panel-head"><h2>🎯 Hallazgos clave</h2><span class="summary-badge">Auto</span></div>';
+    echo '<ul class="insight-list">';
+    echo '<li>La rama que más factura este mes es <strong>' . e($topBranch) . '</strong>.</li>';
+    echo '<li>El mejor mes de beneficio real del último año ha sido <strong>' . e($bestRealLabel) . '</strong>.</li>';
+    echo '<li>Beneficio real global acumulado: <strong>' . e(euro($beneficioRealGlobal)) . '</strong>.</li>';
+    echo '<li>Variación del beneficio real del mes respecto al mes anterior: <strong>' . e($deltaText) . '</strong>.</li>';
+    echo '<li>Movimientos de gasto registrados este mes: <strong>' . e($gastosMes) . '</strong>.</li>';
+    echo '</ul>';
+    echo '</section>';
     echo '</div>';
 
-    echo '<div class="cards two">';
-    echo '<section class="panel">';
+    echo '<div class="cards two db-bottom-row db-section">';
+    echo '<section class="panel db-glow-panel">';
     echo '<div class="branch-panel-head"><h2>Actividad reciente</h2><span class="summary-badge">' . e(count($recent)) . ' items</span></div>';
     echo '<div class="activity-list">';
     if (empty($recent)) {
@@ -4545,18 +4911,14 @@ function render_dashboard_page() {
         }
     }
     echo '</div>';
+    echo '</div>';
     echo '</section>';
 
-    echo '<section class="panel">';
-    echo '<div class="branch-panel-head"><h2>Insights rápidos</h2><span class="summary-badge">12 meses</span></div>';
-    echo '<ul class="insight-list">';
-    echo '<li>La rama que más factura este mes es <strong>' . e($topBranch) . '</strong>.</li>';
-    echo '<li>El mejor mes de beneficio real del último año ha sido <strong>' . e($bestRealLabel) . '</strong>.</li>';
-    echo '<li>Beneficio real global acumulado: <strong>' . e(euro($beneficioRealGlobal)) . '</strong>.</li>';
-    echo '<li>Variación del beneficio real del mes respecto al mes anterior: <strong>' . e($deltaText) . '</strong>.</li>';
-    echo '<li>Leads pendientes de trabajar en LaMami: <strong>' . e($lamamiNuevas + $lamamiAtendidas) . '</strong>.</li>';
-    echo '<li>Movimientos de gasto registrados este mes: <strong>' . e($gastosMes) . '</strong>.</li>';
-    echo '</ul>';
+    echo '<section class="panel db-glow-panel">';
+    echo '<div class="branch-panel-head"><h2>✨ Sugerencias accionables</h2><span class="summary-badge">Smart</span></div>';
+    echo '<div class="db-tip">📞 Leads pendientes de trabajar en LaMami: <strong>' . e($pendingLeads) . '</strong>. Prioriza hoy los más recientes.</div>';
+    echo '<div class="db-tip">🧪 Si ' . e($topBranch) . ' lidera, replica su mensaje/canal en la rama con menor actividad.</div>';
+    echo '<div class="db-tip">⏱️ Revisión rápida: compara los dos últimos meses para ajustar inversión y seguimiento.</div>';
     echo '</section>';
     echo '</div>';
 
@@ -4565,22 +4927,25 @@ function render_dashboard_page() {
     echo '{label:"LaMami",data:' . json_encode($monthIncomeLamami) . '},';
     echo '{label:"Casawasap",data:' . json_encode($monthIncomeCasa) . '},';
     echo '{label:"Jostal",data:' . json_encode($monthIncomeJostal) . '}';
-    echo ']},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}}}});';
+    echo ']},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:function(c){return c.dataset.label+": "+c.parsed.y.toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";}}}}}});';
 
-    echo 'new Chart(document.getElementById("chartRealGlobal12"), {type:"line",data:{labels:' . json_encode($monthLabels) . ',datasets:[';
-    echo '{label:"Ingresos",data:' . json_encode(array_map(function ($i) use ($monthIncomeLamami, $monthIncomeCasa, $monthIncomeJostal) { return $monthIncomeLamami[$i] + $monthIncomeCasa[$i] + $monthIncomeJostal[$i]; }, array_keys($monthLabels))) . '},';
-    echo '{label:"Gastos",data:' . json_encode($monthExpenses) . '},';
-    echo '{label:"Beneficio real",data:' . json_encode($monthReal) . '}';
-    echo ']},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}}}});';
+    // --- chartRealGlobal12: Ingresos, gastos y beneficio real (dual axis + crosshair + zero-line) ---
+    echo 'new Chart(document.getElementById("chartRealGlobal12"),{type:"line",data:{labels:' . json_encode($monthLabels) . ',datasets:[';
+    echo '{label:"Ingresos",data:' . json_encode($monthIngresos) . ',borderColor:"#22c55e",backgroundColor:"rgba(34,197,94,0.06)",borderWidth:2.5,tension:0.4,fill:true,pointRadius:3,pointHoverRadius:7,pointBackgroundColor:"#22c55e",pointBorderColor:"#22c55e",yAxisID:"y",order:2},';
+    echo '{label:"Gastos",data:' . json_encode($monthExpenses) . ',borderColor:"#ef4444",backgroundColor:"rgba(239,68,68,0.06)",borderWidth:2.5,tension:0.4,fill:true,pointRadius:3,pointHoverRadius:7,pointBackgroundColor:"#ef4444",pointBorderColor:"#ef4444",yAxisID:"y",order:2},';
+    echo '{label:"Beneficio real",data:' . json_encode($monthReal) . ',borderColor:"#f59e0b",backgroundColor:"rgba(245,158,11,0.06)",borderWidth:3,tension:0.4,fill:true,pointRadius:function(c){return c.dataIndex===c.dataset.data.length-1?7:3;},pointHoverRadius:9,pointBackgroundColor:function(c){return c.dataIndex===c.dataset.data.length-1?"#f59e0b":"transparent";},pointBorderColor:"#f59e0b",pointBorderWidth:function(c){return c.dataIndex===c.dataset.data.length-1?3:1;},pointHoverBorderWidth:3,pointHoverBorderColor:"#fef3c7",pointHoverBackgroundColor:"#060c16",yAxisID:"yBeneficio",order:1}';
+    echo ']},options:{responsive:true,maintainAspectRatio:false,animation:{duration:800,easing:"easeOutQuart"},interaction:{mode:"index",intersect:false},';
+    echo 'scales:{x:{grid:{display:false},ticks:{color:"#94a3b8",font:{size:11},maxRotation:30}},y:{position:"left",beginAtZero:true,grid:{color:"rgba(148,163,184,0.1)",lineWidth:1,drawBorder:false},ticks:{color:"#94a3b8",font:{size:11},callback:function(v){return v.toLocaleString("es-ES",{minimumFractionDigits:0,maximumFractionDigits:0})+" €";}}},yBeneficio:{position:"right",min:' . json_encode($realYMin) . ',max:' . json_encode($realYMax) . ',grid:{drawOnChartArea:false,drawBorder:false},ticks:{color:"#f59e0b",font:{size:11},callback:function(v){return v.toLocaleString("es-ES",{minimumFractionDigits:0,maximumFractionDigits:0})+" €";}}}},';
+    echo 'plugins:{legend:{position:"bottom",labels:{color:"#cbd5e1",padding:16,usePointStyle:true,pointStyleWidth:10,font:{size:12}}},tooltip:{backgroundColor:"rgba(6,12,22,0.95)",titleColor:"#94a3b8",bodyColor:"#edf2f7",borderColor:"rgba(148,163,184,0.15)",borderWidth:1,padding:{x:14,y:10},cornerRadius:8,displayColors:true,boxPadding:4,titleFont:{size:12,weight:"bold"},bodyFont:{size:12},callbacks:{label:function(c){var v=c.parsed.y,s=v<0?"-":"",a=Math.abs(v),p=a.toFixed(2).split(".");p[0]=p[0].replace(/\B(?=(\d{3})+(?!\d))/g,".");return c.dataset.label+": "+s+p[0]+","+p[1]+" €";}}}}},plugins:[{id:"beneficioZeroLine",beforeDraw:function(chart){var ctx=chart.ctx,a=chart.chartArea,s=chart.scales.yBeneficio;if(!s)return;var y=s.getPixelForValue(0);if(y<a.top||y>a.bottom)return;ctx.save();ctx.strokeStyle="rgba(245,158,11,0.20)";ctx.lineWidth=1.5;ctx.setLineDash([4,6]);ctx.beginPath();ctx.moveTo(a.left,y);ctx.lineTo(a.right,y);ctx.stroke();ctx.restore();}}]});';
 
-    echo 'new Chart(document.getElementById("chartBusinessMix12"), {type:"doughnut",data:{labels:["LaMami","Casawasap","Jostal"],datasets:[{data:' . json_encode(array($mixIncomeLamami, $mixIncomeCasa, $mixIncomeJostal)) . '}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}}}});';
+    echo 'new Chart(document.getElementById("chartBusinessMix12"), {type:"doughnut",data:{labels:["LaMami","Casawasap","Jostal"],datasets:[{data:' . json_encode(array($mixIncomeLamami, $mixIncomeCasa, $mixIncomeJostal)) . '}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:function(c){var t=c.dataset.data.reduce(function(a,b){return a+b;},0),p=t>0?Math.round(c.parsed/t*100):0;return c.label+": "+c.parsed.toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" € ("+p+"%)";}}}}}});';
 
     echo 'new Chart(document.getElementById("chartOps12"), {type:"bar",data:{labels:' . json_encode($monthLabels) . ',datasets:[';
     echo '{label:"LaMami",data:' . json_encode($monthOpsLamami) . '},';
     echo '{label:"Casawasap",data:' . json_encode($monthOpsCasa) . '},';
     echo '{label:"Jostal",data:' . json_encode($monthOpsJostal) . '},';
     echo '{label:"Gastos",data:' . json_encode($monthOpsGastos) . '}';
-    echo ']},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}}}});';
+    echo ']},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:function(c){return c.dataset.label+": "+c.parsed.y.toLocaleString("es-ES");}}}}}});';
     echo '</script>';
 }
 
@@ -4997,6 +5362,7 @@ function render_dashboard_external_bot_panel() {
     echo '<input type="hidden" name="redirect" value="index.php?page=dashboard">';
     echo '<button class="' . e($toggleClass) . '">' . e($toggleLabel) . '</button>';
     echo '</form>';
+    echo '<a class="btn-panel-link" href="index.php?page=bot-casa">Panel Bot Casa</a>';
     if ($girlsUrl !== '') {
         echo '<a class="btn-panel-link" href="' . e($girlsUrl) . '" target="_blank" rel="noopener noreferrer">Abrir panel chicas</a>';
     }
@@ -7611,6 +7977,8 @@ if ($tab === 'clientas') {
         echo '<input type="hidden" name="source_interesada_id" value="' . e($isNew ? ($newFromInteresada['id'] ?? '') : ($edit['source_interesada_id'] ?? '')) . '">';
         field_input('nombre', 'Nombre', $edit['nombre'] ?? '', true);
         field_input('telefono', 'Teléfono', $edit['telefono'] ?? ($newFromInteresada['telefono'] ?? ''), true);
+        field_input('nombre_real', 'Nombre real', $edit['nombre_real'] ?? '', false);
+        field_input('dni', 'DNI/NIE/Pasaporte', $edit['dni'] ?? '', false);
 
         echo '<div class="field">';
         echo '<label>Modo</label>';
@@ -7740,6 +8108,68 @@ if ($tab === 'clientas') {
                 echo '</tbody></table></div>';
             }
 
+            // --- CONTRATO SECTION ---
+            echo '<hr class="sep">';
+            echo '<h2>Contrato de uso de habitación</h2>';
+
+            $contrato = contrato_find_by_clienta($edit['id']);
+
+            if (!$contrato) {
+                echo '<div class="contrato-section contrato-empty">';
+                echo '<div class="contrato-empty-icon">📄</div>';
+                echo '<p><strong>Esta clienta no tiene contrato.</strong></p>';
+                echo '<p>El contrato es necesario para dejar claras las condiciones de ocupación, pago y convivencia.</p>';
+                echo '<form method="post" class="inline-form">';
+                echo '<input type="hidden" name="action" value="save_jostal_contrato">';
+                echo '<input type="hidden" name="clienta_id" value="' . e($edit['id']) . '">';
+                echo '<input type="hidden" name="ocupante_nombre_real" value="' . e($edit['nombre_real'] ?? $edit['nombre'] ?? '') . '">';
+                echo '<input type="hidden" name="ocupante_dni" value="' . e($edit['dni'] ?? '') . '">';
+                echo '<input type="hidden" name="ocupante_telefono" value="' . e($edit['telefono'] ?? '') . '">';
+                echo '<button class="btn-primary">Crear contrato</button>';
+                echo '</form>';
+                echo '</div>';
+            } else {
+                $estadoLabel = ($contrato['estado'] === 'firmado') ? '✅ Firmado' : (($contrato['estado'] === 'enviado') ? '📤 Enviado' : '📝 Borrador');
+                echo '<div class="contrato-section contrato-exists">';
+                echo '<div class="contrato-header">';
+                echo '<span class="contrato-badge contrato-badge--' . e($contrato['estado']) . '">' . $estadoLabel . '</span>';
+                if ($contrato['estado'] !== 'borrador') {
+                    $urlFirma = contrato_generar_url_firma($contrato);
+                    echo '<div class="contrato-actions">';
+                    echo '<button type="button" class="btn-wa-mini" onclick="window.open(\'https://wa.me/?text=\' + encodeURIComponent(\'Firma tu contrato: ' . e($urlFirma) . '\'), \'_blank\')">📱 WhatsApp</button>';
+                    echo '<button type="button" class="btn-secondary-mini" onclick="copyToClipboard(\'' . e($urlFirma) . '\');showToast(\'Enlace copiado\',\'ok\')">📋 Copiar enlace</button>';
+                    echo '</div>';
+                }
+                echo '</div>';
+                echo '<form method="post" class="form-grid contrato-form">';
+                echo '<input type="hidden" name="action" value="save_jostal_contrato">';
+                echo '<input type="hidden" name="clienta_id" value="' . e($edit['id']) . '">';
+                echo '<div class="field"><strong>Datos del titular (Josué):</strong></div>';
+                field_input('arrendadora_nombre', 'Nombre', $contrato['datos_arrendadora']['nombre'] ?? 'Josué', true);
+                field_input('arrendadora_dni', 'DNI', $contrato['datos_arrendadora']['dni'] ?? '', false);
+                field_input('arrendadora_telefono', 'Teléfono', $contrato['datos_arrendadora']['telefono'] ?? '', false);
+                field_input('arrendadora_domicilio', 'Domicilio', $contrato['datos_arrendadora']['domicilio'] ?? '', false);
+                echo '<div class="field"><strong>Datos de la ocupante:</strong></div>';
+                field_input('ocupante_nombre_real', 'Nombre real', $contrato['datos_ocupante']['nombre_real'] ?? ($edit['nombre_real'] ?? $edit['nombre'] ?? ''), true);
+                field_input('ocupante_dni', 'DNI/NIE/Pasaporte', $contrato['datos_ocupante']['dni'] ?? ($edit['dni'] ?? ''), false);
+                field_input('ocupante_telefono', 'Teléfono', $contrato['datos_ocupante']['telefono'] ?? ($edit['telefono'] ?? ''), false);
+                echo '<div class="field"><strong>Habitación:</strong></div>';
+                field_input('habitacion_plaza', 'Habitación o plaza', $contrato['habitacion_plaza'] ?? '', true);
+                field_input('direccion_inmueble', 'Dirección del inmueble', $contrato['direccion_inmueble'] ?? '', false);
+                echo '<div class="field"><strong>Precio:</strong></div>';
+                field_input('precio_semanal', 'Precio semanal (€)', $contrato['precio_semanal'] ?? '', true);
+                field_input('fianza', 'Fianza (€)', $contrato['fianza'] ?? '', true);
+                echo '<div class="field"><strong>Contenido de la habitación:</strong></div>';
+                $contenidoTxt = is_array($contrato['contenido_habitacion'] ?? null) ? implode("\n", $contrato['contenido_habitacion']) : '';
+                field_textarea('contenido_habitacion', 'Una línea por cada item (ej: 3 sábanas, 2 toallas, 1 mando TV...)', $contenidoTxt, 6);
+                echo '<div class="full"><button class="btn-primary">Guardar contrato</button></div>';
+                echo '</form>';
+                echo '<div class="contrato-fechas">';
+                echo '<small>📅 Vigencia: ' . e($contrato['fecha_inicio'] ?? '—') . ' hasta ' . e($contrato['fecha_fin'] ?? '—') . ' (15 días, se renueva automáticamente)</small>';
+                echo '</div>';
+                echo '</div>';
+            }
+
             echo '<hr class="sep">';
             echo '<h2>LEADS</h2>';
 
@@ -7849,13 +8279,18 @@ if ($tab === 'clientas') {
                         ? mb_strtolower($rawSearchText, 'UTF-8')
                         : strtolower($rawSearchText);
 
-                    echo '<tr data-filter-text="' . e($searchText) . '">';
+                    $sinContrato = jostal_clienta_en_casa($row) && !contrato_clienta_tiene_contrato_firmado($row['id']);
+                    echo '<tr data-filter-text="' . e($searchText) . '" class="' . ($sinContrato ? 'row-warning' : '') . '">';
                     echo '<td><strong>' . e($row['nombre'] ?? '') . '</strong></td>';
                     echo '<td>'; crm_render_phone_value((string)($row['telefono'] ?? '')); echo '</td>';
                     echo '<td>' . e($row['modo'] ?? '') . '</td>';
                     echo '<td>' . e(jostal_clienta_en_casa($row) ? 'En casa' : 'Fuera') . '</td>';
                     echo '<td>' . e($row['observaciones'] ?? '') . '</td>';
-                    echo '<td><a class="mini-link" href="index.php?page=jostal&tab=clientas&edit=' . e($row['id']) . '">Abrir ficha</a></td>';
+                    echo '<td>';
+                    if ($sinContrato) {
+                        echo '<span class="contrato-badge contrato-badge--warning" title="Sin contrato firmado">⚠ Sin contrato</span> ';
+                    }
+                    echo '<a class="mini-link" href="index.php?page=jostal&tab=clientas&edit=' . e($row['id']) . '">Abrir ficha</a></td>';
                     echo '</tr>';
                 }
                 echo '</tbody></table></div>';

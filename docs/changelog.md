@@ -1,6 +1,55 @@
 # Changelog
 
-## 2026-05-22 · Fase 2 — Fix Comercial-procesos toggle encender/apagar
+## 2026-05-22 · Fase 3 — Publicista-perfiles: reintentos Pollo.ai y error desconocido
+
+### Problemas abordados
+- **Publicista → Perfiles → Regenerar candidata**: a veces fallaba con "Error desconocido" sin posibilidad de depuración.
+- Los reintentos automáticos (3 con tiempos de 15/45/90s) eran insuficientes para la saturación intermitente de Pollo.ai.
+- El mensaje de error mostrado al usuario era genérico y no diferenciaba entre error de API desconocido y error de saturación.
+
+### Causa raíz identificada
+Pollo.ai devuelve `status=failed` con `failReason=null` cuando su servidor está saturado o hay un fallo transitorio interno. La función `publicista_pollo_poll_generation()` no logueaba el JSON de respuesta en ese caso, dificultando el diagnóstico. El worker Python (`pollo_image_worker.py`) tenía solo 3 polls de gracia (12s) antes de lanzar el error definitivo.
+
+### Cambios implementados
+
+#### `app/publicista.php`
+1. **`publicista_regenerate_candidate()`**: `$maxRetries` default `3 → 5`, backoff `[15,45,90] → [30,60,120,180,300]` segundos.
+   - Tiempo total de backoff: 150s → 690s (+360%), con 2 reintentos adicionales.
+2. **`publicista_pollo_poll_generation()`**: cuando `failReason=null` y `error=null`, se loguea el JSON completo de la respuesta de Pollo (hasta 500 chars) mediante `bootstrap_runtime_log()` para diagnóstico futuro, antes de devolver `'desconocido'`.
+
+#### `tools/pollo_image_worker.py`
+3. **`UNKNOWN_FAILURE_GRACE_POLLS`**: `3 → 6` (tolerancia al flapping de Pollo.ai: 6 polls × 4s = 24s de gracia antes de lanzar el error, el doble que antes).
+
+#### `app/views.php`
+4. **Mensaje de error al usuario**: diferencia ahora entre:
+   - Error `desconocido` (saturación/cuenta): mensaje explicativo con tiempo de espera de 3-5 min.
+   - Error con razón conocida (cuenta ocupada): mensaje de espera genérico.
+   - Timeout: mensaje específico de tiempo agotado.
+   - El div de error persiste 30s en pantalla (antes 20s) para que el usuario lo vea.
+
+### Tabla resumen de cambios
+
+| Parámetro | Antes | Después |
+|---|---|---|
+| `maxRetries` | 3 | 5 |
+| Backoff total | 150s (2.5 min) | 690s (11.5 min) |
+| Grace polls Python | 3 (12s) | 6 (24s) |
+| Log JSON Pollo fail | No | Sí (bootstrap_runtime_log) |
+| Duración error en UI | 20s | 30s |
+
+### Archivos modificados
+- `app/publicista.php`
+- `tools/pollo_image_worker.py`
+- `app/views.php`
+
+### Tests ejecutados
+- Lint PHP: `publicista.php`, `views.php`, `actions.php` → OK
+- Lint Python: `pollo_image_worker.py` → OK
+- Simulación PHP del bucle de reintentos con backoff → OK
+
+---
+
+
 
 ### Bug corregido
 - **Comercial → Procesos**: el botón "Apagar" no cambiaba el estado cuando el proceso era el último activo. El usuario recibía un flash `OK` falso aunque el proceso seguía encendido.
