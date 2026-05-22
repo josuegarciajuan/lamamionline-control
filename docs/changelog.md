@@ -1,5 +1,34 @@
 # Changelog
 
+## 2026-05-22 · QA-VALIDACION — Validación integral y cierre del proyecto (Fase 5)
+
+### Resultados de validación
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| PHP Lint | ✅ 14/14 | Todos los archivos del pipeline + panel sin errores de sintaxis |
+| JSON Validation | ✅ | dist (17 keys) + local (20 keys), 10/10 secciones paridad idéntica |
+| Prompt Assembly | ✅ | 14233 chars, 0 tags sin reemplazar, 10/10 headers |
+| Content Checks | ✅ 20/20 | Todas las mejoras del prompt verificadas en el ensamblado |
+| Panel | ✅ 22/23 | 1 falso negativo (campos dinámicos con $sk), CSRF protegido |
+| ToneBuilder Retrocompat | ✅ 20/20 | 4 directivas NOVA + 16 preexistentes funcionando |
+| Seguridad | ✅ | 0 secretos, 0 inyección, template injection inofensivo (LLM prompt) |
+| Git | ✅ | 7 archivos committeados, config.local.json gitignored |
+
+### Resumen del proyecto (5 fases)
+
+| Fase | Commits | Archivos |
+|---|---|---|
+| ORION-CORE | `206750e` | config.dist.json, Bot.php |
+| NOVA-PROMPT | `a02d0f6` | config.dist.json (+10 secciones mejoradas) |
+| ORION-UI | `5fd6be1` | panel.php (+229 líneas) |
+| NOVA-TONEBUILDER | `057e5ff` | ToneBuilder.php, ContextAssembler.php, config |
+| QA-VALIDACION | *(este commit)* | docs/changelog.md, spec/tasks.md |
+
+**Total: 7 archivos modificados, 5 commits, 0 regresiones, 0 hallazgos de seguridad.**
+
+---
+
 ## 2026-05-22 · NOVA-TONEBUILDER — Ajustes en ToneBuilder + ContextAssembler (Fase 4)
 
 ### Objetivo

@@ -40,9 +40,16 @@
 - [x] T4.5 — ContextAssembler: nuevos flags eta_from_user_minutes, choose_loop_count, info_pack_ready, is_image_sent_by_user.
 - [x] Config: eta_request_variants en message_variants.
 
-### QA-VALIDACION — FASE 5: Validación integral (pendiente)
+### QA-VALIDACION — FASE 5: Validación integral
 
-- [ ] T5.1–T5.6 — Lint, JSON, prompt assembly, panel, retrocompatibilidad.
+- [x] T5.1 — PHP Lint: 14/14 archivos OK (Bot.php, Config.php, ContextAssembler, ToneBuilder, panel.php, +9 pipeline files).
+- [x] T5.2 — JSON Validation: dist (17 keys) + local (20 keys) OK. 10/10 secciones con paridad idéntica dist↔local.
+- [x] T5.3 — Prompt Assembly: 14233 chars, 0 tags sin reemplazar, 10/10 headers, 20/20 content checks.
+- [x] T5.4 — Panel: 22/23 checks (1 false negative), CSRF protegido, estructura 2 columnas + preview + accordion.
+- [x] T5.5 — ToneBuilder retrocompatibilidad: 20/20 tests (4 nuevas directivas + 16 preexistentes OK).
+- [x] T5.6 — Git: 7 archivos committeados en 4 fases, config.local.json gitignored, sin fugas.
+
+**CIERRE TOTAL DEL PROYECTO BOT-CASA — todas las fases completadas.**
 
 ---
 
