@@ -1,5 +1,40 @@
 # Changelog
 
+## 2026-05-22 · ORION-UI — Panel de administración del prompt parametrizado (Fase 3)
+
+### Objetivo
+Rediseñar el Tab 2 (System Prompt) del panel de administración para soportar
+la edición por secciones del prompt parametrizado, con preview en tiempo real.
+
+### Cambios implementados
+- **Layout 2 columnas**: izquierda (60%) = formulario editable, derecha (40%) = preview sticky.
+- **Template editable**: textarea para `prompt.template` con chips clickables `[seccion]`
+  que insertan la etiqueta en el cursor. Los chips se muestran con borde discontinuo
+  si la sección no tiene contenido.
+- **Accordion de 10 secciones**: elementos `<details>` nativos HTML, ordenados por
+  frecuencia de edición (tarifas, ubicacion primero). Cada uno muestra el nombre
+  de la sección + badge con longitud en chars.
+- **Preview en tiempo real**: JavaScript vanilla (`rebuildPreview()`) disparado en cada
+  `oninput`. Muestra el prompt ensamblado en `<pre>` con fondo oscuro monospace.
+  Línea de stats con chars totales + conteo de tags sin reemplazar.
+- **`insertTag(key)`**: inserta `[rol]`, `[tarifas]`, etc. en el textarea del template,
+  en la posición del cursor.
+- **`processValue()` extendido**: ahora normaliza CRLF→LF para `prompt.template` y
+  todas las claves `prompt.sections.*`, no solo el legacy `prompt.system_prompt`.
+- **Responsive**: en móvil, las columnas pasan a apiladas verticalmente y el preview
+  deja de ser sticky.
+
+### Archivos modificados
+- `bot-casa/public/panel.php` — Tab 2 + CSS + JS (~229 líneas nuevas)
+
+### Tests
+- PHP lint: panel.php OK
+- JSON validation: dist + local OK
+- Prompt assembly: 14233 chars, 0 tags sin reemplazar, 10/10 headers
+- Security: sin eval/system/exec peligrosos, todos los valores escapados con `h()`
+
+---
+
 ## 2026-05-22 · NOVA-PROMPT — Mejora integral del system prompt (Fase 2)
 
 ### Objetivo

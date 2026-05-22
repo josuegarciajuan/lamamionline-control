@@ -22,9 +22,14 @@
 - [x] T2.9 — Reescribir sección 'ejemplos' (18 ejemplos: regateo, audio, bot, indeciso, post-maps, foto, ETA).
 - [x] T2.10 — Reescribir sección 'formato_respuesta' (no URLs, lead detection recordatorio).
 
-### ORION-UI — FASE 3: Panel de administración (pendiente)
+### ORION-UI — FASE 3: Panel de administración
 
-- [ ] T3.1–T3.6 — Rediseño del Tab 2 con preview en tiempo real del prompt ensamblado.
+- [x] T3.1 — Layout de 2 columnas (formulario 60% / preview sticky 40%).
+- [x] T3.2 — Textarea para el template + chips clickables de etiquetas [seccion].
+- [x] T3.3 — Accordion nativo (details/summary) con textarea por cada sección, ordenado por frecuencia de edición.
+- [x] T3.4 — Preview en tiempo real con JS vanilla (rebuildPreview on input).
+- [x] T3.5 — Guardado de formulario (processValue extiende CRLF→LF a prompt.template y prompt.sections.*).
+- [x] T3.6 — Cache-busting verificado (panel.php es standalone, no requiere).
 
 ### NOVA-TONEBUILDER — FASE 4: Ajustes en ToneBuilder (pendiente)
 

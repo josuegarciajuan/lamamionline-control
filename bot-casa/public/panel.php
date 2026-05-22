@@ -49,7 +49,7 @@ $nullLogger = new class implements \WasapBot\Core\LoggerInterface {
 $config = new \WasapBot\Core\Config(WASAPBOT_ROOT);
 $memory = new \WasapBot\Core\Memory($config, $nullLogger);
 
-$modeFilePath = WASAPBOT_ROOT . '/' . ltrim((string) $config->get('bot.mode_file', 'data/.bot_mode'), '/');
+$modeFilePath = resolveConfigPath('bot.mode_file', 'data/.bot_mode');
 
 // ─────────────────────────────────────────────────────────────────────
 //  Helper functions
@@ -127,6 +127,20 @@ function setBotMode(string $mode): void
     @file_put_contents($modeFilePath, $mode, LOCK_EX);
 }
 
+/**
+ * Resolve a config file path: use it directly if absolute, otherwise
+ * prepend WASAPBOT_ROOT. Mirrors Memory.php constructor logic.
+ */
+function resolveConfigPath(string $configKey, string $defaultValue): string
+{
+    global $config;
+    $rawPath = (string) $config->get($configKey, $defaultValue);
+    if (str_starts_with($rawPath, '/')) {
+        return $rawPath;
+    }
+    return WASAPBOT_ROOT . '/' . ltrim($rawPath, '/');
+}
+
 // ─────────────────────────────────────────────────────────────────────
 //  CSRF protection (time-based token, no sessions needed)
 // ─────────────────────────────────────────────────────────────────────
@@ -162,54 +176,87 @@ $action = (string) ($_GET['action'] ?? '');
 $baseUrl = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH));
 $baseUrl = rtrim($baseUrl, '/');
 
+/**
+ * Build redirect URL preserving the active tab so the user lands on the
+ * same tab after any POST action instead of being thrown back to "Estado".
+ * The active tab is sent as a hidden field `active_tab` in every form.
+ */
+function buildRedirectUrl(string $baseUrl, string $extraParam): string
+{
+    $allowedTabs = [
+        'tab-status', 'tab-descripcion', 'tab-prompt', 'tab-leads',
+        'tab-waha', 'tab-openai', 'tab-routing', 'tab-delays',
+        'tab-variants', 'tab-followup', 'tab-reminder', 'tab-urls',
+        'tab-memory', 'tab-logs',
+    ];
+    $tab = (string) ($_POST['active_tab'] ?? $_GET['tab'] ?? '');
+    if (!in_array($tab, $allowedTabs, true)) {
+        $tab = '';
+    }
+    $tabParam = $tab !== '' ? '&tab=' . urlencode($tab) : '';
+    return $baseUrl . '?' . $extraParam . $tabParam;
+}
+
+$method = $method ?? ($_SERVER['REQUEST_METHOD'] ?? 'GET');
+
 // ── action=save_config (POST only, CSRF protected) ────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'save_config') {
+if ($method === 'POST' && $action === 'save_config') {
     requireValidCsrf();
     handleSaveConfig($config, $_POST);
-    header('Location: ' . $baseUrl . '?saved=1');
+    header('Location: ' . buildRedirectUrl($baseUrl, 'saved=1'));
     exit;
 }
 
 // ── action=toggle_bot (POST only, CSRF protected) ─────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'toggle_bot') {
+if ($method === 'POST' && $action === 'toggle_bot') {
     requireValidCsrf();
     $current = getBotMode();
     setBotMode($current === 'start' ? 'stop' : 'start');
-    header('Location: ' . $baseUrl . '?toggled=1');
+    header('Location: ' . buildRedirectUrl($baseUrl, 'toggled=1'));
     exit;
 }
 
 // ── action=delete_memory_thread (POST only, CSRF protected) ────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'delete_memory_thread') {
+if ($method === 'POST' && $action === 'delete_memory_thread') {
     requireValidCsrf();
     $threadId = (string) ($_POST['thread_id'] ?? '');
     $removed = 0;
     if ($threadId !== '') {
         $removed = $memory->deleteByThreadId($threadId);
     }
-    header('Location: ' . $baseUrl . '?deleted=' . $removed);
+    header('Location: ' . buildRedirectUrl($baseUrl, 'deleted=' . $removed));
     exit;
 }
 
 // ── action=delete_memory_line (POST only, CSRF protected) ──────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'delete_memory_line') {
+if ($method === 'POST' && $action === 'delete_memory_line') {
     requireValidCsrf();
     $lineIndex = (int) ($_POST['line_index'] ?? -1);
     $memory->deleteByLineIndex($lineIndex);
-    header('Location: ' . $baseUrl . '?deleted_line=1');
+    header('Location: ' . buildRedirectUrl($baseUrl, 'deleted_line=1'));
     exit;
 }
 
 // ── action=clear_memory (POST only, CSRF protected) ────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'clear_memory') {
+if ($method === 'POST' && $action === 'clear_memory') {
     requireValidCsrf();
     $memory->clear();
-    header('Location: ' . $baseUrl . '?cleared=1');
+    header('Location: ' . buildRedirectUrl($baseUrl, 'cleared=1'));
+    exit;
+}
+
+// ── action=delete_memory_line_ajax (POST, AJAX JSON response) ─────────
+if ($method === 'POST' && $action === 'delete_memory_line_ajax') {
+    requireValidCsrf();
+    $lineIndex = (int) ($_POST['line_index'] ?? -1);
+    $memory->deleteByLineIndex($lineIndex);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => true, 'deleted_line' => $lineIndex], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 // ── action=get_thread_conversation (GET, JSON response) ────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'get_thread_conversation') {
+if ($method === 'GET' && $action === 'get_thread_conversation') {
     $threadId = (string) ($_GET['thread_id'] ?? '');
     $records  = getThreadConversation($config, $threadId);
     header('Content-Type: application/json; charset=utf-8');
@@ -218,7 +265,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'get_thread_conversation
 }
 
 // ── action=get_telefonos_lines (GET, JSON response) ─────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'get_telefonos_lines') {
+if ($method === 'GET' && $action === 'get_telefonos_lines') {
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['ok' => true, 'lines' => getTelefonosLines()], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
@@ -259,43 +306,56 @@ function recursiveSave(\WasapBot\Core\Config $config, array $data, string $prefi
 
         // array-of-arrays (e.g., routing.lines table rows) — save as a whole.
         // Use array_values() to re-index and handle client-side gaps from row deletion.
+        // Only treat as table rows if the original array has exclusively numeric keys.
+        // Without this guard, associative arrays whose values happen to be arrays
+        // (like cron[followup][...], cron[reminder][...]) would be flattened into an
+        // indexed list, breaking the config structure.
         if (is_array($value) && !empty($value)) {
             $reindexed = array_values($value);
             if (is_array($reindexed[0] ?? null)) {
-                $cleanLines = [];
-                foreach ($reindexed as $line) {
-                    if (!is_array($line)) {
-                        continue;
+                $isRowList = true;
+                foreach (array_keys($value) as $k) {
+                    if (!is_int($k) && (!is_string($k) || !ctype_digit($k))) {
+                        $isRowList = false;
+                        break;
                     }
-                    // Skip completely empty rows
-                    $hasContent = false;
-                    foreach ($line as $v) {
-                        if (is_string($v) && trim($v) !== '') {
-                            $hasContent = true;
-                            break;
-                        }
-                        if (is_int($v) || is_float($v)) {
-                            $hasContent = true;
-                            break;
-                        }
-                    }
-                    if (!$hasContent) {
-                        continue;
-                    }
-                    // Type coercion per field
-                    if (isset($line['port'])) {
-                        $line['port'] = (int) $line['port'];
-                    }
-                    if (!isset($line['enabled'])) {
-                        $line['enabled'] = false;
-                    } else {
-                        $line['enabled'] = (bool) $line['enabled'];
-                    }
-                    $cleanLines[] = $line;
                 }
-                $config->set($fullKey, $cleanLines);
-                $savedKeys[] = $fullKey;
-                continue;
+                if ($isRowList) {
+                    $cleanLines = [];
+                    foreach ($reindexed as $line) {
+                        if (!is_array($line)) {
+                            continue;
+                        }
+                        // Skip completely empty rows
+                        $hasContent = false;
+                        foreach ($line as $v) {
+                            if (is_string($v) && trim($v) !== '') {
+                                $hasContent = true;
+                                break;
+                            }
+                            if (is_int($v) || is_float($v)) {
+                                $hasContent = true;
+                                break;
+                            }
+                        }
+                        if (!$hasContent) {
+                            continue;
+                        }
+                        // Type coercion per field
+                        if (isset($line['port'])) {
+                            $line['port'] = (int) $line['port'];
+                        }
+                        if (!isset($line['enabled'])) {
+                            $line['enabled'] = false;
+                        } else {
+                            $line['enabled'] = (bool) $line['enabled'];
+                        }
+                        $cleanLines[] = $line;
+                    }
+                    $config->set($fullKey, $cleanLines);
+                    $savedKeys[] = $fullKey;
+                    continue;
+                }
             }
         }
 
@@ -335,8 +395,8 @@ function processValue(string $key, mixed $value): mixed
         return array_values(array_filter($lines, static fn(string $line): bool => $line !== ''));
     }
 
-    // System prompt: normalize CRLF to LF
-    if ($key === 'prompt.system_prompt') {
+    // Prompt fields (template, sections, legacy): normalize CRLF to LF
+    if ($key === 'prompt.system_prompt' || $key === 'prompt.template' || str_starts_with($key, 'prompt.sections.')) {
         return str_replace("\r\n", "\n", $value);
     }
 
@@ -499,9 +559,8 @@ function readNdjson(string $filePath): array
  */
 function getBotStats(\WasapBot\Core\Config $config): array
 {
-    $root = WASAPBOT_ROOT;
-    $leadsPath   = $root . '/' . ltrim((string) $config->get('files.leads', 'data/leads.ndjson'), '/');
-    $memoryPath  = $root . '/' . ltrim((string) $config->get('files.session_memory', 'data/session_memory.ndjson'), '/');
+    $leadsPath   = resolveConfigPath('files.leads', 'data/leads.ndjson');
+    $memoryPath  = resolveConfigPath('files.session_memory', 'data/session_memory.ndjson');
 
     $todayStr = (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Madrid')))->format('Y-m-d');
 
@@ -548,8 +607,7 @@ function getBotStats(\WasapBot\Core\Config $config): array
  */
 function getLeadsForDisplay(\WasapBot\Core\Config $config): array
 {
-    $root      = WASAPBOT_ROOT;
-    $leadsPath = $root . '/' . ltrim((string) $config->get('files.leads', 'data/leads.ndjson'), '/');
+    $leadsPath = resolveConfigPath('files.leads', 'data/leads.ndjson');
     $records   = readNdjson($leadsPath);
     // newest first
     usort($records, static function (array $a, array $b): int {
@@ -568,13 +626,38 @@ function getThreadConversation(\WasapBot\Core\Config $config, string $threadId):
     if ($threadId === '') {
         return [];
     }
-    $root       = WASAPBOT_ROOT;
-    $memoryPath = $root . '/' . ltrim((string) $config->get('files.session_memory', 'data/session_memory.ndjson'), '/');
+    $memoryPath = resolveConfigPath('files.session_memory', 'data/session_memory.ndjson');
+    if (!file_exists($memoryPath)) {
+        return [];
+    }
     $result = [];
-    foreach (readNdjson($memoryPath) as $record) {
-        if ((string) ($record['thread_id'] ?? '') === $threadId) {
-            $result[] = $record;
+    $fp = @fopen($memoryPath, 'rb');
+    if ($fp === false) {
+        return [];
+    }
+    try {
+        if (flock($fp, LOCK_SH)) {
+            rewind($fp);
+            $lineIdx = 0;
+            while (($line = fgets($fp)) !== false) {
+                $trimmed = trim($line);
+                if ($trimmed !== '') {
+                    try {
+                        $decoded = json_decode($trimmed, true, 512, JSON_THROW_ON_ERROR);
+                        if (is_array($decoded) && (string) ($decoded['thread_id'] ?? '') === $threadId) {
+                            $decoded['line_index'] = $lineIdx;
+                            $result[] = $decoded;
+                        }
+                    } catch (\JsonException) {
+                        // skip malformed
+                    }
+                    $lineIdx++;
+                }
+            }
+            flock($fp, LOCK_UN);
         }
+    } finally {
+        fclose($fp);
     }
     return $result;
 }
@@ -768,7 +851,7 @@ function getMemoryGroups(array $lines): array
     foreach ($byPhone as $phone => $threads) {
         // Sort threads within phone by last_ts descending
         uasort($threads, static fn(array $a, array $b): int => strcmp($b['last_ts'], $a['last_ts']));
-        $result[] = ['phone' => $phone, 'threads' => array_values($threads)];
+        $result[] = ['phone' => (string) $phone, 'threads' => array_values($threads)];
     }
     // Sort phones: max last_ts across threads descending
     usort($result, static function (array $a, array $b): int {
@@ -849,7 +932,7 @@ $leadsDisplay = getLeadsForDisplay($config);
 
 // ─── Log file: read last 300 lines ───
 $logLines = [];
-$logFilePath = WASAPBOT_ROOT . '/' . ltrim((string) $config->get('files.bot_log', 'data/bot.log'), '/');
+$logFilePath = resolveConfigPath('files.bot_log', 'data/bot.log');
 if (file_exists($logFilePath) && is_readable($logFilePath)) {
     $fp = @fopen($logFilePath, 'rb');
     if ($fp !== false) {
@@ -1121,6 +1204,89 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
     .tab-nav button { padding: 8px 10px; font-size: .75rem; }
     .header { padding: 10px 14px; }
     .tab-content { padding: 12px; }
+    .prompt-layout { flex-direction: column !important; }
+    .prompt-edit-col, .prompt-preview-col { flex: 1 1 100% !important; max-width: 100% !important; }
+    .prompt-preview-card { position: static !important; max-height: 50vh !important; }
+}
+
+/* ── Prompt parametrizado ── */
+.prompt-layout { display: flex; gap: 20px; align-items: flex-start; }
+.prompt-edit-col { flex: 0 0 60%; min-width: 0; }
+.prompt-preview-col { flex: 0 0 40%; min-width: 0; }
+.prompt-preview-card { position: sticky; top: 20px; max-height: 92vh; display: flex; flex-direction: column; }
+.prompt-preview-box {
+    flex: 1;
+    overflow-y: auto;
+    background: #0a0e17;
+    color: #c9d1d9;
+    padding: 14px 16px;
+    border-radius: var(--radius-sm);
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: .76rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    max-height: calc(92vh - 120px);
+    border: 1px solid var(--border);
+}
+.prompt-stats {
+    margin-top: 8px;
+    font-size: .76rem;
+    color: var(--text-muted);
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.prompt-stats .stat-ok { color: var(--ok); }
+.prompt-stats .stat-warn { color: var(--warn); }
+.prompt-chip {
+    display: inline-block;
+    padding: 3px 8px;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: .78rem;
+    color: var(--accent-light);
+    cursor: pointer;
+    user-select: none;
+    transition: all .15s;
+}
+.prompt-chip:hover { background: var(--accent); color: #1a1206; border-color: var(--accent); }
+.prompt-chip-empty { opacity: .45; border-style: dashed; }
+.prompt-details {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+    overflow: hidden;
+}
+.prompt-details[open] { border-color: var(--accent); }
+.prompt-summary {
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: .84rem;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+}
+.prompt-summary:hover { background: rgba(245,158,11,.06); }
+.prompt-summary-badge {
+    font-size: .72rem;
+    color: var(--text-muted);
+    font-weight: 400;
+    font-family: monospace;
+}
+.prompt-section-ta {
+    margin: 0;
+    border: none;
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+    display: block;
 }
 </style>
 </head>
@@ -1134,6 +1300,7 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
     <div style="display:flex;gap:8px">
         <form method="post" action="<?php echo h($baseUrl); ?>?action=toggle_bot" style="display:inline">
             <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
+            <input type="hidden" name="active_tab" class="js-active-tab-input" value="tab-status">
             <button type="submit" class="btn <?php echo $botMode === 'start' ? 'btn-danger' : 'btn-success'; ?> btn-lg">
                 <?php echo $botMode === 'start' ? 'APAGAR BOT' : 'ENCENDER BOT'; ?>
             </button>
@@ -1145,30 +1312,32 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
 
 <!-- Tab Navigation -->
 <div class="tab-nav" id="tabNav">
-    <button class="active" data-tab="tab-status">Estado</button>
-    <button data-tab="tab-descripcion">📖 Descripción</button>
-    <button data-tab="tab-prompt">System Prompt</button>
-    <button data-tab="tab-leads">Leads</button>
-    <button data-tab="tab-waha">WAHA</button>
-    <button data-tab="tab-openai">OpenAI</button>
-    <button data-tab="tab-routing">Routing</button>
-    <button data-tab="tab-delays">Human Delays</button>
-    <button data-tab="tab-variants">Variantes</button>
-    <button data-tab="tab-followup">Cron Follow-up</button>
-    <button data-tab="tab-reminder">Cron Reminder</button>
-    <button data-tab="tab-urls">URLs</button>
-    <button data-tab="tab-memory">Memoria</button>
-    <button data-tab="tab-logs">Logs</button>
+    <button type="button" class="active" data-tab="tab-status">Estado</button>
+    <button type="button" data-tab="tab-descripcion">📖 Descripción</button>
+    <button type="button" data-tab="tab-prompt">System Prompt</button>
+    <button type="button" data-tab="tab-leads">Leads</button>
+    <button type="button" data-tab="tab-waha">WAHA</button>
+    <button type="button" data-tab="tab-openai">OpenAI</button>
+    <button type="button" data-tab="tab-routing">Routing</button>
+    <button type="button" data-tab="tab-delays">Human Delays</button>
+    <button type="button" data-tab="tab-variants">Variantes</button>
+    <button type="button" data-tab="tab-followup">Cron Follow-up</button>
+    <button type="button" data-tab="tab-reminder">Cron Reminder</button>
+    <button type="button" data-tab="tab-urls">URLs</button>
+    <button type="button" data-tab="tab-memory">Memoria</button>
+    <button type="button" data-tab="tab-logs">Logs</button>
 </div>
 
 <!-- ── Main config form ── -->
 <!-- Form separado para toggle bot (no puede anidarse dentro del main form) -->
 <form id="form-toggle-bot-status" method="post" action="<?php echo h($baseUrl); ?>?action=toggle_bot" style="display:none">
     <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
+    <input type="hidden" name="active_tab" class="js-active-tab-input" value="tab-status">
 </form>
 
 <form method="post" action="<?php echo h($baseUrl); ?>?action=save_config" class="main-form">
 <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
+<input type="hidden" name="active_tab" class="js-active-tab-input" value="tab-status">
 
 <!-- ===== TAB 1: Estado del Bot ===== -->
 <div class="tab-content active" id="tab-status">
@@ -1308,21 +1477,96 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
 
 </div>
 
-<!-- ===== TAB 2: System Prompt ===== -->
+<!-- ===== TAB 2: System Prompt (Parametrizado) ===== -->
 <div class="tab-content" id="tab-prompt">
-    <div class="card">
-        <h2>System Prompt</h2>
-        <div class="form-group">
-            <label>System Prompt (el prompt completo que se envía a OpenAI)</label>
-            <textarea name="prompt[system_prompt]" class="code-area" style="width:100%;min-height:500px;height:600px" spellcheck="false"><?php
-                // Show with real newlines (JSON decoded already has real \n)
-                echo h((string) $config->get('prompt.system_prompt', ''));
+
+<div class="prompt-layout">
+    <!-- LEFT COLUMN: edit form (60%) -->
+    <div class="prompt-edit-col">
+
+        <!-- Template -->
+        <div class="card">
+            <h2>Estructura del prompt</h2>
+            <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:8px">
+                Define el orden y estructura con etiquetas <code style="background:var(--input-bg);padding:1px 6px;border-radius:3px">[seccion]</code> como marcadores de posición.
+                Click en una etiqueta para insertarla.
+            </p>
+            <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:5px">
+                <?php
+                $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucciones_fotos', 'identidad_chicas', 'seguridad', 'ejemplos', 'formato_respuesta'];
+                foreach ($sectionKeys as $sk) {
+                    $hasContent = strlen((string) ($config->get("prompt.sections.$sk", ''))) > 0;
+                    $badge = $hasContent ? '' : ' prompt-chip-empty';
+                    echo '<span class="prompt-chip' . $badge . '" onclick="insertTag(\'' . $sk . '\')" title="Insertar [' . $sk . ']">[' . $sk . ']</span>';
+                }
+                ?>
+            </div>
+            <textarea name="prompt[template]" id="prompt-template" class="code-area"
+                      style="width:100%;min-height:160px"
+                      spellcheck="false"
+                      oninput="rebuildPreview()"><?php
+                echo h((string) $config->get('prompt.template', ''));
             ?></textarea>
         </div>
-        <div style="margin-top:10px">
-            <button type="submit" class="btn btn-primary btn-lg">Guardar System Prompt</button>
+
+        <!-- Sections (accordion) -->
+        <div class="card" style="margin-top:12px">
+            <h2>Secciones editables</h2>
+            <p style="color:var(--text-muted);font-size:.8rem;margin-bottom:10px">
+                Cada sección corresponde a un bloque del prompt. Ordenadas por frecuencia de edición.
+            </p>
+            <?php
+            $sectionLabels = [
+                'tarifas'              => '💰 TARIFAS',
+                'ubicacion'            => '📍 UBICACIÓN',
+                'servicios'            => '🛏️ SERVICIOS',
+                'estilo'               => '✍️ ESTILO',
+                'rol'                  => '🎭 ROL',
+                'instrucciones_fotos'  => '📸 FOTOS',
+                'identidad_chicas'     => '👩 IDENTIDAD Y CHICAS',
+                'seguridad'            => '🛡️ SEGURIDAD',
+                'ejemplos'             => '💬 EJEMPLOS',
+                'formato_respuesta'    => '📋 FORMATO RESPUESTA',
+            ];
+            foreach ($sectionKeys as $sk) {
+                $val = (string) $config->get("prompt.sections.$sk", '');
+                $len = strlen($val);
+                $label = $sectionLabels[$sk] ?? $sk;
+                $openAttr = ($sk === 'tarifas' || $sk === 'ubicacion') ? ' open' : '';
+                echo '<details class="prompt-details"' . $openAttr . '>';
+                echo '<summary class="prompt-summary">';
+                echo '<span>' . h($label) . '</span>';
+                echo '<span class="prompt-summary-badge">' . $len . ' chars</span>';
+                echo '</summary>';
+                echo '<textarea name="prompt[sections][' . $sk . ']" class="code-area prompt-section-ta'
+                     . '" style="width:100%;min-height:' . max(80, min($len, 400)) . 'px"'
+                     . ' spellcheck="false" oninput="rebuildPreview()">';
+                echo h($val);
+                echo '</textarea>';
+                echo '</details>';
+            }
+            ?>
+        </div>
+
+        <div style="margin-top:16px">
+            <button type="submit" class="btn btn-primary btn-lg">💾 Guardar Prompt</button>
+        </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN: preview (40%) -->
+    <div class="prompt-preview-col">
+        <div class="card prompt-preview-card">
+            <h2>Prompt ensamblado</h2>
+            <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:8px">
+                Vista previa de cómo queda el prompt con los valores actuales. Solo lectura.
+            </p>
+            <pre id="prompt-preview" class="prompt-preview-box"></pre>
+            <div id="prompt-stats" class="prompt-stats"></div>
         </div>
     </div>
+</div>
+
 </div>
 
 <!-- ===== TAB 3: Leads ===== -->
@@ -1430,24 +1674,7 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
     </div>
 </div>
 
-<!-- Modal conversación completa -->
-<div id="convModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);align-items:center;justify-content:center">
-    <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);width:min(700px,94vw);max-height:85vh;display:flex;flex-direction:column;box-shadow:var(--shadow-md)">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)">
-            <div>
-                <strong id="convModalTitle" style="font-size:1rem">Conversación</strong>
-                <span id="convModalSubtitle" style="color:var(--text-muted);font-size:.82rem;margin-left:8px"></span>
-            </div>
-            <button type="button" onclick="closeConversationModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1">&times;</button>
-        </div>
-        <div id="convModalBody" style="overflow-y:auto;padding:16px 20px;flex:1;font-size:.85rem;line-height:1.55">
-            <p style="color:var(--text-muted)">Cargando…</p>
-        </div>
-        <div style="padding:12px 20px;border-top:1px solid var(--border);text-align:right">
-            <button type="button" class="btn btn-sm" onclick="closeConversationModal()" style="background:var(--input-bg);color:var(--text)">Cerrar</button>
-        </div>
-    </div>
-</div>
+<!-- (old convModal removed — consolidated into conversationModal above) -->
 
 <!-- ===== TAB 4: Configuración WAHA ===== -->
 <div class="tab-content" id="tab-waha">
@@ -2020,6 +2247,7 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:flex-end">
             <form method="post" action="<?php echo h($baseUrl); ?>?action=delete_memory_thread" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
                 <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
+                <input type="hidden" name="active_tab" value="tab-memory">
                 <div class="form-group" style="margin-bottom:0">
                     <label>Borrar por thread_id</label>
                     <input type="text" name="thread_id" placeholder="Thread ID" required style="width:200px">
@@ -2029,61 +2257,75 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
 
             <form method="post" action="<?php echo h($baseUrl); ?>?action=clear_memory" style="display:inline" onsubmit="return confirm('¿Seguro que quieres VACIAR toda la memoria? Esta acción no se puede deshacer.')">
                 <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
+                <input type="hidden" name="active_tab" value="tab-memory">
                 <button type="submit" class="btn btn-danger">Vaciar TODA la memoria</button>
             </form>
         </div>
 
         <p style="color:var(--text-muted);font-size:.8rem;margin-bottom:16px">
-            Agrupado por teléfono. Pulsa sobre cualquier línea para ver la conversación completa.
+            Cada fila representa una conversación. Pulsa sobre la fila para ver el diálogo completo.
         </p>
 
-        <?php if (empty($memoryGroups)): ?>
+        <?php
+        // Flatten threads into a single list of conversations for the new row-per-conversation view
+        $allConversations = [];
+        foreach ($memoryGroups as $group) {
+            foreach ($group['threads'] as $thread) {
+                $lastLine   = end($thread['lines']);
+                $lastTsRaw  = $lastLine['timestamp'] ?? '';
+                $lastPreview = $lastLine['preview'] ?? '';
+                // Format last timestamp for display
+                $lastTsFormatted = '';
+                if ($lastTsRaw && ($tsNum = strtotime(str_replace('T', ' ', $lastTsRaw)))) {
+                    $lastTsFormatted = date('d/m H:i', $tsNum);
+                }
+                if ($lastTsFormatted === '') {
+                    $lastTsFormatted = $lastTsRaw;
+                }
+                $allConversations[] = [
+                    'phone'           => (string) $group['phone'],
+                    'thread_id'       => $thread['thread_id'],
+                    'msg_count'       => count($thread['lines']),
+                    'last_ts'         => $lastTsFormatted,
+                    'last_ts_raw'     => $lastTsRaw,
+                    'last_preview'    => $lastPreview,
+                ];
+            }
+        }
+        // Sort conversations by last timestamp descending (newest first)
+        usort($allConversations, function($a, $b) {
+            $tsA = strtotime(str_replace('T', ' ', $a['last_ts_raw'] ?? ''));
+            $tsB = strtotime(str_replace('T', ' ', $b['last_ts_raw'] ?? ''));
+            return $tsB <=> $tsA;
+        });
+        ?>
+        <?php if (empty($allConversations)): ?>
         <div style="text-align:center;color:var(--text-muted);padding:20px">
-            Sin entradas de memoria.
+            Sin conversaciones en memoria.
         </div>
         <?php else: ?>
-        <div class="memory-phone-groups">
-            <?php foreach ($memoryGroups as $group): ?>
-            <div class="memory-phone-group" style="margin-bottom:16px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
-                <div class="memory-phone-header" style="background:var(--input-bg);padding:8px 14px;font-weight:600;font-size:.88rem;color:var(--accent);cursor:pointer;display:flex;justify-content:space-between;align-items:center"
-                     onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none'">
-                    <span>📱 <?php echo h($group['phone']); ?></span>
-                    <span style="font-size:.75rem;color:var(--text-muted);font-weight:400"><?php echo count($group['threads']); ?> hilo(s) · <?php echo array_sum(array_map(fn($t) => count($t['lines']), $group['threads'])); ?> mensajes</span>
+        <div class="memory-conversation-list">
+            <?php foreach ($allConversations as $conv): ?>
+            <div class="memory-conversation-row"
+                 style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border-soft);cursor:pointer;transition:background .15s"
+                 data-thread-id="<?php echo h($conv['thread_id']); ?>"
+                 onmouseover="this.style.background='rgba(245,158,11,.06)';this.style.borderLeft='3px solid var(--accent)'"
+                 onmouseout="this.style.background='';this.style.borderLeft='3px solid transparent'"
+                 onclick="openConversationModal('<?php echo h($conv['thread_id']); ?>')">
+                <div style="flex:1;min-width:0;display:flex;align-items:center;gap:12px">
+                    <span style="font-size:.8rem;color:var(--accent);white-space:nowrap;font-weight:600">📱 <?php echo h($conv['phone']); ?></span>
+                    <code style="font-size:.7rem;color:var(--text-muted);white-space:nowrap"><?php echo h(strlen($conv['thread_id']) > 16 ? substr($conv['thread_id'], 0, 16) . '…' : $conv['thread_id']); ?></code>
+                    <span style="font-size:.75rem;color:var(--text-muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?php echo h($conv['last_preview']); ?></span>
                 </div>
-                <div class="memory-phone-body" style="display:block">
-                    <?php foreach ($group['threads'] as $thread): ?>
-                    <div class="memory-thread-group" style="border-top:1px solid var(--border-soft);padding:4px 0">
-                        <div class="memory-thread-header" style="padding:4px 14px;font-size:.78rem;color:var(--text-muted);display:flex;justify-content:space-between">
-                            <span>🧵 Thread: <code style="font-size:.72rem"><?php echo h(strlen($thread['thread_id']) > 14 ? substr($thread['thread_id'], 0, 14) . '…' : $thread['thread_id']); ?></code></span>
-                            <span><?php echo count($thread['lines']); ?> msgs</span>
-                        </div>
-                        <?php foreach ($thread['lines'] as $ml): ?>
-                        <div class="memory-line-row js-memory-line"
-                             style="display:flex;justify-content:space-between;align-items:center;padding:4px 14px;font-size:.82rem;cursor:pointer;border-left:2px solid transparent"
-                             data-thread-id="<?php echo h($ml['thread_id']); ?>"
-                             onmouseover="this.style.background='rgba(245,158,11,.06)';this.style.borderLeftColor='var(--accent)'"
-                             onmouseout="this.style.background='';this.style.borderLeftColor='transparent'"
-                             onclick="openConversationModal('<?php echo h($ml['thread_id']); ?>')">
-                            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:10px">
-                                <span class="mono" style="font-size:.72rem;color:var(--text-muted);margin-right:6px"><?php
-                                    $ts = $ml['timestamp'];
-                                    if ($ts && ($tstamp = strtotime(str_replace('T',' ',$ts)))) {
-                                        echo h(date('d/m H:i', $tstamp));
-                                    } else {
-                                        echo h($ts);
-                                    }
-                                ?></span>
-                                <span class="memory-preview-text"><?php echo $ml['preview']; ?></span>
-                            </span>
-                            <form method="post" action="<?php echo h($baseUrl); ?>?action=delete_memory_line" style="display:inline;flex-shrink:0" onsubmit="event.stopPropagation(); return confirm('¿Eliminar línea <?php echo $ml['line_index']; ?>?')">
-                                <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
-                                <input type="hidden" name="line_index" value="<?php echo $ml['line_index']; ?>">
-                                <button type="submit" class="btn btn-danger btn-sm" style="font-size:.7rem;padding:2px 6px">X</button>
-                            </form>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <?php endforeach; ?>
+                <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:12px">
+                    <span style="font-size:.7rem;color:var(--text-muted);white-space:nowrap" title="Última actividad"><?php echo h($conv['last_ts']); ?></span>
+                    <span style="background:var(--input-bg);color:var(--text-muted);font-size:.7rem;padding:2px 8px;border-radius:10px;white-space:nowrap"><?php echo (int) $conv['msg_count']; ?> msgs</span>
+                    <form method="post" action="<?php echo h($baseUrl); ?>?action=delete_memory_thread" style="display:inline;flex-shrink:0" onsubmit="event.stopPropagation(); if(!confirm('¿Eliminar toda la conversación con thread «<?php echo h($conv['thread_id']); ?>»?')) return false;">
+                        <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
+                        <input type="hidden" name="thread_id" value="<?php echo h($conv['thread_id']); ?>">
+                        <input type="hidden" name="active_tab" value="tab-memory">
+                        <button type="submit" class="btn btn-danger btn-sm" style="font-size:.7rem;padding:2px 6px" title="Eliminar esta conversación">X</button>
+                    </form>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -2091,14 +2333,14 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
         <?php endif; ?>
 
         <p style="margin-top:10px;color:var(--text-muted);font-size:.8rem">
-            Total: <?php echo count($memoryLines); ?> líneas de memoria en <?php echo count($memoryGroups); ?> teléfonos.
+            Total: <?php echo count($allConversations); ?> conversaciones, <?php echo count($memoryLines); ?> mensajes en <?php echo count($memoryGroups); ?> teléfonos.
         </p>
     </div>
 </div>
 
 <!-- ===== MODAL: Conversación Completa ===== -->
 <div id="conversationModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center">
-    <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);max-width:700px;width:90%;max-height:85vh;display:flex;flex-direction:column;box-shadow:var(--shadow-md)">
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);max-width:750px;width:90%;max-height:85vh;display:flex;flex-direction:column;box-shadow:var(--shadow-md)">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border)">
             <h3 style="margin:0;font-size:1rem">Conversación — <span id="convModalPhone" style="color:var(--accent)"></span></h3>
             <button onclick="closeConversationModal()" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;line-height:1">&times;</button>
@@ -2110,20 +2352,23 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
 </div>
 
 <script>
+var _convModalCsrf = '<?php echo h(generateCsrfToken()); ?>';
+var _convModalBaseUrl = '<?php echo h($baseUrl); ?>';
+
 function openConversationModal(threadId) {
     var modal = document.getElementById('conversationModal');
     modal.style.display = 'flex';
     document.getElementById('convModalPhone').textContent = threadId;
     document.getElementById('conversationContent').innerHTML = '<p style="color:var(--text-muted);text-align:center">Cargando conversación…</p>';
 
-    fetch('<?php echo h($baseUrl); ?>?action=get_thread_conversation&thread_id=' + encodeURIComponent(threadId))
+    fetch(_convModalBaseUrl + '?action=get_thread_conversation&thread_id=' + encodeURIComponent(threadId))
         .then(function(r) { return r.json(); })
         .then(function(data) {
             var html = '';
             if (!data.ok || !data.records || data.records.length === 0) {
                 html = '<p style="color:var(--text-muted);text-align:center">Sin registros para este hilo.</p>';
             } else {
-                data.records.forEach(function(rec) {
+                data.records.forEach(function(rec, idx) {
                     var ts = rec.ts || rec.timestamp || '';
                     var dateStr = '';
                     if (ts) {
@@ -2131,8 +2376,15 @@ function openConversationModal(threadId) {
                     }
                     var userMsg = rec.user_msg || rec.body || '';
                     var botMsg  = rec.bot_reply || (rec['| B:'] || '');
-                    html += '<div style="margin-bottom:10px;padding:8px 10px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-soft)">';
-                    if (dateStr) html += '<div style="font-size:.7rem;color:var(--text-muted);margin-bottom:4px">' + dateStr + '</div>';
+                    var lineIdx = rec.line_index !== undefined ? rec.line_index : idx;
+                    html += '<div class="conv-message-bubble" id="conv-msg-' + lineIdx + '" style="margin-bottom:10px;padding:8px 10px;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-soft);position:relative">';
+                    // Header with timestamp and X delete button
+                    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+                    if (dateStr) html += '<span style="font-size:.7rem;color:var(--text-muted)">' + dateStr + '</span>';
+                    else html += '<span></span>';
+                    html += '<button onclick="deleteMemoryLine(' + lineIdx + ', this)" title="Eliminar este mensaje" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.9rem;line-height:1;padding:2px 6px;opacity:.6;transition:opacity .15s" onmouseover="this.style.opacity=\'1\'" onmouseout="this.style.opacity=\'.6\'">&times;</button>';
+                    html += '</div>';
+                    // Message bodies
                     if (userMsg) html += '<div style="margin-bottom:4px"><span style="color:var(--info);font-size:.72rem">📥 Usuario:</span><br>' + escHtml(userMsg) + '</div>';
                     if (botMsg)  html += '<div><span style="color:var(--ok);font-size:.72rem">📤 Bot:</span><br>' + escHtml(botMsg) + '</div>';
                     html += '</div>';
@@ -2142,6 +2394,43 @@ function openConversationModal(threadId) {
         })
         .catch(function() {
             document.getElementById('conversationContent').innerHTML = '<p style="color:var(--danger);text-align:center">Error al cargar la conversación.</p>';
+        });
+}
+
+function deleteMemoryLine(lineIndex, btnElement) {
+    if (!confirm('¿Eliminar este mensaje?')) return;
+    btnElement.disabled = true;
+    btnElement.textContent = '…';
+    var formData = new FormData();
+    formData.append('csrf_token', _convModalCsrf);
+    formData.append('line_index', lineIndex);
+    fetch(_convModalBaseUrl + '?action=delete_memory_line_ajax', { method: 'POST', body: formData })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                var msgDiv = document.getElementById('conv-msg-' + lineIndex);
+                if (msgDiv) {
+                    msgDiv.style.opacity = '0.3';
+                    msgDiv.style.textDecoration = 'line-through';
+                    // Remove after animation
+                    setTimeout(function() {
+                        if (msgDiv.parentNode) msgDiv.remove();
+                        // If no messages left, refresh parent to update counts
+                        if (document.querySelectorAll('.conv-message-bubble').length === 0) {
+                            location.reload();
+                        }
+                    }, 400);
+                }
+            } else {
+                btnElement.disabled = false;
+                btnElement.textContent = '×';
+                alert('Error al eliminar el mensaje.');
+            }
+        })
+        .catch(function() {
+            btnElement.disabled = false;
+            btnElement.textContent = '×';
+            alert('Error de conexión al eliminar el mensaje.');
         });
 }
 
@@ -2210,24 +2499,133 @@ document.getElementById('conversationModal').addEventListener('click', function(
 </script>
 
 <script>
-// ── Tab switching ──
+// ── Tab switching with persistence ──
 (function() {
+    var STORAGE_KEY = 'botcasa_active_tab';
     var nav = document.getElementById('tabNav');
+    if (!nav) return;
     var buttons = nav.querySelectorAll('button');
     var tabs = document.querySelectorAll('.tab-content');
 
+    /**
+     * Activate a tab by its ID (e.g. "tab-status").
+     * Also updates all hidden active_tab inputs so every form POST
+     * carries the current tab and the server can redirect back to it.
+     */
+    function activateTab(tabId) {
+        var found = false;
+        buttons.forEach(function(b) {
+            var isTarget = b.getAttribute('data-tab') === tabId;
+            b.classList.toggle('active', isTarget);
+            if (isTarget) found = true;
+        });
+        // Fallback: if tabId not found, activate first tab
+        if (!found) {
+            tabId = buttons[0] ? buttons[0].getAttribute('data-tab') : 'tab-status';
+            buttons.forEach(function(b) {
+                b.classList.toggle('active', b.getAttribute('data-tab') === tabId);
+            });
+        }
+        tabs.forEach(function(t) {
+            t.classList.toggle('active', t.id === tabId);
+        });
+        // Persist choice
+        try { localStorage.setItem(STORAGE_KEY, tabId); } catch(e) {}
+        // Keep all active_tab hidden inputs in sync so every form knows the current tab
+        document.querySelectorAll('.js-active-tab-input').forEach(function(inp) {
+            inp.value = tabId;
+        });
+    }
+
+    // Determine initial tab: URL param > localStorage > default
+    var initialTab = '';
+    try {
+        var params = new URLSearchParams(window.location.search);
+        initialTab = params.get('tab') || '';
+    } catch(e) {}
+    if (!initialTab) {
+        try { initialTab = localStorage.getItem(STORAGE_KEY) || ''; } catch(e) {}
+    }
+    if (!initialTab) { initialTab = 'tab-status'; }
+    activateTab(initialTab);
+
+    // Wire click handlers
     buttons.forEach(function(btn) {
         btn.addEventListener('click', function() {
-            var targetId = this.getAttribute('data-tab');
-            // Deactivate all
-            buttons.forEach(function(b) { b.classList.remove('active'); });
-            tabs.forEach(function(t) { t.classList.remove('active'); });
-            // Activate selected
-            this.classList.add('active');
-            var target = document.getElementById(targetId);
-            if (target) target.classList.add('active');
+            activateTab(this.getAttribute('data-tab'));
         });
     });
+})();
+
+// ── Prompt preview: realtime assembly ──
+(function() {
+    var sectionKeys = ['rol','estilo','tarifas','servicios','ubicacion','instrucciones_fotos','identidad_chicas','seguridad','ejemplos','formato_respuesta'];
+
+    // Known LLM placeholders in prompt examples that are NOT template tags
+    var knownPlaceholders = ['selected', 'nombre', 'audio'];
+
+    function getVal(key) {
+        // Try matching textarea by name attribute
+        var ta = document.querySelector('textarea[name="prompt[sections][' + key + ']"]');
+        if (ta) return ta.value;
+        // Fallback: try by id
+        ta = document.getElementById('prompt-section-' + key);
+        return ta ? ta.value : '';
+    }
+
+    window.rebuildPreview = function() {
+        var template = document.getElementById('prompt-template');
+        var preview = document.getElementById('prompt-preview');
+        var stats = document.getElementById('prompt-stats');
+        if (!template || !preview || !stats) return;
+
+        var text = template.value;
+        sectionKeys.forEach(function(k) {
+            // Replace all occurrences (global flag needed)
+            var re = new RegExp('\\[' + k + '\\]', 'g');
+            text = text.replace(re, getVal(k));
+        });
+
+        preview.textContent = text;
+
+        // Count unreplaced tags
+        var unreplaced = [];
+        var tagRe = /\[([a-z_]+)\]/g;
+        var m;
+        while ((m = tagRe.exec(text)) !== null) {
+            if (knownPlaceholders.indexOf(m[1]) === -1 && unreplaced.indexOf(m[1]) === -1) {
+                unreplaced.push(m[1]);
+            }
+        }
+
+        var chars = text.length;
+        var hasUnreplaced = unreplaced.length > 0;
+        stats.innerHTML =
+            '<span class="' + (chars > 0 ? 'stat-ok' : 'stat-warn') + '">' + chars + ' chars</span>' +
+            '<span>' + (hasUnreplaced
+                ? '<span class="stat-warn">⚠ ' + unreplaced.length + ' sin reemplazar: [' + unreplaced.join(', ') + ']</span>'
+                : '<span class="stat-ok">✓ 0 tags sueltos</span>') +
+            '</span>';
+    };
+
+    window.insertTag = function(key) {
+        var ta = document.getElementById('prompt-template');
+        if (!ta) return;
+        var tag = '[' + key + ']';
+        var start = ta.selectionStart;
+        var end = ta.selectionEnd;
+        var before = ta.value.substring(0, start);
+        var after = ta.value.substring(end);
+        ta.value = before + tag + after;
+        ta.selectionStart = ta.selectionEnd = start + tag.length;
+        ta.focus();
+        rebuildPreview();
+    };
+
+    // Initial preview on page load if the tab is visible
+    if (document.getElementById('tab-prompt')) {
+        rebuildPreview();
+    }
 })();
 
 // ── Routing lines: add row manually ──
@@ -2296,9 +2694,9 @@ function addRoutingRowFromSelector() {
     var tr = document.createElement('tr');
     tr.className = 'routing-row';
     tr.innerHTML = [
-        '<td><input type="text" name="routing[lines][' + idx + '][last9]" value="' + escH(last9) + '" placeholder="Últimos 9 dígitos" class="input-cell"></td>',
-        '<td><input type="number" name="routing[lines][' + idx + '][port]" value="' + escH(port) + '" placeholder="3000" class="input-cell" style="width:80px"></td>',
-        '<td><input type="text" name="routing[lines][' + idx + '][label]" value="' + escH(lbl) + '" placeholder="linea_3000" class="input-cell"></td>',
+        '<td><input type="text" name="routing[lines][' + idx + '][last9]" value="' + escHtml(last9) + '" placeholder="Últimos 9 dígitos" class="input-cell"></td>',
+        '<td><input type="number" name="routing[lines][' + idx + '][port]" value="' + escHtml(port) + '" placeholder="3000" class="input-cell" style="width:80px"></td>',
+        '<td><input type="text" name="routing[lines][' + idx + '][label]" value="' + escHtml(lbl) + '" placeholder="linea_3000" class="input-cell"></td>',
         '<td style="text-align:center"><input type="hidden" name="routing[lines][' + idx + '][enabled]" value="0"><input type="checkbox" name="routing[lines][' + idx + '][enabled]" value="1" checked></td>',
         '<td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove()">X</button></td>'
     ].join('');
@@ -2311,86 +2709,7 @@ function addRoutingRowFromSelector() {
 // Load telefonos on page load (only when routing tab is visible or eagerly)
 loadTelefonosIntoSelector();
 
-// ── Conversation modal ──
-var convModal = document.getElementById('convModal');
-
-function openConversationModal(threadId, phoneHint) {
-    document.getElementById('convModalTitle').textContent = 'Conversación ' + phoneHint;
-    document.getElementById('convModalSubtitle').textContent = threadId;
-    document.getElementById('convModalBody').innerHTML = '<p style="color:var(--text-muted)">Cargando…</p>';
-    convModal.style.display = 'flex';
-
-    fetch('?action=get_thread_conversation&thread_id=' + encodeURIComponent(threadId))
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (!data.ok || !data.records || data.records.length === 0) {
-                document.getElementById('convModalBody').innerHTML = '<p style="color:var(--text-muted)">No se encontraron mensajes para este hilo.</p>';
-                return;
-            }
-            var html = '<div style="display:flex;flex-direction:column;gap:10px">';
-            data.records.forEach(function(rec) {
-                var ts = rec.ts || rec.timestamp || '';
-                var tsDisp = '';
-                if (ts) {
-                    try {
-                        var d = new Date(ts);
-                        tsDisp = d.toLocaleString('es-ES', {timeZone:'Europe/Madrid', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
-                    } catch(e) { tsDisp = ts; }
-                }
-                // Detect user or bot message
-                var userMsg = rec['U:'] || rec['user_msg'] || rec.body || '';
-                var botReply = rec['| B:'] || rec['bot_reply'] || '';
-                if (userMsg) {
-                    html += '<div style="display:flex;gap:8px;align-items:flex-start">';
-                    html += '<span style="color:var(--info);font-size:.75rem;min-width:32px;padding-top:2px">👤</span>';
-                    html += '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:0 var(--radius-sm) var(--radius-sm) var(--radius-sm);padding:8px 12px;flex:1">';
-                    if (tsDisp) html += '<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:3px">' + escH(tsDisp) + '</div>';
-                    html += '<div style="color:var(--text)">' + escH(userMsg).replace(/\n/g,'<br>') + '</div>';
-                    html += '</div></div>';
-                }
-                if (botReply) {
-                    html += '<div style="display:flex;gap:8px;align-items:flex-start;justify-content:flex-end">';
-                    html += '<div style="background:var(--tab-active);border:1px solid var(--border-soft);border-radius:var(--radius-sm) 0 var(--radius-sm) var(--radius-sm);padding:8px 12px;flex:1;max-width:90%">';
-                    if (tsDisp) html += '<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:3px">' + escH(tsDisp) + ' · 🤖 Bot</div>';
-                    html += '<div style="color:var(--text)">' + escH(botReply).replace(/\n/g,'<br>') + '</div>';
-                    html += '</div>';
-                    html += '<span style="color:var(--accent);font-size:.75rem;min-width:32px;padding-top:2px;text-align:right">🤖</span>';
-                    html += '</div>';
-                }
-                if (!userMsg && !botReply) {
-                    // Raw fallback
-                    html += '<div style="color:var(--text-muted);font-size:.75rem;font-family:monospace;padding:4px 0">' + escH(JSON.stringify(rec)) + '</div>';
-                }
-            });
-            html += '</div>';
-            document.getElementById('convModalBody').innerHTML = html;
-        })
-        .catch(function(err) {
-            document.getElementById('convModalBody').innerHTML = '<p style="color:var(--danger)">Error al cargar la conversación: ' + escH(String(err)) + '</p>';
-        });
-}
-
-function closeConversationModal() {
-    convModal.style.display = 'none';
-}
-
-function escH(str) {
-    return String(str)
-        .replace(/&/g,'&amp;')
-        .replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;')
-        .replace(/"/g,'&quot;')
-        .replace(/'/g,'&#039;');
-}
-
-// Close modal on backdrop click
-convModal.addEventListener('click', function(e) {
-    if (e.target === convModal) closeConversationModal();
-});
-// Close on Escape
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && convModal.style.display !== 'none') closeConversationModal();
-});
+// ── Conversation modal: consolidated in first script block (uses #conversationModal) ──
 </script>
 
 </body>
