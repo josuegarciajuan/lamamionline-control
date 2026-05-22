@@ -1825,8 +1825,8 @@ function publicista_build_reference_locked_prompt($job, $variantPrompt) {
     $outfitLock = publicista_build_outfit_session_lock($job);
     $requirements = array(
         // ANCLA DE IDENTIDAD — primero y más explícito para que el modelo lo trate correctamente
-        'La imagen adjunta es una ANCLA DE IDENTIDAD FUERTE. Úsala para preservar el rostro, la complexión, las proporciones corporales, el tono de piel y los rasgos faciales específicos de la persona real. NO uses la imagen adjunta como canvas a rellenar ni como fondo a extender. Genera una NUEVA imagen de la misma persona en un nuevo encuadre, nueva escena y nueva ropa.',
-        'NO extiendas ni modifiques la imagen adjunta. Crea una imagen completamente nueva donde la persona se parezca a la de la referencia adjunta.',
+        'La imagen adjunta es una ANCLA DE IDENTIDAD FUERTE. Úsala como referencia visual base para generar una NUEVA fotografía de la MISMA persona real. Preserva EXACTAMENTE el rostro, la complexión, las proporciones corporales, el tono de piel y todos los rasgos faciales específicos de la persona. El resultado debe mostrar a la misma mujer —visualmente idéntica— en un nuevo encuadre, nueva escena y nueva ropa.',
+        'La persona en la imagen generada debe ser visualmente IDÉNTICA a la de la referencia: mismo rostro, misma complexión, mismas proporciones corporales. Solo cambia el encuadre, la ropa y el fondo. NO generes una persona diferente ni alteres ninguno de sus rasgos físicos.',
         'Mantén la identidad visual muy cercana a la referencia: evita drift facial, evita cambiar peso, evita cambiar forma de cara, hombros, pecho o cintura de manera notable. La identidad debe ser reconocible aunque la ropa y el fondo sean completamente distintos.',
         'La salida debe ser una fotografía 1:1 cuadrada, hiperrealista y nítida. PROHIBIDO: estética anime, ilustración, render 3D, CGI, caricatura, piel plastificada — el resultado DEBE parecer una foto real.',
         'PROHIBIDO deformar, estirar, ensanchar o aplastar la foto original. Si falta aire alrededor, completa mediante EXTENSIÓN REALISTA DEL FONDO.',
@@ -1835,7 +1835,7 @@ function publicista_build_reference_locked_prompt($job, $variantPrompt) {
         'La mujer debe ocupar aproximadamente el 80% de la imagen y quedar protagonista, con encuadre limpio y dominante. Solo usa formato selfie o primer plano muy cercano cuando la variante concreta lo pida; no conviertas todas las imágenes en selfie.',
         'Toda la producción debe parecer una única sesión del mismo día con EXACTAMENTE el mismo vestuario. No cambies escote, mangas, largo, tejido, zapatos ni complementos entre tomas.',
         'Si el encuadre no enseña toda la ropa, asume igualmente que fuera de cuadro sigue siendo exactamente la misma prenda y los mismos complementos.',
-        'Evita recortes incómodos y cualquier artefacto: manos extra, dedos raros, objetos derretidos, fondos torcidos, dobles caras, anatomía incorrecta.',
+        'Manos y antebrazos SIEMPRE completos y visibles dentro del encuadre — nunca cortados por ningún borde de la imagen. Ajusta el plano si es necesario para que quepan. Evita cualquier artefacto: manos extra, dedos raros, objetos derretidos, fondos torcidos, dobles caras, anatomía incorrecta.',
         'Mejora de forma natural la luz en rostro y cuerpo, contraste suave, color atractivo pero realista, piel natural y pelo definido. Si aplicas desenfoque de fondo, que sea muy sutil y el entorno siga siendo reconocible.',
     );
     if (!empty($outfitLock['negative_block'])) {
@@ -2826,6 +2826,55 @@ function publicista_build_pollo_subject_description($job) {
     return trim(implode('. ', $parts));
 }
 
+function publicista_detect_prompt_contradictions($prompt, $productionParams = array()) {
+    $promptLower = strtolower($prompt);
+    $warnings = array();
+    
+    // Rule 1: selfie indoors + outdoor background
+    $hasSelfie = (strpos($promptLower, 'selfie') !== false);
+    $hasOutdoor = preg_match('/(calle|exterior|terraza|balcón|patio|jardín|parque|urbana)/i', $prompt);
+    if ($hasSelfie && $hasOutdoor) {
+        $warnings[] = 'CONTRADICCIÓN: selfie + fondo exterior detectado. El selfie suele ser interior.';
+    }
+    
+    // Rule 2: protagonism 70-85% vs far shot 2-3m
+    $hasProtagonism = (strpos($promptLower, '70') !== false || strpos($promptLower, '80%') !== false || strpos($promptLower, 'protagonista') !== false || strpos($promptLower, 'domina el encuadre') !== false);
+    $hasFarShot = (strpos($promptLower, '2-3 metros') !== false || strpos($promptLower, 'lejano') !== false);
+    if ($hasProtagonism && $hasFarShot) {
+        $warnings[] = 'CONTRADICCIÓN: protagonismo alto (70-85%) incompatible con plano lejano (2-3m).';
+    }
+    
+    // Rule 3: studio/cyclorama vs real domestic environment
+    $hasStudio = preg_match('/(estudio|ciclorama|fondo liso|fondo blanco|fondo neutro|studio)/i', $prompt);
+    $hasDomestic = preg_match('/(salón|cocina|dormitorio|casa|doméstico|habitación real)/i', $prompt);
+    if ($hasStudio && $hasDomestic) {
+        $warnings[] = 'CONTRADICCIÓN: fondo de estudio vs entorno doméstico real.';
+    }
+    
+    // Rule 4: natural light vs artificial colored lights
+    $hasNatural = preg_match('/(luz natural|diurna|luz ambiente|luz cálida|ventana|bombilla)/i', $prompt);
+    $hasArtificial = preg_match('/(neón|led rosa|led violeta|discoteca|luz de color|iluminación artificial)/i', $prompt);
+    if ($hasNatural && $hasArtificial) {
+        $warnings[] = 'CONTRADICCIÓN: luz natural vs iluminación artificial de colores.';
+    }
+    
+    // Rule 5: vestido (dress) + vaqueros (jeans) in same image
+    $hasDress = preg_match('/vestido\b/i', $prompt);
+    $hasJeans = preg_match('/vaquero/i', $prompt);
+    if ($hasDress && $hasJeans) {
+        $warnings[] = 'CONTRADICCIÓN: vestido + vaqueros en misma descripción.';
+    }
+    
+    // Rule 6: thin/slender vs full-figured body
+    $hasThin = preg_match('/(delgad[oa]|esbelt[oa]|fina|estilizada|atletica)/i', $prompt);
+    $hasFull = preg_match('/(rellenita|gruesa|llenita|robusta|corpulenta|voluminosa|curvy|gordita|XL|XXL)/i', $prompt);
+    if ($hasThin && $hasFull) {
+        $warnings[] = 'CONTRADICCIÓN: complexión delgada vs corpulenta.';
+    }
+    
+    return $warnings;
+}
+
 function publicista_build_pollo_master_prompt($job) {
     $pp = function_exists('publicista_job_production_params') ? publicista_job_production_params($job) : array();
     $outfitDetails = publicista_build_outfit_prompt_details($job);
@@ -2897,52 +2946,73 @@ function publicista_build_pollo_master_prompt($job) {
 
     $sections = array();
 
+    // CAPA-2-OP: Operator brief (if exists) — injected ONCE only, no duplicate
     if ($operatorBrief !== '') {
-        $sections[] = '[BRIEF LIBRE DEL OPERADOR — PRIORIDAD MÁXIMA] ' . $operatorBrief;
+        $sections[] = '[CAPA-2-OP BRIEF LIBRE DEL OPERADOR — PRIORIDAD MÁXIMA] ' . $operatorBrief;
     }
 
-    $sections[] = '[MUJER — PARECIDO CON REFERENCIA — IDENTIDAD PRIORITARIA] Una sola mujer adulta. Debe mantener parecido general claro con la referencia original SIN copiar identidad exacta. ' . $subject . '. Prioriza el parecido por rostro, cabello, piel, complexión y silueta. El resultado debe evocar a la misma mujer real aunque la ropa, la pose y el entorno sean distintos. PROHIBIDO: estética anime, ilustración, CGI, render 3D, caricatura, contornos de cómic, ojos desproporcionados de dibujo animado, piel plastificada. El resultado DEBE ser una fotografía real con imperfecciones naturales.';
+    // CAPA-1-ID: Identity (non-compressible, must survive compaction)
+    $sections[] = '[CAPA-1-ID PRIORIDAD#1 PARECIDO A LA ORIGINAL — OBLIGATORIO] La mujer de la foto DEBE ser indistinguible de la persona de la referencia: mismo rostro, misma nariz, mismos ojos, misma boca, misma forma de cara, mismo tono de piel, misma complexión y volumen corporal exacto. Cópiala fielmente — solo la ropa y el fondo cambian. ' . $subject . '. PROHIBIDO: anime, ilustración, CGI, render 3D, caricatura, cómic, dibujo, ojos desproporcionados, piel plastificada/maniquí/Barbie. El resultado DEBE ser una foto real con imperfecciones naturales.';
 
-    // Bloque separado de complexión para máximo peso en el modelo
+    // CAPA-3-CPX: Complexion (non-compressible)
     $d2 = is_array(publicista_array_get($job, 'descriptor', array())) ? publicista_array_get($job, 'descriptor', array()) : array();
     $data2 = is_array(publicista_array_get($d2, 'data', array())) ? publicista_array_get($d2, 'data', array()) : array();
     $bodyBuild2  = trim((string)publicista_array_get($data2, 'body_build', ''));
     $bodyCurves2 = trim((string)publicista_array_get($data2, 'body_curves', ''));
     if ($bodyBuild2 !== '' || $bodyCurves2 !== '') {
         $bodyLine = trim($bodyBuild2 . ($bodyCurves2 !== '' ? '. ' . $bodyCurves2 : ''));
-        $sections[] = '[COMPLEXIÓN — OBLIGATORIO, NO NEGOCIABLE] La mujer DEBE tener la misma complexión que la referencia: ' . $bodyLine . '. PROHIBIDO adelgazar, estilizar, afinar o reducir el volumen corporal. PROHIBIDO generar una silueta más estrecha, más atlética o de menor talla que la referencia. Si hay duda, genera más volumen, nunca menos. El cuerpo debe conservar el mismo peso visual y distribución de carnes que la referencia.';
+        $sections[] = '[CAPA-3-CPX COMPLEXIÓN — OBLIGATORIO, NO NEGOCIABLE] La mujer DEBE tener la misma complexión que la referencia: ' . $bodyLine . '. PROHIBIDO adelgazar, estilizar, afinar o reducir el volumen corporal. PROHIBIDO generar una silueta más estrecha, más atlética o de menor talla que la referencia. Si hay duda, genera más volumen, nunca menos. El cuerpo debe conservar el mismo peso visual y distribución de carnes que la referencia.';
     }
-    $sections[] = '[ROPA Y ESTILO] ' . $outfitLine;
-    $sections[] = '[POSE Y ACTITUD] ' . $poseLine . '. ' . $expressionLine . '. Mirada viva, lenguaje corporal femenino y natural, postura atractiva y segura. La pose debe sentirse espontánea, como si un amigo tomara la foto, no una modelo profesional posando en estudio. Evita poses demasiado perfectas o simétricas: mejor un gesto natural e imperfecto.';
+
+    // CAPA-4-OUT: Outfit
+    $sections[] = '[CAPA-4-OUT ROPA Y ESTILO] ' . $outfitLine;
+
+    // CAPA-5-POSE: Pose + expression
+    $sections[] = '[CAPA-5-POSE POSE Y ACTITUD] ' . $poseLine . '. ' . $expressionLine . '. Mirada viva, lenguaje corporal femenino y natural, postura atractiva y segura. La pose debe sentirse espontánea, como si un amigo tomara la foto, no una modelo profesional posando en estudio. Evita poses demasiado perfectas o simétricas: mejor un gesto natural e imperfecto.';
+
+    // CAPA-6-SELF: Selfie mode
     if ($selfieLine !== '') {
-        $sections[] = '[SELFIE] ' . $selfieLine;
+        $sections[] = '[CAPA-6-SELF SELFIE] ' . $selfieLine;
     }
-    $sections[] = '[ENCUADRE] ' . $framingLine . '.';
-    // If random mode, use a generic line — specific backgrounds go into variants
+
+    // CAPA-7-FRM: Framing
+    $sections[] = '[CAPA-7-FRM ENCUADRE] ' . $framingLine . '.';
+
+    // CAPA-8-AMB: Ambiente/background
     $ambientKey = trim((string)($pp['setting'] ?? 'random'));
     if ($ambientKey === 'random') {
-        $sections[] = '[AMBIENTE] Cada imagen tendrá un fondo distinto. La descripción concreta del entorno se incluye al final en [FONDO PARA ESTA IMAGEN]. El entorno DEBE parecer real y cotidiano: habitación doméstica auténtica, salón, cocina, escalera, calle real o similar. NUNCA fondo liso de estudio, NUNCA fondo borroso artificial, NUNCA escenario de tienda ni estantería genérica. La persona ocupa el centro visual de la escena y domina el encuadre.';
+        $sections[] = '[CAPA-8-AMB AMBIENTE] Cada imagen tendrá un fondo distinto. La descripción concreta del entorno se incluye al final en [FONDO PARA ESTA IMAGEN]. El entorno DEBE parecer real y cotidiano: habitación doméstica auténtica, salón, cocina, escalera, calle real o similar. NUNCA fondo liso de estudio, NUNCA fondo borroso artificial, NUNCA escenario de tienda ni estantería genérica. La persona ocupa el centro visual de la escena y domina el encuadre.';
     } else {
-        $sections[] = '[AMBIENTE] Fondo y entorno: ' . trim((string)($envDesc['setting'] ?? 'entorno interior realista con contexto')) . '. El entorno debe parecer una foto real tomada en un espacio cotidiano, no un montaje de estudio. Incluye objetos personales y algo de desorden sutil: texturas reales en paredes, suelo y muebles. Debe sentirse real, vivido y coherente, nunca fondo liso de estudio genérico salvo que se haya pedido minimalista.';
+        $sections[] = '[CAPA-8-AMB AMBIENTE] Fondo y entorno: ' . trim((string)($envDesc['setting'] ?? 'entorno interior realista con contexto')) . '. El entorno debe parecer una foto real tomada en un espacio cotidiano, no un montaje de estudio. Incluye objetos personales y algo de desorden sutil: texturas reales en paredes, suelo y muebles. Debe sentirse real, vivido y coherente, nunca fondo liso de estudio genérico salvo que se haya pedido minimalista.';
     }
-    $lightingLine = trim((string)($envDesc['lighting'] ?? 'luz realista y coherente'));
-    $realismNote = 'FOTOGRAFÍA HIPERREALISTA — esta imagen debe ser indistinguible de una foto real. Captura la textura de la piel con poros, vello fino, pequeñas asimetrías faciales e imperfecciones naturales (manchitas, líneas de expresión, ligera heterogeneidad de tono). El cabello muestra mechones individuales con peso, brillo y movimiento coherentes con la gravedad. Los ojos tienen reflexo de luz real, iris con detalle y humedad visible. Sin efecto plastificado, sin skin smoothing, sin filtro de belleza. Parece tomada por una persona real con cámara de gama alta, con la imperfección propia de un disparo espontáneo.';
+
+    // CAPA-9-LUZ: Lighting + realism
+    $lightingLine = trim((string)($envDesc['lighting'] ?? 'luz ambiente natural realista'));
+    $realismNote = 'FOTO REAL INDISTINGUIBLE — piel con poros, vello, asimetrías, imperfecciones. Cabello con mechones individuales y peso real. Ojos con reflejo de luz e iris detallado. Sin skin smoothing, sin filtro belleza, sin efecto plastificado. PROHIBIDO: luces de neón rosa/violeta/colores artificiales sobre la piel, iluminación de discoteca, reflejos de colores irreales. Solo luz natural diurna o luz ambiente interior cálida realista (bombilla doméstica, ventana). Parece foto espontánea tomada con móvil.';
     if ($makeupLine !== '') {
-        $sections[] = '[LUZ Y ACABADO] ' . $lightingLine . '. ' . $makeupLine . '. ' . $realismNote;
+        $sections[] = '[CAPA-9-LUZ LUZ Y ACABADO] ' . $lightingLine . '. ' . $makeupLine . '. ' . $realismNote;
     } else {
-        $sections[] = '[LUZ Y ACABADO] ' . $lightingLine . '. ' . $realismNote;
+        $sections[] = '[CAPA-9-LUZ LUZ Y ACABADO] ' . $lightingLine . '. ' . $realismNote;
     }
 
-    $sections[] = '[CALIDAD] Fotografía hiperrealista de persona real — el resultado final debe poder confundirse con una fotografía auténtica hecha por un ser humano. Piel con poros, líneas de expresión y textura heterogénea natural; ojos con iris detallado y microrreflejos; cabello con mechones, peso y movimiento creíbles; manos con venas sutiles y articulaciones naturales. Sin piel de maniquí, sin Barbie, sin efecto CGI, sin filtro de belleza extremo, sin estética de anime ni ilustración digital. PROHIBIDO: anime, manga, caricatura, render 3D, dibujo animado, contornos tipo cómic, hipersaturación, ojos desproporcionados de dibujo, proporciones de muñeca, piel plastificada. Evita: manos deformes, dedos extra, proporciones irreales, texto, watermark, collage o anatomía incorrecta o mirada vacía.';
-    $sections[] = '[SEGURIDAD] Sexy y llamativa sí, pero siempre como glamour adulto no explícito: totalmente vestida, sin lencería visible, sin desnudo, sin transparencias íntimas, sin acto sexual ni foco fetichista.';
+    // CAPA-10-CAL: Quality + backgrounds
+    $sections[] = '[CAPA-10-CAL CALIDAD Y FONDOS] Foto real de persona real — NO ilustración, NO CGI, NO caricatura, NO render, NO dibujo. Piel con textura heterogénea, poros y líneas de expresión. Ojos con iris detallado y microreflejos. Cabello con peso y mechones reales. Manos correctas (5 dedos, articulaciones naturales). FONDO: entorno doméstico real (salón, cocina, calle, escalera, dormitorio normal). PROHIBIDO: fondo liso de estudio, ciclorama, degradado sintético, pared genérica sin textura, fondo borroso artificial, montaje digital. El fondo debe tener objetos reales, texturas de pared/suelo, mobiliario creíble y algo de desorden natural — como una casa de verdad. PROHIBIDO: anime, manga, caricatura, render 3D, dibujo animado, contornos cómic, hipersaturación, ojos de muñeca, piel Barbie, texto, watermark, collage, anatomía incorrecta.';
 
+    // CAPA-11-SEG: Safety
+    $sections[] = '[CAPA-11-SEG SEGURIDAD] Sexy y llamativa sí, pero siempre como glamour adulto no explícito: totalmente vestida, sin lencería visible, sin desnudo, sin transparencias íntimas, sin acto sexual ni foco fetichista.';
+
+    // CAPA-12-RES: Restrictions
     if ($restrictions !== '') {
-        $sections[] = '[RESTRICCIONES] ' . $restrictions . '.';
+        $sections[] = '[CAPA-12-RES RESTRICCIONES] ' . $restrictions . '.';
     }
 
+    // CAPA-13-VAR: Outfit variety
     if ($outfitVariety === 'mixed') {
-        $sections[] = '[VARIEDAD DE ROPA] ENTRE LAS DISTINTAS IMÁGENES DE ESTA SERIE, LA ROPA DEBE VARIAR. No uses exactamente el mismo outfit en todas las fotos. Usa 2-3 looks diferentes pero del mismo estilo y vibra (ej: vaqueros con distinto top, o misma americana sobre distinta camiseta). Cada imagen debe ser visualmente distinta en cuanto a ropa se refiere. No conviertas esto en un desfile de moda — son looks cotidianos de la misma persona.';
+        $sections[] = '[CAPA-13-VAR VARIEDAD DE ROPA] ENTRE LAS DISTINTAS IMÁGENES DE ESTA SERIE, LA ROPA DEBE VARIAR. No uses exactamente el mismo outfit en todas las fotos. Usa 2-3 looks diferentes pero del mismo estilo y vibra (ej: vaqueros con distinto top, o misma americana sobre distinta camiseta). Cada imagen debe ser visualmente distinta en cuanto a ropa se refiere. No conviertas esto en un desfile de moda — son looks cotidianos de la misma persona.';
     }
+
+    // CAPA-NEG: Negative block unificado
+    $sections[] = '[CAPA-NEG NEGATIVOS UNIFICADOS] ' . publicista_pollo_negative_block();
 
     return trim(implode("\n\n", array_filter($sections, function($x) {
         return trim((string)$x) !== '';
@@ -3042,7 +3112,7 @@ function publicista_build_master_prompt($job) {
     }
 
     // [PERSONA — rasgos físicos — SEGUNDO lugar para máximo peso en el modelo]
-    $sections[] = "[PERSONA — IDENTIDAD VISUAL PRIORITARIA] La mujer debe parecerse de forma general a la referencia visual sin replicar su identidad exacta. {$simGuide} "
+    $sections[] = "[PERSONA — IDENTIDAD VISUAL PRIORITARIA] La mujer DEBE ser visualmente LA MISMA PERSONA de la foto de referencia. Conserva EXACTAMENTE su rostro, tono de piel, complexión, proporciones corporales y silueta. La única diferencia permitida respecto a la referencia es la ropa y el fondo. {$simGuide} "
         . "Piel: {$skinTone}. "
         . "Cabello: {$hairColor}, {$hairTex}, longitud {$hairLen}. Peinado con volumen creíble, movimiento natural y acabado pulido de sesión fotográfica premium. "
         . "Complexión — CRÍTICO, NO NEGOCIABLE: {$bodyBuild}. CONSERVA EXACTAMENTE el mismo volumen corporal, distribución de peso y silueta que la referencia. PROHIBIDO adelgazar, estilizar ni afinar el cuerpo respecto a la referencia; PROHIBIDO también engordarlo más de lo que muestra. Si la referencia es robusta y con mucho volumen, genera ese mismo volumen. Si es delgada, conserva esa delgadez. Copia la silueta de la referencia, no la de un estereotipo de modelo. "
@@ -3061,10 +3131,9 @@ function publicista_build_master_prompt($job) {
         . 'cuello de longitud normal; orejas simétricas; muñecas y tobillos proporcionales; '
         . 'las dos piernas tienen la misma longitud; las dos manos tienen el mismo tamaño. '
         . 'PIEL: textura fotográfica real con poros visibles, NO piel de plástico, NO piel encerada, NO skin smoothing extremo, NO efecto de ilustración ni render digital. '
-        . 'COMPOSICIÓN: la figura no está cortada aleatoriamente salvo en plano medio (que corta a la altura de la cintura); '
+        . 'COMPOSICIÓN: la figura no está cortada aleatoriamente; en plano medio corta a la altura de la cintura pero las manos y los brazos SIEMPRE deben estar completos dentro del encuadre (nunca cortados por los bordes); en plano entero, la persona completa de pies a cabeza con margen alrededor; '
         . 'sin objetos flotantes; sin extremidades que aparezcan de la nada. '
-        . 'ESPEJOS: si aparece un espejo en la escena, el reflejo debe ser físicamente coherente con el ángulo de cámara; '
-        . 'si no puedes garantizar la coherencia del reflejo, elimina el espejo del fondo. '
+        . 'ESPEJOS: EVITA incluir espejos en la escena salvo que la configuración del setting lo pida explícitamente. Si el setting es "espejo_selfie", genera un reflejo simplificado y creíble. En cualquier otro caso, omite cualquier espejo del fondo para evitar reflejos irreales. '
         . 'ESTILO: sin filtros de belleza extremos; sin efecto HDR exagerado; profundidad de campo natural de objetivo 85mm f/1.8; '
         . 'la imagen debe parecer tomada con una cámara de gama alta por un fotógrafo real, no generada por IA.';
 
@@ -3212,11 +3281,11 @@ function publicista_build_prompt_variants($masterPrompt, $count = 6, $retryMode 
         $shots = array(
             'Plano lejano: persona a 2-3 metros de la cámara, espacio vacío alrededor, se ve el entorno completo. Nada de primer plano ni retrato cercano.',
             'Plano medio casual: persona desde la cintura hacia arriba pero ligeramente descentrada a la izquierda, con más espacio a la derecha — como foto de móvil mal encuadrada.',
-            'Plano entero casual: figura completa visible pero no perfectamente centrada, con aire desigual a los lados, piernas cortadas por el borde inferior como foto real de móvil.',
+            'Plano entero casual: figura completa de pies a cabeza visible y bien encuadrada, ligeramente descentrada con algo más de aire a un lado — como foto de móvil bien tomada donde se ve el cuerpo entero incluyendo pies y cabeza con margen.',
             'Plano lejano descentrado: persona a la izquierda del encuadre, se ve la habitación entera a la derecha, como foto casual donde el fondo importa más que el encuadre perfecto.',
             'Plano medio: desde cintura hacia arriba, con la persona ligeramente girada y no mirando a cámara — foto espontánea, no posada.',
             'Plano entero: persona de cuerpo completo pero sin posar, caminando o en movimiento natural, foto robada sin pose.',
-            'Plano selfie: persona sosteniendo el móvil, ángulo desde abajo o ligeramente torcido, selfie real no profesional.',
+            'Plano selfie: persona sosteniendo el móvil con la mano y el brazo completos y visibles dentro del encuadre, ángulo natural, selfie real donde se ve el cuerpo desde el torso hacia arriba con las manos siempre dentro de la imagen.',
             'Plano lejano: persona pequeña en el encuadre, mucho ambiente alrededor, como foto donde la persona no es el único foco.',
         );
 
@@ -4055,12 +4124,12 @@ function publicista_build_direct_final_output($jobId, $candidate, $finalIndex, $
         }
     }
 
-    // ── Refinado de identidad post-Pollo con gpt-image-1 ─────────────────────
-    // Pollo.ai genera text-to-image sin referencia visual, por lo que el parecido
-    // con la persona real puede ser bajo. Este paso usa gpt-image-1 /v1/images/edits
-    // con la imagen de referencia original para "re-inyectar" identidad:
-    // mismo rostro, complexión, tono de piel y proporciones. La escena se conserva.
-    if ($usePolloFinal && $out['final_path'] !== '') {
+    // ── Refinado de identidad post-Pollo DESACTIVADO ──────────────────────────
+    // El refinado con gpt-image-1 /v1/images/edits añadía efectos artificiales
+    // (iluminaciones rosas, piel plastificada) y reducía el parecido con la original.
+    // La imagen de Pollo v2 se usa directamente sin post-procesado GPT.
+    // Código preservado como referencia; reactivar si GPT mejora el endpoint edits.
+    if (false && $usePolloFinal && $out['final_path'] !== '') {
         $finalFsForRefine = BASE_PATH . '/' . ltrim($out['final_path'], '/');
         $sourceRel = trim((string)publicista_array_get(
             publicista_array_get(is_array($job) ? $job : publicista_job_get($jobId), 'source_image', array()),
@@ -4671,7 +4740,7 @@ function publicista_regenerate_candidate($jobId, $candidateId, $refineText = '',
     $prompt = $basePrompt;
     if ($prompt === '') {
         if (publicista_job_uses_pollo_model($job)) {
-            $prompt = publicista_build_pollo_master_prompt($job) . "\n\n[REINTENTO] Mantén el mismo tipo de mujer. Mejora el parecido físico, la nitidez y, sobre todo, el hiperrealismo fotográfico: piel con poros y textura real, ojos con iris detallado y humedad, cabello con mechones individuales y peso natural. El resultado debe ser indistinguible de una fotografía real.";
+            $prompt = publicista_build_pollo_master_prompt($job) . "\n\n[REINTENTO — PRIORIDAD ABSOLUTA PARECIDO AL ORIGINAL] La mujer DEBE ser idéntica a la de la foto de referencia: mismo rostro, mismos rasgos, misma complexión, mismo volumen. Piel con poros y textura real. Foto real, NO ilustración, NO CGI, NO caricatura. Luz natural, sin neones ni reflejos de colores. Fondo doméstico real, no estudio sintético.";
         } else {
             $prompt = publicista_build_reference_locked_prompt($job, publicista_build_master_prompt($job) . ' Prioriza todavía más manos correctas, un único rostro y máximo hiperrealismo fotográfico: piel con textura real, ojos vivos, figura humana creíble e indistinguible de una foto real.');
         }
@@ -4817,11 +4886,11 @@ function publicista_regenerate_candidate($jobId, $candidateId, $refineText = '',
         );
         $okLocal = true;
 
-        // ── Refinado de identidad post-Pollo con gpt-image-1 ──────────────────
-        // Aplica el mismo paso que en el pipeline inicial: re-inyectar identidad
-        // de la referencia original sobre la imagen candidata Pollo regenerada.
+        // ── Refinado de identidad post-Pollo DESACTIVADO ───────────────────────
+        // Mismo motivo que en el pipeline inicial: el refinado GPT añade efectos
+        // artificiales y reduce el parecido. Usamos la imagen directa de Pollo v2.
         $cfgRegen = publicista_ai_config();
-        if ($cfgRegen['configured']) {
+        if (false && $cfgRegen['configured']) {
             $sourceRegenRel = trim((string)publicista_array_get(
                 publicista_array_get($job, 'source_image', array()), 'stored_path', ''
             ));
@@ -8404,6 +8473,17 @@ function publicista_ads_euros($value) {
 // La cookie de sesion se guarda en Josue > ConfigM
 // ============================================================
 
+function publicista_pollo_negative_block() {
+    return 'NO: anime, manga, illustration, CGI, 3D render, cartoon, drawing, painting, sketch. ' .
+           'NO: plastic skin, wax skin, mannequin, Barbie, beauty filter, skin smoothing, airbrush. ' .
+           'NO: neon pink light, neon violet, purple glow, colored skin reflections, disco lights, unnatural rim light. ' .
+           'NO: studio cyclorama, plain wall, seamless background, generic backdrop, blurred fake bokeh. ' .
+           'NO: doll eyes, giant eyes, anime eyes, dead stare, asymmetrical pupils. ' .
+           'NO: text, watermark, logo, signature, collage, frame, border. ' .
+           'NO: extra fingers, fused fingers, missing fingers, deformed hands, extra limbs. ' .
+           'NO: double face, merged faces, floating body parts, impossible anatomy.';
+}
+
 function publicista_pollo_models() {
     return array(
         'pollo-image-v2'   => array('name' => 'Pollo Image v2',            'modelName' => 'pollo-image-v2',   'aspectRatio' => '1:1', 'resolution' => '1K', 'supports_mode' => true),
@@ -8544,6 +8624,146 @@ function publicista_pollo_is_prompt_too_big_error($message) {
     );
 }
 
+function publicista_pollo_measure_constraint_retention($originalPrompt, $compactedPrompt) {
+    $original = strtolower($originalPrompt);
+    $compacted = strtolower($compactedPrompt);
+    
+    // Extract key constraints from original using anchor keywords
+    $anchors = array(
+        'capas' => array('[capa-1-id', '[capa-2-op', '[capa-3-cpx'),
+        'identity' => array('mismo rostro', 'misma nariz', 'mismos ojos', 'misma boca', 'tono de piel', 'complexión', 'volumen corporal'),
+        'prohibitions' => array('prohibido', 'nunca', 'no ', 'no:'),
+        'realism' => array('piel con poros', 'piel con textura', 'foto real', 'hiperrealista', 'indistinguible'),
+        'lighting' => array('luz natural', 'luz ambiente', 'sin neón', 'sin skin smoothing'),
+        'background' => array('entorno doméstico', 'no fondo liso', 'no ciclorama', 'no estudio'),
+        'safety' => array('totalmente vestida', 'sin lencería', 'sin desnudo'),
+    );
+    
+    $totalConstraints = 0;
+    $retainedConstraints = 0;
+    $categories = array();
+    
+    foreach ($anchors as $category => $keywords) {
+        $catTotal = 0;
+        $catRetained = 0;
+        foreach ($keywords as $kw) {
+            if (strpos($original, $kw) !== false) {
+                $catTotal++;
+                $totalConstraints++;
+                if (strpos($compacted, $kw) !== false) {
+                    $catRetained++;
+                    $retainedConstraints++;
+                }
+            }
+        }
+        if ($catTotal > 0) {
+            $categories[$category] = array(
+                'total' => $catTotal,
+                'retained' => $catRetained,
+                'rate' => round(100 * $catRetained / $catTotal, 1),
+            );
+        }
+    }
+    
+    return array(
+        'total_constraints' => $totalConstraints,
+        'retained_constraints' => $retainedConstraints,
+        'retention_rate' => $totalConstraints > 0 ? round(100 * $retainedConstraints / $totalConstraints, 1) : 100,
+        'by_category' => $categories,
+    );
+}
+
+function publicista_pollo_compact_smart($prompt, $maxChars) {
+    $maxChars = max(200, (int)$maxChars);
+    $prompt = publicista_pollo_normalize_prompt_text($prompt, false);
+    
+    if (publicista_utf8_len($prompt) <= $maxChars) {
+        return array('prompt' => $prompt, 'final_length' => publicista_utf8_len($prompt));
+    }
+    
+    // Split into sections by double newline
+    $sections = preg_split('/\n{2,}/', $prompt);
+    if (count($sections) <= 1) {
+        $hardCapped = publicista_pollo_hard_cap_prompt($prompt, $maxChars);
+        return array('prompt' => $hardCapped, 'final_length' => publicista_utf8_len($hardCapped));
+    }
+    
+    // Priority: keep CAPA-1-ID, CAPA-2-OP, CAPA-3-CPX intact
+    $lockedSections = array();    // Never truncated
+    $importantSections = array(); // Truncated last
+    $normalSections = array();    // Truncated first
+    
+    foreach ($sections as $section) {
+        $sectionTrim = trim($section);
+        if ($sectionTrim === '') continue;
+        
+        // CAPA markers must be at START of section to prevent injection confusion
+        $isLocked = (strpos($sectionTrim, '[CAPA-1-ID') === 0) ||
+                     (strpos($sectionTrim, '[CAPA-3-CPX') === 0);
+        $isImportant = (strpos($sectionTrim, '[CAPA-2-OP') === 0) ||
+                       (strpos($sectionTrim, '[CAPA-11-SEG') === 0) ||
+                       (strpos($sectionTrim, '[CAPA-10-CAL') === 0);
+        
+        if ($isLocked) {
+            $lockedSections[] = $section;
+        } elseif ($isImportant) {
+            $importantSections[] = $section;
+        } else {
+            $normalSections[] = $section;
+        }
+    }
+    
+    // Assemble: locked first, then important, then normal
+    $orderedSections = array_merge($lockedSections, $importantSections, $normalSections);
+    
+    // Build prompt section by section until maxChars
+    $result = '';
+    $remaining = $maxChars;
+    $lockedText = implode("\n\n", $lockedSections);
+    $lockedLen = publicista_utf8_len($lockedText);
+    
+    // Always include all locked sections
+    $result = $lockedText;
+    $remaining -= $lockedLen;
+    
+    // Add important sections, truncating last one if needed
+    foreach ($importantSections as $section) {
+        $sectionLen = publicista_utf8_len($section);
+        if ($remaining >= $sectionLen + 2) {
+            $result .= "\n\n" . $section;
+            $remaining -= ($sectionLen + 2);
+        } elseif ($remaining > 50) {
+            $truncated = publicista_utf8_substr($section, 0, max(0, $remaining - 2));
+            $result .= "\n\n" . trim($truncated);
+            $remaining = 0;
+            break;
+        } else {
+            break;
+        }
+    }
+    
+    // Add normal sections with remaining space
+    if ($remaining > 50) {
+        foreach ($normalSections as $section) {
+            $sectionLen = publicista_utf8_len($section);
+            if ($remaining >= $sectionLen + 2) {
+                $result .= "\n\n" . $section;
+                $remaining -= ($sectionLen + 2);
+            } elseif ($remaining > 50) {
+                $truncated = publicista_utf8_substr($section, 0, max(0, $remaining - 2));
+                $result .= "\n\n" . trim($truncated);
+                $remaining = 0;
+                break;
+            } else {
+                break;
+            }
+        }
+    }
+    
+    $finalLength = publicista_utf8_len($result);
+    return array('prompt' => $result, 'final_length' => $finalLength);
+}
+
 function publicista_pollo_prepare_prompt($jobId, $prompt, $modelName = '', $hardMax = 2000, $forceAggressive = false) {
     $hardMax = max(200, min((int)$hardMax, publicista_pollo_prompt_char_limit()));
     $originalPrompt = publicista_pollo_normalize_prompt_text($prompt, false);
@@ -8575,16 +8795,19 @@ function publicista_pollo_prepare_prompt($jobId, $prompt, $modelName = '', $hard
         $compactModel = (string)($defaults['descriptor'] ?? 'gpt-5.4-mini');
     }
 
-    $instructions = "Resume y reescribe el siguiente prompt para un generador de imágenes con límite estricto de " . $targetChars . " caracteres. "
-        . "Debes conservar solo lo esencial para que la imagen salga bien. Prioriza, en este orden: "
-        . "(1) outfit exacto y consistencia de vestuario, "
-        . "(2) una sola mujer adulta con identidad/complexión coherente, "
-        . "(3) el ambiente, fondo y luz seleccionados, evitando convertir la escena en un fondo liso o de estudio genérico si no se pidió, "
-        . "(4) estilo fotográfico hiperrealista/editorial, "
-        . "(5) encuadre y pose relevantes, "
-        . "(6) restricciones críticas y negativos importantes, "
-        . "Conserva de forma explícita cualquier instrucción sobre entorno, ambientación, habitación, apartamento, hotel, calle, terraza, muebles, puertas, suelo, ventana o tipo de iluminación cuando aparezca en el prompt original. No conviertas el fondo en un ciclorama, pared lisa o estudio vacío salvo que el prompt original pida claramente un entorno minimalista/studio. El resultado debe ser un único prompt final utilizable directamente, sin explicaciones, sin markdown y sin enumeraciones innecesarias. "
-        . "No inventes detalles nuevos.\n\n[PROMPT ORIGINAL]\n" . $originalPrompt;
+    $instructions = "Resume y reescribe este prompt para un generador de imágenes con límite estricto de " . $targetChars . " caracteres. "
+        . "Conserva solo lo esencial. PRIORIDADES ESTRICTAS en este orden: "
+        . "(1) PARECIDO EXACTO a la persona de la foto original: rostro, rasgos faciales, tono piel, complexión, volumen corporal, cabello, señas distintivas, anclas de identidad — es LO MÁS IMPORTANTE, "
+        . "(2) instrucciones nuevas del operador (brief libre, texto de regeneración o refinado del usuario), "
+        . "(3) outfit y vestuario, "
+        . "(4) ambiente realista (habitación, calle, salón, cocina, objetos, texturas) SIN convertirlo en fondo liso/estudio, "
+        . "(5) iluminación natural (NO luces neón rosa/violeta, NO colores artificiales sobre la piel), "
+        . "(6) estilo fotográfico hiperrealista (piel con poros, imperfecciones, anti-plástico, anti-CGI, anti-caricatura), "
+        . "(7) encuadre y pose, "
+        . "(8) restricciones y negativos. "
+        . "El resultado debe ser una FOTO REAL de una persona real — NADA de ilustración, anime, CGI, render 3D, caricatura, dibujo ni efecto artificial. "
+        . "Conserva cualquier mención a entorno, mobiliario, puertas, ventanas, suelo o tipo de luz. No uses fondo liso/estudio salvo que el prompt lo pida. "
+        . "Devuelve un solo prompt usable directamente, sin explicaciones, sin markdown, sin listas. No inventes. Usa lenguaje compacto y esquemático para maximizar contenido.\n\n[PROMPT ORIGINAL]\n" . $originalPrompt;
 
     $payload = array_merge(publicista_response_payload_defaults('pollo_prompt_compact', $compactModel), array(
         'model' => $compactModel,
@@ -8630,6 +8853,19 @@ function publicista_pollo_prepare_prompt($jobId, $prompt, $modelName = '', $hard
                 }
             }
         }
+    }
+
+    // NEW: Deterministic smart compaction — preserves identity layers
+    $smartResult = publicista_pollo_compact_smart($originalPrompt, $hardMax);
+    if ($smartResult['final_length'] <= $hardMax) {
+        $result['prompt'] = $smartResult['prompt'];
+        $result['final_length'] = $smartResult['final_length'];
+        $result['compacted'] = ($smartResult['prompt'] !== $originalPrompt);
+        $result['method'] = 'smart_deterministic';
+        // Measure retention
+        $retention = publicista_pollo_measure_constraint_retention($originalPrompt, $smartResult['prompt']);
+        $result['constraint_retention'] = $retention;
+        return array(true, $result);
     }
 
     $fallbackPrompt = publicista_pollo_hard_cap_prompt($originalPrompt, $hardMax);

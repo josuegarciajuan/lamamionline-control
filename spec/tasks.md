@@ -13,11 +13,13 @@
 
 ### PRF-F02 — REARQUITECTURA_PROMPT
 
-- [ ] T2.1 — Prompt por capas (identidad/silueta, texto operador, resto).
-- [ ] T2.2 — Bloque anti-contradicciones automático.
-- [ ] T2.3 — Compactación robusta sin pérdida de anclas críticas.
-- [ ] T2.4 — Negativos anti-look-IA actualizados.
-- [ ] T2.5 — Validar retención >85% de constraints post-compactación.
+- [x] T2.1 — Prompt por capas (14 capas etiquetadas con prioridad locked/important/normal).
+- [x] T2.2 — Bloque anti-contradicciones (6 reglas de detección automática).
+- [x] T2.3 — Compactación robusta smart (locked sections nunca truncadas, important al final).
+- [x] T2.4 — Negativos anti-look-IA unificados (8 categorías en un solo bloque).
+- [x] T2.5 — Métrica de retención de constraints (>85% objetivo).
+- [x] T2.6 — Revisión de seguridad (1 MEDIUM corregido: CAPA marker position-locked).
+- [x] T2.7 — Documentación actualizada (design, contracts, changelog).
 
 ### PRF-F03 — CONTROL_IDENTIDAD_Y_SILUETA
 

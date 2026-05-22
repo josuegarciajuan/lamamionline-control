@@ -21,6 +21,54 @@
 - 43 jobs totales, 39 con candidatas, 156 candidatas generadas.
 - 39 jobs con evaluaciones OpenAI completas.
 
+### F02 — Rearquitectura del prompt
+
+#### Arquitectura de capas (implementada)
+El prompt maestro de Pollo ahora tiene 14 capas etiquetadas con prioridad:
+
+| Capa | Etiqueta | Contenido | Compresible |
+|---|---|---|---|
+| CAPA-1-ID | `[CAPA-1-ID PRIORIDAD#1 PARECIDO A LA ORIGINAL]` | Identidad facial/corporal, rasgos, complexión | **NO** (locked) |
+| CAPA-2-OP | `[CAPA-2-OP BRIEF LIBRE]` | Texto del operador | Sí (important) |
+| CAPA-3-CPX | `[CAPA-3-CPX COMPLEXIÓN]` | Complexión exacta, anti-adelgazamiento | **NO** (locked) |
+| CAPA-4-OUT | `[CAPA-4-OUT ROPA Y ESTILO]` | Outfit, tejidos, estilo | Sí |
+| CAPA-5-POSE | `[CAPA-5-POSE POSE Y ACTITUD]` | Pose, expresión | Sí |
+| CAPA-6-SELF | `[CAPA-6-SELF SELFIE]` | Modo selfie (si aplica) | Sí |
+| CAPA-7-FRM | `[CAPA-7-FRM ENCUADRE]` | Encuadre | Sí |
+| CAPA-8-AMB | `[CAPA-8-AMB AMBIENTE]` | Fondo/entorno | Sí |
+| CAPA-9-LUZ | `[CAPA-9-LUZ LUZ Y ACABADO]` | Iluminación, realismo | Sí (important) |
+| CAPA-10-CAL | `[CAPA-10-CAL CALIDAD Y FONDOS]` | Calidad, anti-artefactos | Sí (important) |
+| CAPA-11-SEG | `[CAPA-11-SEG SEGURIDAD]` | Glamour editorial, no explícito | Sí (important) |
+| CAPA-12-RES | `[CAPA-12-RES RESTRICCIONES]` | Restricciones adicionales | Sí |
+| CAPA-13-VAR | `[CAPA-13-VAR VARIEDAD DE ROPA]` | Variedad entre imágenes | Sí |
+| CAPA-NEG | `[CAPA-NEG NEGATIVOS UNIFICADOS]` | Negativos unificados | Sí |
+
+#### Detector de contradicciones
+Función `publicista_detect_prompt_contradictions()` detecta 6 conflictos:
+1. Selfie + fondo exterior
+2. Protagonismo alto + plano lejano
+3. Fondo estudio vs doméstico
+4. Luz natural vs artificial coloreada
+5. Vestido + vaqueros en misma imagen
+6. Complexión delgada vs corpulenta
+
+#### Compactación robusta
+Función `publicista_pollo_compact_smart()`:
+- Las capas locked (CAPA-1-ID, CAPA-3-CPX) nunca se truncan.
+- Las capas important (CAPA-2-OP, CAPA-10-CAL, CAPA-11-SEG) se truncan al final.
+- El resto se trunca primero.
+- Se integra como fallback entre GPT compaction y hard_cap.
+
+#### Negativos unificados
+Función `publicista_pollo_negative_block()`: 8 categorías de términos prohibidos unificados.
+
+#### Métrica de retención
+Función `publicista_pollo_measure_constraint_retention()`: mide % de constraints preservadas por categoría (capas, identidad, prohibiciones, realismo, iluminación, fondo, seguridad).
+
+#### Seguridad
+- CAPA markers solo se detectan al inicio de sección (previene inyección via operator_brief).
+- Los hallazgos de seguridad preexistentes (operator_brief sin validación, CSRF ausente en save_job) se documentan para F03.
+
 ### Decisiones de diseño F01
 - Usar datos históricos reales de `publicista_jobs.json` para baseline.
 - No implementar cambios de código en F01 (solo medición).

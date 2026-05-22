@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-05-23 · PRF-IDENTIDAD-FOTO-2026_F02 — Rearquitectura del prompt
+
+### Cambios implementados (5 tareas)
+1. **Prompt por capas** — 14 capas etiquetadas `[CAPA-N-XX]` con prioridad explícita. CAPA-1-ID y CAPA-3-CPX locked (nunca truncables). Corregido bug de duplicación del operator_brief.
+2. **Anti-contradicciones** — Nueva función `publicista_detect_prompt_contradictions()` con 6 reglas (selfie+exterior, protagonismo+lejano, estudio+doméstico, etc.).
+3. **Compactación robusta** — Nuevo `publicista_pollo_compact_smart()` determinístico: locked sections intactas, important al final.
+4. **Negativos unificados** — `publicista_pollo_negative_block()` con 8 categorías de términos prohibidos.
+5. **Métrica de retención** — `publicista_pollo_measure_constraint_retention()` mide % constraints preservadas por categoría.
+
+### Seguridad
+- Corregido 1 hallazgo MEDIUM: CAPA markers ahora solo se detectan a posición 0 (previene inyección vía operator_brief).
+- Documentados 2 hallazgos preexistentes (operator_brief sin validación, CSRF ausente) para abordar en F03.
+
+### Archivos modificados
+- `app/publicista.php` — 4 nuevas funciones + reestructuración de `publicista_build_pollo_master_prompt()` + integración en `publicista_pollo_prepare_prompt()`.
+- `spec/design.md` — Añadido diseño F02 (arquitectura de capas, compactación, negativos).
+- `spec/contracts.md` — Añadidos contratos F02 (capas, contradicciones, negativos, retención, seguridad).
+- `spec/tasks.md` — F02 marcada completa.
+- `docs/changelog.md` — Esta entrada.
+
 ## 2026-05-23 · PRF-IDENTIDAD-FOTO-2026_F01 — Baseline y métricas
 
 ### Resultados del baseline (43 jobs, 156 candidatas)

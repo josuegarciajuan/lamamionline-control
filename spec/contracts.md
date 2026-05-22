@@ -1,5 +1,31 @@
 # Contracts
 
+### F02 — Contrato de arquitectura de prompt
+
+#### Contrato de capas
+- El prompt maestro DEBE tener 14 capas con etiquetas `[CAPA-N-XX]` al inicio de cada sección.
+- CAPA-1-ID y CAPA-3-CPX son `locked` (nunca truncables en compactación).
+- CAPA-2-OP, CAPA-10-CAL, CAPA-11-SEG son `important` (últimas en truncarse).
+- El compactor DEBE respetar estas clasificaciones.
+
+#### Contrato de contradicciones
+- Antes de generar, se DEBE ejecutar `publicista_detect_prompt_contradictions()`.
+- Si devuelve warnings, se DEBEN registrar en el log del job.
+- Las contradicciones no bloquean la generación (solo advierten).
+
+#### Contrato de negativos
+- Todo prompt DEBE incluir `[CAPA-NEG NEGATIVOS UNIFICADOS]` con el bloque de negativos.
+- El bloque cubre: anti-ilustración, anti-plástico, anti-neón, anti-estudio, anti-artefactos.
+
+#### Contrato de retención
+- Tras compactación, se DEBE medir `constraint_retention`.
+- Umbral de éxito: retención > 85% de constraints totales.
+- Si retención < 85%, se DEBE registrar warning en el log.
+
+#### Contrato de seguridad del compactor
+- Los CAPA markers solo se reconocen al INICIO de sección (posición 0 tras trim).
+- Esto previene que texto de usuario inyecte falsos marcadores.
+
 ## Contratos PRF-IDENTIDAD-FOTO-2026
 
 ### F01 — Contrato de métricas baseline
