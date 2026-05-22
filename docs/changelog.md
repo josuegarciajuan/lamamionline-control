@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-05-23 · PRF-IDENTIDAD-FOTO-2026_F01 — Baseline y métricas
+
+### Resultados del baseline (43 jobs, 156 candidatas)
+
+| Métrica | Valor | Estado |
+|---|---|---|
+| Score medio candidatas | 28.5 / 100 | 🔴 Crítico |
+| Candidatas score 0-20 | 41.0% | 🔴 Crítico |
+| Candidatas score 80+ | 2.6% | 🔴 Crítico |
+| Finales de candidatas <30 | 58.3% | 🔴 Crítico |
+| Jobs con avg < 15 | 10 de 43 | 🔴 Crítico |
+
+### KPIs definidos
+- **Identity Similarity** (0-100): umbral mínimo final = 50, rechazo < 30.
+- **Silhouette Consistency** (0-100): umbral mínimo = 50.
+- **Background Coherence** (0-100): umbral mínimo = 50.
+- **Realism Artifact Rate** (%): máximo = 15%.
+- **Hand Anatomy Confidence** (0-100): mínimo = 60.
+- **Composition Consistency** (0-100): mínimo = 50.
+
+### Archivos modificados
+- `spec/requirements.md` — Añadido programa PRF-IDENTIDAD-FOTO-2026.
+- `spec/design.md` — Añadido diseño F01 con KPIs y umbrales.
+- `spec/contracts.md` — Añadidos contratos de métricas y selección.
+- `spec/tasks.md` — Añadidas fases PRF-F01 a PRF-F06.
+- `docs/changelog.md` — Esta entrada.
+
+### Próxima fase
+PRF-F02_REARQUITECTURA_PROMPT — Rediseñar construcción de prompt por capas.
+
 ## 2026-05-22 · QA-VALIDACION — Validación integral y cierre del proyecto (Fase 5)
 
 ### Resultados de validación

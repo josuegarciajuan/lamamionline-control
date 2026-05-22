@@ -1,5 +1,50 @@
 # Tasks por fases
 
+## PRF-IDENTIDAD-FOTO-2026 — Mejora de parecido y realismo Publicista
+
+### PRF-F01 — BASELINE_Y_METRICAS
+
+- [x] T1.1 — Definir KPIs: identity similarity, silhouette consistency, background coherence, realism artifacts, hand anatomy, composition.
+- [x] T1.2 — Seleccionar muestra representativa de jobs (43 jobs, 156 candidatas).
+- [x] T1.3 — Medir baseline actual por KPI (score medio=28.5, 58.3% finales de candidatas <30).
+- [x] T1.4 — Definir umbrales de "apto final" y "rechazo automático".
+- [x] T1.5 — Documentar hallazgos en specs (requirements, design, contracts).
+- [x] T1.6 — Actualizar changelog.
+
+### PRF-F02 — REARQUITECTURA_PROMPT
+
+- [ ] T2.1 — Prompt por capas (identidad/silueta, texto operador, resto).
+- [ ] T2.2 — Bloque anti-contradicciones automático.
+- [ ] T2.3 — Compactación robusta sin pérdida de anclas críticas.
+- [ ] T2.4 — Negativos anti-look-IA actualizados.
+- [ ] T2.5 — Validar retención >85% de constraints post-compactación.
+
+### PRF-F03 — CONTROL_IDENTIDAD_Y_SILUETA
+
+- [ ] T3.1 — Umbral de similitud objetivo (rango, no máximo).
+- [ ] T3.2 — Reglas explícitas de complexión/volumen corporal.
+- [ ] T3.3 — Gate de rechazo temprano por baja fidelidad.
+- [ ] T3.4 — Ninguna final < umbral mínimo de parecido.
+
+### PRF-F04 — COHERENCIA_1A1_Y_ENTORNO
+
+- [ ] T4.1 — Regla "extend scene, not replace".
+- [ ] T4.2 — Guardrails de composición sujeto-entorno.
+- [ ] T4.3 — Restricciones de iluminación realista.
+
+### PRF-F05 — RERANKING_Y_SELECCION_FINAL
+
+- [ ] T5.1 — Scoring con prioridad real en identidad/silueta.
+- [ ] T5.2 — Gates duros antes de selección final.
+- [ ] T5.3 — Política de regeneración automática.
+
+### PRF-F06 — EXPERIMENTOS_AB_Y_HARDENING
+
+- [ ] T6.1 — Diseñar A/B por bloques.
+- [ ] T6.2 — Medir por KPI F01.
+- [ ] T6.3 — Elegir configuración ganadora.
+- [ ] T6.4 — Checklist operativo de producción.
+
 ## Bot Casa — Parametrización del system prompt
 
 ### ORION-CORE — FASE 1: Estructura de datos y ensamblado en backend

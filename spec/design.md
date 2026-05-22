@@ -1,5 +1,33 @@
 # Design · Fase 1 + Fase 2
 
+## PRF-IDENTIDAD-FOTO-2026 — Diseño por fases
+
+### F01 — Baseline y métricas
+
+#### KPIs definidos
+1. **Identity Similarity Score (0-100)** — Parecido percibido con la referencia (likeness_score actual + métricas complementarias).
+2. **Silhouette Consistency (0-100)** — Conservación de complexión, volumen y proporciones corporales.
+3. **Background Coherence (0-100)** — Coherencia fondo-entorno respecto a la referencia (extensión vs sustitución).
+4. **Realism Artifact Rate (%)** — Tasa de artefactos IA (piel plástica, cartoon, CGI, manos mal).
+5. **Hand Anatomy Confidence (0-100)** — Calidad anatómica de manos visibles.
+6. **Composition Consistency (0-100)** — Relación sujeto-entorno y encuadre coherente.
+
+#### Umbrales de calidad
+- **Apto para final**: Identity ≥ 50, Silhouette ≥ 50, Background ≥ 50, Artifact Rate < 15%, Hand ≥ 60.
+- **Rechazo automático**: Identity < 30 (independientemente de otras métricas).
+- **Warning**: Identity 30-49 → requiere revisión manual antes de pasar a final.
+
+#### Muestra baseline
+- 43 jobs totales, 39 con candidatas, 156 candidatas generadas.
+- 39 jobs con evaluaciones OpenAI completas.
+
+### Decisiones de diseño F01
+- Usar datos históricos reales de `publicista_jobs.json` para baseline.
+- No implementar cambios de código en F01 (solo medición).
+- Las métricas se extraen de las evaluaciones existentes y se complementan con análisis heurístico.
+
+## Decisiones Fase 1
+
 ## Decisiones Fase 1
 1. **Compacción fuera de bootstrap**
    - `bootstrap_storage()` ya no ejecuta compactación pesada.

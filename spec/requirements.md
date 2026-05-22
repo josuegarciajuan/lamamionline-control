@@ -22,6 +22,25 @@ Mejorar el rendimiento percibido del sistema sin romper funcionalidad y preparar
 - Sin dependencias nuevas sin permiso.
 - Mantener compatibilidad funcional durante Fase 1.
 
+## PRF-IDENTIDAD-FOTO-2026 — Mejora de parecido y realismo en generación Publicista
+
+### Objetivo
+Generar candidatas **muy similares físicamente** a la original (sin clon exacto), con **foto real creíble**, **identidad/silueta preservadas** y **coherencia sujeto-entorno**, eliminando efectos artificiales (iluminaciones rosas, piel plastificada, look CGI/caricatura, fondos sintéticos).
+
+### Alcance por fases
+1. **F01_BASELINE_Y_METRICAS** — Medir estado actual, definir KPIs y umbrales de calidad.
+2. **F02_REARQUITECTURA_PROMPT** — Rediseñar construcción de prompt (capas, prioridades, anti-contradicciones).
+3. **F03_CONTROL_IDENTIDAD_Y_SILUETA** — Blindar parecido físico fuerte sin clon exacto.
+4. **F04_COHERENCIA_1A1_Y_ENTORNO** — Extensión de escena natural, no sustitución artificial.
+5. **F05_RERANKING_Y_SELECCION_FINAL** — Impedir que candidatas malas pasen a finales.
+6. **F06_EXPERIMENTOS_AB_Y_HARDENING** — Validar científicamente y cerrar versión estable.
+
+### Restricciones
+- Cambios mínimos y seguros.
+- Sin dependencias nuevas sin permiso.
+- Compatibilidad con flujo Pollo existente.
+- No modificar comportamiento de otros módulos (comercial, avisos, etc.).
+
 ## Bloque CX2 — Desbloqueo SDD bot comercial
 
 ### Objetivo

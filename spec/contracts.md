@@ -1,5 +1,27 @@
 # Contracts
 
+## Contratos PRF-IDENTIDAD-FOTO-2026
+
+### F01 — Contrato de métricas baseline
+
+#### Métricas obligatorias por candidata
+- `identity_similarity` (0-100): umbral mínimo para apto = 50.
+- `silhouette_consistency` (0-100): umbral mínimo = 50.
+- `background_coherence` (0-100): umbral mínimo = 50.
+- `realism_artifact_rate` (%): máximo permitido = 15%.
+- `hand_anatomy_confidence` (0-100): mínimo = 60.
+- `composition_consistency` (0-100): mínimo = 50.
+
+#### Gate de rechazo automático
+- `identity_similarity < 30` → candidata rechazada automáticamente, no puede ser final.
+- `identity_similarity 30-49` → warning, requiere revisión manual.
+
+#### Contrato de selección de finales
+- Una final no puede provenir de candidata con `effective_score < 30`.
+- El selector debe priorizar `likeness_score` sobre `overall_score`.
+
+## Contratos funcionales Fase 1
+
 ## Contratos funcionales Fase 1
 
 ### Avisos
