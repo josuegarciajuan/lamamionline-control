@@ -1,5 +1,32 @@
 # Tasks por fases
 
+## Bot Casa — Parametrización del system prompt
+
+### ORION-CORE — FASE 1: Estructura de datos y ensamblado en backend
+
+- [x] T1.1 — Nuevo esquema JSON en config.dist.json (template + sections con 10 secciones).
+- [x] T1.2 — Modificar Bot::buildSystemPrompt() para ensamblado dinámico con template + fallback legacy.
+- [x] T1.3 — Migrar config.local.json al nuevo formato parametrizado.
+- [x] T1.4 — Tests de humo (php -l, JSON validation, prompt assembly).
+
+### NOVA-PROMPT — FASE 2: Mejora integral del system prompt (pendiente)
+
+- [ ] T2.1–T2.10 — Reescritura de las 10 secciones con mejoras de humanidad, conversión y robustez.
+
+### ORION-UI — FASE 3: Panel de administración (pendiente)
+
+- [ ] T3.1–T3.6 — Rediseño del Tab 2 con preview en tiempo real del prompt ensamblado.
+
+### NOVA-TONEBUILDER — FASE 4: Ajustes en ToneBuilder (pendiente)
+
+- [ ] T4.1–T4.5 — Nuevas directivas de cierre suave, escasez, ETA rotativa.
+
+### QA-VALIDACION — FASE 5: Validación integral (pendiente)
+
+- [ ] T5.1–T5.6 — Lint, JSON, prompt assembly, panel, retrocompatibilidad.
+
+---
+
 ## Publiscort — Nueva rama comercial
 
 ### PUBLISCORT-F1 — MAPA_Y_ENCAJE (Mapa y Encaje de Rama)

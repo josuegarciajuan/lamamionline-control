@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-05-22 · ORION-CORE — Parametrización del system prompt del bot (Fase 1)
+
+### Objetivo
+Externalizar el system prompt monolítico del bot-casa en 10 secciones configurables
+independientemente, con ensamblado dinámico en runtime vía plantilla `[etiquetas]`.
+
+### Cambios implementados
+- **config.dist.json**: nuevo esquema `prompt.template` + `prompt.sections.*` (10 secciones).
+  - Secciones: `rol`, `estilo`, `tarifas`, `servicios`, `ubicacion`, `instrucciones_fotos`,
+    `identidad_chicas`, `seguridad`, `ejemplos`, `formato_respuesta`.
+  - El campo `system_prompt` legacy se mantiene como `null` (fallback en runtime).
+- **config.local.json**: migrado al nuevo esquema parametrizado. Prompt reconstruido
+  tiene 99.5% de similitud con el original.
+- **src/Bot.php** (`buildSystemPrompt`): ahora ensambla `prompt.template` sustituyendo
+  `[rol]`, `[estilo]`, etc. por los valores de `prompt.sections`. Mantiene fallback
+  legacy a `prompt.system_prompt` y los appends de ToneBuilder + Playbook.
+- Separación limpia entre estructura del prompt y valores editables.
+- Sin dependencias nuevas. Sin cambios en API/DB.
+
+### Tests
+- PHP lint: Bot.php, Config.php, ContextAssembler.php, ToneBuilder.php, panel.php → OK
+- JSON validation: config.dist.json, config.local.json → OK
+- Prompt assembly: 4693 chars, 0 unreplaced tags, 10/10 headers presentes → OK
+- Content verification: tarifa base, ubicación, identidad chicas, ejemplos, seguridad → OK
+
+### Archivos modificados
+- `bot-casa/config.dist.json` — nuevo esquema template + sections
+- `bot-casa/config.local.json` — migrado al nuevo esquema
+- `bot-casa/src/Bot.php` — `buildSystemPrompt()` con template assembly
+
+---
+
 ## 2026-05-22 · Memoria bot-casa + envío de fotos
 
 ### Bug 1 corregido — Memoria: teléfono completo, agrupado y clickeable

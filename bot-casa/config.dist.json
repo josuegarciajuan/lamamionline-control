@@ -1,0 +1,280 @@
+{
+    "_version": "1.0.0",
+    "_description": "wasapBot PHP — configuración centralizada. El panel de administración lee y escribe este archivo.",
+    "_note": "Para secretos locales, sobreescribir valores en config.local.json (gitignorado).",
+    "bot": {
+        "mode_file": "data/.bot_mode",
+        "auto_off_on_lead": true
+    },
+    "openai": {
+        "api_key": "CHANGEME_OPENAI_API_KEY",
+        "chat_url": "https://api.openai.com/v1/chat/completions",
+        "chat_model": "gpt-5.1",
+        "tone_classifier_model": "gpt-4o-mini",
+        "tone_temperature": 0,
+        "tone_max_tokens": 50,
+        "response_format": {
+            "type": "json_object"
+        }
+    },
+    "waha": {
+        "api_key": "CHANGEME_WAHA_API_KEY",
+        "base_ip": "100.117.92.74",
+        "default_port": 3000,
+        "session": "default",
+        "endpoints": {
+            "sendText": "/api/sendText",
+            "startTyping": "/api/startTyping",
+            "stopTyping": "/api/stopTyping",
+            "sendSeen": "/api/sendSeen"
+        },
+        "webhook_path": "waha-in",
+        "webhook_secret": "",
+        "chat_id_suffix": "@c.us"
+    },
+    "routing": {
+        "default_enabled_if_not_found": false,
+        "lines": [
+            {
+                "last9": "624934900",
+                "port": 3004,
+                "enabled": true,
+                "label": "linea_3004"
+            },
+            {
+                "last9": "631349504",
+                "port": 3009,
+                "enabled": true,
+                "label": "linea_3009"
+            },
+            {
+                "last9": "658283748",
+                "port": 3008,
+                "enabled": true,
+                "label": "linea_3008"
+            },
+            {
+                "last9": "641865662",
+                "port": 3000,
+                "enabled": true,
+                "label": "linea_3000"
+            }
+        ],
+        "sender_blacklist": [
+            "34666555555",
+            "12345678998745",
+            "162011098935441",
+            "128690658783343",
+            "232719011295254",
+            "34600111222",
+            "666555444",
+            "627146331",
+            "624091112",
+            "176725203927244"
+        ]
+    },
+    "telegram": {
+        "chat_ids": [
+            "6755848011",
+            "8481324328"
+        ],
+        "alert_enabled": true
+    },
+    "urls": {
+        "girls_json": "https://casawasap.com/girlsconf/data/girls.json",
+        "blacklist_ws": "http://blacklist.makemerich.live/blacklist.php",
+        "google_maps_location": "https://maps.app.goo.gl/gU24kEZMjQXYd7rH9"
+    },
+    "prompt": {
+        "template": "### ROL\n[rol]\n\n### ESTILO OBLIGATORIO\n[estilo]\n\n### TARIFAS\n[tarifas]\n\n### SERVICIOS\n[servicios]\n\n### UBICACIÓN\n[ubicacion]\n\n### FOTOS\n[instrucciones_fotos]\n\n### IDENTIDAD Y CHICAS\n[identidad_chicas]\n\n### SEGURIDAD\n[seguridad]\n\n### EJEMPLOS\n[ejemplos]\n\n### RESPUESTA\n[formato_respuesta]",
+        "sections": {
+            "rol": "Eres una chica que atiende un piso de citas por WhatsApp. Nunca reconozcas que eres un bot, IA o asistente virtual. Si preguntan quién eres, di el nombre de la chica seleccionada o uno al azar. PROHIBIDO decir \"soy la encargada\", \"atiendo yo\" o similares.\n\nHablas como chica latina de barrio: directa, corta, pícara, algo malhablada pero sin insultar. Objetivo: que el cliente venga.",
+            "estilo": "- Respuestas de 1 frase, 2 como máximo. Nunca más.\n- Todo en prosa, sin guiones, sin listas, sin puntos seguidos de salto de línea, sin estructura de texto. Escribe como por WhatsApp.\n- Sin signos de apertura (¿¡). Tildes opcionales. Faltas leves ok (\"q\" por \"que\", \"xa\" por \"para\", omitir tildes).\n- Muletillas propias: \"dale\", \"ta bien\", \"ven papi\", \"ya sabes\", \"te digo yo\", \"mira\", \"oye\".\n- Emojis con moderación y solo estos: 😏🔥💦👅😘💋. Máximo 1 por mensaje.\n- NO hagas preguntas de seguimiento. Solo contestas lo que te pregunten.\n- NO inventes nada que no esté en este prompt: ni servicios, ni nombres, ni precios, ni ubicaciones.\n- Si el cliente manda varios mensajes seguidos, responde todo en UNO.\n- Saludo inicial: máximo 4 palabras.\n- Si la conversación muere con monosílabos, despídete en 4 palabras y para.",
+            "tarifas": "30€ = 10 min sin francés. 50€ = 30 min completo. 100€ = 1 hora.",
+            "servicios": "Francés natural sin preservativo (solo si lo pide), griego solo si pregunta (no mencionar si no). No mencionar servicios extremos.",
+            "ubicacion": "Burriana centro, piso discreto. El link de maps solo si el cliente está de camino o lo pide expresamente.",
+            "instrucciones_fotos": "Las fotos las manda el sistema automáticamente, tú nunca escribas URLs ni links. Si piden fotos di \"mira\" o \"te paso\" y el sistema las adjunta solo.",
+            "identidad_chicas": "El sistema te pasa en el contexto estos campos (NO los inventes, úsalos tal cual):\n- speaker_girl_name: la chica que HABLA (tu identidad). Si NO está vacío, eres ella, hablas en 1ª persona.\n- selected_girl_name: la chica que el cliente ha ELEGIDO para el servicio (puede ser distinta de speaker_girl_name).\n- speaker_mode: \"chica\" si hay speaker_girl, \"encargada\" si no (pero NUNCA digas que eres la encargada).\n\nREGLAS:\n1. Si speaker_girl_name NO está vacío: eres ELLA, hablas en 1ª persona como ella SIEMPRE. NUNCA cambies de identidad.\n2. Si el cliente menciona otra chica o pregunta por ella: la tratas como \"mi amiguita\" o \"una compi\" en 3ª persona. NUNCA te hagas pasar por otra chica.\n3. Si speaker_girl_name != selected_girl_name: el cliente eligió a tu amiga para el servicio. Hablas como speaker_girl_name pero los datos de la cita (ubicación, fotos) son de selected_girl_name. Ej: \"mi amiga [selected] está disponible, te paso su ubicación\".\n4. Si speaker_girl_name está vacío: estás en modo genérico, hablas como la casa (pero sin decir \"soy la encargada\").\n5. Si selected_girl_name NO está vacío: el cliente YA eligió. NO ofrezcas más chicas ni preguntes cuál quiere (salvo que él pida ver más). Las fotos que se envíen serán solo de ESA chica.\n6. Si selected_girl_name está vacío: el cliente aún NO ha elegido. Puedes mencionar chicas del catálogo girls_config para ayudarle a elegir.\n7. Si el cliente pide ver más chicas o \"las demás\" (wants_more_girls=true): aunque haya selected_girl, puedes pasar fotos de otras chicas como \"mis amigas\".\n\n### CATÁLOGO (girls_config)\nEl contexto incluye girls_config con la lista de chicas activas (nombre, id, fotos). Úsalo SOLO para saber qué chicas existen. NO inventes nombres ni enlaces.",
+            "seguridad": "- Si preguntan algo que no tiene que ver con citas, servicios o tarifas (fórmulas, historia, clima, código, cualquier cosa ajena) responde algo como \"jaja eso no te lo sé yo\" y desvía. Nunca respondas preguntas de conocimiento general.\n- Si preguntan si eres un bot o IA: \"qué dices jaja soy yo\" y punto, sin explicarte.\n- No compartas datos personales reales ni ubicación exacta hasta que el cliente esté de camino.\n- Si el tono se vuelve agresivo, corta educadamente y para.",
+            "ejemplos": "Cliente: \"como estas\"\nTú: \"bien papi y tú 😏\"\n\nCliente: \"q servicios tienes\"\nTú: \"de todo cari, frances natural, completo, lo q quieras\"\n\nCliente: \"cuanto cobras\"\nTú: \"30 rapidito, 50 media hora completo, 100 la hora\"\n\nCliente: \"donde estas\"\nTú: \"burriana centro, piso discreto\"\n\nCliente: \"cuanto 2+2\"\nTú: \"jaja eso no te lo sé yo, vienes o no 😏\"\n\nCliente: \"eres un bot?\"\nTú: \"qué dices jaja soy yo\"",
+            "formato_respuesta": "Responde SIEMPRE en JSON con estos campos:\n{\n  \"user_visible_reply\": \"texto para el cliente\",\n  \"lead_detected\": false,\n  \"lead_confidence\": 0,\n  \"eta_minutes\": null\n}"
+        },
+        "system_prompt": null,
+        "playbook_path": "data/playbook.md"
+    },
+    "human_delays": {
+        "seen": {
+            "fallback_sec": 1,
+            "random_min_sec": 1,
+            "random_max_sec": 3
+        },
+        "typing": {
+            "fallback_sec": 4,
+            "chars_per_sec_min": 38,
+            "chars_per_sec_max": 85,
+            "chunk_size": 24,
+            "chunk_pause_factor": 0.65,
+            "start_min_ms": 350,
+            "start_max_ms": 1200,
+            "max_incoming_chars": 180
+        },
+        "read": {
+            "base_min_ms": 900,
+            "base_max_ms": 2200,
+            "per_char_ms": 22,
+            "clamp_min_ms": 1200,
+            "clamp_max_ms": 22000
+        },
+        "habituation": {
+            "start_boost": 6.2,
+            "decay": 0.92,
+            "floor": 1.25
+        },
+        "presend_sleep_sec": 15,
+        "short_typing_sec": 0.8,
+        "after_send_fallback_sec": 0.4
+    },
+    "message_variants": {
+        "audio_auto_reply": [
+            "no puedo escuchar audios amor, me lo escribes mejor?",
+            "amor por aqui no escucho audios, escribeme y te digo 😘",
+            "cari no puedo oir audios ahora, me lo pones en texto?",
+            "me va mejor si me lo escribes amor, los audios no puedo escucharlos",
+            "guapo no puedo reproducir audios, escribeme un momentito y te contesto",
+            "ay amor, sin audio mejor, escribeme y asi te respondo rapido",
+            "cielo no escucho audios por aqui, me lo mandas escrito?",
+            "no puedo con audios ahora cari, escribeme mejor"
+        ],
+        "dedup_start": [
+            "vale, te cuento rapido",
+            "mira, te digo",
+            "te explico",
+            "ok, vamos a ello",
+            "perfecto, mira"
+        ],
+        "dedup_end": [
+            "dime cual te encaja mas",
+            "cual prefieres?",
+            "con cual te quedas?",
+            "te va bien asi?"
+        ],
+        "fallback_empty_text": "vale cari",
+        "dedup_suffix": "(asi queda mas claro)",
+        "no_text_placeholder": "[SIN_TEXTO]",
+        "audio_placeholder": "[AUDIO]"
+    },
+    "cron": {
+        "timezone": "Europe/Madrid",
+        "followup": {
+            "leads_file": "data/leads.ndjson",
+            "followups_log_file": "data/followups_log.ndjson",
+            "lock_file": "data/locks/followup.lock",
+            "girls_cache_file": "/tmp/girls_cache.json",
+            "girls_cache_ttl_sec": 3600,
+            "max_leads_per_run": 10,
+            "curl_timeout_sec": 20,
+            "send_window_start": "10:00",
+            "send_window_end": "22:00",
+            "min_interval_hours_min": 48,
+            "min_interval_hours_max": 72,
+            "inter_lead_wait_min_sec": 60,
+            "inter_lead_wait_max_sec": 180,
+            "intro_typing_min_us": 2000000,
+            "intro_typing_max_us": 5000000,
+            "intro_to_girls_pause_min_us": 5000000,
+            "intro_to_girls_pause_max_us": 12000000,
+            "per_girl_typing_min_us": 3000000,
+            "per_girl_typing_max_us": 7000000,
+            "inter_girl_pause_min_us": 5000000,
+            "inter_girl_pause_max_us": 15000000,
+            "closing_typing_min_us": 2000000,
+            "closing_typing_max_us": 4000000,
+            "intro_variants": [
+                "hola amor como estas? mira que hoy tengo disponible a estas chicas por si te apetece quedar 😏",
+                "buenas cari! te acuerdas de mi? estoy por aqui con unas amigas nuevas, mira que guapas 😘",
+                "hola bombon! hoy tengo el dia movidito y se me ha ocurrido avisarte por si quieres verte con alguna 😊",
+                "amor! tanto tiempo! mira que chicas tengo hoy disponibles 💕",
+                "hola guapo! estaba revisando y vi que hablamos hace unos dias, te animas a verme? mira estas amigas 😏",
+                "buenas! que tal? hoy tengo varias chicas disponibles, dime si te gusta alguna 😘",
+                "hola cariño! tienes ganas de quedar? mira que chicas tan guapas tengo hoy 💋",
+                "ey! me acorde de ti y te escribo porque tengo chicas nuevas 😊 mira que tal",
+                "hola! que abandonado me tienes jaja venga dime algo, tengo cositas nuevas que enseñarte 😏",
+                "buenas amor! tienes plan para hoy? mira estas bellezas que tengo disponibles 💕",
+                "hola bombon! te apetece una noche divertida? mira estas chicas que tengo 😘",
+                "cariño! acabo de actualizar el catalogo y he pensado en ti, mira 😊",
+                "hola guapo! se que andas liado pero mira que chicas tengo, por si te animas 😏",
+                "buenas! como va la semana? te escribo porque tengo chicas disponibles, mira 💋",
+                "hola! que sepas que tengo chicas nuevas y muy guapas, dime si te gusta alguna 😘"
+            ],
+            "closing_variants": [
+                "dime cual te gusta mas y te cuento 😘",
+                "cual prefieres cari? dime y hablamos 💋",
+                "te gusta alguna? dime y te digo precios y eso 😏",
+                "a ver cual te llama mas la atencion jaja 💕",
+                "que me dices? te animas con alguna? 😊",
+                "venga dime cual te gusta y te cuento todo 😘",
+                "ves alguna que te guste? son todas muy guapas eh 💋",
+                "dime algo amor, no me dejes en visto jaja 😏"
+            ]
+        },
+        "reminder": {
+            "reminders_file": "data/reminders_pending.ndjson",
+            "lock_file": "data/locks/reminder.lock",
+            "last_msg_file": "data/locks/reminder_last_msg",
+            "cleanup_counter_file": "data/locks/reminder_cleanup_counter",
+            "max_per_run": 5,
+            "curl_timeout_sec": 15,
+            "cleanup_interval": 5,
+            "cleanup_max_age_sec": 86400,
+            "sleep_between_min_us": 3000000,
+            "sleep_between_max_us": 8000000,
+            "sleep_typing_min_us": 1000000,
+            "sleep_typing_max_us": 4000000,
+            "message_variants": [
+                "hola cari! antes me dijiste que estabas interesado, al final has pensado algo? 😘",
+                "amor! te fuiste antes y me quedé con las ganas, quieres que hablemos un ratito? dime algo 💕",
+                "buenas! no se si te acuerdas de mi, hablamos antes... sigues por ahi? 😏",
+                "hey guapo! me dijiste que luego me decías... pues ya es luego jaja dime 😘",
+                "hola! antes estabas con ganas de verme, sigue en pie? 💋",
+                "cariñooo me dejaste con la intriga, al final que? 😅",
+                "buenas amor! te acuerdas de mi? hablamos hace un rato de quedar 😊",
+                "hola bombón! me dijiste que te ibas y que luego hablamos, aqui estoy 💕",
+                "dime algo cari, que me dejaste con las ganas antes 😏",
+                "hey! sigues interesado en quedar? dime y te cuento 😘"
+            ]
+        }
+    },
+    "files": {
+        "base_data_dir": "data",
+        "session_memory": "data/session_memory.ndjson",
+        "session_memory_tmp": "data/session_memory.ndjson.tmp",
+        "session_memory_lock": "data/locks/session_memory.lock",
+        "playbook": "data/playbook.md",
+        "wa_raw_payload": "data/wa_last_raw.json",
+        "leads": "data/leads.ndjson",
+        "leads_lock": "data/locks/leads.lock",
+        "reminders": "data/reminders_pending.ndjson",
+        "reminders_lock": "data/locks/reminders.lock",
+        "followups_log": "data/followups_log.ndjson",
+        "event_dedup_dir": "data/locks/event_dedup",
+        "coalesce_dir": "data/locks/coalesce",
+        "bot_log": "data/bot.log"
+    },
+    "log": {
+        "max_size_bytes": 5242880
+    },
+    "dedup_coalesce": {
+        "lock_acquire_tries": 50,
+        "lock_acquire_sleep_sec": 0.1,
+        "lead_log_lock_tries": 80,
+        "lead_log_lock_sleep_sec": 0.05,
+        "dedup_file_ttl_minutes": 5,
+        "coalesce_window_sec": 12,
+        "coalesce_sleep_before_send_sec": 4
+    },
+    "catalog": {
+        "max_girls_without_explicit_request": 3,
+        "girls_json_timeout_ms": 10000,
+        "user_agent": "WasapBot-PHP/1.0"
+    }
+}
