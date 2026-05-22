@@ -1,6 +1,39 @@
 # Changelog
 
-## 2026-05-22 · Fase 1 — Fix Bot Casa toggle encender/apagar
+## 2026-05-22 · Fase 2 — Fix Comercial-procesos toggle encender/apagar
+
+### Bug corregido
+- **Comercial → Procesos**: el botón "Apagar" no cambiaba el estado cuando el proceso era el último activo. El usuario recibía un flash `OK` falso aunque el proceso seguía encendido.
+
+### Causa raíz
+`action_toggle_comercial_process_enabled()` en `actions.php` siempre ejecutaba `comercial_upsert_process()` y emitía flash `'ok'` independientemente del resultado real. El guardrail antidesconexión masiva en `comercial_save_processes()` silenciosamente restauraba el proceso al estado anterior cuando se intentaba apagar el último proceso activo, pero no informaba al usuario. Resultado: flash `"Estado del proceso actualizado"` correcto pero estado sin cambiar.
+
+Doble problema adicional:
+- El mensaje de flash era genérico (`"Estado del proceso actualizado"`), sin indicar qué proceso ni a qué estado.
+- La comparación `request_post('enabled') ? 1 : 0` era ambigua para el string `'0'` (PHP lo trata como falsy, lo que en este caso era correcto pero no explícito).
+
+### Solución aplicada
+En `app/actions.php`, función `action_toggle_comercial_process_enabled()`:
+
+1. **Pre-check del guardrail**: antes de ejecutar el upsert, si la acción es "apagar", se cuenta cuántos procesos están activos. Si el proceso objetivo es el único activo, se redirige con `flash('error', ...)` explicativo **sin** intentar el cambio.
+
+2. **Comparación explícita**: `(int)request_post('enabled') === 1 ? 1 : 0` en lugar del truthy implícito.
+
+3. **Flash informativo**: el mensaje ahora incluye el nombre del proceso y la acción realizada: `"Proceso 'Plaza' apagado correctamente."` / `"Proceso 'Casawasap' encendido correctamente."`.
+
+### Ejemplo de mensaje de error al usuario (nuevo)
+> `No se puede apagar "Publiscort" porque es el único proceso activo. Enciende otro proceso antes de apagar este.`
+
+### Archivos modificados
+- `app/actions.php` — función `action_toggle_comercial_process_enabled()`
+
+### Tests ejecutados
+- Simulación PHP de 3 escenarios: encender apagado ✓, apagar único activo → flash error ✓, apagar cuando hay 2 activos ✓
+- Lint PHP `actions.php` y `comercial.php` → sin errores
+
+---
+
+
 
 ### Bug corregido
 - **Bot Casa panel iframe**: el botón "ENCENDER BOT" no hacía nada visible al pulsarlo.

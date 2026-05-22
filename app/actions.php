@@ -1,5 +1,26 @@
 <?php
 
+function handle_get_actions() {
+    if (!is_logged_in()) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('ok' => false, 'error' => 'No autenticado.'));
+        exit;
+    }
+    $action = trim((string)($_GET['action'] ?? ''));
+    switch ($action) {
+        case 'poll_publicista_regen_status':
+            action_poll_publicista_regen_status();
+            break;
+        case 'cancel_publicista_regen_queue':
+            action_cancel_publicista_regen_queue();
+            break;
+        default:
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(array('ok' => false, 'error' => 'Acción GET desconocida.'));
+            exit;
+    }
+}
+
 function handle_post_actions() {
     $action = request_post('action');
 
@@ -357,6 +378,9 @@ function handle_post_actions() {
         case 'regenerate_publicista_candidate':
             action_regenerate_publicista_candidate();
             break;
+        case 'poll_publicista_regen_status':
+            action_poll_publicista_regen_status();
+            break;
         case 'refresh_publicista_final_local':
             action_refresh_publicista_final_local();
             break;
@@ -383,6 +407,12 @@ function handle_post_actions() {
             break;
         case 'voice_command':
             action_voice_command();
+            break;
+        case 'save_jostal_contrato':
+            action_save_jostal_contrato();
+            break;
+        case 'submit_contrato_firma':
+            action_submit_contrato_firma();
             break;
     }
 }
@@ -540,6 +570,95 @@ function action_regenerate_publicista_candidate() {
         }
     }
 
+    exit;
+}
+
+/**
+ * Endpoint de polling ligero. Devuelve JSON con:
+ * - queue: estado de la cola de regeneraciones (queued/running/done/error por candidateId)
+ * - candidates: snapshot de square_path + filemtime + status de cada candidata
+ * - avisos_count: número de avisos activos nuevos (para badge)
+ * No requiere CSRF — solo GET con id del job.
+ */
+function action_poll_publicista_regen_status() {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    $id = trim((string)($_GET['id'] ?? $_POST['id'] ?? ''));
+    if ($id === '') {
+        echo json_encode(array('ok' => false, 'error' => 'Falta id del trabajo.'));
+        exit;
+    }
+    $job = function_exists('publicista_job_get') ? publicista_job_get($id) : null;
+    if (!$job) {
+        echo json_encode(array('ok' => false, 'error' => 'Trabajo no encontrado.'));
+        exit;
+    }
+    $queue = function_exists('publicista_regen_queue_get') ? publicista_regen_queue_get($id) : array();
+    $candidates = is_array($job['candidates'] ?? null) ? $job['candidates'] : array();
+    $candidatesOut = array();
+    foreach ($candidates as $cand) {
+        $candId = trim((string)($cand['id'] ?? ''));
+        if ($candId === '') continue;
+        $squarePath = trim((string)($cand['square_path'] ?? ''));
+        $fsPath = $squarePath !== '' ? BASE_PATH . '/' . ltrim($squarePath, '/') : '';
+        $mtime = ($fsPath !== '' && file_exists($fsPath)) ? (int)filemtime($fsPath) : 0;
+        $candidatesOut[$candId] = array(
+            'square_path' => $squarePath,
+            'mtime'       => $mtime,
+            'src'         => $mtime > 0 ? $squarePath . '?t=' . $mtime : $squarePath,
+            'status'      => trim((string)($cand['status'] ?? '')),
+            'round'       => trim((string)($cand['round'] ?? '')),
+            'error'       => trim((string)($cand['error'] ?? '')),
+        );
+    }
+    // Avisos activos recientes (últimos 30 min)
+    $avisosCount = 0;
+    if (function_exists('avisos_get_active')) {
+        $avisos = avisos_get_active();
+        if (is_array($avisos)) {
+            $cutoff = time() - 1800;
+            foreach ($avisos as $av) {
+                $createdAt = trim((string)($av['created_at'] ?? ''));
+                $ts = $createdAt !== '' ? strtotime($createdAt) : 0;
+                if ($ts >= $cutoff) $avisosCount++;
+            }
+        }
+    }
+    echo json_encode(array(
+        'ok'           => true,
+        'queue'        => $queue,
+        'candidates'   => $candidatesOut,
+        'avisos_count' => $avisosCount,
+        'ts'           => time(),
+    ), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+/**
+ * Cancela las entradas en cola (queued) para un job dado.
+ * Las entradas en running no se pueden cancelar desde aquí (el proceso PHP ya arrancó).
+ */
+function action_cancel_publicista_regen_queue() {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    $id = trim((string)($_GET['id'] ?? ''));
+    if ($id === '') {
+        echo json_encode(array('ok' => false, 'error' => 'Falta id del trabajo.'));
+        exit;
+    }
+    if (!function_exists('publicista_regen_queue_get') || !function_exists('publicista_regen_queue_set_status')) {
+        echo json_encode(array('ok' => false, 'error' => 'Funciones de cola no disponibles.'));
+        exit;
+    }
+    $queue = publicista_regen_queue_get($id);
+    $cancelled = array();
+    foreach ($queue as $candId => $entry) {
+        if (($entry['status'] ?? '') === 'queued') {
+            publicista_regen_queue_set_status($id, $candId, 'cancelled', 'Cancelado por el usuario');
+            $cancelled[] = $candId;
+        }
+    }
+    echo json_encode(array('ok' => true, 'cancelled' => $cancelled), JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -1822,6 +1941,8 @@ function action_save_jostal_clienta() {
             'modo' => trim(request_post('modo')),
             'rent_due_weekday' => max(1, min(7, (int)request_post('rent_due_weekday', jostal_weekday_from_date($firstArrival)))),
             'nombre' => trim(request_post('nombre')),
+            'nombre_real' => trim(request_post('nombre_real')),
+            'dni' => trim(request_post('dni')),
             'updated_at' => now_datetime(),
             'created_at' => now_datetime(),
             'source_interesada_id' => $sourceInteresadaId,
@@ -1852,6 +1973,8 @@ function action_save_jostal_clienta() {
         'modo' => trim(request_post('modo')),
         'rent_due_weekday' => max(1, min(7, (int)request_post('rent_due_weekday', jostal_alquiler_due_weekday($existing)))),
         'nombre' => trim(request_post('nombre')),
+        'nombre_real' => trim(request_post('nombre_real')),
+        'dni' => trim(request_post('dni')),
         'updated_at' => now_datetime(),
         'created_at' => isset($existing['created_at']) ? $existing['created_at'] : now_datetime(),
         'source_interesada_id' => isset($existing['source_interesada_id']) ? $existing['source_interesada_id'] : '',
@@ -3257,11 +3380,33 @@ function action_toggle_comercial_process_enabled() {
         redirect_to(comercial_page_url('procesos'));
     }
 
-    $row['enabled'] = request_post('enabled') ? 1 : 0;
+    $newEnabled = (int)request_post('enabled') === 1 ? 1 : 0;
+    $nombre = trim((string)($row['nombre'] ?? $row['slug'] ?? $id));
+
+    // Detectar si el guardrail de apagado masivo va a bloquear el cambio
+    // antes de ejecutarlo, para informar al usuario con claridad.
+    if ($newEnabled === 0) {
+        $allProcesses = comercial_get_processes();
+        $currentEnabledCount = 0;
+        foreach ($allProcesses as $p) {
+            if (!empty($p['enabled'])) {
+                $currentEnabledCount++;
+            }
+        }
+        if ($currentEnabledCount <= 1 && !empty($row['enabled'])) {
+            // El guardrail impediría apagar el último proceso activo.
+            // Informamos al usuario y no intentamos el cambio.
+            set_flash('error', 'No se puede apagar "' . $nombre . '" porque es el único proceso activo. Enciende otro proceso antes de apagar este.');
+            redirect_to(comercial_page_url('procesos', array('edit' => $row['id'])));
+        }
+    }
+
+    $row['enabled'] = $newEnabled;
     $row['next_run_at'] = '';
     comercial_upsert_process($row);
 
-    set_flash('ok', 'Estado del proceso actualizado.');
+    $accion = $newEnabled ? 'encendido' : 'apagado';
+    set_flash('ok', 'Proceso "' . $nombre . '" ' . $accion . ' correctamente.');
     redirect_to(comercial_page_url('procesos', array('edit' => $row['id'])));
 }
 
@@ -4095,4 +4240,98 @@ function action_publicar_estado_manual() {
         set_flash('error', $result['error']);
     }
     redirect_to('index.php?page=publicista&tab=estados_wasap');
+}
+
+// ─── Jostal Contratos ─────────────────────────────────────────────────────
+
+function action_save_jostal_contrato() {
+    $clientaId = trim(request_post('clienta_id'));
+    if ($clientaId === '') {
+        set_flash('error', 'Falta el ID de clienta.');
+        redirect_to('index.php?page=jostal&tab=clientas');
+    }
+
+    $existing = contrato_find_by_clienta($clientaId);
+    $id = $existing ? $existing['id'] : generate_id('ctr');
+    $esNuevo = !$existing;
+
+    $ventana = contrato_calcular_ventana_15dias();
+
+    $contenidoRaw = trim(request_post('contenido_habitacion', ''));
+    $contenidoLineas = array();
+    if ($contenidoRaw !== '') {
+        $lineas = preg_split('/\r\n|\r|\n/', $contenidoRaw);
+        foreach ($lineas as $linea) {
+            $linea = trim($linea);
+            if ($linea !== '') $contenidoLineas[] = $linea;
+        }
+    }
+
+    $row = array(
+        'id' => $id,
+        'clienta_id' => $clientaId,
+        'estado' => $existing ? ($existing['estado'] ?? 'borrador') : 'borrador',
+        'datos_arrendadora' => array(
+            'nombre' => trim(request_post('arrendadora_nombre', 'Josué')),
+            'dni' => trim(request_post('arrendadora_dni', '')),
+            'telefono' => trim(request_post('arrendadora_telefono', '')),
+            'domicilio' => trim(request_post('arrendadora_domicilio', '')),
+        ),
+        'datos_ocupante' => array(
+            'nombre_real' => trim(request_post('ocupante_nombre_real', '')),
+            'dni' => trim(request_post('ocupante_dni', '')),
+            'telefono' => trim(request_post('ocupante_telefono', '')),
+        ),
+        'habitacion_plaza' => trim(request_post('habitacion_plaza', '')),
+        'direccion_inmueble' => trim(request_post('direccion_inmueble', '')),
+        'precio_semanal' => trim(request_post('precio_semanal', '')),
+        'fianza' => trim(request_post('fianza', '')),
+        'contenido_habitacion' => $contenidoLineas,
+        'fecha_inicio' => $ventana['fecha_inicio'],
+        'fecha_fin' => $ventana['fecha_fin'],
+        'firma_ocupante' => $existing ? ($existing['firma_ocupante'] ?? contrato_default_row()['firma_ocupante']) : contrato_default_row()['firma_ocupante'],
+        'firma_arrendadora' => $existing ? ($existing['firma_arrendadora'] ?? contrato_default_row()['firma_arrendadora']) : contrato_default_row()['firma_arrendadora'],
+        'url_firma_token' => $existing ? ($existing['url_firma_token'] ?? generate_id('ctrtkn')) : generate_id('ctrtkn'),
+        'updated_at' => now_datetime(),
+        'created_at' => $existing ? ($existing['created_at'] ?? now_datetime()) : now_datetime(),
+    );
+
+    storage_upsert('contratos.json', $row);
+
+    set_flash('ok', $esNuevo ? 'Contrato creado.' : 'Contrato actualizado.', 'celebrate');
+    redirect_to('index.php?page=jostal&tab=clientas&edit=' . urlencode($clientaId));
+}
+
+function action_submit_contrato_firma() {
+    $token = trim(request_post('token', ''));
+    $contrato = contrato_find_by_token($token);
+
+    if (!$contrato) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('ok' => false, 'error' => 'Contrato no encontrado.'));
+        exit;
+    }
+
+    $firmaDataUrl = trim(request_post('firma_data_url', ''));
+    if ($firmaDataUrl === '') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('ok' => false, 'error' => 'No se ha recibido la firma.'));
+        exit;
+    }
+
+    $contrato['estado'] = 'firmado';
+    $contrato['firma_ocupante'] = array(
+        'data_url' => $firmaDataUrl,
+        'fecha_hora' => date('Y-m-d H:i:s'),
+        'ip' => $_SERVER['REMOTE_ADDR'] ?? '',
+        'dispositivo' => trim(request_post('dispositivo', $_SERVER['HTTP_USER_AGENT'] ?? '')),
+        'navegador' => trim(request_post('navegador', '')),
+    );
+    $contrato['updated_at'] = now_datetime();
+
+    storage_upsert('contratos.json', $contrato);
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(array('ok' => true, 'message' => 'Contrato firmado correctamente.'));
+    exit;
 }
