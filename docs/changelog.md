@@ -1,5 +1,47 @@
 # Changelog
 
+## 2026-05-22 · Fase 1 — Fix Bot Casa toggle encender/apagar
+
+### Bug corregido
+- **Bot Casa panel iframe**: el botón "ENCENDER BOT" no hacía nada visible al pulsarlo.
+
+### Causa raíz
+`config.local.json` tenía `bot.mode_file` configurado como ruta absoluta
+(`/var/www/html/atupuerta/control/bot-casa/public/data/.bot_mode`).
+Tanto `panel.php` como `BotModeGate.php` construyen la ruta como
+`WASAPBOT_ROOT . '/' . ltrim($modeFile, '/')`, lo que con una ruta absoluta
+produce una ruta duplicada e inexistente:
+`/var/www/html/atupuerta/control/bot-casa/var/www/html/.../public/data/.bot_mode`
+
+Consecuencia:
+- `setBotMode()` intentaba escribir en una ruta que no existe → silencio total.
+- `getBotMode()` devolvía `'unknown'` al no encontrar el fichero → el botón
+  siempre mostraba "ENCENDER BOT" sin cambiar.
+- `BotModeGate.php` fallaba en `validatePath()` → operaba siempre en modo `start`
+  (fail-open), por lo que el bot no respondía al toggle tampoco.
+
+### Solución aplicada
+Cambio mínimo en `bot-casa/config.local.json`:
+```json
+// Antes (roto):
+"mode_file": "/var/www/html/atupuerta/control/bot-casa/public/data/.bot_mode"
+
+// Después (correcto):
+"mode_file": "data/.bot_mode"
+```
+
+El fichero `bot-casa/data/.bot_mode` ya existía con permisos `666` y propietario
+`www-data`, por lo que no se requieren cambios de permisos.
+
+### Archivos modificados
+- `bot-casa/config.local.json` — valor de `bot.mode_file`
+
+### Tests ejecutados
+- Simulación PHP de `getBotMode()` / `setBotMode()` → OK (write=4 bytes)
+- Simulación de `BotModeGate.validatePath()` → OK (`str_starts_with` en verde)
+
+---
+
 ## 2026-05-15 · Publiscort F6 — CIERRE_ENTREGA
 
 ### Resumen de archivos tocados (F1→F5)
