@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-05-23 · PRF-IDENTIDAD-FOTO-2026_F06 — Experimentos A/B y hardening (CIERRE DE PROGRAMA)
+
+### Cambios implementados (4 tareas)
+1. **6 experimentos A/B diseñados** — Capa ID, compactación smart, gates, extend scene, anti-neón, auto-regen. Cada uno con hipótesis, muestra (10 jobs) y KPI objetivo.
+2. **Medición pre-post definida** — Contra baseline F01 (score 28.5). Target post: score ≥50, 0% finales <30, <15% candidatas 0-20.
+3. **Fórmula de decisión ponderada** — likeness×0.4 + silhouette×0.25 + background×0.15 + artifact_reduction×0.1 + composition×0.1. ≥15 adoptar, 8-14 piloto, <8 descartar.
+4. **Checklist operativo** — Pre-rollout (backup, lint, test), rollout (monitorizar primer job), monitorización 48h, rollback (score <35 o ≥3 errores), cierre (ADR-009).
+
+### CIERRE DEL PROGRAMA PRF-IDENTIDAD-FOTO-2026
+
+| Fase | Estado | Commits |
+|---|---|---|
+| F01 — Baseline y métricas | ✅ | `b9210de` |
+| F02 — Rearquitectura del prompt | ✅ | `9cdb2de` |
+| F03 — Control de identidad y silueta | ✅ | `0011420` |
+| F04 — Coherencia 1:1 y entorno | ✅ | `4fe75cf` |
+| F05 — Reranking y selección final | ✅ | `3e332cd` |
+| F06 — Experimentos A/B y hardening | ✅ | (este commit) |
+
+**Total**: 6 fases, 6 commits, ~750 líneas añadidas en código y documentación.
+
+### Archivos modificados en F06
+- `spec/design.md` — +30 líneas: diseño F06 (experimentos, medición, decisión, checklist).
+- `spec/contracts.md` — +16 líneas: contratos experimentación, decisión, producción.
+- `spec/tasks.md` — F06: 5/5 tareas completadas + programa cerrado.
+- `docs/changelog.md` — Esta entrada + cierre de programa.
+
 ## 2026-05-23 · PRF-IDENTIDAD-FOTO-2026_F05 — Reranking y selección final
 
 ### Cambios implementados (3 tareas)

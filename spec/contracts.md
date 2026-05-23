@@ -80,6 +80,23 @@
   - Máximo 3 rondas de auto-regeneración.
 - Si `auto_regenerate=0`, pipeline sigue con `status = 'needs_review'` cuando < 4 finales.
 
+### F06 — Contrato de experimentos A/B y hardening
+
+#### Contrato de experimentación
+- Cada experimento DEBE ejecutarse sobre mín. 10 jobs (40 candidatas).
+- Resultados DEBEN compararse contra baseline F01.
+- Mejora DEBE ser estadísticamente significativa (p<0.05 o mejora absoluta >umbral).
+
+#### Contrato de decisión
+- Configuración ganadora se elige por fórmula ponderada: likeness×0.4 + silhouette×0.25 + background×0.15 + artifact_reduction×0.1 + composition×0.1.
+- Score ≥15: adopción directa. 8-14: piloto controlado. <8: descartar.
+
+#### Contrato de producción
+- Rollout DEBE incluir backup de archivos pre-F06.
+- Rollback DEBE activarse si score medio <35 tras 10 jobs o ≥3 errores consecutivos.
+- Monitorización DEBE cubrir: score medio, % finales <30, auto-regen rate, error rate.
+- Cierre DEBE incluir ADR-009 documentando la decisión final de arquitectura de prompt.
+
 ## Contratos PRF-IDENTIDAD-FOTO-2026
 
 ### F01 — Contrato de métricas baseline

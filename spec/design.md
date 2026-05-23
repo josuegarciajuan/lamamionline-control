@@ -131,6 +131,36 @@ Nueva función `publicista_candidate_meets_minimum_threshold()`:
 - No implementar cambios de código en F01 (solo medición).
 - Las métricas se extraen de las evaluaciones existentes y se complementan con análisis heurístico.
 
+### F06 — Experimentos A/B y hardening
+
+#### Diseño de experimentos A/B (T6.1)
+6 experimentos alineados con cambios F01-F05:
+
+| # | Experimento | Variable | Hipótesis | Muestra |
+|---|---|---|---|---|
+| E1 | Capa ID al inicio | Posición CAPA-1-ID | likeness_score +10 pts | 10 jobs |
+| E2 | Compactación smart vs GPT | Método compactación | Retención >85% vs ~60% | 10 jobs |
+| E3 | Gates ON vs OFF | meets_minimum_threshold() | 0% finales likeness<30 | 10 jobs |
+| E4 | Extend scene vs sin directiva | CAPA-8-AMB "EXTIENDE" | background +15 pts | 10 jobs |
+| E5 | Anti-neón reforzado vs básico | CAPA-9-LUZ "PROHIBIDO" | artifacts -10% | 10 jobs |
+| E6 | Auto-regen ON vs OFF | auto_regenerate=1 | 80% jobs 4 finales | 10 jobs |
+
+#### Medición KPIs F01 (T6.2)
+- **Pre**: baseline F01 (score medio 28.5, 58.3% finales <30).
+- **Post**: recalcular 6 KPIs con nueva configuración.
+- **Target**: score medio ≥50, 0% finales <30, <15% candidatas 0-20.
+
+#### Configuración ganadora (T6.3)
+Fórmula: `Score = likeness_gain×0.4 + silhouette×0.25 + background×0.15 + artifact_reduction×0.1 + composition×0.1`
+- ≥15: adoptar. 8-14: piloto. <8: descartar.
+
+#### Checklist producción (T6.4)
+- **Pre-rollout**: backup, lint, 1 job test manual.
+- **Rollout**: activar config, monitorizar primer job.
+- **Monitorización 48h**: score medio, % finales <30, auto-regen rate.
+- **Rollback**: si score <35 en 10 jobs o ≥3 errores → `git revert` F01-F06.
+- **Cierre**: ADR-009, docs/operacion.md, spec/design.md final.
+
 ## Decisiones Fase 1
 
 ## Decisiones Fase 1

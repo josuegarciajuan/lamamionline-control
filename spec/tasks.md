@@ -49,10 +49,11 @@
 
 ### PRF-F06 — EXPERIMENTOS_AB_Y_HARDENING
 
-- [ ] T6.1 — Diseñar A/B por bloques.
-- [ ] T6.2 — Medir por KPI F01.
-- [ ] T6.3 — Elegir configuración ganadora.
-- [ ] T6.4 — Checklist operativo de producción.
+- [x] T6.1 — Diseñar 6 experimentos A/B (capa ID, compactación, gates, extend scene, anti-neón, auto-regen).
+- [x] T6.2 — Definir medición pre-post contra KPIs F01 (baseline 28.5 → target ≥50).
+- [x] T6.3 — Fórmula de decisión ponderada para configuración ganadora (≥15 adoptar, 8-14 piloto, <8 descartar).
+- [x] T6.4 — Checklist operativo: pre-rollout, rollout, monitorización 48h, rollback, cierre (ADR-009).
+- [x] T6.5 — Documentación final: design, contracts, tasks, changelog + cierre de programa.
 
 ## Bot Casa — Parametrización del system prompt
 
