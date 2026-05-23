@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-05-23 · PRF-IDENTIDAD-FOTO-2026_F03 — Control de identidad y silueta
+
+### Cambios implementados (5 tareas + seguridad)
+1. **Scoring recalibrado** — `effective_score` ahora 60% likeness + 20% overall. Body mismatch penaliza -20 (máxima severidad).
+2. **Gates de rechazo** — Nueva función `meets_minimum_threshold()`: likeness<30 = hard reject, likeness<50+bad body = reject, likeness<40 = warning.
+3. **Selección blindada** — `rebuild_finals_from_candidates()` filtra por umbral antes de seleccionar top-4. Rechazos registrados en pipeline para trazabilidad.
+4. **Validación operator_brief** — Límite 500 chars + sanitización CAPA via regex `\[CAPA\b` → `[C4P4-`.
+5. **Validación restrictions_text** — Límite 1000 chars + misma sanitización CAPA.
+
+### Impacto esperado
+- Se elimina el 58.3% de finales que provenían de candidatas con score < 30.
+- Si no hay 4 candidatas que pasen los gates, se regeneran automáticamente (F05).
+- Trazabilidad completa de rechazos en `pipeline.rejection_summary`.
+
+### Seguridad
+- Corregidos 2 hallazgos heredados de F02: operator_brief sin validación (HIGH) y restrictions_text sin sanitizar (MEDIUM).
+- CAPA sanitization mejorada de str_ireplace a regex para cubrir más variantes.
+
+### Archivos modificados
+- `app/publicista.php` — effective_score reescrito, nueva función meets_minimum_threshold, rebuild_finals refactorizado.
+- `app/helpers.php` — operator_brief con límite 500 chars + CAPA sanitize.
+- `app/actions.php` — restrictions_text con límite 1000 chars + CAPA sanitize.
+- `spec/design.md` — Añadido diseño F03.
+- `spec/contracts.md` — Añadidos contratos F03.
+- `spec/tasks.md` — F03 marcada completa.
+- `docs/changelog.md` — Esta entrada.
+
 ## 2026-05-23 · PRF-IDENTIDAD-FOTO-2026_F02 — Rearquitectura del prompt
 
 ### Cambios implementados (5 tareas)

@@ -69,7 +69,32 @@ Función `publicista_pollo_measure_constraint_retention()`: mide % de constraint
 - CAPA markers solo se detectan al inicio de sección (previene inyección via operator_brief).
 - Los hallazgos de seguridad preexistentes (operator_brief sin validación, CSRF ausente en save_job) se documentan para F03.
 
-### Decisiones de diseño F01
+### F03 — Control de identidad y silueta
+
+#### Scoring recalibrado
+`publicista_candidate_effective_score()` reescrito:
+- **60% likeness_score** (parecido con la referencia) — componente principal.
+- **20% overall_score** (calidad técnica).
+- **20% pool de flags** (penalizaciones).
+- `body_proportions_match=false` ahora penaliza -20 (antes -14), la más severa.
+
+#### Gates de rechazo
+Nueva función `publicista_candidate_meets_minimum_threshold()`:
+- **Gate 1 (HARD REJECT)**: `likeness_score < 30` → rechazo automático.
+- **Gate 2 (SILHOUETTE REJECT)**: `likeness < 50` + `body_proportions_match=false` → rechazo.
+- **Gate 3 (WARNING)**: `likeness < 40` → requiere revisión manual.
+
+#### Selección final blindada
+`publicista_rebuild_finals_from_candidates()` refactorizado:
+1. Filtra candidatas que no cumplen umbrales mínimos.
+2. Ordena elegibles por effective_score.
+3. Selecciona top-4 (o menos si no hay suficientes).
+4. Rechazos registrados en `pipeline.rejection_summary` para trazabilidad.
+
+#### Seguridad (heredado de F02)
+- `operator_brief`: límite 500 chars + sanitización CAPA via regex `\[CAPA\b`.
+- `restrictions_text`: límite 1000 chars + misma sanitización.
+- CAPA markers se convierten a `[C4P4-` para prevenir confusión en el compactor.
 - Usar datos históricos reales de `publicista_jobs.json` para baseline.
 - No implementar cambios de código en F01 (solo medición).
 - Las métricas se extraen de las evaluaciones existentes y se complementan con análisis heurístico.

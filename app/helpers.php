@@ -611,7 +611,6 @@ function publicista_setting_type_options() {
         'dormitorio_real' => 'Dormitorio real (habitación normal, objetos cotidianos)',
         'salon_casa'    => 'Salón de casa (ambiente doméstico vivido)',
         'espejo_selfie' => 'Selfie de espejo (baño o habitación con espejo)',
-        'neutro'          => 'Fondo neutro (gris liso, para editar después)',
     );
 }
 
@@ -715,7 +714,15 @@ function publicista_normalize_outfit_params($raw) {
     $out['makeup']       = trim((string)($raw['makeup_pref'] ?? ($raw['makeup'] ?? 'auto')));
     $out['selfie_mode']  = trim((string)($raw['selfie_mode'] ?? 'off'));
     $out['outfit_variety'] = trim((string)($raw['outfit_variety'] ?? 'off'));
-    $out['operator_brief'] = trim((string)($raw['operator_brief'] ?? ''));
+    $rawBrief = trim((string)($raw['operator_brief'] ?? ''));
+    // Security: limit 500 chars, strip CAPA-like injection markers
+    if (function_exists('mb_substr')) {
+        $rawBrief = mb_substr($rawBrief, 0, 500, 'UTF-8');
+    } else {
+        $rawBrief = substr($rawBrief, 0, 500);
+    }
+    $rawBrief = preg_replace('/\[CAPA\b/i', '[C4P4-', $rawBrief);
+    $out['operator_brief'] = $rawBrief;
     $out['copy_brief']   = trim((string)($raw['copy_brief'] ?? ''));
 
     $allowedSelfieModes = array_keys(publicista_selfie_mode_options());
@@ -1236,10 +1243,11 @@ function bot_girls_panel_url($bot) {
 }
 
 function dashboard_external_bot_config() {
+    $modePath = '/srv/n8n_data/.bot_mode';
     return array(
         'id' => 'dashboard_external_bot',
         'nombre_bot' => 'Casawasap externo',
-        'bot_mode_path' => '/srv/n8n_data/.bot_mode',
+        'bot_mode_path' => $modePath,
         'girls_panel_url' => 'https://casawasap.com/girlsconf/',
     );
 }
@@ -2223,4 +2231,62 @@ function publicista_pick_random_backgrounds($count = 4) {
         $available = array_values($available);
     }
     return $picked;
+}
+
+// ─── Jostal Contratos ──────────────────────────────────────────────────────
+
+function contrato_default_row() {
+    return array(
+        'id' => '',
+        'clienta_id' => '',
+        'estado' => 'borrador',
+        'datos_arrendadora' => array('nombre' => 'Josué', 'dni' => '', 'telefono' => '', 'domicilio' => ''),
+        'datos_ocupante' => array('nombre_real' => '', 'dni' => '', 'telefono' => ''),
+        'habitacion_plaza' => '',
+        'direccion_inmueble' => '',
+        'precio_semanal' => '',
+        'fianza' => '',
+        'contenido_habitacion' => array(),
+        'fecha_inicio' => '',
+        'fecha_fin' => '',
+        'firma_ocupante' => array('data_url' => '', 'fecha_hora' => '', 'ip' => '', 'dispositivo' => '', 'navegador' => ''),
+        'firma_arrendadora' => array('data_url' => '', 'fecha_hora' => ''),
+        'url_firma_token' => '',
+        'created_at' => '',
+        'updated_at' => '',
+    );
+}
+
+function contrato_generar_url_firma($contrato) {
+    $token = !empty($contrato['url_firma_token']) ? $contrato['url_firma_token'] : generate_id('ctrtkn');
+    $base = 'https://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '/control';
+    return $base . '/contrato_firmado.php?token=' . urlencode($token);
+}
+
+function contrato_calcular_ventana_15dias() {
+    $hoy = business_today_date();
+    $fechaInicio = date('Y-m-d', strtotime($hoy));
+    $fechaFin = date('Y-m-d', strtotime($hoy . ' + 14 days'));
+    return array('fecha_inicio' => $fechaInicio, 'fecha_fin' => $fechaFin);
+}
+
+function contrato_find_by_clienta($clientaId) {
+    $contratos = storage_read('contratos.json');
+    foreach ($contratos as $c) {
+        if (($c['clienta_id'] ?? '') === $clientaId) return $c;
+    }
+    return null;
+}
+
+function contrato_find_by_token($token) {
+    $contratos = storage_read('contratos.json');
+    foreach ($contratos as $c) {
+        if (($c['url_firma_token'] ?? '') === $token) return $c;
+    }
+    return null;
+}
+
+function contrato_clienta_tiene_contrato_firmado($clientaId) {
+    $contrato = contrato_find_by_clienta($clientaId);
+    return $contrato && ($contrato['estado'] ?? '') === 'firmado';
 }

@@ -447,8 +447,15 @@ function action_save_publicista_job() {
     $row['tarifas_snapshot'] = trim((string)request_post('tarifas_snapshot'));
     $row['localidad_snapshot'] = trim((string)request_post('localidad_snapshot'));
     $row['provincia_snapshot'] = trim((string)request_post('provincia_snapshot'));
+    $rawRestr = trim((string)request_post('restrictions_text'));
+    if (function_exists('mb_substr')) {
+        $rawRestr = mb_substr($rawRestr, 0, 1000, 'UTF-8');
+    } else {
+        $rawRestr = substr($rawRestr, 0, 1000);
+    }
+    $rawRestr = preg_replace('/\[CAPA\b/i', '[C4P4-', $rawRestr);
     $row['workflow'] = array_merge(isset($existing['workflow']) && is_array($existing['workflow']) ? $existing['workflow'] : array(), array(
-        'restrictions_text' => trim((string)request_post('restrictions_text')),
+        'restrictions_text' => $rawRestr,
         'restriction_flags' => publicista_normalize_restriction_flags(request_post('restriction_flags', array())),
         'auto_regenerate' => !empty($_POST['auto_regenerate']) ? 1 : 0,
     ));

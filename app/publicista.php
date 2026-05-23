@@ -4014,20 +4014,36 @@ function publicista_evaluate_candidate_with_openai($jobId, $sourceFs, $candidate
 
 function publicista_candidate_effective_score($candidate) {
     $eval = is_array(publicista_array_get($candidate, 'evaluation', array())) ? publicista_array_get($candidate, 'evaluation', array()) : array();
-    $score = (int)publicista_array_get($eval, 'overall_score', 0);
-
-    if (empty($eval['single_person']))      $score -= 20;
+    
+    // ── COMPONENTE PRINCIPAL: parecido con la referencia (0-100) ──────────
+    $likeness = max(0, (int)publicista_array_get($eval, 'likeness_score', 0));
+    $overall = max(0, (int)publicista_array_get($eval, 'overall_score', 0));
+    
+    // Base: 60% likeness + 20% overall + 20% flags
+    $score = (int)round(($likeness * 0.60) + ($overall * 0.20));
+    $flagPool = 20; // max 20 points from flags
+    
+    // ── PENALIZACIONES DE IDENTIDAD/SILUETA (severas) ──────────────────────
+    if (array_key_exists('body_proportions_match', $eval) && empty($eval['body_proportions_match'])) {
+        $score -= 20; // PÉRDIDA GRAVE: no respeta complexión/silueta
+    }
+    
+    // ── PENALIZACIONES DE ANATOMÍA ─────────────────────────────────────────
+    if (empty($eval['single_person']))      $score -= 18;
     if (empty($eval['anatomy_ok']))         $score -= 16;
     if (empty($eval['single_face_clear']))  $score -= 16;
     if (empty($eval['hands_ok']))           $score -= 14;
-    if (array_key_exists('body_proportions_match', $eval) && empty($eval['body_proportions_match'])) $score -= 14;
-    if (array_key_exists('subject_prominence_ok', $eval) && empty($eval['subject_prominence_ok']))   $score -= 12;
-    if (array_key_exists('square_fill_realistic', $eval) && empty($eval['square_fill_realistic']))   $score -= 12;
-    if (array_key_exists('no_stretch_detected', $eval) && empty($eval['no_stretch_detected']))       $score -= 12;
+    
+    // ── PENALIZACIONES DE COMPOSICIÓN/ENTORNO ──────────────────────────────
+    if (array_key_exists('subject_prominence_ok', $eval) && empty($eval['subject_prominence_ok']))   $score -= 10;
+    if (array_key_exists('square_fill_realistic', $eval) && empty($eval['square_fill_realistic']))   $score -= 10;
+    if (array_key_exists('no_stretch_detected', $eval) && empty($eval['no_stretch_detected']))       $score -= 10;
+    
+    // ── PENALIZACIONES DE CALIDAD ──────────────────────────────────────────
     if (array_key_exists('skin_texture_ok', $eval) && empty($eval['skin_texture_ok']))               $score -= 8;
-    if (array_key_exists('mirror_coherent', $eval) && empty($eval['mirror_coherent']))               $score -= 7;
-    if (array_key_exists('background_ok', $eval) && empty($eval['background_ok']))                   $score -= 7;
-
+    if (array_key_exists('mirror_coherent', $eval) && empty($eval['mirror_coherent']))               $score -= 5;
+    if (array_key_exists('background_ok', $eval) && empty($eval['background_ok']))                   $score -= 5;
+    
     return max(0, min(100, $score));
 }
 
@@ -4613,19 +4629,73 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
 }
 
 
+/**
+ * Verifica si una candidata cumple los umbrales mínimos de identidad/silueta.
+ * @return array [bool $passes, string $reason]
+ */
+function publicista_candidate_meets_minimum_threshold($candidate) {
+    $eval = is_array(publicista_array_get($candidate, 'evaluation', array())) ? publicista_array_get($candidate, 'evaluation', array()) : array();
+    $likeness = (int)publicista_array_get($eval, 'likeness_score', 0);
+    $bodyOk = array_key_exists('body_proportions_match', $eval) ? !empty($eval['body_proportions_match']) : null;
+    
+    // GATE 1: Parecido mínimo absoluto (rechazo automático)
+    if ($likeness < 30) {
+        return array(false, 'IDENTITY_REJECT: likeness_score=' . $likeness . ' < 30 (umbral mínimo absoluto)');
+    }
+    
+    // GATE 2: Si parecido es bajo (<50), la complexión DEBE coincidir
+    if ($likeness < 50 && $bodyOk === false) {
+        return array(false, 'SILHOUETTE_REJECT: likeness=' . $likeness . ' < 50 y body_proportions_match=false');
+    }
+    
+    // GATE 3: Si parecido es bajo (<40), necesita revisión manual
+    if ($likeness < 40) {
+        return array(true, 'IDENTITY_WARNING: likeness=' . $likeness . ' < 40 — requiere revisión manual pero no se rechaza');
+    }
+    
+    return array(true, 'OK');
+}
+
+
 function publicista_rebuild_finals_from_candidates($jobId, $candidates, $job = null) {
     $rows = is_array($candidates) ? $candidates : array();
-    usort($rows, function($a, $b) {
+    
+    // ── FASE 1: Filtrar candidatas que no cumplen umbrales mínimos ─────────
+    $eligible = array();
+    $rejected = array();
+    foreach ($rows as $candidate) {
+        if (trim((string)publicista_array_get($candidate, 'square_path', '')) === '') {
+            continue; // sin imagen, no elegible
+        }
+        list($passes, $reason) = publicista_candidate_meets_minimum_threshold($candidate);
+        if ($passes || strpos($reason, 'WARNING') !== false) {
+            $eligible[] = $candidate;
+        } else {
+            $candidate['_reject_reason'] = $reason;
+            $rejected[] = $candidate;
+        }
+    }
+    
+    // ── FASE 2: Ordenar elegibles por effective_score ──────────────────────
+    usort($eligible, function($a, $b) {
         return (int)publicista_array_get($b, 'effective_score', 0) <=> (int)publicista_array_get($a, 'effective_score', 0);
     });
-    $selected = array_slice(array_values(array_filter($rows, function($c) {
-        return trim((string)publicista_array_get($c, 'square_path', '')) !== '';
-    })), 0, 4);
+    
+    // ── FASE 3: Seleccionar top 4 (o menos si no hay suficientes) ──────────
+    $selected = array_slice($eligible, 0, 4);
     $selectedIds = array();
     foreach ($selected as $candidate) $selectedIds[] = publicista_array_get($candidate, 'id', '');
+    
+    // Marcar selected=true solo en las seleccionadas; rejected quedan selected=false
     foreach ($rows as $idx => $row) {
-        $rows[$idx]['selected'] = in_array(publicista_array_get($row, 'id', ''), $selectedIds, true);
+        $cid = publicista_array_get($row, 'id', '');
+        $rows[$idx]['selected'] = in_array($cid, $selectedIds, true);
+        if (isset($row['_reject_reason'])) {
+            unset($rows[$idx]['_reject_reason']); // limpiar campo interno
+        }
     }
+    
+    // ── FASE 4: Construir finales ──────────────────────────────────────────
     $finalImages = array();
     $job = is_array($job) ? $job : publicista_job_get($jobId);
     $usePollo = publicista_job_uses_pollo_model($job);
@@ -4634,6 +4704,25 @@ function publicista_rebuild_finals_from_candidates($jobId, $candidates, $job = n
             ? publicista_build_direct_final_output($jobId, $candidate, $i + 1, $job)
             : publicista_finalize_candidate_output($jobId, $candidate, $i + 1, $job);
     }
+    
+    // Añadir info de rechazos al pipeline summary para trazabilidad
+    if (!empty($rejected)) {
+        $job2 = is_array($job) ? $job : publicista_job_get($jobId);
+        if ($job2) {
+            $pipeline = is_array(publicista_array_get($job2, 'pipeline', array())) ? publicista_array_get($job2, 'pipeline', array()) : array();
+            $rejectSummary = count($rejected) . ' candidatas rechazadas por umbral mínimo de identidad/silueta.';
+            $pipeline['rejection_summary'] = $rejectSummary;
+            $pipeline['rejected_candidates'] = array_map(function($c) {
+                return array(
+                    'id' => publicista_array_get($c, 'id', ''),
+                    'reason' => publicista_array_get($c, '_reject_reason', 'unknown'),
+                );
+            }, $rejected);
+            $job2['pipeline'] = $pipeline;
+            publicista_job_save($job2);
+        }
+    }
+    
     return array($rows, $finalImages, $selectedIds);
 }
 

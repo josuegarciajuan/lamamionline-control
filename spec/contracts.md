@@ -26,6 +26,28 @@
 - Los CAPA markers solo se reconocen al INICIO de sección (posición 0 tras trim).
 - Esto previene que texto de usuario inyecte falsos marcadores.
 
+### F03 — Contrato de control de identidad y silueta
+
+#### Contrato de scoring
+- `effective_score` DEBE basarse 60% en `likeness_score` y 20% en `overall_score`.
+- `body_proportions_match=false` DEBE penalizar -20 puntos.
+- El resto de flags DEBEN penalizar según su severidad (anatomía > composición > calidad).
+
+#### Contrato de gates
+- `likeness_score < 30` → **rechazo automático**. La candidata NO puede ser final.
+- `likeness_score < 50` + `body_proportions_match=false` → **rechazo**. La candidata NO puede ser final.
+- `likeness_score < 40` → **warning**. Puede ser final pero requiere revisión manual.
+
+#### Contrato de selección
+- `publicista_rebuild_finals_from_candidates()` DEBE filtrar por umbral antes de seleccionar.
+- Los rechazos DEBEN registrarse en `pipeline.rejection_summary`.
+- Si no hay 4 candidatas que pasen los gates, se seleccionan las que pasen (menos de 4 es aceptable).
+
+#### Contrato de seguridad de entrada
+- `operator_brief`: máximo 500 caracteres, sanitizado contra CAPA markers.
+- `restrictions_text`: máximo 1000 caracteres, sanitizado contra CAPA markers.
+- La sanitización DEBE usar regex `\[CAPA\b` → `[C4P4-`.
+
 ## Contratos PRF-IDENTIDAD-FOTO-2026
 
 ### F01 — Contrato de métricas baseline

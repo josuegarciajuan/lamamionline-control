@@ -23,10 +23,13 @@
 
 ### PRF-F03 — CONTROL_IDENTIDAD_Y_SILUETA
 
-- [ ] T3.1 — Umbral de similitud objetivo (rango, no máximo).
-- [ ] T3.2 — Reglas explícitas de complexión/volumen corporal.
-- [ ] T3.3 — Gate de rechazo temprano por baja fidelidad.
-- [ ] T3.4 — Ninguna final < umbral mínimo de parecido.
+- [x] T3.1 — Umbral de similitud: scoring recalibrado (60% likeness, 20% overall, 20% flags).
+- [x] T3.2 — Reglas de complexión: body_proportions_match penaliza -20 (la más severa).
+- [x] T3.3 — Gate de rechazo temprano: likeness<30 hard reject, likeness<50+body_mismatch reject.
+- [x] T3.4 — Ninguna final < umbral mínimo: filtro en rebuild_finals_from_candidates.
+- [x] T3.5 — Seguridad heredada F02: operator_brief (500 chars, CAPA sanitize), restrictions_text (1000 chars).
+- [x] T3.6 — Revisión de seguridad: PASS, CAPA sanitization mejorada a regex.
+- [x] T3.7 — Documentación actualizada (design, contracts, changelog).
 
 ### PRF-F04 — COHERENCIA_1A1_Y_ENTORNO
 
