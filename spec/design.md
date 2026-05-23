@@ -69,6 +69,21 @@ Función `publicista_pollo_measure_constraint_retention()`: mide % de constraint
 - CAPA markers solo se detectan al inicio de sección (previene inyección via operator_brief).
 - Los hallazgos de seguridad preexistentes (operator_brief sin validación, CSRF ausente en save_job) se documentan para F03.
 
+### F05 — Reranking y selección final
+
+#### Unificación de rutas de selección (T5.1 + T5.2)
+- El batch pipeline (`publicista_continue_image_batch_pipeline`) ahora usa `rebuild_finals_from_candidates()` como única ruta de selección.
+- Antes usaba `usort + array_slice` sin gates (permitía candidatas con likeness<30 en finales).
+- Todas las rutas (batch, regeneración manual, refresh) comparten la misma lógica de selección con gates.
+
+#### Política de auto-regeneración (T5.3)
+- Si `auto_regenerate` está activado en el workflow y hay < 4 finales:
+  - El pipeline se marca con `status = 'needs_regen'`.
+  - Se registra `auto_regen_summary` con el conteo de faltantes.
+  - El usuario puede lanzar `action_continue_image_batch_pipeline` para generar más candidatas.
+- Máximo 3 rondas de auto-regeneración (`auto_regen_round < 3`).
+- El flag `auto_regen_round` se persiste entre rondas.
+
 ### F04 — Coherencia 1:1 y entorno
 
 #### Regla "extend scene, not replace" (T4.1)

@@ -66,6 +66,20 @@
 - PROHIBIDO: rim lights de color, hair light artificial, key lights de estudio.
 - Solo luz natural diurna o luz interior doméstica (bombilla cálida, ventana).
 
+### F05 — Contrato de reranking y selección final
+
+#### Contrato de selección unificada
+- TODAS las rutas de selección DEBEN usar `publicista_rebuild_finals_from_candidates()`.
+- Ninguna ruta DEBE seleccionar finales sin pasar por `meets_minimum_threshold()`.
+- Las candidatas rechazadas DEBEN quedar como `selected=false` en el array de candidatas.
+
+#### Contrato de auto-regeneración
+- Si `auto_regenerate=1` y `count(finalImages) < 4`:
+  - Pipeline DEBE marcarse como `status = 'needs_regen'`.
+  - El contador `auto_regen_round` DEBE incrementarse.
+  - Máximo 3 rondas de auto-regeneración.
+- Si `auto_regenerate=0`, pipeline sigue con `status = 'needs_review'` cuando < 4 finales.
+
 ## Contratos PRF-IDENTIDAD-FOTO-2026
 
 ### F01 — Contrato de métricas baseline

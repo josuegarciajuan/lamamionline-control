@@ -2321,8 +2321,8 @@ function publicista_prepare_job_engine($jobId, $uploadedFile = null) {
         if (!$okUpload) {
             return array(false, $savedUpload);
         }
-        $job = publicista_job_get($jobId);
-        $workflow = publicista_job_workflow($job);
+    $job = publicista_job_get($jobId);
+    $workflow = publicista_job_workflow($job);
         $workflow['pack_final'] = 0;
         $workflow['pack_finalized_at'] = '';
         $workflow['pack_final_note'] = '';
@@ -3789,21 +3789,29 @@ function publicista_continue_image_batch_pipeline($jobId) {
         $candidates[] = $candidateRow;
     }
 
-    usort($candidates, function($a, $b) {
-        return (int)publicista_array_get($b, 'effective_score', 0) <=> (int)publicista_array_get($a, 'effective_score', 0);
-    });
-    $selected = array_slice(array_values(array_filter($candidates, function($c) {
-        return trim((string)publicista_array_get($c, 'raw_path', '')) !== '';
-    })), 0, 4);
-    $finalImages = array();
-    foreach ($selected as $i => $candidate) {
-        $selected[$i]['selected'] = true;
-        $finalImages[] = publicista_finalize_candidate_output($jobId, $candidate, $i + 1);
-    }
-    $selectedIds = array(); foreach ($selected as $c) $selectedIds[] = $c['id'];
+    // ── Usar la función unificada de selección con gates (F03/F05) ──────────
+    list($candidates, $finalImages, $selectedIds) = publicista_rebuild_finals_from_candidates($jobId, $candidates, $job);
+    $selected = array_values(array_filter($candidates, function($c) {
+        return !empty($c['selected']);
+    }));
     $finalIds = array(); foreach ($finalImages as $f) $finalIds[] = $f['id'];
 
     $job = publicista_job_get($jobId);
+
+    // ── Auto-regeneración: si < 4 finales y flag activado, programar ronda extra ──
+    $autoRegenEnabled = !empty($job['workflow']['auto_regenerate']);
+    $regenRound = (int)(publicista_array_get($job['pipeline'], 'auto_regen_round', 0));
+    
+    if ($autoRegenEnabled && count($finalImages) < 4 && $regenRound < 3) {
+        $missingCount = 4 - count($finalImages);
+        $autoRegenSummary = '⚠️ Solo ' . count($finalImages) . ' de 4 candidatas pasaron los gates de calidad. Se recomiendan ' . $missingCount . ' regeneraciones extra. Auto-regen ronda ' . ($regenRound + 1) . '/3.';
+        $job['pipeline']['auto_regen_round'] = $regenRound + 1;
+        $job['pipeline']['auto_regen_summary'] = $autoRegenSummary;
+        $autoRegenActive = true;
+    } else {
+        $autoRegenActive = false;
+    }
+
     $workflow = publicista_job_workflow($job);
     $workflow['pack_final'] = 0; $workflow['pack_finalized_at'] = ''; $workflow['pack_final_note'] = '';
     $job['workflow'] = $workflow;
@@ -3811,7 +3819,7 @@ function publicista_continue_image_batch_pipeline($jobId) {
     $job['final_images'] = $finalImages;
     $job['pipeline'] = array_merge(publicista_array_get($job, 'pipeline', array()), array(
         'finished_at' => now_datetime(),
-        'status' => count($finalImages) >= 4 ? 'done' : 'needs_review',
+        'status' => $autoRegenActive ? 'needs_regen' : (count($finalImages) >= 4 ? 'done' : 'needs_review'),
         'stage' => 'completed',
         'summary' => count($finalImages) >= 4
             ? ('Pipeline completado: ' . count($candidates) . ' candidatas generadas por Batch y 4 finales listas.')

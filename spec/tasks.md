@@ -41,9 +41,11 @@
 
 ### PRF-F05 — RERANKING_Y_SELECCION_FINAL
 
-- [ ] T5.1 — Scoring con prioridad real en identidad/silueta.
-- [ ] T5.2 — Gates duros antes de selección final.
-- [ ] T5.3 — Política de regeneración automática.
+- [x] T5.1 — Unificar selección: batch pipeline ahora usa rebuild_finals_from_candidates() como única ruta.
+- [x] T5.2 — Reforzar gates: meets_minimum_threshold() aplicado en TODAS las rutas de selección.
+- [x] T5.3 — Política de auto-regeneración: si < 4 finales y auto_regenerate=1, pipeline marcado needs_regen.
+- [x] T5.4 — Revisión de seguridad: PASS, corregido bug de status sobrescrito.
+- [x] T5.5 — Documentación actualizada (design, contracts, changelog).
 
 ### PRF-F06 — EXPERIMENTOS_AB_Y_HARDENING
 

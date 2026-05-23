@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-05-23 · PRF-IDENTIDAD-FOTO-2026_F05 — Reranking y selección final
+
+### Cambios implementados (3 tareas)
+1. **Selección unificada** — Batch pipeline ahora usa `rebuild_finals_from_candidates()` (misma función que la ruta manual). Eliminada la selección antigua por `usort + array_slice` que permitía candidatas con likeness<30 en finales.
+2. **Gates en todas las rutas** — `meets_minimum_threshold()` aplicado en batch, regeneración manual y refresh. Ninguna ruta puede saltarse los gates.
+3. **Auto-regeneración** — Si `auto_regenerate=1` y < 4 finales, el pipeline se marca `needs_regen`. Máximo 3 rondas. El usuario puede relanzar para generar candidatas extra.
+
+### Bug corregido
+- El status `needs_regen` era sobrescrito por `array_merge`. Corregido: ahora `$autoRegenActive` controla el status final correctamente.
+
+### Archivos modificados
+- `app/publicista.php` — Batch pipeline usa `rebuild_finals_from_candidates()`, auto-regen con flag `$autoRegenActive`.
+- `spec/design.md`, `spec/contracts.md`, `spec/tasks.md`, `docs/changelog.md` — actualizados.
+
 ## 2026-05-23 · PRF-IDENTIDAD-FOTO-2026_F04 — Coherencia 1:1 y entorno
 
 ### Cambios implementados (3 tareas)
