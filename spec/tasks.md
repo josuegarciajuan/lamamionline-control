@@ -33,9 +33,11 @@
 
 ### PRF-F04 — COHERENCIA_1A1_Y_ENTORNO
 
-- [ ] T4.1 — Regla "extend scene, not replace".
-- [ ] T4.2 — Guardrails de composición sujeto-entorno.
-- [ ] T4.3 — Restricciones de iluminación realista.
+- [x] T4.1 — Regla "extend scene, not replace": añadida en 5 ubicaciones (CAPA-8-AMB ×2, variantes, environment guard).
+- [x] T4.2 — Guardrails composición sujeto-entorno: CAPA-10-CAL con sección "COMPOSICIÓN SUJETO-ENTORNO" + sujeto "PLANTADO".
+- [x] T4.3 — Restricciones iluminación realista: CAPA-9-LUZ reforzado con "PROHIBIDO ABSOLUTAMENTE" neones y lights artificiales.
+- [x] T4.4 — Revisión de seguridad: PASS, 0 hallazgos.
+- [x] T4.5 — Documentación actualizada (design, contracts, changelog).
 
 ### PRF-F05 — RERANKING_Y_SELECCION_FINAL
 

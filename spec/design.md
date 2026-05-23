@@ -69,6 +69,23 @@ Función `publicista_pollo_measure_constraint_retention()`: mide % de constraint
 - CAPA markers solo se detectan al inicio de sección (previene inyección via operator_brief).
 - Los hallazgos de seguridad preexistentes (operator_brief sin validación, CSRF ausente en save_job) se documentan para F03.
 
+### F04 — Coherencia 1:1 y entorno
+
+#### Regla "extend scene, not replace" (T4.1)
+Añadida en 5 ubicaciones del prompt:
+- **CAPA-8-AMB (random)**: "EXTIENDE LA ESCENA, NO LA REEMPLACES. El entorno debe parecer una CONTINUACIÓN NATURAL del espacio".
+- **CAPA-8-AMB (fijo)**: "EXTIENDE EL ENTORNO, no lo reemplaces por otro artificial. Coherencia espacial: misma arquitectura."
+- **Variantes**: cada inyección de `[FONDO PARA ESTA IMAGEN]` incluye "EXTIENDE naturalmente la escena".
+- **Environment guard (random)**: "EXTIENDE LA ESCENA para encajar ese entorno. NUNCA un collage sujeto-fondo."
+
+#### Guardrails de composición sujeto-entorno (T4.2)
+- **CAPA-10-CAL**: Nueva sección "COMPOSICIÓN SUJETO-ENTORNO". Sujeto y fondo deben compartir iluminación, temperatura de color y sombras. Prohibido "sujeto con luz de estudio sobre fondo doméstico" y "persona flotando sin sombra de contacto".
+- Sujeto debe estar "PLANTADO" con sombra de contacto y peso visual coherente.
+
+#### Restricciones de iluminación realista (T4.3)
+- **CAPA-9-LUZ**: Reforzado con "PROHIBIDO ABSOLUTAMENTE" neón rosa/violeta/azul, rim lights de color, hair light artificial, key lights de estudio que no coinciden con el entorno.
+- La luz DEBE ser coherente sujeto-fondo: misma dirección, temperatura, intensidad.
+
 ### F03 — Control de identidad y silueta
 
 #### Scoring recalibrado

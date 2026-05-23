@@ -48,6 +48,24 @@
 - `restrictions_text`: máximo 1000 caracteres, sanitizado contra CAPA markers.
 - La sanitización DEBE usar regex `\[CAPA\b` → `[C4P4-`.
 
+### F04 — Contrato de coherencia 1:1 y entorno
+
+#### Contrato de extensión de escena
+- Todo prompt de imagen DEBE incluir la directiva "EXTIENDE la escena, NO la reemplaces".
+- El fondo generado DEBE ser una continuación natural del espacio, no una sustitución artificial.
+- La persona DEBE estar "plantada" en el suelo con sombra de contacto visible.
+
+#### Contrato de composición sujeto-entorno
+- La iluminación entre sujeto y fondo DEBE ser coherente (misma dirección, temperatura, intensidad).
+- PROHIBIDO: sujeto con iluminación de estudio sobre fondo doméstico.
+- PROHIBIDO: persona flotando sin sombra de contacto.
+- PROHIBIDO: profundidad incoherente entre sujeto y fondo.
+
+#### Contrato de iluminación
+- PROHIBIDO ABSOLUTAMENTE: luces de neón rosa/violeta/azul/colores sobre la piel.
+- PROHIBIDO: rim lights de color, hair light artificial, key lights de estudio.
+- Solo luz natural diurna o luz interior doméstica (bombilla cálida, ventana).
+
 ## Contratos PRF-IDENTIDAD-FOTO-2026
 
 ### F01 — Contrato de métricas baseline

@@ -2981,14 +2981,14 @@ function publicista_build_pollo_master_prompt($job) {
     // CAPA-8-AMB: Ambiente/background
     $ambientKey = trim((string)($pp['setting'] ?? 'random'));
     if ($ambientKey === 'random') {
-        $sections[] = '[CAPA-8-AMB AMBIENTE] Cada imagen tendrá un fondo distinto. La descripción concreta del entorno se incluye al final en [FONDO PARA ESTA IMAGEN]. El entorno DEBE parecer real y cotidiano: habitación doméstica auténtica, salón, cocina, escalera, calle real o similar. NUNCA fondo liso de estudio, NUNCA fondo borroso artificial, NUNCA escenario de tienda ni estantería genérica. La persona ocupa el centro visual de la escena y domina el encuadre.';
+        $sections[] = '[CAPA-8-AMB AMBIENTE] CADA IMAGEN USA UN FONDO DISTINTO descrito en [FONDO PARA ESTA IMAGEN] al final. REGLA OBLIGATORIA: EXTIENDE LA ESCENA, NO LA REEMPLACES. El entorno debe parecer una CONTINUACIÓN NATURAL del espacio — mismo tipo de espacio doméstico (habitación, salón, cocina), mismo estilo arquitectónico, misma calidad de luz. La persona debe sentirse PLANTADA en el suelo (pies con sombra de contacto, peso visual coherente). NUNCA parece un montaje donde la persona "flota" sobre un fondo distinto. NUNCA fondo liso de estudio, NUNCA ciclorama, NUNCA fondo borroso artificial, NUNCA degradado sintético. El fondo debe tener objetos cotidianos reales, texturas en paredes/suelo, y algo de desorden natural.';
     } else {
-        $sections[] = '[CAPA-8-AMB AMBIENTE] Fondo y entorno: ' . trim((string)($envDesc['setting'] ?? 'entorno interior realista con contexto')) . '. El entorno debe parecer una foto real tomada en un espacio cotidiano, no un montaje de estudio. Incluye objetos personales y algo de desorden sutil: texturas reales en paredes, suelo y muebles. Debe sentirse real, vivido y coherente, nunca fondo liso de estudio genérico salvo que se haya pedido minimalista.';
+        $sections[] = '[CAPA-8-AMB AMBIENTE] Fondo: ' . trim((string)($envDesc['setting'] ?? 'entorno interior realista con contexto')) . '. REGLA: EXTIENDE EL ENTORNO, no lo reemplaces por otro artificial. Mantén la coherencia espacial: mismo tipo de espacio, misma arquitectura, misma relación de distancia sujeto-paredes. La persona debe sentirse DENTRO de la escena (pies en el suelo con sombra, peso corporal visible). Incluye objetos personales, mobiliario real y desorden sutil. NUNCA fondo liso de estudio ni ciclorama genérico.';
     }
 
     // CAPA-9-LUZ: Lighting + realism
     $lightingLine = trim((string)($envDesc['lighting'] ?? 'luz ambiente natural realista'));
-    $realismNote = 'FOTO REAL INDISTINGUIBLE — piel con poros, vello, asimetrías, imperfecciones. Cabello con mechones individuales y peso real. Ojos con reflejo de luz e iris detallado. Sin skin smoothing, sin filtro belleza, sin efecto plastificado. PROHIBIDO: luces de neón rosa/violeta/colores artificiales sobre la piel, iluminación de discoteca, reflejos de colores irreales. Solo luz natural diurna o luz ambiente interior cálida realista (bombilla doméstica, ventana). Parece foto espontánea tomada con móvil.';
+    $realismNote = 'FOTO REAL INDISTINGUIBLE — piel con poros, vello, asimetrías, imperfecciones. Cabello con mechones individuales y peso real. Ojos con reflejo de luz e iris detallado. Sin skin smoothing, sin filtro belleza, sin efecto plastificado. ILUMINACIÓN: solo luz natural diurna o luz interior doméstica realista (bombilla cálida, ventana). PROHIBIDO ABSOLUTAMENTE: luces de neón rosa/violeta/azul/colores sobre la piel, iluminación de discoteca, reflejos de colores irreales, rim lights de color, hair light artificial, key lights de estudio que no coinciden con el entorno. La luz DEBE ser coherente entre sujeto y fondo: misma dirección, misma temperatura, misma intensidad. Parece foto espontánea tomada con móvil en una habitación real.';
     if ($makeupLine !== '') {
         $sections[] = '[CAPA-9-LUZ LUZ Y ACABADO] ' . $lightingLine . '. ' . $makeupLine . '. ' . $realismNote;
     } else {
@@ -2996,7 +2996,7 @@ function publicista_build_pollo_master_prompt($job) {
     }
 
     // CAPA-10-CAL: Quality + backgrounds
-    $sections[] = '[CAPA-10-CAL CALIDAD Y FONDOS] Foto real de persona real — NO ilustración, NO CGI, NO caricatura, NO render, NO dibujo. Piel con textura heterogénea, poros y líneas de expresión. Ojos con iris detallado y microreflejos. Cabello con peso y mechones reales. Manos correctas (5 dedos, articulaciones naturales). FONDO: entorno doméstico real (salón, cocina, calle, escalera, dormitorio normal). PROHIBIDO: fondo liso de estudio, ciclorama, degradado sintético, pared genérica sin textura, fondo borroso artificial, montaje digital. El fondo debe tener objetos reales, texturas de pared/suelo, mobiliario creíble y algo de desorden natural — como una casa de verdad. PROHIBIDO: anime, manga, caricatura, render 3D, dibujo animado, contornos cómic, hipersaturación, ojos de muñeca, piel Barbie, texto, watermark, collage, anatomía incorrecta.';
+    $sections[] = '[CAPA-10-CAL CALIDAD, COMPOSICIÓN Y FONDOS] Foto real de persona real — NO ilustración, NO CGI, NO caricatura, NO render, NO dibujo. Piel con textura heterogénea, poros y líneas de expresión. Ojos con iris detallado y microreflejos. Cabello con peso y mechones reales. Manos correctas (5 dedos, articulaciones naturales). COMPOSICIÓN SUJETO-ENTORNO: la persona debe estar INTEGRADA en el entorno — mismo nivel de iluminación entre sujeto y fondo, misma temperatura de color, mismas sombras. PROHIBIDO: sujeto con iluminación de estudio sobre fondo doméstico, persona flotando sin sombra de contacto, profundidad incoherente entre sujeto y fondo. FONDO: entorno doméstico real (salón, cocina, calle, escalera, dormitorio normal). PROHIBIDO: fondo liso de estudio, ciclorama, degradado sintético, pared genérica sin textura, fondo borroso artificial, montaje digital. El fondo debe tener objetos reales, texturas de pared/suelo, mobiliario creíble y algo de desorden natural. PROHIBIDO: anime, manga, caricatura, render 3D, dibujo animado, contornos cómic, hipersaturación, ojos de muñeca, piel Barbie, texto, watermark, collage, anatomía incorrecta.';
 
     // CAPA-11-SEG: Safety
     $sections[] = '[CAPA-11-SEG SEGURIDAD] Sexy y llamativa sí, pero siempre como glamour adulto no explícito: totalmente vestida, sin lencería visible, sin desnudo, sin transparencias íntimas, sin acto sexual ni foco fetichista.';
@@ -3367,7 +3367,7 @@ function publicista_build_prompt_variants($masterPrompt, $count = 6, $retryMode 
         $bgNote = '';
         if ($useRandomBg && isset($randomBackgrounds[$i])) {
             $bg = $randomBackgrounds[$i];
-            $bgNote = '[FONDO PARA ESTA IMAGEN] ' . $bg['description'] . '. IMPORTANTE: esta imagen concreta usa este fondo. La iluminación debe ser coherente con este entorno (luz natural de exterior si es exterior, luz interior si es interior).';
+            $bgNote = '[FONDO PARA ESTA IMAGEN] ' . $bg['description'] . '. EXTIENDE naturalmente la escena para encajar este fondo — NO reemplaces el entorno por uno artificial. La persona debe estar plantada en este espacio con sombra de contacto y coherencia de iluminación (luz natural exterior si es exterior, luz interior doméstica si es interior). El fondo debe verse como una continuación natural de donde está la persona, no como un collage.';
         }
 
         // Inject random outfit if in auto_random mode
@@ -9155,7 +9155,7 @@ function publicista_build_pollo_environment_guard($job, $maxChars = 0) {
     $lighting = trim((string)($envDesc['lighting'] ?? 'luz realista y coherente'));
 
     if ($settingKey === 'random') {
-        $guard = '[AMBIENTE Y FONDO] El fondo de cada imagen se describe individualmente en [FONDO PARA ESTA IMAGEN] al final del prompt. Usa exactamente ese entorno descrito. Asegúrate de que el fondo sea coherente con la iluminación indicada y tenga profundidad natural y elementos de contexto reales.';
+        $guard = '[AMBIENTE Y FONDO] El fondo de cada imagen se describe en [FONDO PARA ESTA IMAGEN]. EXTIENDE LA ESCENA para encajar ese entorno — NO reemplaces el espacio por uno artificial. La persona debe estar PLANTADA en el suelo (sombra de contacto, peso real). La iluminación debe coincidir entre sujeto y fondo. El fondo debe tener profundidad, objetos cotidianos y texturas reales. NUNCA un collage sujeto-fondo.';
     } elseif ($settingKey === 'minimalista') {
         $guard = '[AMBIENTE Y FONDO] Mantén el ambiente minimalista solicitado, pero con textura y profundidad reales. Fondo limpio y controlado, nunca un color plano vacío ni un recorte de estudio artificial. Iluminación: ' . $lighting . '.';
     } elseif ($settingKey !== '' && $settingKey !== 'auto' && $settingKey !== 'random') {

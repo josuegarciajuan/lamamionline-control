@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-05-23 · PRF-IDENTIDAD-FOTO-2026_F04 — Coherencia 1:1 y entorno
+
+### Cambios implementados (3 tareas)
+1. **"Extend scene, not replace"** — Directiva añadida en 5 ubicaciones del prompt: CAPA-8-AMB (ambos modos), variantes de fondo, environment guard. La persona debe estar "PLANTADA" con sombra de contacto.
+2. **Guardrails composición sujeto-entorno** — CAPA-10-CAL con nueva sección "COMPOSICIÓN SUJETO-ENTORNO": iluminación coherente sujeto-fondo, misma temperatura de color, mismas sombras. Prohibido "sujeto con luz de estudio sobre fondo doméstico".
+3. **Iluminación realista reforzada** — CAPA-9-LUZ con "PROHIBIDO ABSOLUTAMENTE" neones rosa/violeta/azul, rim lights, hair lights, key lights de estudio. Solo luz natural diurna o interior doméstica.
+
+### Impacto esperado
+- Elimina el problema de "fondo sustituye la escena original" reportado en los issues.
+- La persona ya no debería parecer un "collage" sobre un fondo distinto.
+- Las iluminaciones rosas/violeta artificiales quedan absolutamente prohibidas.
+
+### Archivos modificados
+- `app/publicista.php` — 5 cambios en texto de prompt: CAPA-8-AMB, CAPA-10-CAL, CAPA-9-LUZ, variantes, environment guard.
+- `spec/design.md`, `spec/contracts.md`, `spec/tasks.md`, `docs/changelog.md` — actualizados.
+
 ## 2026-05-23 · PRF-IDENTIDAD-FOTO-2026_F03 — Control de identidad y silueta
 
 ### Cambios implementados (5 tareas + seguridad)
