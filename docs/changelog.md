@@ -1,24 +1,26 @@
 # Changelog
 
-## 2026-05-27 — PUB-FOTOS-REALES-F1 (reals-upload)
+## 2026-05-27 · COM-IA-F3 — IA con mayor capacidad de entendimiento y calidad de respuestas
 
-### Añadido
-- Subida de fotos reales en perfiles de Publicista (máx 10, 20 MB c/u, JPG/PNG/WEBP).
-- Nueva sección "④ Fotos reales subidas" en la ficha de producto con galería y botón eliminar.
-- Input `multiple` en formularios de crear y editar perfil.
-- Acciones `upload_publicista_real_photos` y `delete_publicista_real_photo` con protección CSRF.
-- Nueva función `publicista_attach_real_photos()` en `app/publicista.php` con validación MIME por contenido.
+### Cambios implementados (6 tareas)
+1. **Contexto enriquecido en prompts de IA** — `comercial_build_contextual_followup_prompt()` ahora inyecta clasificación del último mensaje, estado de la conversación y estrategia psicológica activa. La IA sabe si el cliente saludó, preguntó o mostró interés.
+2. **Nueva función `comercial_ai_output_preserves_key_info()`** — Valida que la salida de IA conserve datos críticos del mensaje original: precios (€), URLs, porcentajes (60/40) y CTAs ("responde INFO"). Si falta alguno, se descarta la variante IA.
+3. **Prompt de variantes IA reforzado** — `comercial_ai_generate_followup_variants()` incluye instrucciones explícitas de conservación intacta de datos económicos, contexto de clasificación, y aviso cuando el cliente solo saludó.
+4. **Validación integrada en `comercial_pick_followup_or_improvise()`** — Tanto en el path de pool disponible como en el de pool agotado, las variantes IA se validan con `comercial_ai_output_preserves_key_info()`. Si fallan, se usa el template original o el fallback contextual.
+5. **Persistencia de `_used_followup_indices`** — `comercial_pick_followup_or_improvise()` ahora persiste inmediatamente los índices de templates usados mediante `comercial_upsert_thread()`, eliminando la dependencia del caller.
+6. **Bump y normalización de assets** — `index.php`: style.css, theme.css y app.js unificados a `v=20260527_3`.
 
-### Modificado
-- `app/storage.php`: `real_photos` en job defaults + `reals_dir` en asset dirs y fs paths.
-- `app/views.php`: paso 4 en barra visual + sección completa de fotos reales.
-- `app/actions.php`: manejo de fotos reales en create/save + dispatch de nuevas acciones.
-- `index.php`: cache-busting `style.css?v=20260527_3`, `app.js?v=20260527_1`.
+### Archivos modificados
+- `app/comercial.php` — +80 líneas, 1 nueva función, 3 funciones modificadas
+- `index.php` — normalización de versión assets (3 líneas)
+- `spec/tasks.md` — nueva fase COM-IA-F3
+- `spec/design.md` — diseño IA-F3
+- `docs/changelog.md` — esta entrada
 
 ### Seguridad
-- CSRF tokens añadidos a formularios de upload y delete de fotos reales.
-- Path derivation desde `photoId` en delete (no desde `stored_path`).
-- Límite 20 MB por archivo con omisión silenciosa.
+- ✅ Auditoría de seguridad: PASS sin hallazgos. Todos los valores inyectados en prompts son system-derived enums (no user input). Regex patterns sin riesgo ReDoS. Logging via `json_encode()` seguro.
+
+---
 
 ## 2026-05-27 · COM-NOTIFICACIONES-F2 — Notificaciones efectivas del bot comercial
 

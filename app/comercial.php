@@ -2070,8 +2070,8 @@ function comercial_build_contextual_followup_prompt($thread, $processSlug, $obje
     }
 
     // ── Obtener contexto IA del proceso ──
-    $process = $processSlug !== '' ? comercial_get_process($processSlug) : null;
-    $iaContext = is_array($process) ? trim((string)($process['ia_context_prompt'] ?? '')) : '';
+    $processObj = $processSlug !== '' ? comercial_get_process($processSlug) : null;
+    $iaContext = is_array($processObj) ? trim((string)($processObj['ia_context_prompt'] ?? '')) : '';
 
     // ── Fix U2: detectar si el cliente SOLO saludó (sin preguntar) ──
     $greetingOnlyNote = '';
@@ -2079,7 +2079,22 @@ function comercial_build_contextual_followup_prompt($thread, $processSlug, $obje
         $greetingOnlyNote = "\nIMPORTANTE: El cliente SOLO saludó, NO hizo ninguna pregunta concreta. NO digas frases como 'me alegra que preguntes', 'gracias por preguntar', 'buena pregunta' ni similares. Responde al saludo de forma natural y haz una pregunta abierta suave para iniciar conversación.";
     }
 
-    $baseRules = "Eres una persona humana real, NUNCA digas que eres un bot, IA, asistente virtual o sistema automatizado. Si te preguntan, di que eres una persona del equipo y cambia de tema con naturalidad. Escribe SOLO una respuesta breve y natural en español. No uses markdown. Máximo 420 caracteres. Tono cercano. CTA suave. No inventes datos." . $greetingOnlyNote;
+    // ── T3.1: contexto de clasificación y estrategia para mejorar entendimiento de la IA ──
+    $classificationNote = '';
+    $lastDecision = trim((string)($thread['last_decision'] ?? ''));
+    $lastStrategy = trim((string)($thread['last_strategy_used'] ?? ''));
+    $lastStage = trim((string)($thread['stage'] ?? ''));
+    if ($lastDecision !== '') {
+        $classificationNote .= "\nDecisión del sistema sobre el último mensaje del cliente: " . $lastDecision . ".";
+    }
+    if ($lastStage !== '' && $lastStage !== 'initial_sent') {
+        $classificationNote .= "\nLa conversación está en estado: " . $lastStage . ". Responde de forma coherente con esta etapa.";
+    }
+    if ($lastStrategy !== '') {
+        $classificationNote .= "\nEstrategia psicológica activa: " . $lastStrategy . ". Aplica esta estrategia en tu respuesta de forma sutil.";
+    }
+
+    $baseRules = "Eres una persona humana real, NUNCA digas que eres un bot, IA, asistente virtual o sistema automatizado. Si te preguntan, di que eres una persona del equipo y cambia de tema con naturalidad. Escribe SOLO una respuesta breve y natural en español. No uses markdown. Máximo 420 caracteres. Tono cercano. CTA suave. No inventes datos. NO modifiques precios, URLs, porcentajes ni condiciones económicas — mantenlos EXACTAMENTE igual que en el mensaje de referencia." . $greetingOnlyNote . $classificationNote;
 
     return trim(
         ($iaContext !== '' ? $iaContext . "\n\n" : '') .
@@ -4070,19 +4085,27 @@ function comercial_ai_generate_followup_variants($thread, $process, $inboundText
     $turnCount = (int)($thread['auto_turn_count'] ?? 0) + 1;
     $history = comercial_thread_recent_history_text($thread, 5);
 
+    // ── T3.3: contexto adicional de clasificación para que la IA entienda mejor ──
+    $classificationCtx = '';
+    $lastDecision = trim((string)($thread['last_decision'] ?? ''));
+    if ($lastDecision !== '') {
+        $classificationCtx .= "CONTEXTO: El sistema clasificó el último mensaje como \"" . $lastDecision . "\". ";
+    }
+
     $prompt = trim(
         ($iaContext !== '' ? $iaContext . "\n\n" : '') .
         "Eres una persona humana real del equipo. NUNCA digas que eres un bot o IA.\n\n" .
         "PROCESO: " . $processSlug . " (turno " . $turnCount . ")\n\n" .
         "HISTORIAL RECIENTE:\n" . ($history !== '' ? $history : "(inicio de conversación)") . "\n\n" .
         "LO ÚLTIMO QUE DIJO EL CLIENTE: «" . $inboundText . "»\n\n" .
+        $classificationCtx .
         "INFORMACIÓN QUE DEBES COMUNICAR (NO INVENTES DATOS NUEVOS):\n" . $baseFollowup . "\n\n" .
         "ESTRATEGIA A APLICAR: " . $strategyInfo['description'] . "\n\n" .
         (!empty($thread['_greeting_only']) ? "ATENCIÓN: El cliente SOLO saludó, NO hizo ninguna pregunta. NO uses frases como 'me alegra que preguntes', 'gracias por preguntar' o similares.\n\n" : '') .
         "INSTRUCCIONES:\n" .
         "- Reescribe el mensaje base aplicando la estrategia indicada.\n" .
         "- Adapta el tono a lo que dijo el cliente. Sé coherente con la conversación.\n" .
-        "- Mantén TODA la información importante del mensaje base (precios, servicio, condiciones).\n" .
+        "- CONSERVA INTACTOS: precios (ej: 29€, 50€/semana), URLs (ej: https://lamami.online), porcentajes (ej: 60/40), condiciones económicas y CTAs (ej: 'responde INFO'). NO los cambies, NO los parafrasees, NO los omitas.\n" .
         "- Añade un CTA suave que invite a responder (no presiones agresivamente).\n" .
         "- Usa español natural, con alguna palabra coloquial si encaja.\n" .
         "- Puedes usar 1-2 emojis si procede.\n" .
@@ -4109,6 +4132,72 @@ function comercial_ai_generate_followup_variants($thread, $process, $inboundText
         $text = function_exists('mb_substr') ? trim((string)mb_substr($text, 0, 420, 'UTF-8')) : trim(substr($text, 0, 420));
     }
     return array('ok' => true, 'text' => $text, 'model' => $model, 'strategy' => $strategyKey);
+}
+
+/**
+ * ── T3.2: valida que la salida de IA conserve datos críticos del mensaje original ──
+ * Extrae del texto original: precios (€ + dígitos), URLs (http/https),
+ * porcentajes (ej. 60/40), condiciones económicas, y CTAs clave ("responde INFO").
+ * Verifica que cada dato extraído aparezca en la salida de la IA.
+ * Si falta al menos un dato crítico, devuelve false → se debe usar el template original.
+ */
+function comercial_ai_output_preserves_key_info($original, $aiOutput) {
+    $original = trim((string)$original);
+    $aiOutput = trim((string)$aiOutput);
+    if ($original === '' || $aiOutput === '') return true;
+
+    // Extraer datos críticos del original
+    $criticalItems = array();
+
+    // 1. Precios: patrones como "29€", "50€/semana", "50 €", "10€ / 30min"
+    if (preg_match_all('/(\d+[\s]?[€$](?:\s*\/\s*\w+)?)/u', $original, $m)) {
+        foreach ($m[1] as $price) {
+            $criticalItems[] = trim(preg_replace('/\s+/u', '', $price));
+        }
+    }
+
+    // 2. URLs: http:// o https://
+    if (preg_match_all('/(https?:\/\/[^\s]+)/ui', $original, $m)) {
+        foreach ($m[1] as $url) {
+            $criticalItems[] = rtrim($url, '.…,;:');
+        }
+    }
+
+    // 3. Porcentajes/ratios: "60/40", "15-21 días"
+    if (preg_match_all('/(\d+\s*\/\s*\d+)/u', $original, $m)) {
+        foreach ($m[1] as $ratio) {
+            $criticalItems[] = trim(preg_replace('/\s+/u', '', $ratio));
+        }
+    }
+
+    // 4. CTAs clave: "responde INFO", "responde info", "di INFO", "dime INFO"
+    if (preg_match_all('/((?:responde|di|dime|contesta)\s+(?:INFO|info|"info"|"INFO"))/ui', $original, $m)) {
+        foreach ($m[1] as $cta) {
+            $criticalItems[] = comercial_text_fold($cta);
+        }
+    }
+
+    // Sin datos críticos extraídos → no hay nada que validar
+    if (empty($criticalItems)) return true;
+
+    // Verificar que cada dato crítico aparece en la salida (fold normalizado)
+    $aiFolded = comercial_text_fold($aiOutput);
+    foreach ($criticalItems as $item) {
+        $itemFolded = comercial_text_fold($item);
+        if ($itemFolded !== '' && strpos($aiFolded, $itemFolded) === false) {
+            // Permitir pequeñas variaciones en precios (€ vs eur)
+            if (preg_match('/^\d/', $item)) {
+                // Para precios: verificar al menos que el número base aparece
+                $numericPart = preg_replace('/[^0-9]/', '', $item);
+                if ($numericPart !== '' && strpos($aiFolded, $numericPart) !== false) {
+                    continue; // el número base está, aceptamos
+                }
+            }
+            return false;
+        }
+    }
+
+    return true;
 }
 
 /**
@@ -4162,17 +4251,29 @@ function comercial_pick_followup_or_improvise($thread, $process, $inboundText = 
             if ($remainingCount <= 2 && $turnCount >= 1) {
                 $aiVariant = comercial_ai_generate_followup_variants($thread, $process, $inboundText, $picked, $strategy);
                 if (!empty($aiVariant['ok']) && trim((string)($aiVariant['text'] ?? '')) !== '') {
-                    $picked = trim((string)$aiVariant['text']);
+                    $aiText = trim((string)$aiVariant['text']);
+                    // ── T3.4: validar que la variante IA conserva datos críticos ──
+                    if (comercial_ai_output_preserves_key_info($picked, $aiText)) {
+                        $picked = $aiText;
+                    } else {
+                        comercial_event_append('ai_variant_rejected_info_loss', array(
+                            'thread_id' => (string)($thread['id'] ?? ''),
+                            'process_slug' => (string)($thread['process_slug'] ?? ''),
+                            'reason' => 'critical_info_lost_in_ai_variant',
+                        ));
+                        // Se mantiene $picked como el template original
+                    }
                 }
             }
 
-            // Marcar como usado (guardar en thread - se persiste fuera de esta función)
+            // ── T3.5: marcar como usado y persistir inmediatamente ──
             if (!isset($thread['_used_followup_indices'])) $thread['_used_followup_indices'] = array();
             $thread['_used_followup_indices'][] = $picked;
             // Limitar a últimos 10 para no crecer indefinidamente
             if (count($thread['_used_followup_indices']) > 10) {
                 $thread['_used_followup_indices'] = array_slice($thread['_used_followup_indices'], -10);
             }
+            comercial_upsert_thread($thread);
 
             return $picked;
         }
@@ -4185,7 +4286,17 @@ function comercial_pick_followup_or_improvise($thread, $process, $inboundText = 
         if ($baseRef !== '') {
             $aiVariant = comercial_ai_generate_followup_variants($thread, $process, $inboundText, $baseRef, $strategy);
             if (!empty($aiVariant['ok']) && trim((string)($aiVariant['text'] ?? '')) !== '') {
-                return trim((string)$aiVariant['text']);
+                $aiText = trim((string)$aiVariant['text']);
+                // ── T3.4: validar conservación de datos críticos también en pool agotado ──
+                if ($baseRef !== '' && !comercial_ai_output_preserves_key_info($baseRef, $aiText)) {
+                    comercial_event_append('ai_variant_rejected_info_loss', array(
+                        'thread_id' => (string)($thread['id'] ?? ''),
+                        'reason' => 'critical_info_lost_in_exhausted_pool',
+                    ));
+                    // Caer al fallback contextual en lugar de usar una variante que perdió datos
+                } else {
+                    return $aiText;
+                }
             }
         }
     }

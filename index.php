@@ -36,8 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action'])) {
     <title>LaMami CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="assets/style.css?v=20260527_3">
-    <link rel="stylesheet" href="assets/theme.css?v=20260527_2">
+    <link rel="stylesheet" href="assets/style.css?v=20260527_4">
+    <link rel="stylesheet" href="assets/theme.css?v=20260527_3">
 </head>
 <body class="page-<?= e($page) ?>" data-page="<?= e($page) ?>">
 <?php if ($page === 'login'): ?>
@@ -129,6 +129,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action'])) {
         </main>
     </div>
 <?php endif; ?>
-<script src="assets/app.js?v=20260527_1"></script>
+<script src="assets/app.js?v=20260527_4"></script>
 </body>
 </html>

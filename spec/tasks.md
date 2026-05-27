@@ -274,6 +274,15 @@
 - [x] T2.4 — Suprimir notificaciones para clasificación `autoresponder` en `comercial_create_reply_aviso()`.
 - [x] T2.5 — Bump versión en `index.php` para recarga de assets.
 
+### COM-IA-F3 — IA con mayor capacidad de entendimiento y calidad de respuestas
+
+- [x] T3.1 — Mejorar `comercial_build_contextual_followup_prompt()`: añadir clasificación del último mensaje entrante, estrategia activa y reglas reforzadas de preservación de datos al prompt de IA.
+- [x] T3.2 — Nueva función `comercial_ai_output_preserves_key_info($original, $aiOutput)`: extraer datos críticos del original (precios €, URLs, porcentajes, CTA) y verificar que aparecen en la salida IA. Si falta alguno, devolver false para que se use el template original.
+- [x] T3.3 — Fortalecer prompt de `comercial_ai_generate_followup_variants()`: añadir instrucciones explícitas de no modificar precios/URLs/condiciones, y contexto sobre si el cliente preguntó o solo saludó.
+- [x] T3.4 — Integrar `comercial_ai_output_preserves_key_info()` en `comercial_pick_followup_or_improvise()`: validar variante IA antes de usarla; si falla, usar template base como fallback.
+- [x] T3.5 — Persistir `_used_followup_indices` en `comercial_pick_followup_or_improvise()`: llamar a `comercial_upsert_thread()` tras modificar los índices para garantizar persistencia.
+- [x] T3.6 — Bump versión en `index.php` para recarga de assets.
+
 ---
 
 ## CX2 — Desbloqueo SDD bot comercial (F1..F8)
@@ -338,3 +347,15 @@
 - [x] T12 — Revisión de seguridad: CSRF añadido a formularios, path derivation desde `photoId` en delete, límite 20 MB, MIME validation robusta.
 - [x] T13 — Validación técnica: `php -l` OK en 5 archivos. Sin regresión funcional detectada.
 - [x] T14 — Documentación: changelog + contracts actualizados.
+
+### PUB-FOTOS-REALES-F2 — reals-blur
+
+- [x] T1 — Nueva función `publicista_apply_manual_blur_to_real_photo()` en `publicista.php` (mismo patrón que blur para finals, opera sobre `real_photos[]`).
+- [x] T2 — Nueva acción `action_apply_publicista_manual_blur_real` en `actions.php` (JSON, recibe `photo_id`).
+- [x] T3 — Botón "Blur manual" y badge de estado en cada foto real de la sección 4 (`views.php`).
+- [x] T4 — JS extendido: `openManualBlurModal` acepta target `'real'`, `submitManualBlur` despacha action correcta, actualiza DOM con IDs `realBlurImg_` / `realBlurStatus_`.
+- [x] T5 — Registro en dispatcher: `case 'apply_publicista_manual_blur_real'`.
+- [x] T6 — Cache-busting: `style.css?v=20260527_4`, `app.js?v=20260527_4`.
+- [x] T7 — Seguridad: validación de parámetros (bx/by/bw/bh clamp 0..1, intensity 1..20), `escapeshellarg` en todos los parámetros al worker Python, sin CSRF en endpoint AJAX (misma política que blur de finals).
+- [x] T8 — Validación técnica: `php -l` OK en 3 archivos.
+- [x] T9 — Documentación: changelog + contracts + tasks actualizados.

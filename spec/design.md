@@ -774,3 +774,30 @@ Eliminar ruido operacional en las notificaciones y asegurar que el operador reci
 ### Archivos impactados
 - `app/comercial.php` — 3 funciones modificadas
 - `index.php` — bump de versión assets
+
+---
+
+## Diseño COM-IA-F3 — IA con mayor capacidad de entendimiento
+
+### Objetivo de diseño
+Mejorar la calidad de las respuestas generadas por IA dotándola de mayor contexto sobre la conversación (clasificación, estado, estrategia), validando que la salida conserve datos críticos (precios, URLs), y garantizando la persistencia del tracking de templates usados.
+
+### Decisiones de diseño
+
+#### 1. Contexto enriquecido en prompts de IA
+- **Decisión**: Añadir al prompt información sobre la clasificación del último mensaje (`last_decision`), el estado de la conversación (`stage`) y la estrategia psicológica activa (`last_strategy_used`).
+- **Justificación**: La IA sin contexto trata todos los mensajes por igual. Saber si el cliente saludó o preguntó permite respuestas más precisas y naturales.
+- **Implementación**: `comercial_build_contextual_followup_prompt()` y `comercial_ai_generate_followup_variants()` incluyen ahora `$classificationNote` y `$classificationCtx` con datos del thread.
+
+#### 2. Validación post-IA de datos críticos
+- **Decisión**: Nueva función `comercial_ai_output_preserves_key_info($original, $aiOutput)` que extrae precios (€), URLs, porcentajes y CTAs del mensaje original y verifica que aparecen en la salida de IA.
+- **Justificación**: Los LLMs a veces diluyen o eliminan información clave al reescribir. Esta validación actúa como guardrail: si la IA pierde datos críticos, se descarta la variante y se usa el template original.
+- **Algoritmo**: Extracción via regex de 4 categorías (precios, URLs, ratios, CTAs) → verificación via `strpos()` en texto fold-normalizado → tolerancia para variaciones de formato en precios (número base).
+
+#### 3. Persistencia de `_used_followup_indices`
+- **Decisión**: `comercial_pick_followup_or_improvise()` ahora llama a `comercial_upsert_thread()` tras modificar los índices de templates usados.
+- **Justificación**: Antes los índices se modificaban en memoria pero dependían del caller para persistirse, lo que podía causar pérdida de tracking entre turnos.
+
+### Archivos impactados
+- `app/comercial.php` — 4 funciones modificadas + 1 nueva función
+- `index.php` — normalización de versión assets a `v=20260527_3`
