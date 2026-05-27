@@ -1318,7 +1318,7 @@ function render_publicista_cuentas_page() {
             echo '<div class="linked-tags">';
             foreach ($linked as $tel) {
                 $label = trim(($tel['nombre'] ?? '') . ' · ' . ($tel['tfono'] ?? ''));
-                echo '<a class="linked-tag" href="index.php?page=josue&tab=telefonos&edit=' . e($tel['id']) . '">' . e($label) . '</a>';
+                echo '<a class="linked-tag" href="' . e(comercial_page_url('lineas', array('edit' => $tel['id']))) . '">' . e($label) . '</a>';
             }
             echo '</div>';
         }
@@ -7303,7 +7303,7 @@ function render_josue_page() {
     echo '<section class="panel panel-josue">';
 
     echo '<div class="subtabs">';
-    echo '<a class="subtab ' . ($tab === 'telefonos' ? 'active' : '') . '" href="index.php?page=josue&tab=telefonos">Telefonos</a>';
+    echo '<a class="subtab ' . ($tab === 'telefonos' ? 'active' : '') . '" href="' . e(comercial_page_url('lineas')) . '">Telefonos</a>';
     echo '<a class="subtab ' . ($tab === 'waha' ? 'active' : '') . '" href="index.php?page=josue&tab=waha">WAHA</a>';
     echo '<a class="subtab ' . ($tab === 'publias' ? 'active' : '') . '" href="index.php?page=josue&tab=publias">PublIas</a>';
     echo '<a class="subtab ' . ($tab === 'captacion' ? 'active' : '') . '" href="index.php?page=josue&tab=captacion">Captacion</a>';
@@ -7404,7 +7404,7 @@ function render_josue_page() {
                 echo '<td>' . e($row['waha'] ?? '') . '</td>';
                 echo '<td>' . e($destLabel) . '</td>';
                 echo '<td>';
-                echo '<a class="mini-link" href="index.php?page=josue&tab=telefonos&edit=' . e($row['id']) . '">Editar</a> ';
+                echo '<a class="mini-link" href="' . e(comercial_page_url('lineas', array('edit' => $row['id']))) . '">Editar</a> ';
                 echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar este teléfono?\')">';
                 echo '<input type="hidden" name="action" value="delete_telefono">';
                 echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';

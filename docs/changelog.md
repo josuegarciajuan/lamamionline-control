@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-05-27 — UNIFICACION-LINEAS-F3 (actualizar-rutas)
+
+### Cambios implementados
+- **Todas las URLs `page=josue&tab=telefonos` migradas** a `comercial_page_url('lineas')` en `views.php` (3 links: linked-tags en publicista cuentas, subtab en josue, y editar en listado).
+- **Voice routes actualizadas**: `telefonos` eliminado del resolver de tabs huérfanos (ahora `lineas` y demás tabs comercial auto-rutean a `comercial`), eliminado de domain hints y del AI prompt.
+- Sin cambios en `data/settings.json` (la nota TODO es texto de usuario, sin impacto funcional).
+
+### Modificado
+- `app/views.php` — 3 URLs reemplazadas (L1321, L7306, L7407)
+- `app/voice.php` — 3 bloques actualizados (resolver, tab hints, AI prompt)
+
+---
+
 ## 2026-05-27 — UNIFICACION-LINEAS-F2 (unificar-core)
 
 ### Cambios implementados

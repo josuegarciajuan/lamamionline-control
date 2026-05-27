@@ -711,7 +711,7 @@ function voice_domain_hints() {
     return array(
         'pages' => array('dashboard', 'lamami', 'casawasap', 'jostal', 'gastos', 'informes', 'bots', 'avisos', 'josue', 'lamamibot', 'publicista', 'comercial'),
         'tabs' => array(
-            'interesadas', 'clientas', 'lamamibot', 'agenda', 'telefonos', 'waha', 'publias', 'captacion', 'config', 'configm', 'notas', 'eurekas',
+            'interesadas', 'clientas', 'lamamibot', 'agenda', 'waha', 'publias', 'captacion', 'config', 'configm', 'notas', 'eurekas',
             'ventas', 'informes', 'crear_perfiles', 'estrategias', 'cuentas', 'campanas', 'subir_anuncios',
             'resumen', 'procesos', 'lineas', 'conversaciones', 'leads', 'ajustes', 'logs'
         ),
@@ -762,6 +762,40 @@ function voice_interpreter_system_prompt() {
         . "16) Ejemplo de inferencia correcta: 'abrir form de añadir clienta en hostal' probablemente significa abrir clientas de jostal en modo nuevo.\n"
         . "17) Si no encaja, usa unsupported_command o ask_clarification.\n"
         . "\n"
+        . "CORRECCIÓN DE ERRORES DE VOZ (homófonos, ruido, mal reconocimiento):\n"
+        . "- Si la transcripción dice 'hostal', 'josta', 'yostal', 'hostales' → es JOSTAL\n"
+        . "- Si dice 'casa guasap', 'casa wasap', 'casa whatsapp', 'casa wassap' → es CASAWASAP\n"
+        . "- Si dice 'la mami', 'mami', 'lami', 'la mamy', 'lamary' → es LAMAMI\n"
+        . "- Si dice 'mami bot', 'la mamibot', 'lamibot', 'mamibox' → es LAMAMIBOT\n"
+        . "- Si dice 'interesada', 'interesadas', 'interesado', 'interesados', 'enteradas' → target_type=interesada\n"
+        . "- Si dice 'clienta', 'clientas', 'cliente', 'clientes', 'clienta' → target_type=clienta\n"
+        . "- Si dice 'abre', 'abrir', 'habré', 'entre', 'revisa' → acción de abrir/mostrar\n"
+        . "- Si dice 'muéstrame', 'enséñame', 'quiero ver', 'vamos a', 'dame', 'pon' → acción de abrir/mostrar/crear\n"
+        . "- Si dice 'agenda', 'ajenda' → página de agenda de Josué\n"
+        . "- Si dice 'crea', 'crear', 'anade', 'añade', 'agrega', 'registra', 'mete', 'guarda' → acción de crear\n"
+        . "- Si dice 'cuanto', 'cuanto hemos ganado', 'cuánto', 'cuanto va' → query_analytics con analytics_kind=summary\n"
+        . "- Si dice 'dime', 'dame', 'saca' → acción de mostrar/abrir\n"
+        . "- Si dice 'busca', 'buscar', 'localiza', 'encuentra', 'quien es' → acción de buscar\n"
+        . "- Si dice 'la que tiene', 'el que tiene', 'quien tiene' → búsqueda por lookup_field\n"
+        . "\n"
+        . "ÓRDENES CORTAS O INCOMPLETAS (el usuario solo dijo una o dos palabras):\n"
+        . "- Si solo se dice el nombre de una página (ej: 'jostal', 'lamami', 'publicista', 'comercial', 'informes', 'bots', 'avisos', 'josue', 'gastos'), interpreta como abrir esa página.\n"
+        . "- Si solo se dice 'clientas' o 'interesadas', interpreta como abrir esa sección en el ámbito actual o en lamami si no hay contexto.\n"
+        . "- Si solo se dice 'agenda', interpreta como open_agenda.\n"
+        . "- Si se dice 'en casa', interpreta como filtrar clientas que están en casa (list_entities con estado=en_casa).\n"
+        . "- Si se dice 'eureka' o 'eureka!', interpreta como create_eureka.\n"
+        . "- Si solo hay un nombre propio (ej: 'Andrea', 'María'), interpreta como open_entity_by_name.\n"
+        . "- Si solo hay un número de teléfono (9 dígitos), interpreta como open_entity_by_phone.\n"
+        . "\n"
+        . "INFERENCIA DESDE CONTEXTO (usando el campo context en el payload):\n"
+        . "- Si el usuario está en la página de jostal (context.page=jostal) y dice 'clientas', abre clientas de jostal.\n"
+        . "- Si el usuario está en jostal y dice 'la que tiene telefono X', busca por teléfono en jostal (target_scope=jostal).\n"
+        . "- Si está en jostal y dice 'interesadas', abre interesadas de jostal.\n"
+        . "- Si está en lamami y dice 'clientas en casa', busca clientas de lamami con estado en_casa.\n"
+        . "- Si está en casawasap y dice 'crea contacto', usa target_scope=casawasap.\n"
+        . "- Si está en josue y dice 'agenda', abre la pestaña agenda de josue.\n"
+        . "- El contexto siempre debe influir en target_scope cuando no se menciona explícitamente un ámbito.\n"
+        . "\n"
         . "CATÁLOGO PERMITIDO:\n{$catalog}\n"
         . "\n"
         . "GLOSARIO CRM:\n"
@@ -785,7 +819,7 @@ function voice_interpreter_system_prompt() {
         . "\n"
         . "VALORES RECOMENDADOS:\n"
         . "- page: dashboard, lamami, casawasap, jostal, gastos, informes, bots, avisos, josue, lamamibot, publicista, comercial\n"
-        . "- tab: interesadas, clientas, lamamibot, agenda, ventas, telefonos, config, configm, informes, eurekas, crear_perfiles, estrategias, cuentas, campanas, subir_anuncios, resumen, procesos, lineas, conversaciones, leads, ajustes, logs\n"
+        . "- tab: interesadas, clientas, lamamibot, agenda, ventas, config, configm, informes, eurekas, crear_perfiles, estrategias, cuentas, campanas, subir_anuncios, resumen, procesos, lineas, conversaciones, leads, ajustes, logs\n"
         . "- rama: todas, lamami, casawasap, jostal, global\n"
         . "- tipo: todos, ingresos, gastos, lead, alta, pago, venta\n"
         . "- target_type: clienta, interesada, casawasap_contacto, agenda_contact, bot, lamamibot, none\n"
@@ -803,7 +837,15 @@ function voice_interpreter_system_prompt() {
         . "- 'abre publicista campañas' -> open_tab con page=publicista y tab=campanas\n"
         . "- 'abre comercial logs' -> open_tab con page=comercial y tab=logs\n"
         . "- 'abre eurekas de josue' -> open_tab con page=josue y tab=eurekas\n"
-        . "- 'apaga lamamibot' -> set_lamamibot_runtime_mode con mode=stop\n";
+        . "- 'apaga lamamibot' -> set_lamamibot_runtime_mode con mode=stop\n"
+        . "- 'ensename las clientas de jostal' -> list_entities, target_type=clienta, target_scope=jostal\n"
+        . "- 'quiero ver las que estan en casa' -> list_entities con estado=en_casa\n"
+        . "- 'crea una interesada nueva en jostal' -> create_jostal_interesada (o open_tab con view=new y tab=interesadas)\n"
+        . "- 'dame el resumen de esta semana' -> query_analytics, analytics_kind=summary, period_hint=this_week\n"
+        . "- 'cuanto hemos ganado este mes' -> query_analytics, analytics_kind=summary, period_hint=this_month\n"
+        . "- 'crea un contacto en la agenda' -> create_agenda_contact (detecta si hay nombre y teléfono)\n"
+        . "- 'registra un gasto de 50 euros en oficina' -> add_gasto, cantidad=50, descripcion='oficina'\n"
+        . "- 'apaga el bot de Paola' -> set_bot_runtime_mode con mode=stop, lookup_field=nombre, lookup_value=Paola\n";
 }
 
 function voice_interpreter_json_schema() {
@@ -915,7 +957,7 @@ function voice_candidate_texts($text, $speechMeta = array()) {
     return $items;
 }
 
-function voice_rule_interpretation_score($payload) {
+function voice_rule_interpretation_score($payload, $context = array(), $transcript = '') {
     $payload = is_array($payload) ? $payload : array();
     $params = is_array($payload['params'] ?? null) ? $payload['params'] : array();
     $intent = trim((string)($payload['intent'] ?? ''));
@@ -934,6 +976,43 @@ function voice_rule_interpretation_score($payload) {
     if (!empty($params['analytics_kind'])) $score += 1;
     if (!empty($params['mode'])) $score += 1;
     if (!empty($params['nombre']) || !empty($params['telefono']) || !empty($params['descripcion']) || !empty($params['cantidad'])) $score += 2;
+
+    // Domain-specific bonuses for better candidate selection
+    $normalized = voice_normalize_text($transcript);
+
+    // Bonus for Jostal-specific keywords (often misrecognized by voice)
+    if (voice_contains_any($normalized, array('jostal', 'hostal', 'yostal', 'josta'))) {
+        $score += 2;
+    }
+
+    // Bonus for detecting numeric phone patterns in the transcript
+    if (preg_match('/\d{6,}/', $normalized)) {
+        $score += 3;
+    }
+
+    // Bonus for proper name patterns (capitalized words detectable in raw transcript)
+    if (preg_match('/\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+\b/u', (string)$transcript)) {
+        $score += 1;
+    }
+
+    // Penalty for very short interpretations with no meaningful params
+    $paramCount = 0;
+    foreach (array('page', 'tab', 'target_type', 'target_scope', 'lookup_value', 'estado', 'analytics_kind', 'mode') as $k) {
+        if (!empty($params[$k]) && $params[$k] !== 'none' && $params[$k] !== '') $paramCount++;
+    }
+    if ($paramCount === 0 && $intent !== 'confirm_pending_action' && $intent !== 'cancel_pending_action') {
+        $score -= 5;
+    }
+
+    // Bonus when the resolved intent/page matches current page context
+    $currentPage = trim((string)($context['page'] ?? ''));
+    if ($currentPage !== '' && !empty($params['page']) && $params['page'] === $currentPage) {
+        $score += 3;
+    } elseif ($currentPage !== '' && !empty($params['target_scope'])) {
+        if ($params['target_scope'] === $currentPage || voice_normalize_scope($params['target_scope']) === $currentPage) {
+            $score += 3;
+        }
+    }
 
     return $score;
 }
@@ -1033,7 +1112,7 @@ function voice_interpret_with_ai($text, $context = array(), $speechMeta = array(
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 40);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
     curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, $headerLine) use (&$responseHeaders) {
         $len = strlen($headerLine);
         $parts = explode(':', $headerLine, 2);
@@ -1120,6 +1199,54 @@ function voice_interpret_with_rules($raw, $context = array()) {
             'clarification_question' => $descripcion === '' ? 'Dime la idea después de "eureka" para poder guardarla.' : '',
             'missing_fields' => $descripcion === '' ? array('descripcion') : array(),
         );
+    }
+
+    // "en casa" or "solo en casa" patterns for filtering (without navigation verbs)
+    if (voice_contains($normalized, 'en casa') && !voice_contains_any($normalized, array('entra', 'entrar', 'mete', 'meter'))) {
+        $scope = voice_extract_scope_from_text($normalized, $context);
+        $params['estado'] = 'en_casa';
+        $params['target_type'] = 'clienta';
+        if ($scope !== '') {
+            $params['target_scope'] = $scope;
+        } elseif (!empty($context['page'])) {
+            $params['target_scope'] = trim((string)$context['page']);
+        }
+        return array(
+            'intent' => 'list_entities',
+            'params' => $params,
+            'needs_clarification' => false,
+            'clarification_question' => '',
+            'missing_fields' => array(),
+        );
+    }
+
+    // Simple page name only: when the user just says the page name
+    $simplePages = array(
+        'jostal', 'lamami', 'casawasap', 'publicista', 'comercial',
+        'gastos', 'informes', 'bots', 'avisos', 'josue',
+    );
+    if (in_array($normalized, $simplePages, true)) {
+        $params['page'] = $normalized;
+        if ($normalized === 'josue') {
+            return array('intent' => 'open_page', 'params' => $params, 'needs_clarification' => false, 'clarification_question' => '', 'missing_fields' => array());
+        }
+        return array('intent' => 'open_page', 'params' => $params, 'needs_clarification' => false, 'clarification_question' => '', 'missing_fields' => array());
+    }
+
+    // Variant: "hostal", "yostal", "josta" → jostal
+    $normalizedClean = preg_replace('/\s+/', '', $normalized);
+    $simplePageVariants = array(
+        'hostal' => 'jostal', 'yostal' => 'jostal', 'josta' => 'jostal',
+        'lamami' => 'lamami', 'lamary' => 'lamami', 'lami' => 'lamami',
+        'casawasap' => 'casawasap', 'casaguasap' => 'casawasap',
+        'publicista' => 'publicista', 'comercial' => 'comercial',
+        'gastos' => 'gastos', 'informes' => 'informes',
+        'bots' => 'bots', 'avisos' => 'avisos', 'josue' => 'josue',
+    );
+    if (isset($simplePageVariants[$normalized]) || isset($simplePageVariants[$normalizedClean])) {
+        $resolved = $simplePageVariants[$normalized] ?? $simplePageVariants[$normalizedClean];
+        $params['page'] = $resolved;
+        return array('intent' => 'open_page', 'params' => $params, 'needs_clarification' => false, 'clarification_question' => '', 'missing_fields' => array());
     }
 
     $period = voice_parse_period_from_text($normalized);
@@ -1626,17 +1753,54 @@ function voice_pipeline_interpret($text, $context = array(), $speechMeta = array
     $selectedTranscript = $text;
     $rule = null;
     $bestScore = -9999;
+    $candidateResults = array(); // track all results for tie-breaking and logging
     foreach (voice_candidate_texts($text, $speechMeta) as $candidateText) {
         $candidateRule = voice_sanitize_ai_interpretation(voice_interpret_with_rules($candidateText, $context));
-        $candidateScore = voice_rule_interpretation_score($candidateRule);
+        $candidateScore = voice_rule_interpretation_score($candidateRule, $context, $candidateText);
+        $candidateResults[] = array(
+            'transcript' => $candidateText,
+            'score' => $candidateScore,
+            'intent' => $candidateRule['intent'],
+        );
         if ($rule === null || $candidateScore > $bestScore) {
             $rule = $candidateRule;
             $bestScore = $candidateScore;
             $selectedTranscript = $candidateText;
+        } elseif ($candidateScore === $bestScore) {
+            // Tie-breaking: prefer the SHORTEST clean transcript (less noise)
+            if (mb_strlen($candidateText, 'UTF-8') < mb_strlen($selectedTranscript, 'UTF-8')) {
+                $rule = $candidateRule;
+                $selectedTranscript = $candidateText;
+            }
         }
     }
     if ($rule === null) {
         $rule = voice_sanitize_ai_interpretation(voice_interpret_with_rules($text, $context));
+    }
+
+    // If the selected transcript and original text are very similar (diff only in punctuation/case),
+    // prefer the original to avoid confusing the user
+    $originalNormalized = voice_normalize_text($text);
+    $selectedNormalized = voice_normalize_text($selectedTranscript);
+    $similarityDistance = levenshtein($originalNormalized, $selectedNormalized);
+    $maxLen = max(strlen($originalNormalized), strlen($selectedNormalized), 1);
+    $similarityRatio = $similarityDistance / $maxLen;
+    if ($similarityRatio < 0.15 && $selectedTranscript !== $text) {
+        // Very similar — re-interpret using original text for cleaner message
+        $originalRule = voice_sanitize_ai_interpretation(voice_interpret_with_rules($text, $context));
+        $originalScore = voice_rule_interpretation_score($originalRule, $context, $text);
+        if ($originalScore >= $bestScore - 1) {
+            $rule = $originalRule;
+            $selectedTranscript = $text;
+        }
+    }
+
+    // Collect error details for the ai.errors field
+    $aiErrors = isset($ai['errors']) && is_array($ai['errors']) ? $ai['errors'] : array();
+    if (!empty($aiErrors)) {
+        $aiErrors[] = 'fallback_transcripts_considered:' . json_encode($candidateResults, JSON_UNESCAPED_SLASHES);
+        $aiErrors[] = 'original_transcript:' . $text;
+        $aiErrors[] = 'speech_alternatives:' . json_encode($speechMeta['alternatives'] ?? array(), JSON_UNESCAPED_SLASHES);
     }
 
     return array(
@@ -1649,7 +1813,7 @@ function voice_pipeline_interpret($text, $context = array(), $speechMeta = array
             : (($selectedTranscript !== $text)
                 ? 'Orden interpretada por el parser de respaldo usando la variante de voz más probable.'
                 : 'Orden interpretada por el parser de respaldo.'),
-        'errors' => isset($ai['errors']) && is_array($ai['errors']) ? $ai['errors'] : array(),
+        'errors' => $aiErrors,
         'ai' => array(
             'enabled' => !empty(voice_ai_config()['configured']),
             'provider' => 'openai',
@@ -1658,6 +1822,7 @@ function voice_pipeline_interpret($text, $context = array(), $speechMeta = array
             'client_request_id' => $ai['client_request_id'] ?? '',
             'used_fallback' => true,
             'selected_transcript' => $selectedTranscript,
+            'errors' => $aiErrors,
         ),
     );
 }
@@ -2257,9 +2422,11 @@ function voice_pipeline_resolve($interpretation, $context = array()) {
         if ($params['page'] === '' && $params['tab'] !== '') {
             if (in_array($params['tab'], array('interesadas', 'clientas', 'lamamibot'), true)) {
                 $params['page'] = (($params['target_scope'] ?? '') === 'jostal') ? 'jostal' : 'lamami';
-            } elseif (in_array($params['tab'], array('agenda', 'telefonos', 'config', 'configm', 'waha', 'publias', 'captacion', 'sendtaxs', 'notas'), true)) {
-                $params['page'] = 'josue';
-            } elseif (in_array($params['tab'], array('ventas', 'informes'), true)) {
+            } elseif (in_array($params['tab'], array('agenda', 'config', 'configm', 'waha', 'publias', 'captacion', 'sendtaxs', 'notas'), true)) {
+            $params['page'] = 'josue';
+        } elseif (in_array($params['tab'], array('lineas', 'procesos', 'conversaciones', 'leads', 'ajustes', 'logs'), true)) {
+            $params['page'] = 'comercial';
+        } elseif (in_array($params['tab'], array('ventas', 'informes'), true)) {
                 $params['page'] = 'jostal';
             }
         }

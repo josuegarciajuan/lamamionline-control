@@ -17,9 +17,9 @@
 
 ### FASE-3-ACTUALIZAR-RUTAS
 
-- [ ] T3.1 — Reemplazar URLs `page=josue&tab=telefonos` en `views.php` (L1321, L7233, L7334).
-- [ ] T3.2 — Actualizar voice.php (resolver, tab hints, AI prompt).
-- [ ] T3.3 — Verificar `data/settings.json` L4 (nota TODO).
+- [x] T3.1 — Reemplazar URLs `page=josue&tab=telefonos` en `views.php` (L1321, L7306, L7407).
+- [x] T3.2 — Actualizar voice.php (resolver, tab hints, AI prompt).
+- [x] T3.3 — Verificar `data/settings.json` L4 (nota TODO — sin cambios necesarios).
 
 ### FASE-4-MIGRAR-JOSUE-TAB
 
