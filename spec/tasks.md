@@ -319,3 +319,22 @@
 - [x] Formalizar checklist de consistencia documental F1→F8 con 30 ítems verificables (`spec/design.md` + `spec/contracts.md`).
 - [x] Definir criterios de aprobación de cierre con evidencias: checklist OK, métricas en umbral, firma dual, manifiesto inmutable.
 - [x] Crear ADR-008 y actualizar changelog.
+
+## PUB-FOTOS-REALES — Subida de fotos reales en perfiles de Publicista
+
+### PUB-FOTOS-REALES-F1 — reals-upload
+
+- [x] T1 — Añadir `reals/` al mapa de directorios de assets (`storage.php: build_job_asset_dirs, job_fs_paths, ensure_job_dirs, job_defaults`).
+- [x] T2 — Input `file[multiple]` en formulario CREAR perfil (`views.php: render_publicista_crear_perfiles_page`).
+- [x] T3 — Input `file[multiple]` en formulario EDITAR perfil (`views.php: config-panel`).
+- [x] T4 — Nueva función `publicista_attach_real_photos()` en `publicista.php` (subida múltiple con validación MIME, límite 10 fotos, límite 20 MB por archivo).
+- [x] T5 — Manejo de `$_FILES['real_photos']` en `action_create_publicista_job` (`actions.php`).
+- [x] T6 — Manejo de `$_FILES['real_photos']` en `action_save_publicista_job` (`actions.php`).
+- [x] T7 — Paso 4 "Fotos reales" en la barra visual de navegación (`views.php`).
+- [x] T8 — Sección 4 completa: galería de fotos reales con vista previa, metadatos y botón eliminar (`views.php`).
+- [x] T9 — Nuevas acciones `action_upload_publicista_real_photos` y `action_delete_publicista_real_photo` con CSRF (`actions.php`, `views.php`).
+- [x] T10 — CSS existente cubre `.publicista-visual-*`; sin cambios necesarios.
+- [x] T11 — Cache-busting: `style.css?v=20260527_3`, `app.js?v=20260527_1` en `index.php`.
+- [x] T12 — Revisión de seguridad: CSRF añadido a formularios, path derivation desde `photoId` en delete, límite 20 MB, MIME validation robusta.
+- [x] T13 — Validación técnica: `php -l` OK en 5 archivos. Sin regresión funcional detectada.
+- [x] T14 — Documentación: changelog + contracts actualizados.

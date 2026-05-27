@@ -644,6 +644,106 @@ function publicista_attach_uploaded_source_image($jobId, $file) {
     return array(true, $saved);
 }
 
+function publicista_attach_real_photos($jobId, $files) {
+    $job = publicista_job_get($jobId);
+    if (!$job) {
+        return array(false, 'No se encontró el trabajo de Publicista.');
+    }
+
+    if (!is_array($files) || empty($files['tmp_name'])) {
+        return array(true, $job); // sin archivos, sin cambios
+    }
+
+    $paths = publicista_job_fs_paths($jobId);
+    if (!publicista_ensure_job_dirs($jobId)) {
+        return array(false, 'No se pudo preparar la carpeta del trabajo.');
+    }
+
+    $realsDir = $paths['reals_dir'];
+    if (!publicista_ensure_dir($realsDir)) {
+        return array(false, 'No se pudo crear el directorio de fotos reales.');
+    }
+
+    $existingPhotos = is_array($job['real_photos'] ?? null) ? $job['real_photos'] : array();
+    $count = count($existingPhotos);
+    $allowed = publicista_allowed_upload_mimes();
+    $maxBytes = 20 * 1024 * 1024; // 20 MB máximo por foto real
+    $added = array();
+
+    $tmpNames = is_array($files['tmp_name']) ? $files['tmp_name'] : array();
+    $fileNames = is_array($files['name'] ?? null) ? $files['name'] : array();
+    $fileErrors = is_array($files['error'] ?? null) ? $files['error'] : array();
+    $fileSizes = is_array($files['size'] ?? null) ? $files['size'] : array();
+
+    foreach ($tmpNames as $i => $tmpName) {
+        if ($count >= 10) {
+            break; // máximo 10 fotos reales
+        }
+
+        $error = (int)($fileErrors[$i] ?? UPLOAD_ERR_NO_FILE);
+        if ($error !== UPLOAD_ERR_OK) {
+            continue;
+        }
+        if (!is_uploaded_file((string)$tmpName)) {
+            continue;
+        }
+
+        $sizeBytes = isset($fileSizes[$i]) ? (int)$fileSizes[$i] : 0;
+        if ($sizeBytes > $maxBytes) {
+            // El archivo excede el límite de 20 MB — se omite silenciosamente
+            continue;
+        }
+
+        $mime = '';
+        if (function_exists('mime_content_type')) {
+            $mime = (string)mime_content_type((string)$tmpName);
+        }
+        if ($mime === '' && function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo) {
+                $mime = (string)finfo_file($finfo, (string)$tmpName);
+                finfo_close($finfo);
+            }
+        }
+        $mime = strtolower(trim($mime));
+
+        if (!in_array($mime, $allowed, true)) {
+            continue;
+        }
+
+        $count++;
+        $photoId = 'real_' . str_pad((string)$count, 2, '0', STR_PAD_LEFT);
+        $ext = publicista_guess_extension_from_mime($mime);
+        $targetPath = $realsDir . '/' . $photoId . '.' . $ext;
+
+        if (!@move_uploaded_file((string)$tmpName, $targetPath)) {
+            continue;
+        }
+
+        $imgSize = @getimagesize($targetPath);
+        $added[] = array(
+            'id' => $photoId,
+            'original_filename' => trim((string)($fileNames[$i] ?? $photoId)),
+            'stored_path' => publicista_path_to_web($targetPath),
+            'mime_type' => $mime,
+            'size_bytes' => @filesize($targetPath) ?: 0,
+            'width' => is_array($imgSize) ? (int)$imgSize[0] : 0,
+            'height' => is_array($imgSize) ? (int)$imgSize[1] : 0,
+            'uploaded_at' => now_datetime(),
+            'manual_blur_applied' => 0,
+            'manual_blur_intensity' => 0,
+            'manual_blur_shape' => array(),
+        );
+    }
+
+    if (empty($added)) {
+        return array(true, $job); // sin cambios relevantes
+    }
+
+    $job['real_photos'] = array_merge($existingPhotos, $added);
+    return publicista_job_save($job);
+}
+
 function publicista_proc_command($command, $timeoutSec, $cwd = null) {
     $descriptor = array(
         0 => array('pipe', 'r'),

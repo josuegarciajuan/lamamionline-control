@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-05-27 — PUB-FOTOS-REALES-F1 (reals-upload)
+
+### Añadido
+- Subida de fotos reales en perfiles de Publicista (máx 10, 20 MB c/u, JPG/PNG/WEBP).
+- Nueva sección "④ Fotos reales subidas" en la ficha de producto con galería y botón eliminar.
+- Input `multiple` en formularios de crear y editar perfil.
+- Acciones `upload_publicista_real_photos` y `delete_publicista_real_photo` con protección CSRF.
+- Nueva función `publicista_attach_real_photos()` en `app/publicista.php` con validación MIME por contenido.
+
+### Modificado
+- `app/storage.php`: `real_photos` en job defaults + `reals_dir` en asset dirs y fs paths.
+- `app/views.php`: paso 4 en barra visual + sección completa de fotos reales.
+- `app/actions.php`: manejo de fotos reales en create/save + dispatch de nuevas acciones.
+- `index.php`: cache-busting `style.css?v=20260527_3`, `app.js?v=20260527_1`.
+
+### Seguridad
+- CSRF tokens añadidos a formularios de upload y delete de fotos reales.
+- Path derivation desde `photoId` en delete (no desde `stored_path`).
+- Límite 20 MB por archivo con omisión silenciosa.
+
 ## 2026-05-27 · COM-NOTIFICACIONES-F2 — Notificaciones efectivas del bot comercial
 
 ### Cambios implementados (5 tareas)

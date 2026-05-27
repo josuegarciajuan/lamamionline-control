@@ -745,3 +745,23 @@ Reglas:
 8. Acta firmada por un solo rol (sin dualidad comercial + arquitectura) => cierre no válido.
 9. `document_hashes` no coinciden con el estado actual de los archivos => integridad comprometida, cierre inválido.
 10. Regresión completa F1-F7: todos los contratos previos se mantienen sin cambios ni contradicciones introducidas por F8.
+
+## Contrato PUB-FOTOS-REALES — Fotos reales subidas en perfiles Publicista
+
+### Contrato de almacenamiento de fotos reales
+- Cada entrada en `real_photos[]` DEBE contener: `id`, `original_filename`, `stored_path`, `mime_type`, `size_bytes`, `width`, `height`, `uploaded_at`.
+- Cada entrada en `real_photos[]` DEBE contener campos de blur (inicialmente a 0): `manual_blur_applied`, `manual_blur_intensity`, `manual_blur_shape`.
+- El directorio de almacenamiento DEBE ser `data/publicista/jobs/<job_id>/reals/`.
+- El ID DEBE seguir el formato `real_NN` (ej. `real_01`, `real_02`).
+
+### Contrato de subida
+- MIME types permitidos: `image/jpeg`, `image/png`, `image/webp`.
+- Límite máximo: 10 fotos reales por perfil.
+- Límite máximo por archivo: 20 MB.
+- La subida DEBE validar MIME por contenido (no por extensión).
+- Archivos que excedan el límite DEBEN omitirse silenciosamente.
+
+### Contrato de eliminación
+- La ruta del archivo a eliminar DEBE derivarse de `photoId` + `mime_type`, NO de `stored_path`.
+- Tras eliminar, los IDs DEBEN reindexarse secuencialmente (`real_01`, `real_02`, ...).
+- La eliminación DEBE validar CSRF.

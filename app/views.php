@@ -1757,24 +1757,8 @@ function render_publicista_campanas_page() {
                             if ($currentCount !== $storedCount) {
                                 $hasDistributionMismatch = true;
                                 break 2;
-            }
-
-            $activeUnreadCount = 0;
-            foreach ($active as $a) {
-                if (empty($a['read_at'])) $activeUnreadCount++;
-            }
-            if ($activeUnreadCount > 0) {
-                echo '<div class="aviso-actions" style="margin-top:10px;">';
-                echo '<form method="post" class="inline-form js-mark-all-read">';
-                echo '<input type="hidden" name="action" value="mark_avisos_read">';
-                echo '<input type="hidden" name="scope" value="active_unread">';
-                echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
-                echo '<input type="hidden" name="redirect" value="' . e($baseUrl . '&avtab=active') . '">';
-                echo '<button class="btn-secondary-mini">Marcar ' . e((string)$activeUnreadCount) . ' nuevos como leídos</button>';
-                echo '</form>';
-                echo '</div>';
-            }
-        }
+                            }
+                        }
                     }
                 }
                 if ($hasDistributionMismatch) {
@@ -2438,6 +2422,12 @@ function render_publicista_crear_perfiles_page($embedded = false) {
             echo '<div class="field-help">Esta foto se usa directamente para crear el producto y lanzar todo el pipeline inicial.</div>';
             echo '</div>';
 
+            echo '<div class="field full">';
+            echo '<label>Fotos reales del perfil (opcional) <span style="color:#6b7280;font-weight:normal;">— máx 10</span></label>';
+            echo '<input type="file" name="real_photos[]" accept="image/jpeg,image/png,image/webp" multiple>';
+            echo '<div class="field-help">Estas fotos se guardan sin modificar. Podrás editarlas y aplicarles blur más tarde desde la ficha del producto.</div>';
+            echo '</div>';
+
             echo '<div class="field full"><hr style="margin:4px 0;border:none;border-top:1px solid #e5e7eb;"><strong style="font-size:13px;color:#6b7280;">Ropa y estilo visual</strong></div>';
             publicista_render_production_params_fields(array());
 
@@ -2686,6 +2676,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     echo '<a class="publicista-visual-step" href="#publicistaOrigen"><span class="step-num">1</span><span><strong>Original</strong><small>base y recorte</small></span></a>';
     echo '<a class="publicista-visual-step" href="#publicistaCandidates"><span class="step-num">2</span><span><strong>Candidatas</strong><small>revisión y selección</small></span></a>';
     echo '<a class="publicista-visual-step" href="#publicistaFinals"><span class="step-num">3</span><span><strong>Definitivas</strong><small>blur manual final</small></span></a>';
+    echo '<a class="publicista-visual-step" href="#publicistaReals"><span class="step-num">4</span><span><strong>Fotos reales</strong><small>subidas manualmente</small></span></a>';
     echo '</div>';
 
     if ($canCloseProfileAsFinished) {
@@ -2711,6 +2702,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     $prodParams = function_exists('publicista_job_production_params') ? publicista_job_production_params($selectedJob) : array();
     echo '<form method="post" class="form-grid" style="margin-top:16px;">';
     echo '<input type="hidden" name="action" value="save_publicista_job">';
+    echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
     echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
     publicista_field_clienta_picker('clienta_id', 'Clienta', $clientas, $selectedClientaPickerValue);
     field_input('nombre_trabajo', 'Nombre interno del pack', $selectedJob['nombre_trabajo'] ?? '', true);
@@ -2775,6 +2767,12 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     field_textarea('services_snapshot', 'Servicios snapshot (opcional)', $selectedJob['services_snapshot'] ?? '', 3);
     field_textarea('tarifas_snapshot', 'Tarifas snapshot', $selectedJob['tarifas_snapshot'] ?? '', 3);
     field_textarea('notas', 'Notas internas', $selectedJob['notas'] ?? '', 3);
+    echo '<div class="field full"><hr style="margin:4px 0;border:none;border-top:1px solid #e5e7eb;"><strong style="font-size:13px;color:#6b7280;">Fotos reales del perfil</strong></div>';
+    echo '<div class="field full">';
+    echo '<label>Subir fotos reales adicionales (máx 10 en total)</label>';
+    echo '<input type="file" name="real_photos[]" accept="image/jpeg,image/png,image/webp" multiple>';
+    echo '<div class="field-help">Las fotos se añadirán a las ya existentes sin borrar las anteriores.</div>';
+    echo '</div>';
     echo '<div class="full"><button class="btn-primary">Guardar configuración del trabajo</button></div>';
     echo '</form>';
     echo '</details>';
@@ -3062,6 +3060,58 @@ function render_publicista_crear_perfiles_page($embedded = false) {
         echo '<div class="empty">Finales pendientes. Se crean automáticamente al completar el pipeline de imágenes.</div>';
     }
     echo '</section>';
+
+// -----------------------------------------------------------------------
+// SECCIÓN 4: FOTOS REALES SUBIDAS
+// -----------------------------------------------------------------------
+$realPhotos = is_array($selectedJob['real_photos'] ?? null) ? $selectedJob['real_photos'] : array();
+echo '<section class="panel panel-space" id="publicistaReals">';
+echo '<div class="branch-panel-head"><h3>④ Fotos reales subidas</h3><span class="summary-badge">' . e((string)count($realPhotos)) . '</span></div>';
+
+if (!empty($realPhotos)) {
+    echo '<div style="margin-top:8px;font-size:12px;color:#6b7280;">Estas fotos se subieron manualmente. Puedes eliminarlas o más adelante aplicarles blur manual desde esta misma sección.</div>';
+    echo '<div class="cards two" style="margin-top:14px;">';
+    foreach ($realPhotos as $rp) {
+        $rpId = $rp['id'] ?? '';
+        $rpPath = $rp['stored_path'] ?? '';
+        $rpName = $rp['original_filename'] ?? $rpId;
+        $rpWidth = (int)($rp['width'] ?? 0);
+        $rpHeight = (int)($rp['height'] ?? 0);
+        $rpUploaded = $rp['uploaded_at'] ?? '';
+        echo '<div class="panel" style="padding:12px;">';
+        echo '<div class="branch-panel-head" style="margin-bottom:8px;"><strong>' . e($rpName) . '</strong></div>';
+        if ($rpPath !== '') {
+            echo '<img src="' . e($rpPath) . '" alt="Foto real" style="width:100%;border-radius:8px;border:1px solid #e5e7eb;display:block;">';
+        }
+        echo '<div style="display:flex;gap:8px;margin-top:8px;font-size:11px;color:#9ca3af;">';
+        echo '<span>' . e($rpWidth . '×' . $rpHeight) . '</span>';
+        if ($rpUploaded !== '') {
+            echo '<span>' . e(format_created_at($rpUploaded)) . '</span>';
+        }
+        echo '</div>';
+        echo '<form method="post" class="inline-form" style="margin-top:8px;" onsubmit="return confirm(\'¿Eliminar esta foto real?\')">';
+        echo '<input type="hidden" name="action" value="delete_publicista_real_photo">';
+        echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
+        echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
+        echo '<input type="hidden" name="photo_id" value="' . e($rpId) . '">';
+        echo '<button class="btn-secondary-mini" style="color:#b91c1c;">Eliminar</button>';
+        echo '</form>';
+        echo '</div>';
+    }
+    echo '</div>';
+} else {
+    echo '<div class="empty">No hay fotos reales subidas todavía. Usa el formulario de abajo para añadirlas.</div>';
+}
+
+// Formulario rápido de subida desde la sección
+echo '<form method="post" enctype="multipart/form-data" class="inline-form" style="margin-top:14px;">';
+echo '<input type="hidden" name="action" value="upload_publicista_real_photos">';
+echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
+echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
+echo '<input type="file" name="real_photos[]" accept="image/jpeg,image/png,image/webp" multiple style="font-size:12px;">';
+echo ' <button class="btn-secondary-mini">Subir fotos reales</button>';
+echo '</form>';
+echo '</section>';
 
     echo '<section class="panel panel-space" id="publicistaCopyPack">';
     echo '<div class="section-head"><div><h3>Títulos, textos y export</h3><p>Genera el pack de copy, revisa variantes y exporta todo para publicar.</p></div><div class="section-head-actions">';
@@ -3547,6 +3597,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
   var _knownMtimes      = {};    // candidateId -> mtime visto
   var _knownAvisosCount = -1;
   var _hasActiveQueue   = false;
+  var _pollWasActive    = false;
 
   function initPoll() {
     // Leer el job id de un atributo del DOM inyectado por PHP
@@ -3593,20 +3644,31 @@ function render_publicista_crear_perfiles_page($embedded = false) {
         if (newMtime > 0 && newMtime !== (_knownMtimes[candId] || 0)) {
           _knownMtimes[candId] = newMtime;
           // Actualizar src de la imagen si existe en el DOM
-          var imgs = document.querySelectorAll('[data-candidate-id="' + candId + '"] img, #candidateCard_' + candId + ' img');
+          var card = document.querySelector('[data-candidate-id="' + candId + '"]');
+          var imgs = card ? card.querySelectorAll('img') : [];
           if (!imgs.length) {
-            // Fallback: buscar por src que contenga el path base sin ?t=
-            var basePath = cand.square_path.replace(/\?.*$/, '');
-            imgs = document.querySelectorAll('img[src*="' + basePath.split('/').pop().replace(/\.[^.]+$/, '') + '"]');
-          }
-          if (imgs.length) {
-            for (var i = 0; i < imgs.length; i++) {
-              imgs[i].src = cand.src;
+            // Fallback 1: buscar imágenes cuyo src contenga algún fragmento del path
+            var basePath = (cand.square_path || '').replace(/\?.*$/, '');
+            var baseFile = basePath.split('/').pop().replace(/\.[^.]+$/, '').replace(/_manual$/, '');
+            if (baseFile) {
+              imgs = document.querySelectorAll('img[src*="' + baseFile + '"]');
             }
           }
-          // Mostrar badge de "Actualizada" si estaba en error o queued
+          if (!imgs.length) {
+            // Fallback 2: buscar cualquier img dentro del tab actual
+            console.warn('Publicista poll: no se encontraron imágenes para la candidata ' + candId + ' (square_path: ' + (cand.square_path || '') + ')');
+          }
+          if (imgs.length) {
+            // Forzar recarga agresiva con doble cache-bust
+            var freshSrc = (cand.src || '') + '&_=' + Date.now();
+            for (var i = 0; i < imgs.length; i++) {
+              imgs[i].src = '';  // Invalidar caché primero
+              imgs[i].src = freshSrc;
+            }
+          }
+          // Mostrar badge de "Actualizada" solo si realmente se actualizó alguna imagen
           var qStatus = queue[candId] ? queue[candId].status : '';
-          if (qStatus === 'done' || (_knownMtimes[candId] && newMtime)) {
+          if (qStatus === 'done' || (_knownMtimes[candId] && newMtime && imgs.length > 0)) {
             showCandidateUpdatedBadge(candId);
           }
         }
@@ -3622,7 +3684,10 @@ function render_publicista_crear_perfiles_page($embedded = false) {
       _knownAvisosCount = newAvisosCount;
 
       // Próximo poll: rápido si hay cola activa, lento si todo quieto
-      schedulePoll(_hasActiveQueue ? POLL_INTERVAL_MS : POLL_IDLE_MS);
+      // Si acaba de terminar algo, mantenemos un poll rápido durante una iteración más para no perder la actualización
+      var justFinished = !_hasActiveQueue && (_pollWasActive === true);
+      schedulePoll((_hasActiveQueue || justFinished) ? POLL_INTERVAL_MS : POLL_IDLE_MS);
+      _pollWasActive = _hasActiveQueue;
     })
     .catch(function() { schedulePoll(POLL_IDLE_MS); });
   }
@@ -4250,10 +4315,39 @@ function dashboard_card($title, $value, $money = false) {
 
 function render_bot_casa_page() {
     page_header('Bot Casa', 'Panel de control del bot de WhatsApp');
-    $panelUrl = 'bot-casa/public/panel.php';
-    echo '<div class="panel panel-space" style="padding:0;overflow:hidden;border-radius:var(--radius-md)">';
-    echo '<iframe src="' . e($panelUrl) . '" style="width:100%;height:calc(100vh - 200px);border:none;display:block" title="Panel Bot Casa"></iframe>';
+    $panelUrl = 'bot-casa/public/panel.php?v=20260522_2';
+    echo '<div class="panel panel-space" style="padding:0;overflow:visible;border-radius:var(--radius-md)">';
+    echo '<iframe id="bot-casa-iframe" src="' . e($panelUrl) . '" style="width:100%;min-height:calc(100vh - 200px);height:auto;border:none;display:block" title="Panel Bot Casa"></iframe>';
     echo '</div>';
+    echo "<script>(function(){\n";
+    echo "  var iframe = document.getElementById('bot-casa-iframe');\n";
+    echo "  if (!iframe) return;\n";
+    echo "  var minHeight = Math.max(window.innerHeight - 200, 560);\n";
+    echo "  function resizeIframe(){\n";
+    echo "    try {\n";
+    echo "      var doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);\n";
+    echo "      if (!doc) return;\n";
+    echo "      var body = doc.body;\n";
+    echo "      var html = doc.documentElement;\n";
+    echo "      var contentHeight = Math.max(\n";
+    echo "        body ? body.scrollHeight : 0,\n";
+    echo "        html ? html.scrollHeight : 0,\n";
+    echo "        body ? body.offsetHeight : 0,\n";
+    echo "        html ? html.offsetHeight : 0\n";
+    echo "      );\n";
+    echo "      iframe.style.height = Math.max(contentHeight, minHeight) + 'px';\n";
+    echo "    } catch (e) {}\n";
+    echo "  }\n";
+    echo "  iframe.addEventListener('load', function(){\n";
+    echo "    resizeIframe();\n";
+    echo "    setTimeout(resizeIframe, 250);\n";
+    echo "    setTimeout(resizeIframe, 1000);\n";
+    echo "  });\n";
+    echo "  window.addEventListener('resize', function(){\n";
+    echo "    minHeight = Math.max(window.innerHeight - 200, 560);\n";
+    echo "    resizeIframe();\n";
+    echo "  });\n";
+    echo "})();</script>";
 }
 
 function render_dashboard_page() {

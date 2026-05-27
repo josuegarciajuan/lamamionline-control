@@ -278,6 +278,7 @@ function storage_mysql_file_spec($file) {
             'jostal_clientas.json' => array('kind' => 'rows_by_id', 'table' => 'crm_jostal_clientas', 'key_column' => 'id', 'json_column' => 'raw_json'),
             'jostal_leads.json' => array('kind' => 'rows_by_id', 'table' => 'crm_jostal_leads', 'key_column' => 'id', 'json_column' => 'raw_json'),
             'jostal_ventas.json' => array('kind' => 'rows_by_id', 'table' => 'crm_jostal_ventas', 'key_column' => 'id', 'json_column' => 'raw_json'),
+            'contratos.json' => array('kind' => 'rows_by_id', 'table' => 'crm_contratos', 'key_column' => 'id', 'json_column' => 'raw_json'),
             'avisos.json' => array('kind' => 'rows_by_id', 'table' => 'crm_avisos', 'key_column' => 'id', 'json_column' => 'raw_json'),
             'avisos_runs.json' => array('kind' => 'rows_by_id', 'table' => 'crm_avisos_runs', 'key_column' => 'id', 'json_column' => 'raw_json'),
             'comercial_settings.json' => array('kind' => 'singleton', 'table' => 'crm_comercial_settings', 'key_column' => 'id', 'key_value' => 'comercial_settings', 'json_column' => 'payload_json'),
@@ -7819,6 +7820,7 @@ function publicista_build_job_asset_dirs($id) {
         'finals_dir' => $baseRel . '/finals',
         'meta_dir' => $baseRel . '/meta',
         'logs_dir' => $baseRel . '/logs',
+        'reals_dir' => $baseRel . '/reals',
     );
 }
 
@@ -7833,6 +7835,7 @@ function publicista_job_fs_paths($id) {
         'finals_dir' => $base . '/finals',
         'meta_dir' => $base . '/meta',
         'logs_dir' => $base . '/logs',
+        'reals_dir' => $base . '/reals',
     );
 }
 
@@ -8005,6 +8008,7 @@ function publicista_job_defaults($id = '') {
             'last_breakdown' => array(),
             'last_cost_update_at' => '',
         ),
+        'real_photos' => array(),
         'candidates' => array(),
         'final_images' => array(),
         'created_at' => '',
@@ -8033,6 +8037,9 @@ function publicista_jobs_get() {
             $merged['product_profile'] = $defaults['product_profile'];
         } else {
             $merged['product_profile'] = array_merge($defaults['product_profile'], $merged['product_profile']);
+        }
+        if (!isset($merged['real_photos']) || !is_array($merged['real_photos'])) {
+            $merged['real_photos'] = $defaults['real_photos'];
         }
         $merged['estado'] = publicista_normalize_status($merged['estado']);
         $merged['asset_dirs'] = publicista_build_job_asset_dirs($merged['id']);

@@ -405,6 +405,12 @@ function handle_post_actions() {
         case 'apply_publicista_manual_blur':
             action_apply_publicista_manual_blur();
             break;
+        case 'upload_publicista_real_photos':
+            action_upload_publicista_real_photos();
+            break;
+        case 'delete_publicista_real_photo':
+            action_delete_publicista_real_photo();
+            break;
         case 'voice_command':
             action_voice_command();
             break;
@@ -467,12 +473,124 @@ function action_save_publicista_job() {
         : array();
 
     list($ok, $result) = publicista_job_save($row);
+
+    // Guardar fotos reales subidas si las hay
+    $realPhotos = isset($_FILES['real_photos']) && is_array($_FILES['real_photos']) ? $_FILES['real_photos'] : null;
+    if ($realPhotos && !empty($realPhotos['tmp_name'])) {
+        $tmpNames = is_array($realPhotos['tmp_name']) ? $realPhotos['tmp_name'] : array();
+        $hasFile = false;
+        foreach ($tmpNames as $t) {
+            if ((string)$t !== '') { $hasFile = true; break; }
+        }
+        if ($hasFile) {
+            list($okReal, $resultReal) = publicista_attach_real_photos($id, $realPhotos);
+            if ($okReal && is_array($resultReal)) {
+                $result = $resultReal;
+                $ok = true;
+            }
+        }
+    }
+
     if (!$ok) {
         set_flash('error', is_string($result) ? $result : 'No se pudo guardar el trabajo de Publicista.');
         redirect_to(publicista_tab_url(array('job' => $id)));
     }
 
     set_flash('ok', 'Trabajo de Publicista guardado.');
+    redirect_to(publicista_tab_url(array('job' => $id)));
+}
+
+function action_upload_publicista_real_photos() {
+    if (!csrf_validate((string)request_post('csrf_token'))) {
+        set_flash('error', 'Sesión caducada. Recarga la página.');
+        redirect_to(publicista_tab_url());
+    }
+
+    $id = trim((string)request_post('id'));
+    $job = publicista_job_get($id);
+    if (!$job) {
+        set_flash('error', 'No se encontró el trabajo de Publicista.');
+        redirect_to(publicista_tab_url());
+    }
+
+    $realPhotos = isset($_FILES['real_photos']) && is_array($_FILES['real_photos']) ? $_FILES['real_photos'] : null;
+    if (!$realPhotos || empty($realPhotos['tmp_name'])) {
+        set_flash('error', 'No se seleccionaron fotos para subir.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
+    $tmpNames = is_array($realPhotos['tmp_name']) ? $realPhotos['tmp_name'] : array();
+    $hasFile = false;
+    foreach ($tmpNames as $t) {
+        if ((string)$t !== '') { $hasFile = true; break; }
+    }
+    if (!$hasFile) {
+        set_flash('error', 'No se seleccionaron fotos para subir.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
+    list($ok, $result) = publicista_attach_real_photos($id, $realPhotos);
+    if (!$ok) {
+        set_flash('error', is_string($result) ? $result : 'No se pudieron subir las fotos reales.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
+    set_flash('ok', 'Fotos reales subidas correctamente.');
+    redirect_to(publicista_tab_url(array('job' => $id)));
+}
+
+function action_delete_publicista_real_photo() {
+    if (!csrf_validate((string)request_post('csrf_token'))) {
+        set_flash('error', 'Sesión caducada. Recarga la página.');
+        redirect_to(publicista_tab_url());
+    }
+
+    $id = trim((string)request_post('id'));
+    $photoId = trim((string)request_post('photo_id'));
+    $job = publicista_job_get($id);
+    if (!$job) {
+        set_flash('error', 'No se encontró el trabajo de Publicista.');
+        redirect_to(publicista_tab_url());
+    }
+
+    $photos = is_array($job['real_photos'] ?? null) ? $job['real_photos'] : array();
+    $found = null;
+    foreach ($photos as $i => $rp) {
+        if (($rp['id'] ?? '') === $photoId) {
+            $found = $i;
+            break;
+        }
+    }
+    if ($found === null) {
+        set_flash('error', 'Foto no encontrada.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
+    // Eliminar archivo físico del disco (derivar ruta desde photoId, no desde stored_path)
+    $paths = publicista_job_fs_paths($id);
+    $mimeType = trim((string)($photos[$found]['mime_type'] ?? 'image/jpeg'));
+    $ext = function_exists('publicista_guess_extension_from_mime') ? publicista_guess_extension_from_mime($mimeType) : 'jpg';
+    $fs = $paths['reals_dir'] . '/' . $photoId . '.' . $ext;
+    if (file_exists($fs)) {
+        @unlink($fs);
+    }
+
+    // Eliminar del array y reindexar IDs
+    array_splice($photos, $found, 1);
+    $photos = array_values($photos);
+    foreach ($photos as $j => &$rpRef) {
+        $rpRef['id'] = 'real_' . str_pad((string)($j + 1), 2, '0', STR_PAD_LEFT);
+    }
+    unset($rpRef);
+
+    $job['real_photos'] = $photos;
+    list($ok, $result) = publicista_job_save($job);
+    if (!$ok) {
+        set_flash('error', is_string($result) ? $result : 'No se pudo guardar tras eliminar la foto.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
+    set_flash('ok', 'Foto real eliminada.');
     redirect_to(publicista_tab_url(array('job' => $id)));
 }
 
@@ -798,6 +916,23 @@ function action_create_publicista_job() {
     }
 
     $savedJob = is_array($result) ? $result : publicista_job_get($job['id']);
+
+    // Guardar fotos reales subidas junto con el source_image
+    $realPhotos = isset($_FILES['real_photos']) && is_array($_FILES['real_photos']) ? $_FILES['real_photos'] : null;
+    if ($realPhotos && !empty($realPhotos['tmp_name'])) {
+        $tmpNames = is_array($realPhotos['tmp_name']) ? $realPhotos['tmp_name'] : array();
+        $hasFile = false;
+        foreach ($tmpNames as $t) {
+            if ((string)$t !== '') { $hasFile = true; break; }
+        }
+        if ($hasFile) {
+            list($okReal, $resultReal) = publicista_attach_real_photos($savedJob['id'], $realPhotos);
+            if ($okReal && is_array($resultReal)) {
+                $savedJob = $resultReal;
+            }
+        }
+    }
+
     if (!$savedJob || trim((string)($savedJob['id'] ?? '')) === '') {
         set_flash('error', 'Se creó el trabajo, pero no se pudo preparar la generación.');
         redirect_to(publicista_tab_url());
