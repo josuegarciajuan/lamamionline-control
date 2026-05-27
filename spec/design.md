@@ -704,3 +704,41 @@ Estructura mínima del artefacto de cierre:
 
 ### Resultado esperado de F8
 Queda cerrada la fase documental de CX2 con métricas de aceptación claras, un checklist de consistencia verificable y criterios de aprobación con evidencias trazables. El bloque CX2 queda listo para implementación técnica de runtime en fase posterior, con bajo riesgo de ambigüedad contractual.
+
+---
+
+## Diseño COM-CLASIFICACION-F1 — Clasificación inteligente del bot comercial
+
+### Objetivo de diseño
+Corregir bugs críticos de clasificación que producen falsos positivos (negativos clasificados como very_hot), respuestas inapropiadas a saludos, y engagement con auto-responders de WhatsApp Business.
+
+### Decisiones de diseño
+
+#### 1. Reorden de checks en `comercial_classify_reply()`
+- **Decisión**: Mover `comercial_reply_is_negative_intent()` ANTES del bloque `comercial_reply_is_high_intent_after_followup()`.
+- **Justificación**: Un "no me interesa" debe clasificarse como `negative` antes de que el regex de high-intent capture `me interesa` como subcadena.
+- **Impacto**: Sin cambios en el resto del pipeline; solo cambia el orden de evaluación.
+
+#### 2. Validación de contexto negativo
+- **Decisión**: Añadir un pre-check en `comercial_reply_is_high_intent_after_followup()` que detecte negación contextual (`no`, `sin`, `tampoco`, `ni`, `nada de`) precediendo inmediatamente a un keyword positivo.
+- **Regex**: `/\b(no|sin|tampoco|ni|nada de)\s+(me\s+interesa|quiero\s+info|quiero|pasame|ll[aá]mame)\b/ui`
+- **Justificación**: Refuerzo defensivo: incluso si el reorden falla por alguna razón, este pre-check bloquea falsos positivos.
+
+#### 3. Detector de auto-responders
+- **Decisión**: Nueva función `comercial_is_likely_autoresponder($text, $thread)` con tres criterios:
+  1. Texto > 150 caracteres con estructura de tarifas (€, `\d+\s*min`, `\d+\s*h`)
+  2. Palabras clave de catálogo: "disponible", "NOVEDAD", "tarifas", "salidas", "ducha erótica", mayúsculas sostenidas
+  3. Llegada en < 30 segundos desde `last_contact_at` del hilo
+- **Justificación**: En el sector hay alta prevalencia de cuentas con WhatsApp Business auto-reply. El bot no debe malgastar recursos conversando con otro bot.
+
+#### 4. Nuevo stage `autoresponder`
+- **Decisión**: Cuando se detecta auto-responder, aplicar stage `'autoresponder'`, NO enviar followup, NO generar notificación. Solo log de evento.
+- **Justificación**: Estos contactos no son leads reales. Silenciarlos evita ruido operacional.
+
+#### 5. Mejora de contexto para greetings
+- **Decisión**: En el handler de greeting/curious, determinar si el cliente SOLO saludó o si HIZO una pregunta. Pasar esta distinción al prompt de IA y a la selección de template.
+- **Justificación**: El bot actual responde "Me alegra que preguntes" a un simple "Hola amor que tal", lo que delata artificialidad. La IA debe saber si hubo pregunta real o no.
+
+### Archivos impactados
+- `app/comercial.php` — 6 funciones modificadas + 1 nueva función
+- `index.php` — bump de versión assets

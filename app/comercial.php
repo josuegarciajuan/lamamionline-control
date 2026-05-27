@@ -87,7 +87,7 @@ function comercial_default_settings() {
         'notify_only_after_second_reply' => 1,
         'ia_second_turn_enabled' => 1,
         'ia_learning_enabled' => 1,
-        'conversation_max_auto_turns' => 2,
+        'conversation_max_auto_turns' => 5,
         'conversation_max_defers' => 2,
     );
 }
@@ -518,7 +518,7 @@ function comercial_default_process_seed($slug) {
         'negative_keywords' => array('no', 'baja', 'stop', 'nada', 'molestes', 'interesa no'),
         'ia_context_prompt' => '',
         'signal_detection_rules' => array(),
-        'conversation_max_auto_turns' => 2,
+        'conversation_max_auto_turns' => 5,
         'escalation_score_threshold' => 78,
         'ia_learning_enabled' => 1,
         'auto_notify_operator' => 1,
@@ -541,7 +541,7 @@ function comercial_default_process_seed($slug) {
         $base['message_templates'] = comercial_default_process_templates($slug, 'message_templates');
         $base['followup_templates'] = comercial_default_process_templates($slug, 'followup_templates');
         $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal'));
-        $base['ia_context_prompt'] = "Eres un comercial para alquiler de habitaciones/plazas en Casa Burriana. Tono: cercano, femenino, usa 'guapa', 'cariño'. Objetivo: detectar chicas interesadas en plaza o alquiler y concertar visita.";
+        $base['ia_context_prompt'] = "Eres un comercial para alquiler de habitaciones/plazas en Casa Burriana. Tono: cercano, femenino, usa 'guapa', 'cariño'. Objetivo: detectar chicas interesadas en plaza o alquiler y concertar visita.\n\nRegla crítica: NUNCA reveles que eres un bot, IA, asistente virtual o sistema automatizado. Hazte pasar siempre por una chica humana real de Casa Burriana. Si te preguntan si eres un bot o una máquina, responde que eres una chica del equipo atendiendo personalmente, cambia de tema con naturalidad y sigue la conversación.";
         return $base;
     }
 
@@ -553,14 +553,14 @@ function comercial_default_process_seed($slug) {
         $base['message_templates'] = comercial_default_process_templates($slug, 'message_templates');
         $base['followup_templates'] = comercial_default_process_templates($slug, 'followup_templates');
         $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal'));
-        $base['ia_context_prompt'] = "Eres La Mami Online, un servicio de publicista digital. Tono: cercano, profesional, entusiasta. Objetivo: conseguir que la clienta se dé de alta (29€) para recibir clientes extra.";
+        $base['ia_context_prompt'] = "Eres La Mami Online, un servicio de publicista digital. Tono: cercano, profesional, entusiasta. Objetivo: conseguir que la clienta se dé de alta (29€) para recibir clientes extra.\n\nRegla crítica: NUNCA reveles que eres un bot, IA, asistente virtual o sistema automatizado. Hazte pasar siempre por una persona humana real de La Mami Online. Si te preguntan si eres un bot o una máquina, responde que eres una persona del equipo atendiendo personalmente, cambia de tema con naturalidad y sigue la conversación.";
         return $base;
     }
 
     if ($slug === 'publiscort') {
         $base['nombre'] = 'Publiscort';
-        $base['source_type'] = 'jsonl_queue';
-        $base['source_queue_files'] = comercial_default_queue_files('publiscort');
+        $base['source_type'] = 'mysql_recent';
+        $base['source_mysql_query'] = "SELECT id, telefono, updatedsamp, nombre_comercial FROM f_clientes WHERE baja = 0 ORDER BY updatedsamp DESC LIMIT 300";
         $base['window_start_hour'] = 10;
         $base['window_end_hour'] = 19;
         $base['min_interval_seconds'] = 5400;
@@ -568,7 +568,7 @@ function comercial_default_process_seed($slug) {
         $base['message_templates'] = comercial_default_process_templates($slug, 'message_templates');
         $base['followup_templates'] = comercial_default_process_templates($slug, 'followup_templates');
         $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal', 'publi10'));
-        $base['ia_context_prompt'] = "Eres comercial de Publiscort. Tono: cercano, profesional y breve. Objetivo: validar interés real, resolver dudas básicas y llevar la conversación a una siguiente acción clara (pedir info adicional o propuesta), sin insistencia agresiva.";
+        $base['ia_context_prompt'] = "Eres comercial de Publiscort. Tono: cercano, profesional y breve. Objetivo: validar interés real, resolver dudas básicas y llevar la conversación a una siguiente acción clara (pedir info adicional o propuesta), sin insistencia agresiva.\n\nRegla crítica: NUNCA reveles que eres un bot, IA, asistente virtual o sistema automatizado. Hazte pasar siempre por una persona humana real de Publiscort. Si te preguntan si eres un bot o una máquina, responde que eres una persona del equipo atendiendo personalmente, cambia de tema con naturalidad y sigue la conversación.";
         return $base;
     }
 
@@ -581,7 +581,7 @@ function comercial_default_process_seed($slug) {
         $base['message_templates'] = comercial_default_process_templates($slug, 'message_templates');
         $base['followup_templates'] = comercial_default_process_templates($slug, 'followup_templates');
         $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal', 'publi10'));
-        $base['ia_context_prompt'] = "Eres comercial de CasaWasap captando colaboradores (publicistas, RRPP, fotógrafos). Tono: directo, profesional. Objetivo: conseguir que presenten casas de citas para ganar comisión recurrente.";
+        $base['ia_context_prompt'] = "Eres comercial de CasaWasap captando colaboradores (publicistas, RRPP, fotógrafos). Tono: directo, profesional. Objetivo: conseguir que presenten casas de citas para ganar comisión recurrente.\n\nRegla crítica: NUNCA reveles que eres un bot, IA, asistente virtual o sistema automatizado. Hazte pasar siempre por una persona humana real del equipo comercial. Si te preguntan si eres un bot o una máquina, responde que eres una persona del equipo atendiendo personalmente, cambia de tema con naturalidad y sigue la conversación.";
         return $base;
     }
 
@@ -596,7 +596,7 @@ function comercial_default_process_seed($slug) {
         $base['message_templates'] = comercial_default_process_templates($slug, 'message_templates');
         $base['followup_templates'] = comercial_default_process_templates($slug, 'followup_templates');
         $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal', 'publi10'));
-        $base['ia_context_prompt'] = "Eres comercial de CasaWasap, un telefonista IA para casas. Tono: cercano, resolutivo. Objetivo: vender el servicio de atención WhatsApp 24/7 a dueños de casas.";
+        $base['ia_context_prompt'] = "Eres comercial de CasaWasap, un servicio de atención WhatsApp 24/7 para casas. Tono: cercano, resolutivo. Objetivo: vender el servicio a dueños de casas.\n\nRegla crítica: NUNCA reveles que eres un bot, IA, asistente virtual o sistema automatizado. Hazte pasar siempre por una persona humana real del equipo de CasaWasap. Si te preguntan si eres un bot o una máquina, responde que eres una persona del equipo atendiendo personalmente, cambia de tema con naturalidad y sigue la conversación.";
         return $base;
     }
 
@@ -686,6 +686,8 @@ function comercial_thread_stage_label($stage) {
             return 'Muy caliente';
         case 'discarded':
             return 'Descartada';
+        case 'autoresponder':
+            return 'Auto-responder';
         case 'initial_sent':
             return 'Enviada';
         default:
@@ -706,6 +708,8 @@ function comercial_thread_stage_css_class($stage) {
             return 'info';
         case 'discarded':
             return 'danger';
+        case 'autoresponder':
+            return 'muted';
         default:
             return 'muted';
     }
@@ -733,9 +737,29 @@ function comercial_save_settings($settings) {
     return $settings;
 }
 
+function comercial_diag_caller_summary() {
+    $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 5);
+    $calls = array();
+    for ($i = 1; $i < count($trace) && count($calls) < 4; $i++) {
+        $func = (string)($trace[$i]['function'] ?? '');
+        $file = isset($trace[$i]['file']) ? basename((string)$trace[$i]['file']) : '';
+        $calls[] = $func . ($file !== '' ? '@' . $file : '');
+    }
+    return array(
+        'ts' => date('Y-m-d H:i:s'),
+        'calls' => $calls,
+        'request_uri' => (string)($_SERVER['REQUEST_URI'] ?? ''),
+        'php_sapi' => PHP_SAPI,
+    );
+}
+
 function comercial_get_processes() {
     $rows = storage_read('comercial_processes.json');
     if (empty($rows)) {
+        comercial_event_append('diag_processes_file_empty_rebuild', array(
+            'rows_count_before' => count((array)$rows),
+            'caller' => comercial_diag_caller_summary(),
+        ));
         $rows = comercial_build_default_processes();
         storage_write('comercial_processes.json', $rows);
     }
@@ -770,17 +794,85 @@ function comercial_get_processes() {
     foreach ($out as $row) {
         $sanitized[] = comercial_prepare_process_for_storage($row);
     }
-    if ($rows !== $sanitized) {
+    // Solo reescribir si la migración añadió procesos nuevos.
+    // La normalización no debe provocar escrituras — comercial_save_processes()
+    // es la única vía para persistir cambios.
+    $originalCount = count((array)$rows);
+    $normalizedCount = count($sanitized);
+    if ($normalizedCount > $originalCount) {
+        comercial_event_append('diag_migration_persist', array(
+            'caller' => comercial_diag_caller_summary(),
+            'original_count' => $originalCount,
+            'normalized_count' => $normalizedCount,
+        ));
         storage_write('comercial_processes.json', array_values($sanitized));
     }
     return $out;
 }
 
 function comercial_save_processes($rows) {
+    $previousRows = storage_read('comercial_processes.json');
+    $previousEnabledById = array();
+    $previousEnabledCount = 0;
+    foreach ((array)$previousRows as $prev) {
+        $pid = trim((string)($prev['id'] ?? ''));
+        if ($pid === '') continue;
+        $isEnabled = !empty($prev['enabled']) ? 1 : 0;
+        $previousEnabledById[$pid] = $isEnabled;
+        if ($isEnabled) $previousEnabledCount++;
+    }
+
     $out = array();
     foreach ((array)$rows as $row) {
         $out[] = comercial_normalize_process($row);
     }
+
+    // Guardrail: evitar apagado masivo accidental de TODOS los procesos.
+    // Solo aplica si antes había procesos activos y ahora quedarían 0 activos.
+    $newEnabledCount = 0;
+    foreach ($out as $row) {
+        if (!empty($row['enabled'])) $newEnabledCount++;
+    }
+    if ($previousEnabledCount > 0 && $newEnabledCount === 0) {
+        foreach ($out as &$row) {
+            $pid = trim((string)($row['id'] ?? ''));
+            if ($pid === '') continue;
+            if (isset($previousEnabledById[$pid])) {
+                $row['enabled'] = (int)$previousEnabledById[$pid];
+            }
+        }
+        unset($row);
+        comercial_event_append('comercial_guardrail_prevented_mass_disable', array(
+            'previous_enabled' => $previousEnabledCount,
+            'requested_enabled' => $newEnabledCount,
+            'caller' => comercial_diag_caller_summary(),
+        ));
+    }
+
+    // Diag: solo loggear cuando hay cambios en enabled respecto al estado anterior
+    $enabledChanged = false;
+    foreach ($out as $r) {
+        $pid = trim((string)($r['id'] ?? ''));
+        $currentEnabled = !empty($r['enabled']) ? 1 : 0;
+        $prevEnabled = isset($previousEnabledById[$pid]) ? $previousEnabledById[$pid] : null;
+        if ($prevEnabled !== null && $prevEnabled !== $currentEnabled) {
+            $enabledChanged = true;
+            break;
+        }
+    }
+    if ($enabledChanged || $previousEnabledCount !== $newEnabledCount) {
+        $saveSnapshot = array();
+        foreach ($out as $r) {
+            $saveSnapshot[] = array('slug' => $r['slug'] ?? '?', 'enabled' => !empty($r['enabled']) ? 1 : 0);
+        }
+        comercial_event_append('diag_save_processes', array(
+            'caller' => comercial_diag_caller_summary(),
+            'previous_enabled_count' => $previousEnabledCount,
+            'new_enabled_count' => $newEnabledCount,
+            'enabled_snapshot' => $saveSnapshot,
+        ));
+    }
+
     $stored = array();
     foreach ($out as $row) {
         $stored[] = comercial_prepare_process_for_storage($row);
@@ -841,6 +933,19 @@ function comercial_normalize_process($row) {
     $out['source_queue_files'] = comercial_resolve_queue_files((string)$out['slug'], $out['source_queue_files']);
     $out['message_templates'] = comercial_normalize_template_blocks($out['message_templates']);
     $out['followup_templates'] = comercial_normalize_template_blocks($out['followup_templates']);
+    // Auto-detección de plantillas corruptas: si el JSON almacenado tiene los mensajes
+    // fragmentados en líneas sueltas (bug de guardado con \n\n), ninguna variante
+    // alcanzará la longitud mínima del proceso. En ese caso restauramos los defaults.
+    $minMsgLen = comercial_hardcoded_min_message_length((string)$out['slug'], 'message_templates');
+    if ($minMsgLen > 0 && !empty($out['message_templates'])) {
+        $algunoLargo = false;
+        foreach ($out['message_templates'] as $tpl) {
+            if (comercial_safe_len($tpl) >= $minMsgLen) { $algunoLargo = true; break; }
+        }
+        if (!$algunoLargo) {
+            $out['message_templates'] = array();
+        }
+    }
     if (empty($out['message_templates'])) {
         $out['message_templates'] = comercial_default_process_templates((string)$out['slug'], 'message_templates');
     }
@@ -885,12 +990,29 @@ function comercial_normalize_textarea_lines($value) {
 
 function comercial_normalize_template_blocks($value) {
     if (is_array($value)) {
-        $blocks = $value;
-    } else {
-        $text = trim((string)$value);
-        if ($text === '') return array();
-        $blocks = preg_split("/(?:\r\n|\r|\n){2,}/", $text);
+        // Fix Bug 2: cuando viene como array PHP, cada elemento YA ES una variante completa.
+        // Solo hacemos trim y descartamos vacíos — NO colapsamos \n\n internos porque
+        // esos son saltos de párrafo intencionales del mensaje (formato WhatsApp).
+        $out = array();
+        foreach ($value as $block) {
+            $block = trim((string)$block);
+            if ($block !== '') {
+                $out[] = $block;
+            }
+        }
+        return array_values($out);
     }
+
+    // Cuando viene de textarea (string): separar variantes por línea "---".
+    // Cada variante puede tener saltos de línea internos (párrafos de WhatsApp)
+    // porque usamos "---" como separador inequívoco de variantes en lugar de \n\n.
+    $text = trim((string)$value);
+    if ($text === '') return array();
+    // Normalizar line endings a \n
+    $text = str_replace("\r\n", "\n", $text);
+    $text = str_replace("\r", "\n", $text);
+    // Separar por líneas que contengan exactamente "---" (opcionalmente con espacios)
+    $blocks = preg_split("/\n[ \t]*---[ \t]*\n/", $text);
 
     $out = array();
     foreach ((array)$blocks as $block) {
@@ -1168,6 +1290,8 @@ function comercial_hardcoded_min_message_length($slug, $field) {
             return 320;
         case 'publicista':
             return 420;
+        case 'publiscort':
+            return 200;
         default:
             return 0;
     }
@@ -1178,7 +1302,16 @@ function comercial_array_to_textarea($value) {
 }
 
 function comercial_templates_to_textarea($value) {
-    return implode("\n\n", comercial_normalize_template_blocks($value));
+    // Usar "---" como separador inequívoco de variantes para evitar colisión
+    // con saltos de párrafo internos de los mensajes (formato WhatsApp).
+    return implode("\n---\n", comercial_normalize_template_blocks($value));
+}
+
+// Separador seguro entre variantes: línea con "---".
+// Las variantes en textarea se separan por \n---\n.
+// Cada variante puede contener \n\n internos (párrafos de WhatsApp).
+function comercial_templates_separator() {
+    return "\n---\n";
 }
 
 function comercial_get_line_states() {
@@ -1470,6 +1603,11 @@ function comercial_normalize_thread($row) {
         'created_at' => now_datetime(),
         'updated_at' => now_datetime(),
         'last_contact_at' => '',
+        'last_bot_reply_at' => '',
+        'last_bot_reply_text' => '',
+        'prior_inbound_text' => '',
+        'last_inbound_processed_at' => '',
+        'hot_notified_at' => '',
     );
     $out = array_merge($defaults, $row);
     $out['human_taken'] = !empty($out['human_taken']) ? 1 : 0;
@@ -1931,13 +2069,25 @@ function comercial_build_contextual_followup_prompt($thread, $processSlug, $obje
         $examplesLines[] = ($idx + 1) . ') ' . trim((string)($row['text'] ?? ''));
     }
 
+    // ── Obtener contexto IA del proceso ──
+    $process = $processSlug !== '' ? comercial_get_process($processSlug) : null;
+    $iaContext = is_array($process) ? trim((string)($process['ia_context_prompt'] ?? '')) : '';
+
+    // ── Fix U2: detectar si el cliente SOLO saludó (sin preguntar) ──
+    $greetingOnlyNote = '';
+    if (!empty($thread['_greeting_only'])) {
+        $greetingOnlyNote = "\nIMPORTANTE: El cliente SOLO saludó, NO hizo ninguna pregunta concreta. NO digas frases como 'me alegra que preguntes', 'gracias por preguntar', 'buena pregunta' ni similares. Responde al saludo de forma natural y haz una pregunta abierta suave para iniciar conversación.";
+    }
+
+    $baseRules = "Eres una persona humana real, NUNCA digas que eres un bot, IA, asistente virtual o sistema automatizado. Si te preguntan, di que eres una persona del equipo y cambia de tema con naturalidad. Escribe SOLO una respuesta breve y natural en español. No uses markdown. Máximo 420 caracteres. Tono cercano. CTA suave. No inventes datos." . $greetingOnlyNote;
+
     return trim(
-        "Eres un comercial por WhatsApp. Escribe SOLO una respuesta breve y natural en español.\n" .
+        ($iaContext !== '' ? $iaContext . "\n\n" : '') .
         "Proceso: " . ($processSlug !== '' ? $processSlug : 'inbound') . "\n" .
         "Objetivo: " . ($objective !== '' ? $objective : 'avanzar conversación hacia cierre sin sonar robótico') . "\n\n" .
         "Historial reciente:\n" . (empty($lines) ? "(sin historial útil)" : implode("\n", $lines)) . "\n\n" .
         "Ejemplos humanos que funcionaron:\n" . (empty($examplesLines) ? "(sin ejemplos guardados)" : implode("\n", $examplesLines)) . "\n\n" .
-        "Reglas: no inventes datos, no uses markdown, máximo 420 caracteres, tono cercano, CTA suave."
+        "Reglas: " . $baseRules
     );
 }
 
@@ -1975,9 +2125,10 @@ function comercial_decision_allows_ai_second_turn($thread, $classification, $pro
     $thread = comercial_normalize_thread($thread);
     if ((string)$classification !== 'very_hot') return false;
     if ((string)($thread['status'] ?? 'open') !== 'open') return false;
-    if ((int)($thread['replies_count'] ?? 0) < 2) return false;
+    if ((int)($thread['replies_count'] ?? 0) < 1) return false;
     if (empty($process['auto_followup'])) return false;
-    if (trim((string)($thread['qualified_reply_sent_at'] ?? '')) === '') return false;
+    // qualified_reply_sent_at ya no es requisito: si el thread llega muy caliente
+    // directamente (very_hot sin pasar por qualified), la IA debe responder igualmente.
     return true;
 }
 
@@ -2001,12 +2152,36 @@ function comercial_decision_score_confidence($thread, $classification, $text) {
     return max(0, min(1, $score));
 }
 
+/**
+ * Fix Bug 3: Helper para decidir si se puede enviar un auto-followup.
+ * Retorna true si:
+ *   - Quedan turnos automáticos disponibles (auto_turn_count < maxTurns), O
+ *   - La última respuesta fue hace más de 2h (ventana de reenganche).
+ * Fix #4: antes solo aplicaba la ventana de 2h, bloqueando el segundo turno
+ * aunque el proceso tuviera configurado conversation_max_auto_turns > 1.
+ * Fix Bug 3c (v2): ahora siempre consulta auto_turn_count, incluso si
+ * qualified_reply_sent_at está vacío (primer turno: auto_turn_count=0 < maxTurns siempre).
+ */
+function comercial_can_send_auto_followup($thread, $maxTurns = 999) {
+    $sentAt = trim((string)($thread['qualified_reply_sent_at'] ?? ''));
+    // Si todavía quedan turnos automáticos, permitir el seguimiento inmediatamente
+    if ((int)($thread['auto_turn_count'] ?? 0) < (int)$maxTurns) return true;
+    // Nunca se ha respondido → permitir el primer turno (auto_turn_count = 0 < maxTurns ya lo cubre)
+    if ($sentAt === '') return true;
+    // Turnos agotados → solo reenganchar tras 2h de silencio
+    return strtotime($sentAt) < (time() - 7200);
+}
+
 function comercial_decide_inbound_action($thread, $process, $classification, $text) {
     $thread = comercial_normalize_thread($thread);
     $settings = comercial_get_settings();
     $maxTurns = max(1, (int)($process['conversation_max_auto_turns'] ?? $settings['conversation_max_auto_turns'] ?? 2));
     $confidence = comercial_decision_score_confidence($thread, $classification, $text);
     $risk = comercial_inbound_has_risk_phrase($text);
+
+    // Fix Bug 3c (v2): el reset de 24h se hace en el handler
+    // (comercial_handle_inbound_message) para que el cambio se persista.
+    // Aquí solo consultamos el valor ya actualizado.
 
     if (empty($settings['ia_second_turn_enabled']) && empty($process['ia_learning_enabled'])) {
         return array('action' => 'auto_reply_second_turn', 'confidence' => $confidence, 'risk' => $risk, 'reason' => 'legacy_mode_reply');
@@ -2418,6 +2593,48 @@ function comercial_webhook_mark_seen($messageId) {
     comercial_webhook_claim_message($messageId);
 }
 
+// ── Thread-level inbound lock (avoid duplicate auto-replies on burst messages) ──
+
+function comercial_thread_inbound_lock_path($threadId) {
+    $threadId = trim((string)$threadId);
+    $safe = $threadId !== '' ? md5($threadId) : 'unknown';
+    return DATA_PATH . '/comercial_thread_locks/' . $safe . '.lock';
+}
+
+/**
+ * Try to acquire an exclusive, non-blocking lock for a thread's inbound processing.
+ * Returns a file handle on success, or false if another request is already processing
+ * the same thread (or if the lock file is not accessible).
+ */
+function comercial_thread_acquire_inbound_lock($threadId) {
+    $lockPath = comercial_thread_inbound_lock_path($threadId);
+    $dir = dirname($lockPath);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    $lock = @fopen($lockPath, 'c+');
+    if ($lock === false) {
+        return false;
+    }
+    if (!flock($lock, LOCK_EX | LOCK_NB)) {
+        fclose($lock);
+        return false;
+    }
+    // Write a small marker so we can see which PID holds the lock (debug aid)
+    @ftruncate($lock, 0);
+    @fwrite($lock, json_encode(array('pid' => getmypid(), 'ts' => time(), 'thread' => $threadId)));
+    @fflush($lock);
+    return $lock;
+}
+
+function comercial_thread_release_inbound_lock($lockHandle) {
+    if (!$lockHandle || !is_resource($lockHandle)) {
+        return;
+    }
+    @flock($lockHandle, LOCK_UN);
+    @fclose($lockHandle);
+}
+
 function comercial_webhook_extract_payload($request = array()) {
     $request = is_array($request) ? $request : array();
     $body = isset($request['body']) && is_array($request['body']) ? $request['body'] : $request;
@@ -2445,6 +2662,7 @@ function comercial_webhook_extract_payload($request = array()) {
     ));
 
     $rawFrom = trim((string)$from);
+    $rawFrom = preg_replace('/:\d+@/', '@', $rawFrom);
     $isStatusBroadcast = stripos($rawFrom, 'status@broadcast') !== false
         || stripos((string)($dataInfo['Chat'] ?? ''), 'status@broadcast') !== false;
     $isGroupMessage = !empty($dataInfo['IsGroup']) && !$isStatusBroadcast;
@@ -2459,6 +2677,7 @@ function comercial_webhook_extract_payload($request = array()) {
         $me['id'] ?? '',
         $data['to'] ?? '',
     ));
+    $to = preg_replace('/:\d+@/', '@', $to);
 
     $text = comercial_first_nonempty_value(array(
         $request['text'] ?? '',
@@ -2614,6 +2833,15 @@ function comercial_handle_webhook_http() {
                 'classification' => (string)($result['classification'] ?? ''),
                 'action' => (string)($result['action'] ?? ''),
             );
+            if (!empty($result['ignored'])) {
+                // Mensaje ignorado benignamente (sin texto, sin remitente, etc.)
+                comercial_event_append('webhook_inbound_ignored', $successPayload + array('ignored' => $result['ignored']));
+                comercial_webhook_log_append('ignored', $logContext + array(
+                    'ignored_reason' => (string)$result['ignored'],
+                    'http_status' => 200,
+                ));
+                voice_json_response(array('ok' => true) + $result);
+            }
             comercial_event_append('webhook_inbound_processed', $successPayload);
             comercial_webhook_log_append('processed', $logContext + array(
                 'thread_id' => (string)($result['thread_id'] ?? ''),
@@ -2942,7 +3170,74 @@ function comercial_reply_is_high_intent_after_followup($text) {
         return false;
     }
 
+    // ── Fix U1 (defensa en profundidad): detectar negación contextual ──
+    // "no me interesa", "sin interés", "tampoco quiero info", "ni me llames" → NO es high intent.
+    if (preg_match('/\b(no|sin|tampoco|ni|nada\s+de)\s+(me\s+interesa|quiero\s+info|quiero|pasame|p[aá]same|ll[aá]mame)\b/ui', $text)) {
+        return false;
+    }
+
     return (bool)preg_match('/\b(me interesa|quiero|quiero info|quiero empezar|agendar|agenda|llamame|ll[aá]mame|cuando puedo|cu[aá]ndo puedo|precio|cuanto|cu[aá]nto|horario|ubicaci[oó]n|d[oó]nde|direcci[oó]n|pasame|p[aá]same)\b/ui', $text);
+}
+
+/**
+ * ── Fix U3: detector de auto-responders de WhatsApp Business ──
+ * Detecta patrones comunes en mensajes automáticos de catálogo/ausencia:
+ * tarifas estructuradas, mayúsculas sostenidas, palabras clave del sector,
+ * y llegada muy rápida tras el envío inicial.
+ */
+function comercial_is_likely_autoresponder($text, $thread = array()) {
+    $text = trim((string)$text);
+    $thread = is_array($thread) ? $thread : array();
+    if ($text === '') return false;
+
+    $textLen = comercial_safe_len($text);
+
+    // Criterio 1: texto largo con estructura de tarifas (€ + números + min/h)
+    $hasTariffStructure = false;
+    if ($textLen >= 80) {
+        $hasCurrency = (bool)preg_match('/[€$]\s*\d+/u', $text);
+        $hasTimeUnit = (bool)preg_match('/\d+\s*(min|minutos?|h|hora|horas)/ui', $text);
+        $hasTariffStructure = $hasCurrency && $hasTimeUnit;
+    }
+
+    // Criterio 2: palabras clave de catálogo/auto-reply
+    $autoReplyKeywords = array('disponible', 'disponibilidad', 'novedad', 'tarifas', 'tarifa',
+        'salidas', 'ducha erótica', 'ducha erotica', 'servicios', 'completo',
+        'beso negro', 'lluvia dorada', 'masaje', 'cachonda', 'cariñosa');
+    $keywordHits = 0;
+    foreach ($autoReplyKeywords as $kw) {
+        if (stripos($text, $kw) !== false) $keywordHits++;
+    }
+
+    // Criterio 3: mayúsculas sostenidas (típico de auto-responders gritando NOVEDAD, DISPONIBLE)
+    $upperRatio = 0;
+    $alphaCount = preg_match_all('/[a-zA-ZáéíóúÁÉÍÓÚñÑ]/u', $text, $m);
+    $upperCount = preg_match_all('/[A-ZÁÉÍÓÚÑ]/u', $text, $m2);
+    if ($alphaCount > 10) {
+        $upperRatio = $upperCount / $alphaCount;
+    }
+
+    // Criterio 4: llegada muy rápida (< 30s desde el envío inicial)
+    $arrivedFast = false;
+    $lastContactAt = trim((string)($thread['last_contact_at'] ?? ''));
+    if ($lastContactAt !== '') {
+        $lastContactTs = strtotime($lastContactAt);
+        if ($lastContactTs > 0 && (time() - $lastContactTs) < 30) {
+            $arrivedFast = true;
+        }
+    }
+
+    // Ponderación: si cumple al menos 2 de 3 criterios fuertes, es auto-responder
+    $strongSignals = 0;
+    if ($hasTariffStructure) $strongSignals++;
+    if ($keywordHits >= 2) $strongSignals++;
+    if ($upperRatio >= 0.28 && $textLen >= 100) $strongSignals++;
+    // Bonus: llegada rápida + cualquiera de los anteriores
+    if ($arrivedFast && $strongSignals >= 1) return true;
+    // Sin bonus de velocidad: al menos 2 señales fuertes
+    if ($strongSignals >= 2) return true;
+
+    return false;
 }
 
 function comercial_generic_inbound_process() {
@@ -3547,6 +3842,341 @@ function comercial_pick_message($process, $field) {
     $picked = $pool[array_rand($pool)];
     return $picked;
 }
+
+/**
+ * Construye un resumen textual del historial reciente del hilo (últimos N mensajes)
+ * en formato legible para prompts de IA.
+ */
+function comercial_thread_recent_history_text($thread, $limit = 5) {
+    $history = comercial_thread_history($thread, 200);
+    if (empty($history)) return '';
+    $history = array_slice($history, -$limit);
+    $lines = array();
+    foreach ($history as $entry) {
+        $direction = ($entry['direction'] === 'in') ? 'Cliente' : 'Bot';
+        $text = trim((string)($entry['text'] ?? ''));
+        if ($text === '') continue;
+        // Truncar textos muy largos para el prompt
+        if (comercial_safe_len($text) > 200) {
+            $text = (function_exists('mb_substr') ? mb_substr($text, 0, 200, 'UTF-8') : substr($text, 0, 200)) . '...';
+        }
+        $lines[] = $direction . ': ' . $text;
+    }
+    return implode("\n", $lines);
+}
+
+/**
+ * ── Psychology-driven followup system ──
+ * Calcula puntuación de engagement (0-100) basada en señales de la respuesta entrante.
+ */
+function comercial_calc_engagement_score($thread, $text, $process = array()) {
+    $score = 30; // baseline
+    $text = trim((string)$text);
+    $textLen = comercial_safe_len($text);
+    $process = is_array($process) ? $process : array();
+
+    // Señal 1: Hizo una pregunta (curiosidad)
+    if (preg_match('/[?¿]/u', $text) || preg_match('/\b(que|qué|cual|cu[aá]l|como|c[oó]mo|cu[aá]ndo|donde|d[oó]nde|cu[aá]nto|por qu[eé]|precio|info|informaci[oó]n|cu[eé]ntame|explicame|expl[ií]came|dime|dame)\b/ui', $text)) {
+        $score += 20;
+    }
+
+    // Señal 2: Longitud de respuesta (más larga = más interés)
+    if ($textLen >= 100) $score += 20;
+    elseif ($textLen >= 50) $score += 15;
+    elseif ($textLen >= 20) $score += 10;
+
+    // Señal 3: Velocidad de respuesta (respuesta rápida = más interés)
+    $lastBotAt = trim((string)($thread['last_bot_reply_at'] ?? ''));
+    $lastContactAt = trim((string)($thread['last_contact_at'] ?? ''));
+    $refAt = $lastBotAt !== '' ? $lastBotAt : $lastContactAt;
+    if ($refAt !== '') {
+        $refTs = strtotime($refAt);
+        if ($refTs > 0) {
+            $elapsedMin = (time() - $refTs) / 60;
+            if ($elapsedMin <= 15) $score += 25;
+            elseif ($elapsedMin <= 60) $score += 15;
+            elseif ($elapsedMin <= 180) $score += 5;
+        }
+    }
+
+    // Señal 4: Keywords positivas del proceso
+    foreach ((array)($process['positive_keywords'] ?? array()) as $kw) {
+        if (comercial_text_contains_keyword($text, (string)$kw)) {
+            $score += 15;
+            break;
+        }
+    }
+
+    // Señal 5: Keywords negativas → penalización
+    foreach ((array)($process['negative_keywords'] ?? array()) as $kw) {
+        if (comercial_text_contains_keyword($text, (string)$kw)) {
+            $score -= 40;
+            break;
+        }
+    }
+
+    return max(0, min(100, $score));
+}
+
+/**
+ * Registro estático de estrategias psicológicas de seguimiento.
+ * Cada estrategia tiene: key, turns (rango recomendado), engagement_min (umbral),
+ * description (instrucción para IA).
+ */
+function comercial_get_followup_strategies() {
+    return array(
+        'reciprocity' => array(
+            'key' => 'reciprocity',
+            'turns' => array(1, 2),
+            'engagement_min' => 0,
+            'description' => 'Usa el principio de reciprocidad: ya has dado información valiosa, ahora es momento de que el cliente dé un pequeño paso (confirmar interés, preguntar algo concreto, dar su nombre o zona). Hazle sentir que ha recibido valor y que es natural corresponder.',
+        ),
+        'social_proof' => array(
+            'key' => 'social_proof',
+            'turns' => array(1, 2),
+            'engagement_min' => 0,
+            'description' => 'Usa prueba social: menciona que mucha gente ya está usando el servicio con éxito, que hay mucha demanda, que otras personas en su misma situación ya se beneficiaron. Crea sensación de "esto funciona y la gente lo sabe".',
+        ),
+        'liking' => array(
+            'key' => 'liking',
+            'turns' => array(1, 2),
+            'engagement_min' => 0,
+            'description' => 'Crea conexión personal: haz sentir al cliente que te cae bien, que hay química, que le estás contando esto porque de verdad crees que le puede ayudar. Tono cálido y cercano, como si hablaras con un amigo con el que hay confianza.',
+        ),
+        'curiosity_gap' => array(
+            'key' => 'curiosity_gap',
+            'turns' => array(1, 2, 3),
+            'engagement_min' => 0,
+            'description' => 'Abre un gap de curiosidad: insinúa que hay algo importante que aún no le has contado, un beneficio extra, una ventaja secreta, o un dato que le va a sorprender. Haz que quiera preguntar más. No lo reveles todo de golpe.',
+        ),
+        'scarcity' => array(
+            'key' => 'scarcity',
+            'turns' => array(2, 3),
+            'engagement_min' => 0,
+            'description' => 'Crea escasez/FOMO: menciona que quedan pocas plazas, que la oferta es por tiempo limitado, que hay lista de espera, o que otros están a punto de ocupar su sitio. Sin presionar agresivamente, pero dejando claro que si no actúa pronto se lo pierde.',
+        ),
+        'authority' => array(
+            'key' => 'authority',
+            'turns' => array(2, 3),
+            'engagement_min' => 0,
+            'description' => 'Establece autoridad/credibilidad: menciona datos concretos, resultados reales, tiempo en el mercado, casos de éxito. Haz que el cliente sienta que está tratando con profesionales que saben lo que hacen. Sin sonar arrogante.',
+        ),
+        'commitment' => array(
+            'key' => 'commitment',
+            'turns' => array(2, 3),
+            'engagement_min' => 30,
+            'description' => 'Busca micro-compromisos: pide un pequeño paso fácil (confirmar "me interesa", dar un dato, preguntar algo concreto). El objetivo es que el cliente se comprometa con algo pequeño ahora para que luego sea más fácil el compromiso grande. Técnica del pie en la puerta.',
+        ),
+        'urgency' => array(
+            'key' => 'urgency',
+            'turns' => array(3, 4),
+            'engagement_min' => 0,
+            'description' => 'Crea urgencia temporal: si no actúa ahora, pierde algo. Puede ser una promoción que acaba, un hueco que se va a llenar, un precio que va a subir. Tono: no presiones con agresividad, pero deja claro que el momento es AHORA.',
+        ),
+        'direct_close' => array(
+            'key' => 'direct_close',
+            'turns' => array(4, 5),
+            'engagement_min' => 50,
+            'description' => 'Cierre directo: ve al grano. Pregunta si le interesa o no, si quiere empezar ya, si necesita algo más para decidirse. Tono seguro pero respetuoso. Si no va a comprar, que lo diga claro para no perder tiempo. Pero ofrécele una última oportunidad.',
+        ),
+    );
+}
+
+/**
+ * Selecciona la estrategia psicológica óptima para un turno y nivel de engagement dados.
+ */
+function comercial_get_strategy_for_turn($turnNumber, $engagementScore, $process = array()) {
+    $strategies = comercial_get_followup_strategies();
+    $turnNumber = max(1, (int)$turnNumber);
+    $engagementScore = (int)$engagementScore;
+
+    // Si el engagement es ≥75 y estamos en turno 3+, priorizar cierre directo
+    if ($engagementScore >= 75 && $turnNumber >= 3) return 'direct_close';
+
+    // Si el engagement es ≥60 y turno 2+, usar commitment
+    if ($engagementScore >= 60 && $turnNumber >= 2) return 'commitment';
+
+    // Estrategias recomendadas para este turno
+    $candidates = array();
+    foreach ($strategies as $key => $strategy) {
+        $turnsOk = in_array($turnNumber, $strategy['turns']);
+        $engagementOk = $engagementScore >= (int)$strategy['engagement_min'];
+        if ($turnsOk && $engagementOk) {
+            $candidates[] = $key;
+        }
+    }
+
+    if (empty($candidates)) {
+        // Fallback: estrategias por defecto según turno
+        if ($turnNumber <= 2) $candidates = array('reciprocity', 'social_proof', 'liking', 'curiosity_gap');
+        elseif ($turnNumber <= 3) $candidates = array('scarcity', 'authority', 'commitment');
+        else $candidates = array('urgency', 'direct_close');
+    }
+
+    return $candidates[array_rand($candidates)];
+}
+
+/**
+ * Genera variante psicológica de un followup template usando IA (OpenAI).
+ * Toma la plantilla base + inbound text + estrategia + proceso y devuelve
+ * una variante adaptada que preserva la info core pero aplica la psicología.
+ */
+function comercial_ai_generate_followup_variants($thread, $process, $inboundText, $baseFollowup, $strategyKey) {
+    if (!function_exists('publicista_openai_json_request') || !function_exists('publicista_response_output_text') || !function_exists('publicista_ai_config')) {
+        return array('ok' => false, 'error' => 'ai_utilities_unavailable');
+    }
+    $cfg = publicista_ai_config();
+    if (empty($cfg['configured'])) {
+        return array('ok' => false, 'error' => 'ai_not_configured');
+    }
+
+    $strategies = comercial_get_followup_strategies();
+    $strategyInfo = $strategies[$strategyKey] ?? array('description' => 'Responde de forma natural y cercana, sin sonar robótico.');
+
+    $processSlug = (string)($thread['process_slug'] ?? $process['slug'] ?? 'inbound');
+    $iaContext = is_array($process) ? trim((string)($process['ia_context_prompt'] ?? '')) : '';
+
+    $turnCount = (int)($thread['auto_turn_count'] ?? 0) + 1;
+    $history = comercial_thread_recent_history_text($thread, 5);
+
+    $prompt = trim(
+        ($iaContext !== '' ? $iaContext . "\n\n" : '') .
+        "Eres una persona humana real del equipo. NUNCA digas que eres un bot o IA.\n\n" .
+        "PROCESO: " . $processSlug . " (turno " . $turnCount . ")\n\n" .
+        "HISTORIAL RECIENTE:\n" . ($history !== '' ? $history : "(inicio de conversación)") . "\n\n" .
+        "LO ÚLTIMO QUE DIJO EL CLIENTE: «" . $inboundText . "»\n\n" .
+        "INFORMACIÓN QUE DEBES COMUNICAR (NO INVENTES DATOS NUEVOS):\n" . $baseFollowup . "\n\n" .
+        "ESTRATEGIA A APLICAR: " . $strategyInfo['description'] . "\n\n" .
+        (!empty($thread['_greeting_only']) ? "ATENCIÓN: El cliente SOLO saludó, NO hizo ninguna pregunta. NO uses frases como 'me alegra que preguntes', 'gracias por preguntar' o similares.\n\n" : '') .
+        "INSTRUCCIONES:\n" .
+        "- Reescribe el mensaje base aplicando la estrategia indicada.\n" .
+        "- Adapta el tono a lo que dijo el cliente. Sé coherente con la conversación.\n" .
+        "- Mantén TODA la información importante del mensaje base (precios, servicio, condiciones).\n" .
+        "- Añade un CTA suave que invite a responder (no presiones agresivamente).\n" .
+        "- Usa español natural, con alguna palabra coloquial si encaja.\n" .
+        "- Puedes usar 1-2 emojis si procede.\n" .
+        "- MÁXIMO 420 caracteres. Sé conciso.\n" .
+        "- No uses markdown ni formato especial.\n" .
+        "- RESPONDE ÚNICAMENTE con el texto del mensaje, sin explicaciones adicionales."
+    );
+
+    $model = trim((string)($cfg['descriptor_model'] ?? 'gpt-5.4-mini'));
+    $payload = array(
+        'model' => $model,
+        'input' => $prompt,
+        'max_output_tokens' => 180,
+    );
+    $resp = publicista_openai_json_request('/v1/responses', $payload, (int)($cfg['timeouts']['responses'] ?? 90));
+    if (empty($resp['ok'])) {
+        return array('ok' => false, 'error' => trim((string)($resp['error'] ?? 'ai_request_failed')));
+    }
+    $text = trim((string)publicista_response_output_text((array)($resp['decoded'] ?? array())));
+    if ($text === '') {
+        return array('ok' => false, 'error' => 'ai_empty_output');
+    }
+    if (comercial_safe_len($text) > 420) {
+        $text = function_exists('mb_substr') ? trim((string)mb_substr($text, 0, 420, 'UTF-8')) : trim(substr($text, 0, 420));
+    }
+    return array('ok' => true, 'text' => $text, 'model' => $model, 'strategy' => $strategyKey);
+}
+
+/**
+ * Elige el próximo texto de seguimiento para un turno dado con estrategia psicológica.
+ * Lógica:
+ *   - Calcula engagement score del inbound
+ *   - Selecciona estrategia psicológica según turno + engagement
+ *   - Tiene pool de templates variados: elige uno no repetido del pool
+ *   - Si quedan pocos templates no usados, pide variante a IA con la estrategia
+ *   - Si la IA falla, devuelve un template del pool como fallback
+ *   - Turno N+ (textos agotados): improvisar con IA usando estrategia + contexto
+ * Siempre devuelve string (puede ser vacío si todo falla).
+ */
+function comercial_pick_followup_or_improvise($thread, $process, $inboundText = '') {
+    $pool = comercial_process_message_pool($process, 'followup_templates');
+    $turnCount = (int)($thread['auto_turn_count'] ?? 0);
+    $lastBotText = trim((string)($thread['last_bot_reply_text'] ?? ''));
+    $inboundText = trim((string)$inboundText);
+
+    // Calcular engagement y seleccionar estrategia
+    $engagementScore = comercial_calc_engagement_score($thread, $inboundText, $process);
+    $strategy = comercial_get_strategy_for_turn($turnCount + 1, $engagementScore, $process);
+
+    // Guardar en el thread para tracking
+    $thread['last_engagement_score'] = $engagementScore;
+    $thread['last_strategy_used'] = $strategy;
+
+    // Track de templates ya usados en este thread
+    $usedTemplates = is_array($thread['_used_followup_indices'] ?? null) ? $thread['_used_followup_indices'] : array();
+
+    if (!empty($pool)) {
+        // Filtrar: no repetir el último texto enviado ni templates ya usados
+        $available = array();
+        $foldedLast = $lastBotText !== '' ? comercial_text_fold($lastBotText) : '';
+        $foldedUsed = array_map(function($t) { return comercial_text_fold($t); }, $usedTemplates);
+
+        foreach ($pool as $idx => $template) {
+            $folded = comercial_text_fold($template);
+            if ($folded === $foldedLast) continue;  // no repetir el último
+            if (in_array($folded, $foldedUsed, true)) continue;  // no repetir usados antes
+            $available[$idx] = $template;
+        }
+
+        // Si hay disponibles, elegir uno
+        if (!empty($available)) {
+            $idx = array_rand($available);
+            $picked = $available[$idx];
+
+            // Si el pool disponible es pequeño (< 3 templates sin usar), pedir variante IA
+            $remainingCount = count($available);
+            if ($remainingCount <= 2 && $turnCount >= 1) {
+                $aiVariant = comercial_ai_generate_followup_variants($thread, $process, $inboundText, $picked, $strategy);
+                if (!empty($aiVariant['ok']) && trim((string)($aiVariant['text'] ?? '')) !== '') {
+                    $picked = trim((string)$aiVariant['text']);
+                }
+            }
+
+            // Marcar como usado (guardar en thread - se persiste fuera de esta función)
+            if (!isset($thread['_used_followup_indices'])) $thread['_used_followup_indices'] = array();
+            $thread['_used_followup_indices'][] = $picked;
+            // Limitar a últimos 10 para no crecer indefinidamente
+            if (count($thread['_used_followup_indices']) > 10) {
+                $thread['_used_followup_indices'] = array_slice($thread['_used_followup_indices'], -10);
+            }
+
+            return $picked;
+        }
+    }
+
+    // Pool agotado o vacío → improvisar con IA usando estrategia psicológica
+    if ($turnCount >= 1) {
+        // Usar un template base como referencia (cualquiera del pool o el último enviado)
+        $baseRef = !empty($pool) ? $pool[array_rand($pool)] : ($lastBotText !== '' ? $lastBotText : '');
+        if ($baseRef !== '') {
+            $aiVariant = comercial_ai_generate_followup_variants($thread, $process, $inboundText, $baseRef, $strategy);
+            if (!empty($aiVariant['ok']) && trim((string)($aiVariant['text'] ?? '')) !== '') {
+                return trim((string)$aiVariant['text']);
+            }
+        }
+    }
+
+    // Fallback: IA contextual clásico
+    $objective = 'continuar la conversación de forma natural (' . $strategy . '), explicar el servicio con entusiasmo y motivar al cliente a dar el siguiente paso';
+    $ai = comercial_ai_generate_contextual_followup($thread, (string)($thread['process_slug'] ?? ''), $objective);
+    if (!empty($ai['ok']) && trim((string)($ai['text'] ?? '')) !== '') {
+        return trim((string)$ai['text']);
+    }
+
+    // Último recurso: devolver un template aleatorio aunque se repita
+    if (!empty($pool)) {
+        return $pool[array_rand($pool)];
+    }
+
+    return '';
+}
+
+/**
+ * ── Fin del sistema de psicología ──
+ */
 
 function comercial_calc_typing_delay($text, $settings) {
     $len = comercial_safe_len($text);
@@ -4245,8 +4875,8 @@ function comercial_run_tick($forceProcessId = '') {
         if (empty($candidate['ok'])) {
             $process['last_error'] = (string)($candidate['reason'] ?? 'Sin candidato');
             $process['last_result'] = 'idle';
-            $process['last_line_id'] = (string)$line['id'];
-            $process = comercial_schedule_next_run($process, comercial_get_line_state((string)$line['id']));
+            $process['last_line_id'] = !empty($orderedLines) ? (string)($orderedLines[0]['id'] ?? '') : '';
+            $process = comercial_schedule_next_run($process, comercial_get_line_state(!empty($orderedLines) ? (string)($orderedLines[0]['id'] ?? '') : ''));
             comercial_upsert_process($process);
             $results[] = array('process' => $process['nombre'], 'ok' => false, 'reason' => $process['last_error']);
             continue;
@@ -4442,16 +5072,24 @@ function comercial_classify_reply($process, $text, $thread = null) {
         return array('classification' => 'empty', 'reason' => 'empty_text');
     }
 
-    // Si ya se envió la respuesta automática, NO escalar siempre a very_hot:
-    // solo hacerlo cuando haya señales fuertes de intención.
+    // ── Fix U1: evaluar NEGATIVOS PRIMERO ──
+    // "no me interesa" debe clasificarse como negative, no como very_hot.
+    // El check de high-intent-after-followup se ejecuta DESPUÉS de descartar negativos.
+    if (comercial_reply_is_negative_intent($text, $process)) {
+        return array('classification' => 'negative', 'reason' => 'negative_intent');
+    }
+
+    // ── Detectar auto-responders (cuentas con WhatsApp Business auto-reply) ──
+    if ($thread && comercial_is_likely_autoresponder($text, $thread)) {
+        return array('classification' => 'autoresponder', 'reason' => 'autoresponder_pattern_detected');
+    }
+
+    // Si ya se envió la respuesta automática, evaluar high intent
+    // SOLO si el mensaje NO fue clasificado como negativo ni auto-responder.
     if ($thread && trim((string)($thread['qualified_reply_sent_at'] ?? '')) !== '' && (string)($thread['stage'] ?? '') !== 'discarded') {
         if (comercial_reply_is_high_intent_after_followup($text)) {
             return array('classification' => 'very_hot', 'reason' => 'reply_after_auto_followup_high_intent');
         }
-    }
-
-    if (comercial_reply_is_negative_intent($text, $process)) {
-        return array('classification' => 'negative', 'reason' => 'negative_intent');
     }
 
     // ── Fix #2: detectar saludos y frases conversacionales ──
@@ -4497,6 +5135,23 @@ function comercial_classify_reply($process, $text, $thread = null) {
     return array('classification' => 'responded', 'reason' => 'generic_reply');
 }
 
+function comercial_pick_generic_unmatched_followup($thread, $text) {
+    $pool = array(
+        "Hola \u{1F60A} \u{00BF}En qu\u{00E9} puedo ayudarte? Cu\u{00E9}ntame un poco m\u{00E1}s y te explico sin compromiso \u{1F609}",
+        "\u{00A1}Hola! \u{1F44B} Gracias por escribirme. \u{00BF}Qu\u{00E9} te trae por aqu\u{00ED}? Estoy aqu\u{00ED} para lo que necesites \u{1F60A}",
+        "Hola \u{1F64C} No te conozco a\u{00FA}n, pero me alegra que me escribas. \u{00BF}En qu\u{00E9} tema andas interesado?",
+        "\u{00A1}Hey! \u{1F44B}\u{1F3FB} Cu\u{00E9}ntame un poquito m\u{00E1}s de ti y vemos c\u{00F3}mo puedo ayudarte. Sin presiones \u{1F60C}",
+        "Hola \u{1F31F} Me encanta que me hayas escrito. \u{00BF}Hay algo en concreto en lo que pueda orientarte?",
+        "\u{00A1}Buenas! \u{270C}\u{00BF}Me dices qu\u{00E9} necesitas y te cuento? Estoy para ayudarte sin compromiso \u{1F91D}",
+        "Hola \u{1F44B} \u{00BF}C\u{00F3}mo est\u{00E1}s? Cu\u{00E9}ntame en qu\u{00E9} puedo servirte y te doy toda la info que quieras \u{1F4AC}",
+        "\u{00A1}Hola hola! \u{1F60A} Gracias por contactarme. \u{00BF}Me cuentas un poco qu\u{00E9} buscas o en qu\u{00E9} te puedo ayudar?",
+        "Hola \u{1F31F} Me alegra tu mensaje. \u{00BF}Hay algo que te gustar\u{00ED}a saber? Pregunta con confianza \u{1F609}",
+        "\u{00A1}Hola! \u{1F44B}\u{00BF}Qu\u{00E9} tal? Cu\u{00E9}ntame un poco m\u{00E1}s y vemos c\u{00F3}mo puedo echarte una mano \u{1F91D}",
+    );
+    $index = mt_rand(0, count($pool) - 1);
+    return (string)$pool[$index];
+}
+
 function comercial_handle_inbound_message($payload) {
     $payload = is_array($payload) ? $payload : array();
     $fromPhone = comercial_only_digits((string)($payload['from'] ?? $payload['from_phone'] ?? $payload['phone'] ?? ''));
@@ -4505,8 +5160,13 @@ function comercial_handle_inbound_message($payload) {
     $text = trim((string)($payload['text'] ?? $payload['body'] ?? $payload['message'] ?? ''));
     $messageId = trim((string)($payload['message_id'] ?? ''));
 
-    if ($fromPhone === '' || $text === '') {
-        return array('ok' => false, 'error' => 'Payload incompleto');
+    if ($fromPhone === '') {
+        return array('ok' => true, 'ignored' => 'no_sender', 'note' => 'Webhook sin remitente identificable — ignorado sin reintento.');
+    }
+    if ($text === '') {
+        // Mensajes sin texto (escribiendo, recibos de lectura, reacciones, multimedia sin caption...)
+        // Devolvemos ok=true para que WAHA no reintente sin parar (antes devolvía 422).
+        return array('ok' => true, 'ignored' => 'empty_text', 'note' => 'Mensaje sin texto — ignorado sin reintento.');
     }
 
     $thread = comercial_find_open_thread_for_inbound($fromPhone, $toPhone, $linePort);
@@ -4514,10 +5174,13 @@ function comercial_handle_inbound_message($payload) {
         $thread = comercial_register_unmatched_inbound_thread($payload);
         $genericProcess = comercial_generic_inbound_process();
         $classificationData = comercial_classify_reply($genericProcess, $text, $thread);
-        $classification = (string)($classificationData['classification'] ?? 'opened');
+        $originalClassification = (string)($classificationData['classification'] ?? 'opened');
+        $classification = $originalClassification;
         $intentReason = (string)($classificationData['reason'] ?? 'thread_created_from_unmatched_inbound');
         if ($classification === 'negative') {
             $thread = comercial_thread_apply_stage($thread, 'discarded');
+        } elseif ($classification === 'autoresponder') {
+            $thread = comercial_thread_apply_stage($thread, 'autoresponder');
         } elseif ($classification === 'qualified') {
             $thread = comercial_thread_apply_stage($thread, 'qualified');
         } else {
@@ -4527,6 +5190,21 @@ function comercial_handle_inbound_message($payload) {
             }
             $thread = comercial_thread_apply_stage($thread, 'opened');
         }
+        // No enviar followup si es auto-responder
+        if ($originalClassification !== 'autoresponder') {
+        if ($originalClassification === 'greeting' || $originalClassification === 'curious') {
+            $genericFollowup = comercial_pick_generic_unmatched_followup($thread, $text);
+            if ($genericFollowup !== '') {
+                $send = comercial_send_thread_message($thread, $genericFollowup, array('event_type' => 'unmatched_greeting_reply'));
+                if (!empty($send['ok'])) {
+                    $thread = comercial_normalize_thread((array)($send['thread'] ?? $thread));
+                    $thread['last_bot_reply_at'] = now_datetime();
+                    $thread['last_bot_reply_text'] = $genericFollowup;
+                    $thread['auto_turn_count'] = 1;
+                }
+            }
+        }
+        } // fin bloque autoresponder exclusion
         comercial_upsert_thread($thread);
         comercial_event_append('inbound_unmatched', array(
             'from' => $fromPhone,
@@ -4548,6 +5226,39 @@ function comercial_handle_inbound_message($payload) {
         );
     }
 
+    // ── Fix #6: thread-level inbound lock — previene respuestas duplicadas en ráfagas ──
+    $threadLock = comercial_thread_acquire_inbound_lock($thread['id']);
+    if (!$threadLock) {
+        // Otro request ya está procesando este hilo → actualización ligera sin auto-reply
+        $thread['replies_count'] = (int)$thread['replies_count'] + 1;
+        $thread['last_inbound_text'] = $text;
+        $thread['prior_inbound_text'] = $text; // Actualizar para que el cooldown funcione correctamente en ráfagas
+        $thread['last_contact_at'] = now_datetime();
+        $thread['updated_at'] = now_datetime();
+        $thread['last_inbound_processed_at'] = now_datetime();
+        // Fix Bug 1: si ya había una respuesta del bot reciente, extender last_bot_reply_at
+        // para que el cooldown de 180s funcione correctamente cuando se libere el lock.
+        if (trim((string)($thread['last_bot_reply_at'] ?? '')) !== '') {
+            $thread['last_bot_reply_at'] = now_datetime();
+        }
+        comercial_upsert_thread($thread);
+        comercial_event_append('thread_busy', array(
+            'thread_id' => (string)$thread['id'],
+            'target_phone' => $thread['target_phone'],
+            'text_preview' => mb_substr($text, 0, 120),
+        ));
+        return array(
+            'ok' => true,
+            'thread_id' => $thread['id'],
+            'classification' => 'thread_busy',
+            'intent_reason' => 'concurrent_processing',
+            'action' => 'thread_busy',
+            'target_phone' => (string)$thread['target_phone'],
+        );
+    }
+
+    try {
+
     $process = comercial_get_process((string)$thread['process_id']);
     if (!$process) {
         $process = comercial_generic_inbound_process();
@@ -4557,25 +5268,65 @@ function comercial_handle_inbound_message($payload) {
     $thread['last_inbound_text'] = $text;
     $thread['last_contact_at'] = now_datetime();
     $thread['updated_at'] = now_datetime();
+    $thread['last_inbound_processed_at'] = now_datetime();
 
-    // ── Fix #1: cooldown anti-duplicado ──
-    // Si el bot ya contestó hace menos de 90s y el texto entrante es similar al anterior,
-    // no volvemos a enviar otra respuesta automática.
-    $botCooldownSec = 90;
+    // Auto-reopen: si el hilo fue escalado a humano pero no hubo actividad humana
+    // en los últimos 30 minutos, devolver el control al bot automáticamente.
+    if (!empty($thread['human_taken'])) {
+        $lastHumanAt = trim((string)($thread['last_human_reply_at'] ?? $thread['updated_at'] ?? ''));
+        $lastHumanTs = $lastHumanAt !== '' ? strtotime($lastHumanAt) : 0;
+        $humanInactiveMinutes = 30;
+        if ($lastHumanTs === 0 || (time() - $lastHumanTs) > ($humanInactiveMinutes * 60)) {
+            $thread['human_taken'] = 0;
+            $thread['auto_turn_count'] = 0; // resetear turnos para que el bot pueda volver a responder
+            comercial_event_append('human_reopen_auto', array(
+                'thread_id' => (string)$thread['id'],
+                'process_slug' => (string)($thread['process_slug'] ?? ''),
+                'target_phone' => (string)($thread['target_phone'] ?? ''),
+                'reason' => 'human_inactive_' . $humanInactiveMinutes . 'min',
+            ));
+        }
+    }
+
+    // ── Fix Bug 3c (v2): resetear auto_turn_count si el último contacto fue hace más de 24h ──
+    // Se hace aquí (en el handler) en vez de en comercial_decide_inbound_action para que
+    // el cambio se persista al llamar a comercial_upsert_thread más adelante.
+    $lastContactAt = trim((string)($thread['last_contact_at'] ?? ''));
+    if ($lastContactAt !== '' && strtotime($lastContactAt) < (time() - 86400)) {
+        $thread['auto_turn_count'] = 0;
+        comercial_event_append('auto_turn_reset_24h', array(
+            'thread_id' => (string)$thread['id'],
+            'process_slug' => (string)($thread['process_slug'] ?? ''),
+            'target_phone' => (string)($thread['target_phone'] ?? ''),
+            'last_contact_at' => $lastContactAt,
+        ));
+    }
+
+    // ── Fix #1: cooldown anti-duplicado (protege también contra ráfagas con textos distintos) ──
+    // Si el bot ya contestó hace menos de 180s, no volvemos a enviar otra respuesta automática
+    // independientemente de si el texto es similar o no (ráfaga "Hola" + "Me interesa").
+    $botCooldownSec = 180;
     $lastBotReplyAt = trim((string)($thread['last_bot_reply_at'] ?? ''));
     $lastBotReplyTs = $lastBotReplyAt !== '' ? strtotime($lastBotReplyAt) : 0;
     $inCooldown = ($lastBotReplyTs > 0 && (time() - $lastBotReplyTs) < $botCooldownSec);
-    $priorInboundText = trim((string)($thread['prior_inbound_text'] ?? ''));
-    $textSimilar = $priorInboundText !== '' && comercial_text_similarity($text, $priorInboundText) >= 0.60;
-    if ($inCooldown && $textSimilar) {
+    if ($inCooldown) {
         $thread['prior_inbound_text'] = $text;
         comercial_upsert_thread($thread);
+        comercial_event_append('reply_received', array(
+            'thread_id' => $thread['id'],
+            'process_slug' => $thread['process_slug'],
+            'target_phone' => $thread['target_phone'],
+            'classification' => 'cooldown_skip',
+            'intent_reason' => 'bot_reply_cooldown_burst',
+            'decision' => 'skipped_burst',
+            'text' => $text,
+        ));
         return array(
             'ok' => true,
             'thread_id' => $thread['id'],
             'classification' => 'cooldown_skip',
-            'intent_reason' => 'bot_reply_cooldown',
-            'action' => 'skipped_duplicate',
+            'intent_reason' => 'bot_reply_cooldown_burst',
+            'action' => 'skipped_burst',
             'target_phone' => (string)$thread['target_phone'],
         );
     }
@@ -4625,42 +5376,70 @@ function comercial_handle_inbound_message($payload) {
         );
     }
 
-    $autoFollowup = !empty($process['auto_followup']) && !empty(comercial_get_settings()['auto_followup_enabled']);
-
-    // ── Fix #2: greeting y curious → misma lógica que responded pero con mensaje adaptado ──
-    if ($classification === 'greeting' || $classification === 'curious') {
-        $autoFollowup = !empty($process['auto_followup']) && !empty(comercial_get_settings()['auto_followup_enabled']);
-        if ($autoFollowup && ($decision['action'] ?? '') === 'auto_reply_second_turn' && trim((string)$thread['qualified_reply_sent_at']) === '') {
-            // Para greetings y curiosidad, usar un mensaje más conversacional
-            if ($classification === 'greeting') {
-                $followup = "¡Hola! 👋 Soy LaMami, tu asistente virtual. Cuéntame, ¿en qué puedo ayudarte? ¿Te interesa recibir más información?";
-            } else {
-                $followup = comercial_pick_message($process, 'followup_templates');
-                if ($followup === '') {
-                    $followup = "¡Claro! Te cuento un poco más. Soy LaMami y estamos ayudando a negocios y profesionales a conseguir más visibilidad y clientes. ¿Te interesaría saber más?";
-                }
-            }
-            $lastBotText = trim((string)($thread['last_bot_reply_text'] ?? ''));
-            if ($lastBotText !== '' && comercial_text_fold($lastBotText) === comercial_text_fold($followup)) {
-                comercial_event_append('auto_reply_duplicate_skipped', array('thread_id' => $thread['id'], 'reason' => 'same_text_as_previous'));
-            } else {
-                $send = comercial_send_thread_message($thread, $followup, array('event_type' => 'greeting_reply_sent'));
-                if (!empty($send['ok'])) {
-                    $thread = comercial_normalize_thread((array)($send['thread'] ?? $thread));
-                    $thread['last_bot_reply_at'] = now_datetime();
-                    $thread['last_bot_reply_text'] = $followup;
-                    $thread['prior_inbound_text'] = $text;
-                }
-            }
-        }
-        $thread = comercial_thread_apply_stage($thread, 'responded');
+    // ── Fix U3: auto-responder detectado → silenciar sin followup ──
+    if ($classification === 'autoresponder') {
+        $thread = comercial_thread_apply_stage($thread, 'autoresponder');
         comercial_upsert_thread($thread);
+        comercial_event_append('autoresponder_detected', array(
+            'thread_id' => $thread['id'],
+            'process_slug' => $thread['process_slug'],
+            'target_phone' => $thread['target_phone'],
+            'text_preview' => mb_substr($text, 0, 200),
+        ));
         return array(
             'ok' => true,
             'thread_id' => $thread['id'],
             'classification' => $classification,
             'intent_reason' => $intentReason,
-            'action' => 'greeting_or_curious_handled',
+            'action' => 'autoresponder_silenced',
+            'target_phone' => (string)$thread['target_phone'],
+            'test_probe' => comercial_thread_is_test_probe($thread) ? 1 : 0,
+            'test_key' => trim((string)($thread['test_key'] ?? '')),
+        );
+    }
+
+    $autoFollowup = !empty($process['auto_followup']) && !empty(comercial_get_settings()['auto_followup_enabled']);
+
+    // ── greeting y curious → usar followup_templates del proceso (igual que responded/qualified) ──
+    if ($classification === 'greeting' || $classification === 'curious') {
+        $autoFollowup = !empty($process['auto_followup']) && !empty(comercial_get_settings()['auto_followup_enabled']);
+        $maxTurnsGc = max(1, (int)($process['conversation_max_auto_turns'] ?? comercial_get_settings()['conversation_max_auto_turns'] ?? 2));
+        $gcReplied = false;
+
+        // ── Fix U2: determinar si el cliente SOLO saludó o también preguntó ──
+        // 'greeting' sin preguntas vs 'curious' (que ya implica pregunta)
+        $isGreetingOnly = ($classification === 'greeting');
+        $thread['_greeting_only'] = $isGreetingOnly;
+
+        if ($autoFollowup && ($decision['action'] ?? '') === 'auto_reply_second_turn' && !$inCooldown && comercial_can_send_auto_followup($thread, $maxTurnsGc) && (int)$thread['auto_turn_count'] < $maxTurnsGc) {
+            // Usar siempre los followup_templates configurados en el proceso.
+            // Si ya se agotaron los textos y quedan turnos disponibles, improvisar con IA.
+            $followup = comercial_pick_followup_or_improvise($thread, $process, $text);
+            $lastBotText = trim((string)($thread['last_bot_reply_text'] ?? ''));
+            if ($lastBotText !== '' && comercial_text_fold($lastBotText) === comercial_text_fold($followup)) {
+                comercial_event_append('auto_reply_duplicate_skipped', array('thread_id' => $thread['id'], 'reason' => 'same_text_as_previous'));
+            } elseif ($followup !== '') {
+                $send = comercial_send_thread_message($thread, $followup, array('event_type' => 'greeting_reply_sent'));
+                if (!empty($send['ok'])) {
+                    $thread = comercial_normalize_thread((array)($send['thread'] ?? $thread));
+                    $thread['qualified_reply_sent_at'] = now_datetime();
+                    $thread['last_bot_reply_at'] = now_datetime();
+                    $thread['last_bot_reply_text'] = $followup;
+                    $thread['prior_inbound_text'] = $text;
+                    $thread['auto_turn_count'] = (int)$thread['auto_turn_count'] + 1;
+                    $gcReplied = true;
+                }
+            }
+        }
+        $thread = comercial_thread_apply_stage($thread, 'responded');
+        comercial_upsert_thread($thread);
+        comercial_create_reply_aviso($thread, $classification, $text, $intentReason, $messageId);
+        return array(
+            'ok' => true,
+            'thread_id' => $thread['id'],
+            'classification' => $classification,
+            'intent_reason' => $intentReason,
+            'action' => $gcReplied ? 'greeting_reply_sent' : 'greeting_or_curious_handled',
             'target_phone' => (string)$thread['target_phone'],
             'test_probe' => comercial_thread_is_test_probe($thread) ? 1 : 0,
             'test_key' => trim((string)($thread['test_key'] ?? '')),
@@ -4696,14 +5475,15 @@ function comercial_handle_inbound_message($payload) {
                 'target_phone' => (string)$thread['target_phone'],
             );
         }
-        if (($decision['action'] ?? '') === 'auto_reply_second_turn' && $autoFollowup && trim((string)$thread['qualified_reply_sent_at']) === '') {
-            $followup = comercial_pick_message($process, 'followup_templates');
+        $settings = comercial_get_settings();
+        $maxTurns = max(1, (int)($process['conversation_max_auto_turns'] ?? $settings['conversation_max_auto_turns'] ?? 2));
+        if (($decision['action'] ?? '') === 'auto_reply_second_turn' && $autoFollowup && !$inCooldown && comercial_can_send_auto_followup($thread, $maxTurns) && (int)$thread['auto_turn_count'] < $maxTurns) {
+            // Usar templates configurados o improvisar con IA cuando se agotan
+            $followup = comercial_pick_followup_or_improvise($thread, $process, $text);
             $replied = false;
             if ($followup !== '') {
-                // ── Fix #1: evitar enviar el mismo texto que ya se envió antes ──
                 $lastBotText = trim((string)($thread['last_bot_reply_text'] ?? ''));
                 if ($lastBotText !== '' && comercial_text_fold($lastBotText) === comercial_text_fold($followup)) {
-                    // Mismo texto: no reenviar, pero registrar el intento
                     comercial_event_append('auto_reply_duplicate_skipped', array(
                         'thread_id' => $thread['id'],
                         'reason' => 'same_text_as_previous',
@@ -4735,6 +5515,23 @@ function comercial_handle_inbound_message($payload) {
                 'test_key' => trim((string)($thread['test_key'] ?? '')),
             );
         }
+        // Fallback: can_send_auto_followup no aplica pero quedan turnos y no hay cooldown
+        if (($decision['action'] ?? '') === 'auto_reply_second_turn' && $autoFollowup && !$inCooldown && (int)$thread['auto_turn_count'] < $maxTurns) {
+            $fallbackMsg = comercial_pick_followup_or_improvise($thread, $process, $text);
+            if ($fallbackMsg !== '') {
+                $lastBotText = trim((string)($thread['last_bot_reply_text'] ?? ''));
+                if ($lastBotText === '' || comercial_text_fold($lastBotText) !== comercial_text_fold($fallbackMsg)) {
+                    $sendFallback = comercial_send_thread_message($thread, $fallbackMsg, array('event_type' => 'responded_fallback_sent'));
+                    if (!empty($sendFallback['ok'])) {
+                        $thread = comercial_normalize_thread((array)($sendFallback['thread'] ?? $thread));
+                        $thread['last_bot_reply_at'] = now_datetime();
+                        $thread['last_bot_reply_text'] = $fallbackMsg;
+                        $thread['prior_inbound_text'] = $text;
+                        $thread['auto_turn_count'] = (int)$thread['auto_turn_count'] + 1;
+                    }
+                }
+            }
+        }
         $thread = comercial_thread_apply_stage($thread, 'responded');
         comercial_upsert_thread($thread);
         comercial_create_reply_aviso($thread, $classification, $text, $intentReason, $messageId);
@@ -4743,7 +5540,7 @@ function comercial_handle_inbound_message($payload) {
             'thread_id' => $thread['id'],
             'classification' => $classification,
             'intent_reason' => $intentReason,
-            'action' => 'responded',
+            'action' => isset($sendFallback) && !empty($sendFallback['ok']) ? 'responded_fallback_sent' : 'responded',
             'target_phone' => (string)$thread['target_phone'],
             'test_probe' => comercial_thread_is_test_probe($thread) ? 1 : 0,
             'test_key' => trim((string)($thread['test_key'] ?? '')),
@@ -4801,8 +5598,10 @@ function comercial_handle_inbound_message($payload) {
         $thread = comercial_thread_apply_stage($thread, 'qualified');
         $qualifiedReplySent = false;
         $followupError = '';
-        if ($autoFollowup && trim((string)$thread['qualified_reply_sent_at']) === '') {
-            $followup = comercial_pick_message($process, 'followup_templates');
+        $maxTurnsQ = max(1, (int)($process['conversation_max_auto_turns'] ?? comercial_get_settings()['conversation_max_auto_turns'] ?? 2));
+        if ($autoFollowup && !$inCooldown && comercial_can_send_auto_followup($thread, $maxTurnsQ) && (int)$thread['auto_turn_count'] < $maxTurnsQ) {
+            // Usar templates configurados o improvisar con IA cuando se agotan
+            $followup = comercial_pick_followup_or_improvise($thread, $process, $text);
             if ($followup !== '') {
                 $send = comercial_send_thread_message($thread, $followup, array(
                     'qualified_reply_sent' => true,
@@ -4815,6 +5614,7 @@ function comercial_handle_inbound_message($payload) {
                     $thread['last_bot_reply_at'] = now_datetime();
                     $thread['last_bot_reply_text'] = $followup;
                     $thread['prior_inbound_text'] = $text;
+                    $thread['auto_turn_count'] = (int)$thread['auto_turn_count'] + 1;
                     $qualifiedReplySent = true;
                 } else {
                     $followupError = trim((string)($send['error'] ?? 'No se pudo enviar el seguimiento automático.'));
@@ -4876,6 +5676,9 @@ function comercial_handle_inbound_message($payload) {
         'test_probe' => comercial_thread_is_test_probe($thread) ? 1 : 0,
         'test_key' => trim((string)($thread['test_key'] ?? '')),
     );
+} finally {
+    comercial_thread_release_inbound_lock($threadLock);
+}
 }
 
 function comercial_collect_summary() {
@@ -5198,8 +6001,8 @@ function render_comercial_page() {
             comercial_field_text('source_phone_field', 'Campo teléfono JSONL', $selectedProcess['source_phone_field']);
             comercial_field_textarea('source_queue_files', 'Rutas de colas JSONL (una por línea)', comercial_array_to_textarea($selectedProcess['source_queue_files']), 5);
             echo '<div class="field-help" style="margin-top:-6px; margin-bottom:12px;">Para este proyecto, las colas por defecto viven en <code>data/comercial_queues/</code>. Cada línea del fichero debe ser un JSON y el teléfono debe ir en el campo <code>' . e($selectedProcess['source_phone_field']) . '</code> (por defecto <code>group_key</code>).</div>';
-            comercial_field_textarea('message_templates', 'Textos iniciales (un bloque por variante, separados por doble salto de línea)', comercial_templates_to_textarea(comercial_process_message_pool($selectedProcess, 'message_templates')), 18);
-            comercial_field_textarea('followup_templates', 'Textos de seguimiento (un bloque por variante)', comercial_templates_to_textarea(comercial_process_message_pool($selectedProcess, 'followup_templates')), 10);
+            comercial_field_textarea('message_templates', 'Textos iniciales (una variante por bloque, separados por línea con ---)', comercial_templates_to_textarea(comercial_process_message_pool($selectedProcess, 'message_templates')), 18);
+            comercial_field_textarea('followup_templates', 'Textos de seguimiento (una variante por bloque, separados por línea con ---)', comercial_templates_to_textarea(comercial_process_message_pool($selectedProcess, 'followup_templates')), 10);
             comercial_field_textarea('positive_keywords', 'Palabras qualified (una por línea)', comercial_array_to_textarea($selectedProcess['positive_keywords']), 5);
             comercial_field_textarea('negative_keywords', 'Keywords negativas (una por línea)', comercial_array_to_textarea($selectedProcess['negative_keywords']), 5);
 

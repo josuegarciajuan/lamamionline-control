@@ -24,6 +24,11 @@ if ($page === 'josue' && request_get('tab') === 'avisos') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     handle_post_actions();
 }
+
+// Acciones GET ligeras (polling, etc.) — sin CSRF, solo autenticación
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action'])) {
+    handle_get_actions();
+}
 ?><!doctype html>
 <html lang="es">
 <head>
@@ -31,7 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>LaMami CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="assets/style.css?v=20260512_2">
+    <link rel="stylesheet" href="assets/style.css?v=20260527_1">
+    <link rel="stylesheet" href="assets/theme.css?v=20260527_1">
 </head>
 <body class="page-<?= e($page) ?>" data-page="<?= e($page) ?>">
 <?php if ($page === 'login'): ?>
@@ -111,6 +117,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         render_avisos_page();
                         break;
 
+                    case 'bot-casa':
+                        render_bot_casa_page();
+                        break;
+
                     default:
                         render_dashboard_page();
                         break;
@@ -119,6 +129,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </main>
     </div>
 <?php endif; ?>
-<script src="assets/app.js?v=20260512_2"></script>
+<script src="assets/app.js?v=20260527_1"></script>
 </body>
 </html>

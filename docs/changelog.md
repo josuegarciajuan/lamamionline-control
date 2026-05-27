@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-05-27 · COM-CLASIFICACION-F1 — Clasificación inteligente del bot comercial
+
+### Cambios implementados (6 tareas)
+1. **Reorden de checks en `comercial_classify_reply()`** — Negativos evaluados ANTES de high-intent-after-followup. "No me interesa" ahora se clasifica como `negative`, no como `very_hot`.
+2. **Validación de contexto negativo en `comercial_reply_is_high_intent_after_followup()`** — Pre-check de negación contextual (`no`, `sin`, `tampoco`, `ni`, `nada de` + keyword positivo) como defensa en profundidad.
+3. **Nueva función `comercial_is_likely_autoresponder()`** — Detecta patrones de auto-responder WhatsApp Business: tarifas estructuradas (€+min/h), keywords de catálogo, mayúsculas sostenidas, llegada en <30s.
+4. **Integración de auto-responder en handler** — Nuevo stage `autoresponder` con label y CSS class. No se envía followup ni se genera notificación para estos contactos.
+5. **Mejora de contexto para greetings** — Detección de saludo-puro vs saludo-con-pregunta. El flag `_greeting_only` se pasa al prompt de IA y al selector de variantes para evitar respuestas tipo "Me alegra que preguntes" cuando el cliente solo saludó.
+6. **Bump de assets** — `index.php`: style.css, theme.css y app.js actualizados a `v=20260527_1`.
+
+### Archivos modificados
+- `app/comercial.php` — +90 líneas, 1 nueva función, 6 funciones modificadas
+- `index.php` — bump de versión assets (3 líneas)
+- `spec/tasks.md` — nueva fase COM-CLASIFICACION-F1
+- `spec/design.md` — diseño de clasificación inteligente
+- `docs/changelog.md` — esta entrada
+
+### Hallazgos de seguridad
+- **MEDIUM**: El regex de negación contextual puede ser evadido con caracteres intercalados (`n o m e i n t e r e s a`). El mismo bypass afecta a `comercial_reply_is_negative_intent()`. Mitigación parcial: `comercial_text_fold()` colapsa espacios múltiples. Riesgo bajo en práctica (usuarios reales no escriben así).
+- **HIGH** (pre-existente, no introducido): Raw user input inyectado sin sanitizar en prompts de IA (`comercial_build_contextual_followup_prompt` y `comercial_ai_generate_followup_variants`). Recomendación: abordar en fase futura con sanitización de delimitadores y hardening de prompts.
+
+---
+
 ## 2026-05-23 · PRF-IDENTIDAD-FOTO-2026_F06 — Experimentos A/B y hardening (CIERRE DE PROGRAMA)
 
 ### Cambios implementados (4 tareas)

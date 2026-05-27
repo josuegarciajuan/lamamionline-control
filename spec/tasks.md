@@ -255,6 +255,19 @@
 - [ ] Worker que evalúa frecuencia y dispara publicaciones.
 - [ ] Integración con sistema de tasks de publicista.
 
+## COM-CLASIFICACION — Clasificación inteligente del bot comercial
+
+### COM-CLASIFICACION-F1 — Corrección de clasificación, auto-responders y greetings
+
+- [x] T1.1 — Reordenar `comercial_classify_reply()`: mover check de negativos ANTES de high-intent-after-followup para evitar que "no me interesa" se clasifique como very_hot.
+- [x] T1.2 — Añadir validación de contexto negativo en `comercial_reply_is_high_intent_after_followup()` con pre-check de negación contextual (no, sin, tampoco + keyword).
+- [x] T1.3 — Nueva función `comercial_is_likely_autoresponder($text, $thread)`: detectar patrones de auto-responder WhatsApp Business (tarifas estructuradas, mayúsculas, llegada en <30s).
+- [x] T1.4 — Integrar auto-responder en `comercial_classify_reply()` y `comercial_handle_inbound_message()`: nuevo stage `autoresponder`, sin followup automático ni notificación.
+- [x] T1.5 — Mejorar respuesta a greetings: distinguir saludo-puro de saludo-con-pregunta; pasar contexto a `comercial_pick_followup_or_improvise()` para evitar respuestas tipo "Me alegra que preguntes".
+- [x] T1.6 — Bump versión en `index.php` para recarga de assets.
+
+---
+
 ## CX2 — Desbloqueo SDD bot comercial (F1..F8)
 
 ### CX2-F1 — Modelo base de interés real
