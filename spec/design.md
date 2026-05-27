@@ -742,3 +742,35 @@ Corregir bugs críticos de clasificación que producen falsos positivos (negativ
 ### Archivos impactados
 - `app/comercial.php` — 6 funciones modificadas + 1 nueva función
 - `index.php` — bump de versión assets
+
+---
+
+## Diseño COM-NOTIFICACIONES-F2 — Notificaciones efectivas
+
+### Objetivo de diseño
+Eliminar ruido operacional en las notificaciones y asegurar que el operador recibe alertas útiles para todas las interacciones relevantes, no solo las `very_hot`.
+
+### Decisiones de diseño
+
+#### 1. Suprimir notificaciones hasta segunda respuesta
+- **Decisión**: Usar el setting ya definido `notify_only_after_second_reply` (default: 1) en `comercial_create_reply_aviso()`.
+- **Justificación**: La primera respuesta del receptor ("Hola", "Quién eres") suele ser curiosidad sin intención real. Notificar en cada primer contacto genera fatiga de alertas.
+- **Implementación**: Antes de emitir aviso, si `replies_count < 2` y el setting está activo, suprimir con modo `waiting_second_reply`.
+
+#### 2. Notificar respuestas `qualified` con señales reales
+- **Decisión**: Ampliar `comercial_reply_aviso_is_high_value()` para considerar `qualified` como high-value cuando el `intent_reason` contiene señales de intención real.
+- **Señales consideradas**: `info_question:precio`, `info_question:cuanto`, `intent:affirmative_interest`, `keyword:interesa`.
+- **Justificación**: Quien pregunta precio o dice "me interesa" es un lead potencial. Actualmente estas respuestas se suprimen silenciosamente.
+
+#### 3. Límite de defers configurable
+- **Decisión**: Usar el setting ya definido `conversation_max_defers` (default: 2) en el handler de `responded`.
+- **Justificación**: Actualmente `defer_count` se incrementa pero nunca se compara contra el máximo, permitiendo defers infinitos.
+- **Implementación**: Si `defer_count >= conversation_max_defers`, escalar a humano en lugar de otro defer.
+
+#### 4. Silenciar notificaciones de auto-responder
+- **Decisión**: En `comercial_create_reply_aviso()`, si `classification === 'autoresponder'`, retornar sin generar aviso.
+- **Justificación**: Los auto-responders no son leads reales. Ya se silencian en el handler (sin followup); las notificaciones también deben silenciarse.
+
+### Archivos impactados
+- `app/comercial.php` — 3 funciones modificadas
+- `index.php` — bump de versión assets

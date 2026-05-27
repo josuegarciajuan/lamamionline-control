@@ -23,6 +23,27 @@
 
 ---
 
+## 2026-05-27 · COM-NOTIFICACIONES-F2 — Notificaciones efectivas
+
+### Cambios implementados (5 tareas)
+1. **`notify_only_after_second_reply` implementado** — En `comercial_create_reply_aviso()`, si `replies_count < 2` y el setting está activo, se suprime el aviso con modo `waiting_second_reply`. La primera respuesta del receptor no notifica; solo a partir de la segunda.
+2. **`comercial_reply_aviso_is_high_value()` ampliado** — Las respuestas `qualified` ahora son high-value cuando el `intent_reason` contiene señales reales de interés: `info_question:precio`, `info_question:cuanto`, `intent:affirmative_interest`, `keyword:interesa`, etc. Quien pregunta precio o dice "me interesa" ahora genera alerta visible.
+3. **`conversation_max_defers` implementado** — En el handler de `responded`, si `defer_count >= conversation_max_defers` (default: 2), el sistema escala a humano (`human_taken=1`) en lugar de otro defer, generando aviso con `escalation_max_defers_reached`.
+4. **Notificaciones de `autoresponder` suprimidas** — En `comercial_create_reply_aviso()`, la clasificación `autoresponder` retorna sin generar aviso (estos contactos ya se silencian en el handler).
+5. **Bump de assets** — `index.php`: style.css, theme.css y app.js actualizados a `v=20260527_2`.
+
+### Archivos modificados
+- `app/comercial.php` — 3 funciones modificadas (`create_reply_aviso`, `reply_aviso_is_high_value`, handler de responded)
+- `index.php` — bump de versión assets (3 líneas)
+- `spec/tasks.md` — fase COM-NOTIFICACIONES-F2 marcada completa
+- `spec/design.md` — diseño de notificaciones efectivas
+- `docs/changelog.md` — esta entrada
+
+### Seguridad
+- Sin nuevos hallazgos. Los cambios solo leen settings y campos del sistema; sin superficie de inyección.
+
+---
+
 ## 2026-05-23 · PRF-IDENTIDAD-FOTO-2026_F06 — Experimentos A/B y hardening (CIERRE DE PROGRAMA)
 
 ### Cambios implementados (4 tareas)

@@ -3264,6 +3264,18 @@ function comercial_create_reply_aviso($thread, $classification, $text, $intentRe
         return;
     }
 
+    // ── Fix U3 (defensa): auto-responders NO generan aviso ──
+    if ($classification === 'autoresponder') {
+        return;
+    }
+
+    // ── T2.1: suprimir avisos hasta la segunda respuesta ──
+    $settings = comercial_get_settings();
+    if (!empty($settings['notify_only_after_second_reply']) && (int)($thread['replies_count'] ?? 0) < 2) {
+        comercial_reply_aviso_register_suppressed($thread, $classification, $intentReason, $text, 'waiting_second_reply');
+        return;
+    }
+
     $dedupe = comercial_reply_aviso_dedupe_check($thread, $classification, $intentReason);
     if (!empty($dedupe['suppressed'])) {
         comercial_reply_aviso_register_suppressed($thread, $classification, $intentReason, $text, 'dedupe_window', $dedupe);
@@ -3488,8 +3500,27 @@ function comercial_reply_aviso_is_high_value($classification, $intentReason) {
         return false;
     }
 
-    return (strpos($reason, 'escalation') !== false && strpos($reason, 'critical') !== false)
-        || strpos($reason, 'escalation_critical') !== false;
+    // Escalaciones críticas siempre son high-value
+    if ((strpos($reason, 'escalation') !== false && strpos($reason, 'critical') !== false)
+        || strpos($reason, 'escalation_critical') !== false) {
+        return true;
+    }
+
+    // ── T2.2: respuestas qualified con señales reales de interés también son high-value ──
+    if ($classification === 'qualified') {
+        $highValueReasons = array(
+            'info_question:precio', 'info_question:cuanto', 'info_question:cuota',
+            'info_question:cuotas', 'info_question:cuesta', 'info_question:tarifa',
+            'intent:affirmative_interest', 'intent:short_affirmative',
+            'keyword:interesa', 'keyword:precio', 'keyword:info',
+        );
+        foreach ($highValueReasons as $hvReason) {
+            // Plegar ambos para comparar correctamente (text_fold reemplaza : y _ por espacios)
+            if (strpos($reason, comercial_text_fold($hvReason)) !== false) return true;
+        }
+    }
+
+    return false;
 }
 
 function comercial_reply_aviso_metrics_increment($path, $by = 1) {
@@ -5448,6 +5479,23 @@ function comercial_handle_inbound_message($payload) {
 
     if ($classification === 'responded') {
         if (($decision['action'] ?? '') === 'defer') {
+            // ── T2.3: respetar límite de defers configurado ──
+            $maxDefers = max(1, (int)($process['conversation_max_defers'] ?? comercial_get_settings()['conversation_max_defers'] ?? 2));
+            if ((int)$thread['defer_count'] >= $maxDefers) {
+                // Límite alcanzado → escalar a humano en lugar de otro defer
+                $thread['human_taken'] = 1;
+                $thread = comercial_thread_apply_stage($thread, 'responded');
+                comercial_upsert_thread($thread);
+                comercial_create_reply_aviso($thread, 'very_hot', $text, 'escalation_max_defers_reached', $messageId);
+                return array(
+                    'ok' => true,
+                    'thread_id' => $thread['id'],
+                    'classification' => $classification,
+                    'intent_reason' => $intentReason,
+                    'action' => 'escalated_human_max_defers',
+                    'target_phone' => (string)$thread['target_phone'],
+                );
+            }
             $thread['defer_count'] = (int)$thread['defer_count'] + 1;
             $thread['next_bot_action_at'] = date('Y-m-d H:i:s', time() + ((int)$thread['defer_count'] * 300));
             $thread = comercial_thread_apply_stage($thread, 'responded');

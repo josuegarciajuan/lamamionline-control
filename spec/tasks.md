@@ -266,6 +266,14 @@
 - [x] T1.5 — Mejorar respuesta a greetings: distinguir saludo-puro de saludo-con-pregunta; pasar contexto a `comercial_pick_followup_or_improvise()` para evitar respuestas tipo "Me alegra que preguntes".
 - [x] T1.6 — Bump versión en `index.php` para recarga de assets.
 
+### COM-NOTIFICACIONES-F2 — Notificaciones efectivas
+
+- [x] T2.1 — Implementar `notify_only_after_second_reply`: suprimir avisos hasta que `replies_count >= 2` en `comercial_create_reply_aviso()`.
+- [x] T2.2 — Ampliar `comercial_reply_aviso_is_high_value()` para incluir respuestas `qualified` con señales reales de interés (precio, "me interesa").
+- [x] T2.3 — Implementar `conversation_max_defers`: si `defer_count >= max_defers`, escalar a humano en lugar de otro defer.
+- [x] T2.4 — Suprimir notificaciones para clasificación `autoresponder` en `comercial_create_reply_aviso()`.
+- [x] T2.5 — Bump versión en `index.php` para recarga de assets.
+
 ---
 
 ## CX2 — Desbloqueo SDD bot comercial (F1..F8)
