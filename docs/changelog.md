@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-05-27 — UNIFICACION-LINEAS-F1 (verificación-cruzada)
+
+### Investigación completada
+- **Fase 1 de verificación**: inventario completo de consumers, URLs, voice routes y state dependencies antes de unificar `comercial-lineas` ↔ `josue-telefonos`.
+- 20 consumidores de `telefonos.json` inventariados en 7 archivos. Solo 4 son URL-dependientes (`page=josue&tab=telefonos`).
+- `comercial_line_state.json`: 0 dependencias de la UI de Josue. Totalmente autónomo.
+- Voice routes: 3 puntos a modificar (resolver L2425, tab hints L714, AI prompt L822).
+- 5 URLs activas a migrar (`views.php` x3, `actions.php` x2) + 12 en backups.
+
+### Archivos modificados
+- `spec/tasks.md` — añadida sección UNIFICACION-LINEAS con 5 fases (Fase 1 marcada completa).
+- `docs/changelog.md` — esta entrada.
+
+### Sin cambios en código
+- Fase de solo-lectura. 0 archivos PHP tocados.
+
+---
+
 ## 2026-05-27 — PUB-FOTOS-REALES-F3 (six-finals)
 
 ### Cambiado

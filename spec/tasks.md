@@ -1,5 +1,40 @@
 # Tasks por fases
 
+## UNIFICACION-LINEAS — Unificación comercial-lineas ↔ josue-telefonos
+
+### FASE-1-VERIFICACION-CRUZADA
+
+- [x] T1.1 — Inventariar todos los consumidores de `telefonos.json` (20 ocurrencias, 7 archivos, 4 URL-dependientes).
+- [x] T1.2 — Verificar `comercial_line_state.json`: 0 dependencias de la UI de Josue, 100% autónomo.
+- [x] T1.3 — Analizar voice.php: 3 puntos a modificar (resolver L2425, tab hints L714, AI prompt L822).
+- [x] T1.4 — Inventario completo de URLs `page=josue&tab=telefonos`: 5 activas (views.php x3, actions.php x2) + 12 en backups.
+
+### FASE-2-UNIFICAR-CORE
+
+- [ ] T2.1 — Añadir formulario CRUD (crear/editar) en Comercial > Líneas (`app/comercial.php` L6355).
+- [ ] T2.2 — Cambiar redirects de `action_save_telefono()` y `action_delete_telefono()` a `comercial_page_url('lineas')`.
+- [ ] T2.3 — Actualizar versión de assets en `index.php`.
+
+### FASE-3-ACTUALIZAR-RUTAS
+
+- [ ] T3.1 — Reemplazar URLs `page=josue&tab=telefonos` en `views.php` (L1321, L7233, L7334).
+- [ ] T3.2 — Actualizar voice.php (resolver, tab hints, AI prompt).
+- [ ] T3.3 — Verificar `data/settings.json` L4 (nota TODO).
+
+### FASE-4-MIGRAR-JOSUE-TAB
+
+- [ ] T4.1 — Sustituir contenido del tab Josue > Telefonos por aviso de migración + botón a Comercial.
+- [ ] T4.2 — Cambiar etiqueta del subtab en Josue ("Telefonos →").
+- [ ] T4.3 — Actualizar versión assets.
+
+### FASE-5-VALIDACION-FINAL
+
+- [ ] T5.1 — `php -l` en todos los archivos modificados.
+- [ ] T5.2 — `git diff --stat` de todos los cambios.
+- [ ] T5.3 — Actualizar docs/changelog.md.
+- [ ] T5.4 — Verificar integridad de `telefonos.json` y `comercial_line_state.json`.
+
+---
 ## PRF-IDENTIDAD-FOTO-2026 — Mejora de parecido y realismo Publicista
 
 ### PRF-F01 — BASELINE_Y_METRICAS
