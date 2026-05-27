@@ -3287,11 +3287,45 @@ function publicista_campaign_result_requests_copy_retry($result) {
     return false;
 }
 
-function publicista_campaign_pick_images($product, $limit = 6) {
+function publicista_campaign_pick_images($product, $limit = 6, $portalCode = '') {
     $limit = max(1, (int)$limit);
-    $images = array_values((array)($product['final_images'] ?? array()));
-    if (empty($images)) return array();
-    return array_slice($images, 0, $limit);
+    $images = array();
+    
+    // Si hay platform_photos configurado para este portal, usarlos
+    $portalCode = trim((string)$portalCode);
+    if ($portalCode !== '') {
+        $platformPhotos = is_array($product['platform_photos'] ?? null) ? $product['platform_photos'] : array();
+        $photoIds = is_array($platformPhotos[$portalCode] ?? null) ? $platformPhotos[$portalCode] : array();
+        
+        if (!empty($photoIds)) {
+            // Resolver IDs contra final_images y real_photos
+            $finals = array_values((array)($product['final_images'] ?? array()));
+            $reals = array_values((array)($product['real_photos'] ?? array()));
+            $allPhotos = array_merge($finals, $reals);
+            
+            foreach ($photoIds as $pid) {
+                $pid = trim((string)$pid);
+                foreach ($allPhotos as $photo) {
+                    if (trim((string)($photo['id'] ?? '')) === $pid) {
+                        // Asegurar que tenga final_path (para compatibilidad con image_paths)
+                        $img = $photo;
+                        if (empty($img['final_path']) && !empty($img['stored_path'])) {
+                            $img['final_path'] = $img['stored_path'];
+                        }
+                        $images[] = $img;
+                        break;
+                    }
+                }
+                if (count($images) >= $limit) break;
+            }
+            return $images;
+        }
+    }
+    
+    // Fallback: primeras N final_images
+    $finals = array_values((array)($product['final_images'] ?? array()));
+    if (empty($finals)) return array();
+    return array_slice($finals, 0, $limit);
 }
 
 function publicista_campaign_validate_for_generation($campaign) {
@@ -3319,11 +3353,29 @@ function publicista_campaign_validate_for_generation($campaign) {
     if (empty($accounts)) $errors[] = 'Selecciona al menos una cuenta de portal.';
 
     $readyProducts = array();
+    $planningPortal = trim((string)($planning['portal_code'] ?? 'destacamos'));
     foreach ($products as $product) {
         $readyInfo = publicista_product_is_ready_for_campaign($product);
         $product['_campaign_ready'] = $readyInfo;
         if ($readyInfo['ready']) $readyProducts[] = $product;
         else $warnings[] = 'El producto "' . trim((string)($product['nombre_trabajo'] ?? $product['id'])) . '" no está listo para campaña (faltan copies o imágenes finales).';
+    }
+
+    // Validar platform_photos por producto para el portal del planning
+    if ($planningPortal !== '' && $planningPortal !== 'otro' && !empty($readyProducts)) {
+        $productsWithoutPhotos = array();
+        foreach ($readyProducts as $idx => $prod) {
+            $pp = is_array($prod['platform_photos'] ?? null) ? $prod['platform_photos'] : array();
+            $ids = is_array($pp[$planningPortal] ?? null) ? $pp[$planningPortal] : array();
+            if (empty($ids)) {
+                $productsWithoutPhotos[] = $prod;
+                unset($readyProducts[$idx]);
+            }
+        }
+        $readyProducts = array_values($readyProducts);
+        foreach ($productsWithoutPhotos as $prod) {
+            $warnings[] = 'El producto "' . trim((string)($prod['nombre_trabajo'] ?? $prod['id'])) . '" no tiene fotos asignadas para el portal "' . e($planningPortal) . '". Configúralas en ⑤ Fotos por plataforma.';
+        }
     }
 
     $validAccounts = array();
@@ -4556,7 +4608,7 @@ function publicista_campaign_generate_items($campaign) {
         $variantIndex = (int)($productVariantUsage[$productIdForVariant] ?? 0);
         $productVariantUsage[$productIdForVariant] = $variantIndex + 1;
         $copyVariant = publicista_campaign_pick_copy_variant($product, $variantIndex);
-        $images = publicista_campaign_pick_images($product, 6);
+        $images = publicista_campaign_pick_images($product, 6, $planning['portal_code'] ?? '');
         $item = publicista_campaign_item_defaults();
         $item['campaign_id'] = $campaign['id'];
         $item['estado'] = 'ready';
@@ -6672,6 +6724,7 @@ function publicista_campaign_item_image_paths($item) {
             trim((string)($img['final_path'] ?? '')),
             trim((string)($img['square_path'] ?? '')),
             trim((string)($img['preview_path'] ?? '')),
+            trim((string)($img['stored_path'] ?? '')),
             trim((string)($img['path_rel'] ?? '')),
             trim((string)($img['filename'] ?? '')),
         );
@@ -8009,6 +8062,11 @@ function publicista_job_defaults($id = '') {
             'last_cost_update_at' => '',
         ),
         'real_photos' => array(),
+        'platform_photos' => array(
+            'destacamos' => array(),
+            'mundosex'    => array(),
+            'girlsconf'   => array(),
+        ),
         'candidates' => array(),
         'final_images' => array(),
         'created_at' => '',
@@ -8040,6 +8098,9 @@ function publicista_jobs_get() {
         }
         if (!isset($merged['real_photos']) || !is_array($merged['real_photos'])) {
             $merged['real_photos'] = $defaults['real_photos'];
+        }
+        if (!isset($merged['platform_photos']) || !is_array($merged['platform_photos'])) {
+            $merged['platform_photos'] = $defaults['platform_photos'];
         }
         $merged['estado'] = publicista_normalize_status($merged['estado']);
         $merged['asset_dirs'] = publicista_build_job_asset_dirs($merged['id']);

@@ -414,6 +414,9 @@ function handle_post_actions() {
         case 'delete_publicista_real_photo':
             action_delete_publicista_real_photo();
             break;
+        case 'save_publicista_platform_photos':
+            action_save_publicista_platform_photos();
+            break;
         case 'voice_command':
             action_voice_command();
             break;
@@ -594,6 +597,40 @@ function action_delete_publicista_real_photo() {
     }
 
     set_flash('ok', 'Foto real eliminada.');
+    redirect_to(publicista_tab_url(array('job' => $id)));
+}
+
+function action_save_publicista_platform_photos() {
+    $id = trim((string)request_post('id'));
+    if (!csrf_validate((string)request_post('csrf_token'))) {
+        set_flash('error', 'Sesión caducada. Recarga la página.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
+    $job = publicista_job_get($id);
+    if (!$job) {
+        set_flash('error', 'No se encontró el trabajo de Publicista.');
+        redirect_to(publicista_tab_url());
+    }
+
+    $platformPhotos = is_array($job['platform_photos'] ?? null) ? $job['platform_photos'] : array(
+        'destacamos' => array(), 'mundosex' => array(), 'girlsconf' => array(),
+    );
+
+    $posted = isset($_POST['platform_photos']) && is_array($_POST['platform_photos']) ? $_POST['platform_photos'] : array();
+    foreach (array('destacamos', 'mundosex', 'girlsconf') as $pCode) {
+        $ids = isset($posted[$pCode]) && is_array($posted[$pCode]) ? $posted[$pCode] : array();
+        $platformPhotos[$pCode] = array_values(array_map('trim', $ids));
+    }
+
+    $job['platform_photos'] = $platformPhotos;
+    list($ok, $result) = publicista_job_save($job);
+    if (!$ok) {
+        set_flash('error', is_string($result) ? $result : 'No se pudo guardar la configuración de fotos por plataforma.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
+    set_flash('ok', 'Fotos por plataforma guardadas.');
     redirect_to(publicista_tab_url(array('job' => $id)));
 }
 

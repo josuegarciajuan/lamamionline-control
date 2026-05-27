@@ -2677,6 +2677,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     echo '<a class="publicista-visual-step" href="#publicistaCandidates"><span class="step-num">2</span><span><strong>Candidatas</strong><small>revisión y selección</small></span></a>';
     echo '<a class="publicista-visual-step" href="#publicistaFinals"><span class="step-num">3</span><span><strong>Definitivas</strong><small>blur manual final</small></span></a>';
     echo '<a class="publicista-visual-step" href="#publicistaReals"><span class="step-num">4</span><span><strong>Fotos reales</strong><small>subidas manualmente</small></span></a>';
+    echo '<a class="publicista-visual-step" href="#publicistaPlatformPhotos"><span class="step-num">5</span><span><strong>Por plataforma</strong><small>destacamos/mundosex/girlsconf</small></span></a>';
     echo '</div>';
 
     if ($canCloseProfileAsFinished) {
@@ -3126,6 +3127,78 @@ echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '"
 echo '<input type="file" name="real_photos[]" accept="image/jpeg,image/png,image/webp" multiple style="font-size:12px;">';
 echo ' <button class="btn-secondary-mini">Subir fotos reales</button>';
 echo '</form>';
+echo '</section>';
+
+// -----------------------------------------------------------------------
+// SECCIÓN 5: FOTOS POR PLATAFORMA
+// -----------------------------------------------------------------------
+$allPhotosForSelection = array_merge(
+    is_array($selectedJob['final_images'] ?? null) ? $selectedJob['final_images'] : array(),
+    is_array($selectedJob['real_photos'] ?? null) ? $selectedJob['real_photos'] : array()
+);
+$platformPhotos = is_array($selectedJob['platform_photos'] ?? null) ? $selectedJob['platform_photos'] : array(
+    'destacamos' => array(), 'mundosex' => array(), 'girlsconf' => array(),
+);
+
+echo '<section class="panel panel-space" id="publicistaPlatformPhotos">';
+echo '<div class="branch-panel-head"><h3>⑤ Fotos por plataforma</h3><span class="summary-badge">Selecciona cuáles usar</span></div>';
+echo '<div style="margin-top:8px;font-size:12px;color:#6b7280;">Para cada plataforma, marca las fotos que quieres que se usen al publicar. Si no configuras una plataforma, la campaña <strong>no se podrá ejecutar</strong> para ese portal.</div>';
+
+if (empty($allPhotosForSelection)) {
+    echo '<div class="empty" style="margin-top:14px;">No hay fotos disponibles todavía. Genera las definitivas primero.</div>';
+} else {
+    echo '<form method="post" style="margin-top:14px;">';
+    echo '<input type="hidden" name="action" value="save_publicista_platform_photos">';
+    echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
+    echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
+
+    $platforms = array(
+        'destacamos' => 'Destacamos',
+        'mundosex'   => 'Mundosex',
+        'girlsconf'  => 'Girlsconf',
+    );
+
+    foreach ($platforms as $pCode => $pName) {
+        $selectedIds = is_array($platformPhotos[$pCode] ?? null) ? $platformPhotos[$pCode] : array();
+        $selectedCount = count($selectedIds);
+        echo '<div style="margin-bottom:20px;border:1px solid #e5e7eb;border-radius:10px;padding:14px;">';
+        echo '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+        echo '<strong style="font-size:14px;">' . e($pName) . '</strong>';
+        echo '<span class="summary-badge">' . e((string)$selectedCount) . ' seleccionadas</span>';
+        echo '</div>';
+        echo '<div style="display:flex;flex-wrap:wrap;gap:10px;">';
+        foreach ($allPhotosForSelection as $photo) {
+            $pId = trim((string)($photo['id'] ?? ''));
+            if ($pId === '') continue;
+            $pSrc = '';
+            if (!empty($photo['preview_path'])) $pSrc = $photo['preview_path'];
+            elseif (!empty($photo['square_path'])) $pSrc = $photo['square_path'];
+            elseif (!empty($photo['final_path'])) $pSrc = $photo['final_path'];
+            elseif (!empty($photo['stored_path'])) $pSrc = $photo['stored_path'];
+            
+            $checked = in_array($pId, $selectedIds, true) ? ' checked' : '';
+            $isReal = strpos($pId, 'real_') === 0;
+            $label = $isReal ? 'Real: ' . e($photo['original_filename'] ?? $pId) : e($pId);
+            $blurBadge = '';
+            if ($isReal && !empty($photo['manual_blur_applied'])) {
+                $blurBadge = ' <span style="font-size:10px;background:#ede9fe;color:#6d28d9;padding:1px 5px;border-radius:3px;">BLUR</span>';
+            }
+            
+            echo '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;border:2px solid ' . ($checked ? '#6366f1' : '#e5e7eb') . ';border-radius:8px;padding:4px;min-width:110px;transition:border-color .15s;" class="platform-photo-label">';
+            if ($pSrc !== '') {
+                echo '<img src="' . e($pSrc) . '" style="width:100px;height:100px;object-fit:cover;border-radius:6px;">';
+            }
+            echo '<span style="font-size:10px;color:#374151;text-align:center;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' . $label . $blurBadge . '</span>';
+            echo '<input type="checkbox" name="platform_photos[' . e($pCode) . '][]" value="' . e($pId) . '"' . $checked . ' style="display:none;">';
+            echo '</label>';
+        }
+        echo '</div>';
+        echo '</div>';
+    }
+
+    echo '<div class="full"><button class="btn-primary">Guardar configuración por plataforma</button></div>';
+    echo '</form>';
+}
 echo '</section>';
 
     echo '<section class="panel panel-space" id="publicistaCopyPack">';

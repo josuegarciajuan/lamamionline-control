@@ -414,3 +414,16 @@
 - [x] T4.3 — Validar `from_me` en webhook logs: cuando un mensaje entrante tiene `from_me=0` pero el `from` pertenece a una línea propia, loguear warning para detectar si WAHA reporta incorrectamente.
 - [x] T4.4 — Verificar delays humanos: confirmar que los parámetros de typing delay producen rangos realistas (3-17s) y documentar en comentarios.
 - [x] T4.5 — Bump versión en `index.php` para recarga de assets.
+
+### PUB-FOTOS-REALES-F4 — platform-photos
+
+- [x] T1 — Añadir `platform_photos` a `publicista_job_defaults()` y merge en `publicista_jobs_get()` (`storage.php`).
+- [x] T2 — Nueva sección "⑤ Fotos por plataforma" en job detail: checkboxes por plataforma (destacamos, mundosex, girlsconf) con miniaturas (`views.php` + paso 5 en barra visual).
+- [x] T3 — Nueva acción `save_publicista_platform_photos` con CSRF y registro en dispatcher (`actions.php`).
+- [x] T4 — Modificar `publicista_campaign_pick_images()` para aceptar `$portalCode` y resolver fotos desde `platform_photos` (finales + reales) (`storage.php`).
+- [x] T5 — Pasar `$planning['portal_code']` a `pick_images()` en `publicista_campaign_generate_items()` (`storage.php`).
+- [x] T6 — Añadir `stored_path` como candidato en `publicista_campaign_item_image_paths()` para soportar fotos reales (`storage.php`).
+- [x] T7 — Validación en `publicista_campaign_validate_for_generation()`: bloquear productos sin `platform_photos` para el portal del planning (`storage.php`).
+- [x] T8 — Cache-busting: `v=20260527_6`.
+- [x] T9 — Validación técnica: `php -l` OK en 3 archivos.
+- [x] T10 — Documentación: changelog + contracts + tasks actualizados.

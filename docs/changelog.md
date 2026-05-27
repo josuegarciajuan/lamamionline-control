@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-05-27 — PUB-FOTOS-REALES-F4 (platform-photos)
+
+### Añadido
+- Nueva sección "⑤ Fotos por plataforma" en ficha de producto: checkboxes con miniaturas para seleccionar qué fotos usar en destacamos, mundosex y girlsconf.
+- Nuevo campo `platform_photos` en el job JSON (por plataforma).
+- `publicista_campaign_pick_images()` ahora usa `platform_photos` si está configurado para el portal destino.
+- Validación en generación de campañas: bloquea productos sin fotos asignadas para el portal.
+
+### Modificado
+- `app/storage.php` — pick_images con portalCode, stored_path en image_paths, validación platform_photos, job_defaults.
+- `app/views.php` — sección 5 con checkboxes por plataforma + paso 5 en barra visual.
+- `app/actions.php` — nueva acción save_publicista_platform_photos con CSRF.
+- `index.php` — cache-busting v=20260527_6.
+
+---
+
 ## 2026-05-27 · COM-INTEGRIDAD-F4 — Integridad del sistema
 
 ### Cambios implementados (5 tareas)

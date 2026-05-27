@@ -785,3 +785,12 @@ Reglas:
 - `mundosex_browser.js` DEBE tener 6 slots de subida de fotos.
 - Los umbrales de auto-regeneración y estado DEBEN usar >= 6 (no >= 4).
 - El badge UI DEBE mostrar "X/6".
+
+## Contrato PUB-PLATFORM-PHOTOS — Selección de fotos por plataforma
+
+### Contrato de platform_photos
+- Cada job DEBE almacenar `platform_photos` con claves `destacamos`, `mundosex`, `girlsconf`, cada una con array de photo IDs.
+- `publicista_campaign_pick_images()` DEBE aceptar `$portalCode` y, si `platform_photos[$portalCode]` tiene IDs, resolverlos contra `final_images` + `real_photos`.
+- Si no hay `platform_photos` configurado para un portal, DEBE usar el fallback (primeras N de `final_images`).
+- `publicista_campaign_validate_for_generation()` DEBE excluir de `readyProducts` los productos sin `platform_photos` para el portal target, añadiendo warning.
+- `publicista_campaign_item_image_paths()` DEBE considerar `stored_path` (para fotos reales).
