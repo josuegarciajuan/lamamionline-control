@@ -74,6 +74,12 @@ async function main() {
   const page = await context.newPage();
   page.setDefaultTimeout(TIMEOUT);
 
+  // Debug: capturar errores y logs del navegador
+  page.on('console', msg => {
+    if (msg.type() === 'error') log('BROWSER-ERROR:', msg.text());
+  });
+  page.on('pageerror', err => log('PAGE-ERROR:', err.message));
+
   try {
     // ═══════════════════════════════════════════
     // STEP 1: Home + legal gate
@@ -160,7 +166,18 @@ async function main() {
     }
     log('Formulario cargado, esperando inicialización JS...');
     // Esperar a que Cloudflare Rocket Loader + Prototype + TinyMCE terminen de cargar
-    await page.waitForTimeout(6000);
+    await page.waitForTimeout(3000);
+    // Cloudflare Rocket Loader: el onsubmit del form y los onchange de los select
+    // están guardados por window.__cfRLUnblockHandlers. Hay que esperar a que
+    // Rocket Loader los desbloquee, o el formulario NO se enviará al hacer submit.
+    try {
+      await page.waitForFunction(() => !window.__cfRLUnblockHandlers, { timeout: 25000 });
+      log('Rocket Loader finalizado');
+    } catch (e) {
+      log('Timeout esperando Rocket Loader — continuando igualmente');
+      result.warnings.push(warn('Rocket Loader no finalizó a tiempo'));
+    }
+    await page.waitForTimeout(2000);
 
     // ═══════════════════════════════════════════
     // STEP 4: Fill fields
@@ -186,7 +203,22 @@ async function main() {
     };
 
     if (fields.provincia) await setField('#id_provincia', fields.provincia, 'provincia');
-    if (fields.ciudad) { await page.waitForTimeout(1000); await setField('#id_ciudad', fields.ciudad, 'ciudad'); }
+    if (fields.ciudad) {
+      // El selector de provincia dispara selProvList() que rellena el dropdown de ciudad.
+      // Con Cloudflare Rocket Loader, el onchange puede tardar en ejecutarse.
+      await page.waitForTimeout(3000);
+      // Esperar a que el dropdown de ciudad tenga opciones reales (más allá del option "0")
+      try {
+        await page.waitForFunction(() => {
+          const sel = document.getElementById('id_ciudad');
+          return sel && sel.options && sel.options.length > 1;
+        }, { timeout: 10000 });
+      } catch (e) {
+        result.warnings.push(warn('Timeout esperando opciones de ciudad'));
+      }
+      await page.waitForTimeout(500);
+      await setField('#id_ciudad', fields.ciudad, 'ciudad');
+    }
     if (fields.title)       await setField('#titol', fields.title, 'título');
     if (fields.phone)       await setField('#telefono', String(fields.phone), 'teléfono');
     if (fields.email)       await setField('#mail', fields.email, 'email');
@@ -237,16 +269,34 @@ async function main() {
     // ═══════════════════════════════════════════
     if (photos.length > 0) {
       log('Eliminando fotos existentes...');
-      // Click all visible remove buttons
-      const removeBtns = page.locator('input[type="checkbox"][name^="remove_"]');
+      // Los botones de eliminar son input[type="button"] con id="remove_1", etc.
+      // Al hacer clic, ejecutan remove_img() / remove_img_edit() que marcan
+      // los campos hidden image[del][X] = 1 mediante JavaScript.
+      let removed = 0;
+      // Marcar hidden fields directamente como respaldo
+      for (const delId of ['image_del_1', 'image_del_2', 'image_del_3', 'image_del_4']) {
+        try {
+          const hidden = page.locator('#' + delId);
+          if (await hidden.isVisible({ timeout: 1000 }).catch(() => false) || await hidden.count() > 0) {
+            await hidden.evaluate(el => { el.value = '1'; });
+            removed++;
+          }
+        } catch (e) {}
+      }
+      // También hacer clic en los botones de eliminar (dispara la lógica JS del sitio)
+      const removeBtns = page.locator('input[type="button"][id^="remove_"]');
       const count = await removeBtns.count();
       for (let i = 0; i < count; i++) {
         try {
-          await removeBtns.nth(i).check({ force: true, timeout: 2000 });
-        } catch (e) {}
+          await removeBtns.nth(i).click({ force: true, timeout: 3000 });
+          removed++;
+          await page.waitForTimeout(500);
+        } catch (e) {
+          result.warnings.push(warn('No se pudo hacer clic en remove_' + i + ': ' + e.message));
+        }
       }
-      log('Remove buttons marcados: ' + count);
-      await page.waitForTimeout(800);
+      log('Fotos marcadas para eliminar: ' + removed + ' (hidden: OK, buttons: ' + count + ')');
+      await page.waitForTimeout(1000);
     }
 
     // ═══════════════════════════════════════════
@@ -263,6 +313,8 @@ async function main() {
         { sel: '#image_1',          fallback: '[name="image_1"]' },
         { sel: '#image_2',          fallback: '[name="image_2"]' },
         { sel: '#image_3',          fallback: '[name="image_3"]' },
+        { sel: '#image_4',          fallback: '[name="image_4"]' },
+        { sel: '#image_5',          fallback: '[name="image_5"]' },
       ];
 
       for (let i = 0; i < Math.min(photos.length, fileSlots.length); i++) {
@@ -311,23 +363,38 @@ async function main() {
     // ═══════════════════════════════════════════
     log('Clicando Guardar cambios...');
 
-    // Capturar respuesta de red antes de hacer clic
+    // Verificar Rocket Loader antes de submit (el onsubmit tiene guard)
+    try {
+      const rlReady = await page.evaluate(() => !window.__cfRLUnblockHandlers);
+      if (!rlReady) {
+        log('Rocket Loader aún activo antes de save, esperando...');
+        await page.waitForFunction(() => !window.__cfRLUnblockHandlers, { timeout: 15000 }).catch(() => {});
+      }
+    } catch (e) {}
+
+    // El formulario usa target="pubresfrm" (iframe) — no hay navegación de página.
+    // Capturamos la respuesta de red del POST al iframe.
     let capturedBody = null;
     const responseHandler = async (response) => {
-      if (response.url().includes('/publicar/insertar/' + listingId) && response.status() === 200) {
-        try { capturedBody = await response.text(); } catch (e) {}
+      const url = response.url();
+      if (url.includes('/publicar/insertar/' + listingId) && response.status() === 200) {
+        try {
+          capturedBody = await response.text();
+          log('Respuesta capturada: ' + capturedBody.substring(0, 300));
+        } catch (e) {}
       }
     };
     page.on('response', responseHandler);
 
-    // También esperar posible navegación
-    const navPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 40000 }).catch(() => null);
+    // También esperar posible navegación (por si el servidor redirige la página principal)
+    const navPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => null);
 
+    // Hacer clic en el botón de guardar
     await page.locator('#sendButton').click({ timeout: 10000 });
     result.saveClicked = true;
 
-    // Esperar a que la respuesta llegue
-    await page.waitForTimeout(5000);
+    // Esperar a que la respuesta del iframe llegue
+    await page.waitForTimeout(6000);
 
     // Quitar listener
     page.off('response', responseHandler);
@@ -349,7 +416,13 @@ async function main() {
           result.error = json.mensaje || 'Servidor rechazó el guardado (estado=' + (json.estado ?? '?') + ')';
         }
       } catch (e) {
-        result.error = 'Error parseando JSON: ' + e.message;
+        // Puede no ser JSON; si contiene "estado":1 igual es válido
+        if (capturedBody.includes('"estado":1') || capturedBody.includes('"estado": 1')) {
+          result.ok = true;
+          log('✓ Save confirmado (JSON parcial con estado=1)');
+        } else {
+          result.error = 'Error parseando respuesta: ' + e.message + ' | body=' + capturedBody.substring(0, 200);
+        }
       }
     } else {
       // No se capturó la respuesta de red → chequeo visual
@@ -363,15 +436,30 @@ async function main() {
         result.ok = true;
         log('✓ Confirmación visual detectada');
       } else {
-        const koMsg = await page.locator('.flash_ko').textContent({ timeout: 2000 }).catch(() => '');
-        if (koMsg && koMsg.includes('editado recientemente')) {
+        // Buscar errores visibles antes de asumir éxito
+        const flashKo = await page.locator('.flash_ko').textContent({ timeout: 2000 }).catch(() => '');
+        const menErr = await page.locator('#men').textContent({ timeout: 2000 }).catch(() => '');
+        const anyError = flashKo || menErr || '';
+
+        if (anyError && anyError.includes('editado recientemente')) {
           result.error = 'Rate-limit: anuncio editado recientemente';
-        } else if (koMsg) {
-          result.error = koMsg;
-        } else if (page.url().includes('/publicar/editar/')) {
-          // Seguimos en la página de edición sin error visible → asumir éxito
+        } else if (anyError && anyError.trim()) {
+          result.error = anyError.trim();
+        } else if (page.url().includes('/misAnuncios') || page.url().includes('/privado/')) {
+          // Redirigido al panel de usuario → probablemente éxito
           result.ok = true;
-          result.warnings.push('Sin confirmación explícita del servidor');
+          result.warnings.push('Redirigido a panel (asumido éxito)');
+        } else if (page.url().includes('/publicar/editar/')) {
+          // Seguimos en la página de edición → el submit probablemente falló
+          // Comprobar si el botón está disabled (se deshabilita al hacer submit exitoso)
+          const btnDisabled = await page.locator('#sendButton').isDisabled({ timeout: 2000 }).catch(() => false);
+          if (btnDisabled) {
+            // El botón está disabled → el JS de submit se ejecutó (probablemente éxito)
+            result.ok = true;
+            result.warnings.push('Botón disabled pero sin confirmación explícita');
+          } else {
+            result.error = 'El formulario no se envió (posible error de validación o Rocket Loader). Revisa los campos: provincia, ciudad, título (min 10 chars, 5 letras), teléfono, condiciones.';
+          }
         } else {
           result.error = 'Redirigido inesperadamente a: ' + page.url();
         }

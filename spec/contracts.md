@@ -775,3 +775,13 @@ Reglas:
 - La intensidad DEBE clamparse a [1, 20].
 - El blur reemplaza el `stored_path` de la foto real con la versión con blur aplicado.
 - Los metadatos de blur (`manual_blur_applied`, `manual_blur_intensity`, `manual_blur_shape`) DEBEN guardarse en la entrada de `real_photos[]`.
+
+## Contrato PUB-SIX-FINALS — Definitivas ampliadas de 4 a 6
+
+### Contrato de selección de finales
+- El pipeline DEBE seleccionar las 6 mejores candidatas (antes 4).
+- `publicista_campaign_pick_images()` DEBE devolver hasta 6 imágenes por defecto.
+- `GIRLSCONF_MAX_PHOTOS` DEBE ser 6.
+- `mundosex_browser.js` DEBE tener 6 slots de subida de fotos.
+- Los umbrales de auto-regeneración y estado DEBEN usar >= 6 (no >= 4).
+- El badge UI DEBE mostrar "X/6".

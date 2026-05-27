@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-05-27 — PUB-FOTOS-REALES-F3 (six-finals)
+
+### Cambiado
+- Definitivas del pack: de 4 a 6. El pipeline selecciona top 6 candidatas, la UI muestra "X/6".
+- `publicista_campaign_pick_images()`: límite 6 por defecto.
+- `GIRLSCONF_MAX_PHOTOS`: 4 → 6.
+- `mundosex_browser.js`: 2 nuevos slots de imagen (#image_4, #image_5).
+- Umbrales de auto-regeneración y status: >= 6 finales para considerar "done".
+
+### Modificado
+- `app/publicista.php` — 17 cambios (rebuild_finals, auto-regen, status).
+- `app/views.php` — 10 cambios (badges, TOP 6, textos wizard).
+- `app/storage.php` — 4 cambios (pick_images default + llamadas).
+- `app/publicista_girlsconf.php` — 2 cambios (constante + comentario).
+- `subirPublicidad/mundosex_browser.js` — 3 cambios (slots + image_del).
+- `index.php` — cache-busting v=20260527_5.
+
+---
+
 ## 2026-05-27 · COM-IA-F3 — IA con mayor capacidad de entendimiento y calidad de respuestas
 
 ### Cambios implementados (6 tareas)

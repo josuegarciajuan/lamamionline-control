@@ -2577,7 +2577,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
                 if (!empty($wf['pack_final'])) echo '<div class="muted small" style="margin-top:6px;">Definitivo</div>';
                 echo '</td>';
                 echo '<td>' . e($row['clienta_nombre_snapshot'] ?? '-') . '<br><span class="muted small">' . e($clientaScopeLabel) . '</span></td>';
-                echo '<td>' . e((string)$finalCount) . '/4</td>';
+                echo '<td>' . e((string)$finalCount) . '/6</td>';
                 echo '<td>' . e(format_created_at($row['updated_at'] ?? '')) . '</td>';
                 echo '<td><a class="mini-link" href="' . e(publicista_tab_url(array('job' => $row['id']))) . '">Abrir ficha</a>';
                 if ($clientaEditUrl !== '') echo ' · <a class="mini-link" href="' . e($clientaEditUrl) . '">Clienta</a>';
@@ -2622,7 +2622,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     $pipelineButtonLabel = $hasPendingBatch ? 'Relanzar generación' : 'Generar / regenerar 6 candidatas';
     $pipelineWaitingLabel = $hasPendingBatch ? 'Generación en curso / esperando resultado' : 'Generación en curso';
     $pipelineStartedLabel = !empty($processing['last_started_at']) ? format_created_at($processing['last_started_at']) : '';
-    $canCloseProfileAsFinished = (count($finalImages) >= 4) && !empty($currentCopyVersion) && empty($workflow['pack_final']);
+    $canCloseProfileAsFinished = (count($finalImages) >= 6) && !empty($currentCopyVersion) && empty($workflow['pack_final']);
 
     echo '<section class="panel panel-space">';
     echo '<div class="section-head">';
@@ -2660,7 +2660,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     echo '<div class="cards four">';
     echo '<div class="info-strip"><strong>Original</strong><br>' . (!empty($source['stored_path']) ? 'Subida' : 'Pendiente') . '</div>';
     echo '<div class="info-strip"><strong>Candidatas</strong><br>' . e((string)count($candidates)) . '</div>';
-    echo '<div class="info-strip"><strong>Finales</strong><br>' . e((string)count($finalImages)) . '/4</div>';
+    echo '<div class="info-strip"><strong>Finales</strong><br>' . e((string)count($finalImages)) . '/6</div>';
     echo '<div class="info-strip"><strong>Auto-regenerar</strong><br>' . (!empty($workflow['auto_regenerate']) ? 'Sí (encarece)' : 'No (recomendado)') . '</div>';
     echo '</div>';
     echo '<div class="cards four" style="margin-top:12px;">';
@@ -2916,7 +2916,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
             $isSelected = !empty($cand['selected']);
             $cardBorder = $isSelected ? 'border:2px solid #6366f1;' : '';
             echo '<div class="panel" style="padding:12px;' . $cardBorder . '" data-candidate-id="' . e($cand['id'] ?? '') . '">';
-            echo '<div class="branch-panel-head"><h4 style="margin:0;">' . e($cand['id'] ?? 'candidate') . ($isSelected ? ' <span style="color:#6366f1;font-size:11px;">★ TOP 4</span>' : '') . '</h4><span class="summary-badge">' . e((string)($cand['effective_score'] ?? 0)) . '</span></div>';
+            echo '<div class="branch-panel-head"><h4 style="margin:0;">' . e($cand['id'] ?? 'candidate') . ($isSelected ? ' <span style="color:#6366f1;font-size:11px;">★ TOP 6</span>' : '') . '</h4><span class="summary-badge">' . e((string)($cand['effective_score'] ?? 0)) . '</span></div>';
             // Mostrar imagen sin blur: square_path si existe, si no preview_path, si no raw
             $imgToShow = '';
             if (!empty($cand['square_path'])) $imgToShow = $cand['square_path'];
@@ -2967,7 +2967,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     // SECCIÓN 3: FINALES DEL PACK — sin blur + con blur manual
     // -----------------------------------------------------------------------
     echo '<section class="panel panel-space" id="publicistaFinals">';
-    echo '<div class="branch-panel-head"><h3>③ Definitivas del pack</h3><span class="summary-badge">' . e((string)count($finalImages)) . '/4</span></div>';
+    echo '<div class="branch-panel-head"><h3>③ Definitivas del pack</h3><span class="summary-badge">' . e((string)count($finalImages)) . '/6</span></div>';
     $usesPolloVisualFlow = function_exists('publicista_job_uses_pollo_model') && publicista_job_uses_pollo_model($selectedJob ?? array());
     if (!empty($finalImages)) {
         if ($usesPolloVisualFlow) {
@@ -3333,7 +3333,7 @@ echo '</section>';
       <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
         <button type="submit" class="btn-primary">Regenerar candidata</button>
         <button type="button" class="btn-secondary" onclick="closeRegenerateCandidateModal()">Cancelar</button>
-        <span style="font-size:12px;color:#6b7280;">Si esta candidata está en TOP 4, las finales se recomponen automáticamente.</span>
+        <span style="font-size:12px;color:#6b7280;">Si esta candidata está en TOP 6, las finales se recomponen automáticamente.</span>
       </div>
     </form>
   </div>
@@ -4107,7 +4107,7 @@ function publicista_build_job_guide_data($job) {
     $hasPrepared = trim((string)($localAssets['prepared_square_path'] ?? '')) !== '' || !empty($descriptorData);
     $hasCandidates = count($candidates) > 0;
     $finalCount = count($finalImages);
-    $hasFullFinals = $finalCount >= 4;
+    $hasFullFinals = $finalCount >= 6;
     $hasCopy = !empty($currentCopyVersion);
     $isDefinitive = !empty($workflow['pack_final']);
 
@@ -4139,7 +4139,7 @@ function publicista_build_job_guide_data($job) {
     } elseif (!$hasFullFinals) {
         $currentStep = 4;
         $headline = 'Ya hay candidatas, pero el pack visual todavía necesita revisión.';
-        $hint = 'Entra en <strong>Candidatas generadas</strong> y pulsa <strong>Regenerar esta</strong> en las flojas. El sistema recompone automáticamente el top 4.';
+        $hint = 'Entra en <strong>Candidatas generadas</strong> y pulsa <strong>Regenerar esta</strong> en las flojas. El sistema recompone automáticamente el top 6.';
         $cta = array('type' => 'anchor', 'href' => '#publicistaCandidates', 'label' => 'Ir a candidatas');
     } elseif (!$hasCopy) {
         $currentStep = 5;
@@ -4198,10 +4198,10 @@ function publicista_build_job_guide_data($job) {
                 : ($isPipelineRunning
                     ? ($usesPolloVisualFlow
                         ? 'Cuando termine la generación, aquí aparecerán las candidatas y después las 4 definitivas base para revisión manual.'
-                        : 'Cuando termine la generación, aquí aparecerán las candidatas y después el top 4 visual refinado.')
+                        : 'Cuando termine la generación, aquí aparecerán las candidatas y después el top 6 visual refinado.')
                     : ($usesPolloVisualFlow
                         ? 'Aquí revisas candidatas, definitivas base y propuestas refinadas manuales hasta cerrar el top visual.'
-                        : 'Aquí revisas las candidatas y regeneras solo las que no convencen hasta dejar un top 4 limpio y refinado.'))
+                        : 'Aquí revisas las candidatas y regeneras solo las que no convencen hasta dejar un top 6 limpio y refinado.'))
         ),
         array(
             'num' => 5,

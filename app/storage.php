@@ -3287,7 +3287,7 @@ function publicista_campaign_result_requests_copy_retry($result) {
     return false;
 }
 
-function publicista_campaign_pick_images($product, $limit = 4) {
+function publicista_campaign_pick_images($product, $limit = 6) {
     $limit = max(1, (int)$limit);
     $images = array_values((array)($product['final_images'] ?? array()));
     if (empty($images)) return array();
@@ -4086,7 +4086,7 @@ function publicista_campaign_rebalance_distribution($campaign, $distributionMatr
             $productVariantUsage[$dpid] = $vi + 1;
             $newProd = $productEntities[$dpid];
             $cv = publicista_campaign_pick_copy_variant($newProd, $vi);
-            $imgs = publicista_campaign_pick_images($newProd, 4);
+            $imgs = publicista_campaign_pick_images($newProd, 6);
             $item['copy_variant_id'] = trim((string)($cv['variant_id'] ?? ''));
             $item['copy_snapshot'] = $cv;
             $item['image_ids'] = array_map(function($img) { return trim((string)($img['id'] ?? ($img['filename'] ?? $img['path_rel'] ?? ''))); }, $imgs);
@@ -4183,7 +4183,7 @@ function publicista_campaign_rebalance_distribution($campaign, $distributionMatr
                 $variantIndex = (int)($productVariantUsage[$pid] ?? 0);
                 $productVariantUsage[$pid] = $variantIndex + 1;
                 $copyVariant = publicista_campaign_pick_copy_variant($productEntity, $variantIndex);
-                $images = publicista_campaign_pick_images($productEntity, 4);
+                $images = publicista_campaign_pick_images($productEntity, 6);
                 $item['copy_variant_id'] = trim((string)($copyVariant['variant_id'] ?? ''));
                 $item['copy_snapshot'] = $copyVariant;
                 $item['image_ids'] = array_map(function($img) { return trim((string)($img['id'] ?? ($img['filename'] ?? $img['path_rel'] ?? ''))); }, $images);
@@ -4556,7 +4556,7 @@ function publicista_campaign_generate_items($campaign) {
         $variantIndex = (int)($productVariantUsage[$productIdForVariant] ?? 0);
         $productVariantUsage[$productIdForVariant] = $variantIndex + 1;
         $copyVariant = publicista_campaign_pick_copy_variant($product, $variantIndex);
-        $images = publicista_campaign_pick_images($product, 4);
+        $images = publicista_campaign_pick_images($product, 6);
         $item = publicista_campaign_item_defaults();
         $item['campaign_id'] = $campaign['id'];
         $item['estado'] = 'ready';

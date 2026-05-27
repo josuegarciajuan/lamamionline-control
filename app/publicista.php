@@ -3898,13 +3898,13 @@ function publicista_continue_image_batch_pipeline($jobId) {
 
     $job = publicista_job_get($jobId);
 
-    // ── Auto-regeneración: si < 4 finales y flag activado, programar ronda extra ──
+    // ── Auto-regeneración: si < 6 finales y flag activado, programar ronda extra ──
     $autoRegenEnabled = !empty($job['workflow']['auto_regenerate']);
     $regenRound = (int)(publicista_array_get($job['pipeline'], 'auto_regen_round', 0));
     
-    if ($autoRegenEnabled && count($finalImages) < 4 && $regenRound < 3) {
-        $missingCount = 4 - count($finalImages);
-        $autoRegenSummary = '⚠️ Solo ' . count($finalImages) . ' de 4 candidatas pasaron los gates de calidad. Se recomiendan ' . $missingCount . ' regeneraciones extra. Auto-regen ronda ' . ($regenRound + 1) . '/3.';
+    if ($autoRegenEnabled && count($finalImages) < 6 && $regenRound < 3) {
+        $missingCount = 6 - count($finalImages);
+        $autoRegenSummary = '⚠️ Solo ' . count($finalImages) . ' de 6 candidatas pasaron los gates de calidad. Se recomiendan ' . $missingCount . ' regeneraciones extra. Auto-regen ronda ' . ($regenRound + 1) . '/3.';
         $job['pipeline']['auto_regen_round'] = $regenRound + 1;
         $job['pipeline']['auto_regen_summary'] = $autoRegenSummary;
         $autoRegenActive = true;
@@ -3919,9 +3919,9 @@ function publicista_continue_image_batch_pipeline($jobId) {
     $job['final_images'] = $finalImages;
     $job['pipeline'] = array_merge(publicista_array_get($job, 'pipeline', array()), array(
         'finished_at' => now_datetime(),
-        'status' => $autoRegenActive ? 'needs_regen' : (count($finalImages) >= 4 ? 'done' : 'needs_review'),
+        'status' => $autoRegenActive ? 'needs_regen' : (count($finalImages) >= 6 ? 'done' : 'needs_review'),
         'stage' => 'completed',
-        'summary' => count($finalImages) >= 4
+        'summary' => count($finalImages) >= 6
             ? ('Pipeline completado: ' . count($candidates) . ' candidatas generadas por Batch y 4 finales listas.')
             : ('Pipeline Batch completado con revisión pendiente: ' . count($finalImages) . ' finales disponibles.'),
         'selected_candidate_ids' => $selectedIds,
@@ -3936,7 +3936,7 @@ function publicista_continue_image_batch_pipeline($jobId) {
         'last_error' => '',
         'last_error_at' => '',
     ));
-    $job['estado'] = count($finalImages) >= 4 ? 'done' : 'needs_review';
+    $job['estado'] = count($finalImages) >= 6 ? 'done' : 'needs_review';
     list($okSave, $saved) = publicista_job_save($job);
     if (!$okSave) {
         return array(false, is_string($saved) ? $saved : 'No se pudo guardar el pipeline Batch final de Publicista.');
@@ -4697,9 +4697,9 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
     $job['final_images'] = $finalImages;
     $job['pipeline'] = array_merge(publicista_array_get($job, 'pipeline', array()), array(
         'finished_at' => now_datetime(),
-        'status' => count($finalImages) >= 4 ? 'done' : 'needs_review',
+        'status' => count($finalImages) >= 6 ? 'done' : 'needs_review',
         'stage' => 'completed',
-        'summary' => count($finalImages) >= 4
+        'summary' => count($finalImages) >= 6
             ? ($usePollo
                 ? ('Pipeline completado: 4 candidatas generadas con Pollo.ai. Las definitivas arrancan como copia directa de esas candidatas y el refinado pasa a ser manual desde cada final.')
                 : ('Pipeline completado: ' . count($rows) . ' candidatas referenciadas y 4 finales refinadas premium listas.'))
@@ -4716,7 +4716,7 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
         'last_error' => '',
         'last_error_at' => '',
     ));
-    $job['estado'] = count($finalImages) >= 4 ? 'done' : 'needs_review';
+    $job['estado'] = count($finalImages) >= 6 ? 'done' : 'needs_review';
     list($okSave, $saved) = publicista_job_save($job);
     if (!$okSave) {
         return array(false, is_string($saved) ? $saved : 'No se pudo guardar el pipeline premium de Publicista.');
@@ -4789,8 +4789,8 @@ function publicista_rebuild_finals_from_candidates($jobId, $candidates, $job = n
         return (int)publicista_array_get($b, 'effective_score', 0) <=> (int)publicista_array_get($a, 'effective_score', 0);
     });
     
-    // ── FASE 3: Seleccionar top 4 (o menos si no hay suficientes) ──────────
-    $selected = array_slice($eligible, 0, 4);
+    // ── FASE 3: Seleccionar top 6 (o menos si no hay suficientes) ──────────
+    $selected = array_slice($eligible, 0, 6);
     $selectedIds = array();
     foreach ($selected as $candidate) $selectedIds[] = publicista_array_get($candidate, 'id', '');
     
@@ -5192,7 +5192,7 @@ function publicista_regenerate_candidate($jobId, $candidateId, $refineText = '',
     $job['final_images'] = $finalImages;
     $job['pipeline'] = array_merge(publicista_array_get($job, 'pipeline', array()), array(
         'finished_at' => now_datetime(),
-        'status' => count($finalImages) >= 4 ? 'done' : 'needs_review',
+        'status' => count($finalImages) >= 6 ? 'done' : 'needs_review',
         'summary' => $usePollo
             ? ('Candidata ' . $candidateId . ' regenerada con Pollo.ai. Las definitivas se han recompuesto como copia directa de candidatas.')
             : ('Candidata ' . $candidateId . ' regenerada con referencia real. Finales premium recompuestas automáticamente.'),
@@ -5204,7 +5204,7 @@ function publicista_regenerate_candidate($jobId, $candidateId, $refineText = '',
     if (!$okEval) {
         $job['pipeline']['summary'] .= ' Evaluación OpenAI pendiente temporalmente; la imagen regenerada sí se aplicó.';
     }
-    $job['estado'] = count($finalImages) >= 4 ? 'done' : 'needs_review';
+    $job['estado'] = count($finalImages) >= 6 ? 'done' : 'needs_review';
     list($okSave, $saved) = publicista_job_save($job);
     if (!$okSave) {
         publicista_regen_queue_set_status($jobId, $candidateId, 'error', 'No se pudo guardar la regeneración.');
@@ -5283,7 +5283,7 @@ function publicista_refresh_final_local_assets($jobId, $finalId, $mode = 'refres
     $job['final_images'] = array_values($finals);
     $job['pipeline'] = array_merge(publicista_array_get($job, 'pipeline', array()), array(
         'finished_at' => now_datetime(),
-        'status' => count($finals) >= 4 ? 'done' : 'needs_review',
+        'status' => count($finals) >= 6 ? 'done' : 'needs_review',
         'summary' => $summary,
         'final_candidate_ids' => array_map(function($row){ return publicista_array_get($row, 'id', ''); }, $finals),
     ));
@@ -5546,7 +5546,7 @@ function publicista_set_final_variant_choice($jobId, $finalId, $choice) {
     $job['final_images'] = array_values($finals);
     $job['pipeline'] = array_merge(publicista_array_get($job, 'pipeline', array()), array(
         'finished_at' => now_datetime(),
-        'status' => count($finals) >= 4 ? 'done' : 'needs_review',
+        'status' => count($finals) >= 6 ? 'done' : 'needs_review',
         'summary' => $choice === 'refined'
             ? ('La propuesta refinada pasa a ser la definitiva de ' . $finalId . '.')
             : ('Se mantiene la candidata original como definitiva de ' . $finalId . '.'),

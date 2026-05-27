@@ -359,3 +359,15 @@
 - [x] T7 — Seguridad: validación de parámetros (bx/by/bw/bh clamp 0..1, intensity 1..20), `escapeshellarg` en todos los parámetros al worker Python, sin CSRF en endpoint AJAX (misma política que blur de finals).
 - [x] T8 — Validación técnica: `php -l` OK en 3 archivos.
 - [x] T9 — Documentación: changelog + contracts + tasks actualizados.
+
+### PUB-FOTOS-REALES-F3 — six-finals
+
+- [x] T1 — `rebuild_finals_from_candidates()`: seleccionar top 6 en lugar de top 4 (`array_slice($eligible, 0, 6)`).
+- [x] T2 — UI: badges "X/6", "TOP 6", textos de wizard "top 6" en `views.php` (10 cambios).
+- [x] T3 — `publicista_campaign_pick_images()`: límite por defecto 6, actualizadas 4 llamadas explícitas en `storage.php`.
+- [x] T4 — `GIRLSCONF_MAX_PHOTOS`: de 4 a 6 en `publicista_girlsconf.php`.
+- [x] T5 — `mundosex_browser.js`: slots `#image_4` y `#image_5` añadidos + eliminación de hasta 4 fotos antiguas.
+- [x] T6 — Umbrales de auto-regeneración y status: `>= 4` → `>= 6` en `publicista.php` (10 ocurrencias en 6 funciones).
+- [x] T7 — Cache-busting: `v=20260527_5`.
+- [x] T8 — Validación técnica: `php -l` OK en 4 archivos PHP.
+- [x] T9 — Documentación: changelog + contracts + tasks actualizados.
