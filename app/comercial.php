@@ -1378,6 +1378,9 @@ function comercial_normalize_line_state($row) {
         'last_power_drop_at' => '',
         'cooldown_until' => '',
         'rolling_window' => array(),
+        // COM-BALANCE: contador diario de envíos para balanceo entre líneas
+        'daily_sent_count' => 0,
+        'daily_sent_date' => '',
         'updated_at' => now_datetime(),
     );
     $out = array_merge($defaults, $row);
@@ -1391,6 +1394,8 @@ function comercial_normalize_line_state($row) {
     $out['consecutive_failures'] = (int)$out['consecutive_failures'];
     $out['health_http_code'] = (int)$out['health_http_code'];
     $out['last_http_code'] = (int)$out['last_http_code'];
+    $out['daily_sent_count'] = (int)($out['daily_sent_count'] ?? 0);
+    $out['daily_sent_date'] = trim((string)($out['daily_sent_date'] ?? ''));
     $out['rolling_window'] = array_values(array_slice((array)$out['rolling_window'], -50));
     $out['updated_at'] = now_datetime();
     return $out;
@@ -1552,6 +1557,96 @@ function comercial_update_line_state($lineId, $patch) {
     $map[$lineId] = comercial_normalize_line_state(array_merge($current, is_array($patch) ? $patch : array()));
     comercial_save_line_states($map);
     return $map[$lineId];
+}
+
+// ── COM-BALANCE: contador diario de envíos para balanceo entre líneas ──
+
+/**
+ * Obtiene el contador diario de envíos de una línea.
+ * Si la fecha almacenada no es hoy, resetea el contador a 0.
+ */
+function comercial_line_get_daily_count($lineId) {
+    $state = comercial_get_line_state($lineId);
+    $today = date('Y-m-d');
+    $storedDate = trim((string)($state['daily_sent_date'] ?? ''));
+    if ($storedDate !== $today) {
+        // Reset silencioso: el contador se resetea en la primera lectura del día
+        comercial_update_line_state($lineId, array(
+            'daily_sent_count' => 0,
+            'daily_sent_date' => $today,
+        ));
+        return 0;
+    }
+    return (int)($state['daily_sent_count'] ?? 0);
+}
+
+/**
+ * Incrementa el contador diario de una línea tras un envío exitoso.
+ * Persiste a disco inmediatamente para que otros procesos en el mismo tick vean el valor actualizado.
+ */
+function comercial_line_increment_daily_count($lineId) {
+    $state = comercial_get_line_state($lineId);
+    $today = date('Y-m-d');
+    $storedDate = trim((string)($state['daily_sent_date'] ?? ''));
+    $count = ($storedDate === $today) ? (int)($state['daily_sent_count'] ?? 0) : 0;
+    return comercial_update_line_state($lineId, array(
+        'daily_sent_count' => $count + 1,
+        'daily_sent_date' => $today,
+    ));
+}
+
+/**
+ * Resetea los contadores diarios de todas las líneas si cambió el día.
+ * Debe invocarse al inicio de comercial_run_tick(), antes de iterar procesos.
+ */
+function comercial_reset_daily_counts_if_new_day() {
+    $today = date('Y-m-d');
+    $map = comercial_get_line_states();
+    $changed = false;
+    foreach ($map as $lineId => $state) {
+        $storedDate = trim((string)($state['daily_sent_date'] ?? ''));
+        if ($storedDate !== $today && (int)($state['daily_sent_count'] ?? 0) > 0) {
+            $map[$lineId]['daily_sent_count'] = 0;
+            $map[$lineId]['daily_sent_date'] = $today;
+            $changed = true;
+        }
+    }
+    if ($changed) {
+        comercial_save_line_states($map);
+    }
+}
+
+/**
+ * Devuelve un mapa [lineId => daily_sent_count] para las líneas indicadas.
+ * Versión批量 para eficiencia: una sola lectura de disco, un solo reset.
+ */
+function comercial_line_get_daily_counts_map($lineIds) {
+    $today = date('Y-m-d');
+    $map = comercial_get_line_states();
+    $out = array();
+    $changed = false;
+    foreach ((array)$lineIds as $lineId) {
+        $lineId = trim((string)$lineId);
+        if ($lineId === '') continue;
+        if (!isset($map[$lineId])) {
+            $out[$lineId] = 0;
+            continue;
+        }
+        $state = $map[$lineId];
+        $storedDate = trim((string)($state['daily_sent_date'] ?? ''));
+        if ($storedDate !== $today) {
+            $map[$lineId]['daily_sent_count'] = 0;
+            $map[$lineId]['daily_sent_date'] = $today;
+            $changed = true;
+            $out[$lineId] = 0;
+        } else {
+            $out[$lineId] = (int)($state['daily_sent_count'] ?? 0);
+        }
+    }
+    if ($changed) {
+        comercial_save_line_states($map);
+    }
+    return $out;
 }
 
 function comercial_get_threads() {

@@ -456,11 +456,11 @@
 
 ### COM-BALANCE-F1 — Data Layer
 
-- [ ] T1.1 — Añadir `daily_sent_count` y `daily_sent_date` al normalizer `comercial_normalize_line_state()` (defaults: `0`, `""`).
-- [ ] T1.2 — Implementar `comercial_line_increment_daily_count($lineId)`: leer, incrementar, guardar estado a disco.
-- [ ] T1.3 — Implementar `comercial_line_get_daily_count($lineId)`: devolver contador del día, reset si `daily_sent_date != today`.
-- [ ] T1.4 — Implementar `comercial_reset_daily_counts_if_new_day()`: ejecutar al inicio de `comercial_run_tick()`.
-- [ ] T1.5 — Implementar `comercial_line_get_daily_counts_map($lineIds)`: versión批量 `[lineId => count]`.
+- [x] T1.1 — Añadir `daily_sent_count` y `daily_sent_date` al normalizer `comercial_normalize_line_state()` (defaults: `0`, `""`).
+- [x] T1.2 — Implementar `comercial_line_increment_daily_count($lineId)`: leer, incrementar, guardar estado a disco.
+- [x] T1.3 — Implementar `comercial_line_get_daily_count($lineId)`: devolver contador del día, reset si `daily_sent_date != today`.
+- [x] T1.4 — Implementar `comercial_reset_daily_counts_if_new_day()`: ejecutar al inicio de `comercial_run_tick()`.
+- [x] T1.5 — Implementar `comercial_line_get_daily_counts_map($lineIds)`: versión批量 `[lineId => count]`.
 
 ### COM-BALANCE-F2 — Core Algorithm
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-05-27 — COM-BALANCE-F1 (data layer)
+
+### Añadido
+- **Fase 1 del plan COM-BALANCE**: infraestructura de datos para balanceo ponderado de envíos entre líneas.
+- Dos nuevos campos en `comercial_normalize_line_state()`: `daily_sent_count` (int, default 0) y `daily_sent_date` (string YYYY-MM-DD, default "").
+- `comercial_line_get_daily_count($lineId)`: obtiene el contador diario de una línea, reseteando a 0 si cambió el día.
+- `comercial_line_increment_daily_count($lineId)`: incrementa el contador tras envío exitoso, persistiendo a disco inmediatamente.
+- `comercial_reset_daily_counts_if_new_day()`: resetea todos los contadores al inicio del tick si cambió el día.
+- `comercial_line_get_daily_counts_map($lineIds)`: versión批量 que devuelve `[lineId => count]` con una sola lectura de disco.
+
+### Modificado
+- `app/comercial.php` — 1 función modificada (`comercial_normalize_line_state`) + 4 funciones nuevas.
+
+### Validación
+- `php -l` OK. Tests funcionales: 7/7 OK (get, increment, reset, batch map, same-day no-reset).
+
+### Sin cambios en comportamiento runtime
+- Las funciones están disponibles pero aún no se invocan desde `comercial_run_tick()` (eso será en F2-F3).
+
+---
+
 ## 2026-05-27 — COM-BALANCE-F0 (spec & design)
 
 ### Documentación creada
