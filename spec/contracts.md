@@ -794,3 +794,61 @@ Reglas:
 - Si no hay `platform_photos` configurado para un portal, DEBE usar el fallback (primeras N de `final_images`).
 - `publicista_campaign_validate_for_generation()` DEBE excluir de `readyProducts` los productos sin `platform_photos` para el portal target, añadiendo warning.
 - `publicista_campaign_item_image_paths()` DEBE considerar `stored_path` (para fotos reales).
+
+## Contratos COM-BALANCE — Balanceo ponderado de envíos entre líneas
+
+### Contrato de contador diario (`DailyLineCounter`)
+
+Campos obligatorios en `comercial_line_state.json` por línea:
+- `daily_sent_count` (int, default `0`): envíos exitosos acumulados hoy.
+- `daily_sent_date` (string `YYYY-MM-DD`, default `""`): fecha del último incremento.
+
+Reglas:
+1. `daily_sent_count` DEBE incrementarse en `+1` SOLO tras envío exitoso (`send_ok`), nunca en fallos.
+2. Si `daily_sent_date != date("Y-m-d")`, `daily_sent_count` DEBE resetearse a `0` y `daily_sent_date` DEBE actualizarse a hoy antes de cualquier lectura.
+3. El reset diario DEBE ejecutarse al inicio de `comercial_run_tick()`, una sola vez por tick, antes de iterar procesos.
+4. El incremento DEBE persistirse a disco inmediatamente (`storage_write`) para que procesos subsiguientes en el mismo tick vean el valor actualizado.
+5. `comercial_normalize_line_state()` DEBE garantizar que ambos campos existen con defaults correctos en cualquier línea, nueva o existente.
+
+### Contrato de selección de línea (`LineSelectionAlgorithm`)
+
+`comercial_order_lines_for_process($process)` DEBE:
+
+1. Filtrar líneas `assigned_line_ids` que pasen `comercial_line_is_available()`.
+2. Si candidatas ≤ 1 → devolver tal cual (sin cambios de orden).
+3. Si candidatas ≥ 2:
+   a. Calcular `deficit = daily_sent_count / effective_power_factor` para cada candidata.
+   b. Si `effective_power_factor <= 0` → `deficit = PHP_INT_MAX` (última prioridad).
+   c. Ordenar candidatas por `deficit` ASCENDENTE.
+   d. Empate (mismo déficit): tiebreaker = siguiente línea después de `process.last_line_id` (rotación legacy).
+   e. Si la primera candidata coincide con `runtime.last_sent_line_id` Y existe otra con mismo déficit → mover primera al final.
+4. Devolver array ordenado (primera = preferida).
+
+La función hermana `comercial_pick_line_for_process($process)` DEBE aplicar la misma lógica.
+
+### Contrato de integridad del contador
+
+1. El contador DEBE incrementarse para la línea que **efectivamente envió**, no la primera intentada (relevante en `comercial_send_process_message_with_fallback()`).
+2. El envío manual desde UI DEBE respetar el mismo algoritmo de balanceo que el cron.
+3. `comercial_register_last_send()` DEBE encadenar: incrementar contador → guardar runtime state.
+4. Los avisos (`avisos_comercial_sender_lines`) NO DEBEN afectar al contador diario de balance.
+
+### Contrato de edge cases
+
+| Escenario | Comportamiento exigido |
+|-----------|----------------------|
+| 1 línea available | Devolver esa única línea sin modificar orden |
+| 0 líneas available | Devolver `[]`, proceso saltado con `last_result='skip'` |
+| Cambio de día | `comercial_reset_daily_counts_if_new_day()` resetea todos los contadores a 0 antes de procesar procesos |
+| Línea nueva sin estado | `comercial_normalize_line_state()` garantiza `daily_sent_count=0`, `daily_sent_date=""` |
+| Power factor 0.30 (paused) | Déficit = count/0.30. Prioridad baja pero no nula |
+| Todas con mismo déficit | Tiebreaker: rotación por `process.last_line_id` |
+| Global-last-line es la de menor déficit | Solo se rota si hay otra línea con déficit idéntico |
+
+### Contrato de no regresión
+
+1. El sistema de power factor y autoregulación DEBE seguir funcionando sin cambios.
+2. `comercial_schedule_next_run()` DEBE seguir usando el power factor de la línea usada.
+3. Los procesos existentes NO DEBEN requerir reconfiguración manual.
+4. La UI de "Reparto diario y normalización" DEBE seguir funcionando (porcentajes por proceso).
+5. `comercial_line_is_available()` DEBE mantener su contrato actual (health + cooldown).

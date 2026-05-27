@@ -74,3 +74,30 @@ Habilitar un modelo operativo y trazable de **interés real** para el bot comerc
 8. **CX2-F8 — Cierre de despliegue y criterios de éxito**
    - Definir métricas de aceptación (precisión operativa y tiempos de respuesta).
    - Cerrar documentación y checklist de salida.
+
+## COM-BALANCE — Balanceo equitativo de envíos entre líneas comerciales
+
+### Objetivo
+Corregir el desequilibrio en el reparto de envíos de publicidad entre líneas WhatsApp. Actualmente el algoritmo de selección de línea (`comercial_order_lines_for_process`) usa round-robin por proceso sin tracking diario de envíos por línea, lo que provoca que una línea acapare casi todo el tráfico mientras otras envían 1-2 mensajes al día. El nuevo algoritmo debe garantizar que todas las líneas seleccionadas reciban un volumen de envíos equitativo, respetando las restricciones de disponibilidad y power factor de cada línea.
+
+### Alcance por fases
+1. **COM-BALANCE-F0 — Spec & Design**
+   - Formalizar requisitos, diseño del algoritmo min-count-first y contratos.
+2. **COM-BALANCE-F1 — Data Layer**
+   - Añadir `daily_sent_count` y `daily_sent_date` al estado de cada línea.
+   - Implementar funciones de incremento, consulta y reset automático al cambiar de día.
+3. **COM-BALANCE-F2 — Core Algorithm**
+   - Reescribir `comercial_order_lines_for_process()` con selección min-count-first.
+   - Adaptar `comercial_pick_line_for_process()` con la misma lógica.
+   - Integrar incremento de contador en envíos exitosos.
+4. **COM-BALANCE-F3 — Integration & Verification**
+   - Cablear todo en `comercial_run_tick()`, validar edge cases, simular reparto.
+5. **COM-BALANCE-F4 — UI & Monitoring (opcional)**
+   - Mostrar contadores diarios en panel comercial para transparencia operativa.
+
+### Restricciones
+- Cambios mínimos y seguros.
+- Sin dependencias nuevas.
+- Compatible con el sistema de power factor y autoregulación existente.
+- No modificar el comportamiento de otros módulos (publicista, avisos, etc.).
+- El balanceo debe operar exclusivamente sobre líneas disponibles (`comercial_line_is_available`).

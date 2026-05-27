@@ -442,3 +442,44 @@
 - [x] T6 — Fix warnings: incluir selector y valor en mensajes de error de campos.
 - [x] T7 — Validación técnica: `php -l mundosex.php` + `node -c mundosex_browser.js` OK.
 - [x] T8 — Documentación: changelog + tasks actualizados.
+
+## COM-BALANCE — Balanceo ponderado de envíos entre líneas comerciales
+
+### COM-BALANCE-F0 — Spec & Design
+
+- [x] T0.1 — Requisitos: definir objetivo, alcance por fases y restricciones en `spec/requirements.md`.
+- [x] T0.2 — Diseño: formalizar algoritmo min-deficit-first ponderado, pseudocódigo y edge cases en `spec/design.md`.
+- [x] T0.3 — Contratos: definir contratos formales de contador diario, selección de línea y no regresión en `spec/contracts.md`.
+- [x] T0.4 — Tasks: crear tracking de subtareas F1-F4 en `spec/tasks.md` §COM-BALANCE.
+- [x] T0.5 — Changelog: entrada de cierre de fase F0 en `docs/changelog.md`.
+- [x] T0.6 — Validación cruzada: verificar consistencia entre requirements, design y contracts.
+
+### COM-BALANCE-F1 — Data Layer
+
+- [ ] T1.1 — Añadir `daily_sent_count` y `daily_sent_date` al normalizer `comercial_normalize_line_state()` (defaults: `0`, `""`).
+- [ ] T1.2 — Implementar `comercial_line_increment_daily_count($lineId)`: leer, incrementar, guardar estado a disco.
+- [ ] T1.3 — Implementar `comercial_line_get_daily_count($lineId)`: devolver contador del día, reset si `daily_sent_date != today`.
+- [ ] T1.4 — Implementar `comercial_reset_daily_counts_if_new_day()`: ejecutar al inicio de `comercial_run_tick()`.
+- [ ] T1.5 — Implementar `comercial_line_get_daily_counts_map($lineIds)`: versión批量 `[lineId => count]`.
+
+### COM-BALANCE-F2 — Core Algorithm
+
+- [ ] T2.1 — Reescribir `comercial_order_lines_for_process()`: déficit normalizado, sort ASC, tiebreaker con rotación legacy.
+- [ ] T2.2 — Reescribir `comercial_pick_line_for_process()` con misma lógica de déficit.
+- [ ] T2.3 — Modificar `comercial_register_last_send()` para encadenar `comercial_line_increment_daily_count()`.
+- [ ] T2.4 — En `comercial_send_process_message_with_fallback()`, incrementar contador de la línea que efectivamente envió.
+- [ ] T2.5 — Gate: si `effective_power_factor <= 0`, `deficit = PHP_INT_MAX`.
+
+### COM-BALANCE-F3 — Integration & Verification
+
+- [ ] T3.1 — Cablear reset diario al inicio de `comercial_run_tick()`.
+- [ ] T3.2 — Verificar que envío manual desde UI usa mismo algoritmo de balanceo.
+- [ ] T3.3 — Validar edge cases: 1 línea, 0 líneas, cambio día, power 0, línea nueva.
+- [ ] T3.4 — Simular reparto: 5 procesos, 2 líneas (power 1.0 y 0.5) → verificar proporción ~2:1.
+- [ ] T3.5 — Bump versión en `index.php` para recarga de assets.
+
+### COM-BALANCE-F4 — UI & Monitoring (opcional)
+
+- [ ] T4.1 — Mostrar `daily_sent_count` junto a cada línea en panel de procesos comerciales.
+- [ ] T4.2 — Indicador visual de déficit/balance en panel comercial.
+- [ ] T4.3 — Botón "Reset contadores diarios" con CSRF.

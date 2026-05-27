@@ -1,112 +1,22 @@
 # Changelog
 
-## 2026-05-27 — UNIFICACION-LINEAS-F5 (validacion-final)
+## 2026-05-27 — COM-BALANCE-F0 (spec & design)
 
-### Cierre del proyecto
-- **5/5 archivos PHP con lint limpio**: `comercial.php`, `actions.php`, `views.php`, `voice.php`, `index.php`.
-- **Datos íntegros**: `telefonos.json` (14 registros) y `comercial_line_state.json` (14 registros) sin alteraciones.
-- **Resumen de cambios**: +85/-95 líneas netas. CRUD de líneas unificado en `Comercial > Líneas`, 5 URLs migradas, voice routes actualizadas, Josue > Telefonos convertido en aviso de migración.
+### Documentación creada
+- **Fase 0 del plan COM-BALANCE**: balanceo ponderado de envíos entre líneas comerciales.
+- `spec/requirements.md` — añadida sección COM-BALANCE: objetivo, alcance F0-F4, restricciones.
+- `spec/design.md` — añadido diseño COM-BALANCE: algoritmo min-deficit-first ponderado por power factor, pseudocódigo, estructuras de datos, edge cases y tradeoff balance puro vs. ponderado (decisión: ponderado).
+- `spec/contracts.md` — añadidos contratos COM-BALANCE: `DailyLineCounter`, `LineSelectionAlgorithm`, integridad del contador, edge cases y no regresión.
+- `spec/tasks.md` — añadidas 24 subtareas repartidas en F0 (6, completadas), F1 (5), F2 (5), F3 (5), F4 (3 opcionales).
 
-### Archivos modificados (todo el proyecto)
-- `app/comercial.php` — +63 líneas (form CRUD + layout `.cards.two` en tab lineas)
-- `app/actions.php` — 2 líneas (redirects a `comercial_page_url`)
-- `app/views.php` — -80/+9 líneas (URLs migradas, CRUD antiguo eliminado, aviso migración)
-- `app/voice.php` — +12/-3 líneas (resolver + tab hints + AI prompt)
-- `index.php` — cache-busting v=20260527_9
+### Algoritmo definido
+- **Min-deficit-first ponderado**: `deficit = daily_sent_count / effective_power_factor`.
+- Líneas con mayor power factor reciben proporcionalmente más envíos.
+- Reset diario automático al cambiar de día.
+- Contador solo en envíos exitosos, persistido a disco inmediatamente.
 
----
-
-## 2026-05-27 — UNIFICACION-LINEAS-F4 (migrar-josue-tab)
-
-### Cambios implementados
-- **Tab Josue > Telefonos convertido en aviso de migración**: el antiguo panel CRUD + listado se reemplaza por un panel informativo con botón "Abrir Líneas en Comercial".
-- **Subtab renombrado**: "Telefonos" → "Telefonos →" indicando la redirección.
-- El formulario CRUD ya no se renderiza en Josue; toda la gestión está en `Comercial > Líneas`.
-
-### Modificado
-- `app/views.php` — ~85 líneas eliminadas (CRUD antiguo), 6 líneas añadidas (aviso migración) + label subtab
-- `index.php` — cache-busting v=20260527_9
-
----
-
-## 2026-05-27 — UNIFICACION-LINEAS-F3 (actualizar-rutas)
-
-### Cambios implementados
-- **Todas las URLs `page=josue&tab=telefonos` migradas** a `comercial_page_url('lineas')` en `views.php` (3 links: linked-tags en publicista cuentas, subtab en josue, y editar en listado).
-- **Voice routes actualizadas**: `telefonos` eliminado del resolver de tabs huérfanos (ahora `lineas` y demás tabs comercial auto-rutean a `comercial`), eliminado de domain hints y del AI prompt.
-- Sin cambios en `data/settings.json` (la nota TODO es texto de usuario, sin impacto funcional).
-
-### Modificado
-- `app/views.php` — 3 URLs reemplazadas (L1321, L7306, L7407)
-- `app/voice.php` — 3 bloques actualizados (resolver, tab hints, AI prompt)
-
----
-
-## 2026-05-27 — UNIFICACION-LINEAS-F2 (unificar-core)
-
-### Cambios implementados
-- **CRUD de líneas unificado en Comercial**: el formulario de crear/editar/eliminar líneas (nombre, tfono, uso, PIN, compañía, WAHA Port, WAHA, Destacamos, notas) ahora reside en `Comercial > Líneas` en layout `.cards.two` (formulario izquierda, tabla salud derecha).
-- **Redirects actualizados**: `action_save_telefono()` y `action_delete_telefono()` ahora redirigen a `comercial_page_url('lineas')` en lugar de `page=josue&tab=telefonos`.
-- **Datos compartidos**: `telefonos.json` sigue siendo la fuente única. `comercial_line_state.json` sin cambios.
-
-### Modificado
-- `app/comercial.php` — +63 líneas (formulario CRUD en tab lineas, layout `.cards.two`)
-- `app/actions.php` — 2 líneas (redirects save/delete a comercial)
-- `index.php` — cache-busting v=20260527_8
-
----
-
-## 2026-05-27 — MUNDOSEX-F6 (mundosex-fix)
-
-### Revisado y corregido
-- `subirPublicidad/mundosex_browser.js` — 4 correcciones de robustez:
-  - TinyMCE: fallback a `body` si `#tinymce` no visible.
-  - Debug: volcado HTML a `/tmp/mundosex_debug_*.html` en fallos de submit.
-  - Provincia: `dispatchEvent('change')` manual para forzar selProvList().
-  - Warnings: incluyen selector y valor para diagnóstico.
-- `subirPublicidad/mundosex.php` — revisado: mapping provincia/ciudad correcto, sin cambios necesarios.
-- 6 slots de fotos ya funcionando desde fase six-finals.
-
-### Modificado
-- `subirPublicidad/mundosex_browser.js` — 4 líneas corregidas.
-- `index.php` — cache-busting v=20260527_7.
-
----
-
-## 2026-05-27 — PUB-FOTOS-REALES-F4 (platform-photos)
-
-### Añadido
-- Nueva sección "⑤ Fotos por plataforma" en ficha de producto: checkboxes con miniaturas para seleccionar qué fotos usar en destacamos, mundosex y girlsconf.
-- Nuevo campo `platform_photos` en el job JSON (por plataforma).
-- `publicista_campaign_pick_images()` ahora usa `platform_photos` si está configurado para el portal destino.
-- Validación en generación de campañas: bloquea productos sin fotos asignadas para el portal.
-
-### Modificado
-- `app/storage.php` — pick_images con portalCode, stored_path en image_paths, validación platform_photos, job_defaults.
-- `app/views.php` — sección 5 con checkboxes por plataforma + paso 5 en barra visual.
-- `app/actions.php` — nueva acción save_publicista_platform_photos con CSRF.
-- `index.php` — cache-busting v=20260527_6.
-
----
-
-## 2026-05-27 · COM-INTEGRIDAD-F4 — Integridad del sistema
-
-### Cambios implementados (5 tareas)
-1. **Fortalecimiento de `find_open_thread_for_inbound()`** — Nuevo fallback `$fallbackSameLine` que prioriza hilos de la misma línea receptora. Exclusión de `autoresponder` en fallbacks. Cadena de prioridad: exact match → sameLine → phoneOnly → matched → null.
-2. **Reset de `auto_turn_count` en `run_tick()`** — Pasada de mantenimiento al inicio del tick que resetea `auto_turn_count = 0` en hilos con >24h de inactividad. Antes solo se reseteaba al recibir un nuevo mensaje entrante.
-3. **Validación `from_me` en webhook** — Nuevo check en `comercial_handle_webhook_http()`: si `from_me=0` pero el remitente es una línea propia, se loguea `webhook_from_me_mismatch` para diagnosticar si WAHA detecta correctamente mensajes manuales.
-4. **Documentación de delays humanos** — Comentario en `comercial_default_settings()` documentando rango efectivo: pre (1-3s) + typing (~2-12s) + jitter (0-2s) = ~3-17s total.
-5. **Normalización de assets** — `index.php`: style.css, theme.css y app.js unificados a `v=20260527_5`.
-
-### Archivos modificados
-- `app/comercial.php` — 3 funciones modificadas (+30 líneas)
-- `index.php` — normalización versión assets (1 línea)
-- `spec/tasks.md` — nueva fase COM-INTEGRIDAD-F4
-- `spec/design.md` — diseño integridad F4
-- `docs/changelog.md` — esta entrada
-
-### Seguridad
-- ✅ Sin hallazgos: cambios de control de flujo sin nueva superficie. Logging usa funciones seguras existentes. Reset loop O(n) sobre threads sin riesgo DoS.
+### Sin cambios en código
+- Fase de solo-lectura. 0 archivos PHP tocados.
 
 ---
 

@@ -804,6 +804,160 @@ Mejorar la calidad de las respuestas generadas por IA dotándola de mayor contex
 
 ---
 
+## Diseño COM-BALANCE — Balanceo ponderado de envíos entre líneas
+
+### Objetivo de diseño
+Sustituir el round-robin ingenuo por proceso por un algoritmo de selección de línea que garantice reparto equitativo **ponderado por power factor**, asegurando que cada línea reciba envíos proporcionales a su capacidad real.
+
+### Diagnóstico del algoritmo actual
+
+**Función**: `comercial_order_lines_for_process()` (`app/comercial.php:3780`)
+
+El algoritmo actual opera así:
+1. Filtra líneas asignadas al proceso que estén `available`
+2. Rota: pone la línea siguiente a `process.last_line_id` al principio
+3. Si la primera candidata coincide con la global-last-line, la mueve al final
+4. Devuelve array ordenado
+
+**Problemas**:
+- No existe tracking de cuántos envíos ha hecho cada línea en el día
+- La rotación es independiente por proceso (5 procesos, 5 rotaciones descoordinadas)
+- El mecanismo "evitar global-last-line" solo evita la misma línea 2 veces seguidas, no balancea
+- Si una línea cae, el 100% del tráfico va a la otra sin degradación parcial
+
+### Algoritmo propuesto: Min-deficit-first ponderado
+
+#### Principio
+En lugar de comparar contadores absolutos, se compara el **déficit normalizado** de cada línea:
+
+```
+deficit(linea) = daily_sent_count / effective_power_factor
+```
+
+Una línea con power 1.0 que ha enviado 10 mensajes tiene déficit 10.  
+Una línea con power 0.5 que ha enviado 5 mensajes tiene déficit 10.  
+→ Mismo déficit = misma prioridad. La línea más lenta no necesita enviar tanto para estar equilibrada.
+
+#### Pseudocódigo
+
+```
+function comercial_order_lines_for_process($process):
+    candidates = filter_available(process.assigned_line_ids)
+    
+    if count(candidates) <= 1:
+        return candidates
+    
+    // Obtener déficit normalizado de cada línea candidata
+    for each line in candidates:
+        count = comercial_line_get_daily_count(line.id)
+        power = line.effective_power_factor  // ya calculado por autoregulación
+        deficit = (power > 0) ? count / power : INF
+        line._deficit = deficit
+    
+    // Ordenar por déficit ASC (la que menos ha enviado relativo a su capacidad, primero)
+    sort candidates by _deficit ASC
+    
+    // Tiebreaker: si dos líneas tienen mismo déficit, usar rotación actual
+    // (siguiente después de process.last_line_id)
+    
+    // Regla anti-monopolio: si la primera candidata es la global-last-line
+    // Y hay otra con déficit igual, rotar para evitar usar siempre la misma
+    if count(candidates) > 1 AND candidates[0].id == global_last_line_id:
+        for other in candidates[1:]:
+            if other._deficit == candidates[0]._deficit:
+                move candidates[0] to end
+                break
+    
+    return candidates
+```
+
+#### Ejemplo numérico
+
+Escenario: 2 líneas, power factors distintos:
+- `tf_de558a13` (jostal dulce): power=1.0, 30 envíos hoy → déficit=30
+- `tf_f500d7c3` (nuria-jostal): power=0.5, 10 envíos hoy → déficit=20
+
+→ nuria-jostal tiene déficit 20 < 30 de jostal dulce → **nuria-jostal primera**.  
+→ Se selecciona nuria-jostal, su contador sube a 11, déficit=22.  
+→ Siguiente tick: jostal dulce 30 vs nuria-jostal 22 → nuria-jostal otra vez.  
+→ Al cabo de varios ticks, convergen a déficit ≈ igual, lo que implica que jostal dulce (power 1.0) tendrá ~el doble de envíos que nuria-jostal (power 0.5).  
+→ **Balance ponderado**: cada línea recibe envíos proporcionales a su capacidad.
+
+#### Estructura de datos
+
+Se añaden dos campos al estado de línea (`comercial_line_state.json`):
+
+```
+daily_sent_count: int      // envíos exitosos hoy
+daily_sent_date: string    // "YYYY-MM-DD" para detectar cambio de día
+```
+
+Ambos campos se normalizan en `comercial_normalize_line_state()` con defaults: `0` y `""`.
+
+#### Funciones nuevas (F1)
+
+| Función | Descripción |
+|---------|-------------|
+| `comercial_line_increment_daily_count($lineId)` | Incrementa `daily_sent_count` de la línea y guarda a disco inmediatamente |
+| `comercial_line_get_daily_count($lineId)` | Devuelve `daily_sent_count` si la fecha es hoy; si no, resetea a 0 |
+| `comercial_line_get_daily_counts_map($lineIds)` | Versión批量 para eficiencia: devuelve `[lineId => count]` |
+
+#### Reset diario
+
+Al inicio de `comercial_run_tick()`, se invoca `comercial_reset_daily_counts_if_new_day()`:
+
+```
+function comercial_reset_daily_counts_if_new_day():
+    today = date("Y-m-d")
+    for each line in comercial_list_lines():
+        state = comercial_get_line_state(line.id)
+        if state.daily_sent_date != today:
+            state.daily_sent_count = 0
+            state.daily_sent_date = today
+            comercial_save_line_state(state)
+```
+
+Esto garantiza que el primer tick de cada día arranca con todos los contadores a cero.
+
+#### Integración con envío (F2-F3)
+
+El contador se incrementa **solo en envíos exitosos** (`send_ok`), dentro de `comercial_register_last_send()`:
+
+```
+function comercial_register_last_send($lineId, $targetPhone):
+    comercial_line_increment_daily_count($lineId)
+    comercial_save_runtime_state([...])
+```
+
+En `comercial_send_process_message_with_fallback()`, si se intenta la línea A y falla, pero la línea B envía con éxito, el contador se incrementa para la línea B (la que efectivamente envió), no para la A (la intentada).
+
+#### Edge cases contemplados
+
+| Escenario | Comportamiento |
+|-----------|---------------|
+| 1 sola línea disponible | Se usa esa línea (sin cambios respecto al algoritmo actual) |
+| Todas las líneas down | `comercial_order_lines_for_process()` devuelve `[]`, el proceso se salta con error |
+| Cambio de día a medianoche | Reset automático en el primer tick del nuevo día |
+| Power factor = 0 (línea paused) | `effective_power_factor` mínimo es 0.30 por `comercial_line_effective_power_from_state()`. Si aún así es 0, `deficit = INF` (última prioridad) |
+| Línea recién añadida sin estado | `comercial_normalize_line_state()` asigna `daily_sent_count=0`, `daily_sent_date=""` |
+| Todas las líneas con misma cuenta | El tiebreaker usa la rotación actual (comportamiento legacy) |
+
+#### Tradeoff: balance puro vs. ponderado
+
+**Decisión**: Balance **ponderado** por power factor.
+
+- **Ventaja**: Las líneas más lentas (power bajo por bans/warnings) no se sobrecargan, reduciendo riesgo de más bans.
+- **Ventaja**: Las líneas sanas (power alto) asumen más carga, maximizando throughput total.
+- **Riesgo mitigado**: Si una línea está paused (power ≤ 0.30), su déficit crece muy rápido → el algoritmo la evita naturalmente, coherente con la autoregulación existente.
+
+### Archivos impactados (F1-F3)
+
+- `app/comercial.php` — 3 funciones nuevas + 4 funciones modificadas
+- `data/comercial_line_state.json` — nuevos campos (auto-gestionados por normalizer)
+- `index.php` — bump versión assets
+
+---
+
 ## Diseño COM-INTEGRIDAD-F4 — Integridad del sistema
 
 ### Objetivo de diseño
