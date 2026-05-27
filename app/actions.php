@@ -405,6 +405,9 @@ function handle_post_actions() {
         case 'apply_publicista_manual_blur':
             action_apply_publicista_manual_blur();
             break;
+        case 'apply_publicista_manual_blur_real':
+            action_apply_publicista_manual_blur_real();
+            break;
         case 'upload_publicista_real_photos':
             action_upload_publicista_real_photos();
             break;
@@ -993,6 +996,41 @@ function action_apply_publicista_manual_blur() {
     echo json_encode(array(
         'ok' => true,
         'final_path' => $result['final_path'] ?? '',
+        'preview_path' => $result['preview_path'] ?? '',
+        'manual_blur_applied' => !empty($result['manual_blur_applied']),
+        'manual_blur_intensity' => (int)($result['manual_blur_intensity'] ?? 0),
+    ));
+    exit;
+}
+
+function action_apply_publicista_manual_blur_real() {
+    header('Content-Type: application/json; charset=utf-8');
+    if (!csrf_validate((string)request_post('csrf_token'))) {
+        echo json_encode(array('ok' => false, 'error' => 'Sesión caducada. Recarga la página.'));
+        exit;
+    }
+    $id = trim((string)request_post('id'));
+    $photoId = trim((string)request_post('photo_id'));
+    $bx = (float)request_post('bx', '0.2');
+    $by = (float)request_post('by', '0.05');
+    $bw = (float)request_post('bw', '0.6');
+    $bh = (float)request_post('bh', '0.35');
+    $intensity = (int)request_post('intensity', '8');
+
+    if ($id === '' || $photoId === '') {
+        echo json_encode(array('ok' => false, 'error' => 'Parámetros incompletos.'));
+        exit;
+    }
+
+    list($ok, $result) = publicista_apply_manual_blur_to_real_photo($id, $photoId, $bx, $by, $bw, $bh, $intensity);
+    if (!$ok) {
+        echo json_encode(array('ok' => false, 'error' => is_string($result) ? $result : 'Error al aplicar el blur manual.'));
+        exit;
+    }
+
+    echo json_encode(array(
+        'ok' => true,
+        'stored_path' => $result['stored_path'] ?? '',
         'preview_path' => $result['preview_path'] ?? '',
         'manual_blur_applied' => !empty($result['manual_blur_applied']),
         'manual_blur_intensity' => (int)($result['manual_blur_intensity'] ?? 0),

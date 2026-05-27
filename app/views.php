@@ -3081,12 +3081,27 @@ if (!empty($realPhotos)) {
         echo '<div class="panel" style="padding:12px;">';
         echo '<div class="branch-panel-head" style="margin-bottom:8px;"><strong>' . e($rpName) . '</strong></div>';
         if ($rpPath !== '') {
-            echo '<img src="' . e($rpPath) . '" alt="Foto real" style="width:100%;border-radius:8px;border:1px solid #e5e7eb;display:block;">';
+            echo '<img id="realBlurImg_' . e($rpId) . '" src="' . e($rpPath) . '" alt="Foto real" style="width:100%;border-radius:8px;border:1px solid #e5e7eb;display:block;">';
         }
         echo '<div style="display:flex;gap:8px;margin-top:8px;font-size:11px;color:#9ca3af;">';
         echo '<span>' . e($rpWidth . '×' . $rpHeight) . '</span>';
         if ($rpUploaded !== '') {
             echo '<span>' . e(format_created_at($rpUploaded)) . '</span>';
+        }
+        echo '</div>';
+        $rpBlurApplied = !empty($rp['manual_blur_applied']);
+        $rpBlurIntensity = (int)($rp['manual_blur_intensity'] ?? 0);
+        echo '<div style="display:flex;gap:8px;margin-top:8px;">';
+        echo '<button type="button" class="btn-primary js-manual-blur-btn" style="font-size:12px;padding:4px 10px;background:#7c3aed;border-color:#7c3aed;" '
+            . 'data-job-id="' . e($selectedJob['id'] ?? '') . '" '
+            . 'data-photo-id="' . e($rpId) . '" '
+            . 'data-square-src="' . e($rpPath) . '" '
+            . 'data-intensity="' . e((string)$rpBlurIntensity) . '" '
+            . 'data-target="real">✏ Blur manual</button>';
+        if ($rpBlurApplied) {
+            echo '<span id="realBlurStatus_' . e($rpId) . '" class="summary-badge" style="background:#ede9fe;color:#6d28d9;">Blur · ' . e((string)$rpBlurIntensity) . '/20</span>';
+        } else {
+            echo '<span id="realBlurStatus_' . e($rpId) . '" class="summary-badge" style="background:#f3f4f6;color:#6b7280;">Sin blur</span>';
         }
         echo '</div>';
         echo '<form method="post" class="inline-form" style="margin-top:8px;" onsubmit="return confirm(\'¿Eliminar esta foto real?\')">';
@@ -3354,7 +3369,7 @@ echo '</section>';
 </div>
 <script>
 (function() {
-  var _mbJobId = '', _mbFinalId = '', _mbEllipse = null, _mbDragging = false, _mbStartX = 0, _mbStartY = 0;
+  var _mbJobId = '', _mbFinalId = '', _mbTarget = 'final', _mbPhotoId = '', _mbCsrfToken = '<?php echo e(csrf_token()); ?>', _mbEllipse = null, _mbDragging = false, _mbStartX = 0, _mbStartY = 0;
   var _mbImg = new Image();
 
   window.openRegenerateCopyPackModal = function(jobId) {
@@ -3388,11 +3403,14 @@ echo '</section>';
     document.getElementById('manualBlurIntensityNumber').value = num;
   };
 
-  window.openManualBlurModal = function(jobId, finalId, squareSrc, currentIntensity) {
+  window.openManualBlurModal = function(jobId, finalId, squareSrc, currentIntensity, target) {
     _mbJobId = jobId || '';
-    _mbFinalId = finalId || '';
+    _mbFinalId = (target === 'real') ? '' : (finalId || '');
+    _mbPhotoId = (target === 'real') ? (finalId || '') : '';
+    _mbTarget = target || 'final';
     _mbEllipse = null;
-    if (!_mbJobId || !_mbFinalId || !squareSrc) {
+    var targetId = (_mbTarget === 'real') ? _mbPhotoId : _mbFinalId;
+    if (!_mbJobId || !targetId || !squareSrc) {
       document.getElementById('manualBlurStatus').textContent = 'Faltan datos para abrir el editor.';
       return;
     }
@@ -3422,6 +3440,8 @@ echo '</section>';
     _mbEllipse = null;
     _mbJobId = '';
     _mbFinalId = '';
+    _mbPhotoId = '';
+    _mbTarget = 'final';
   };
 
   function openManualBlurModalFromButton(btn) {
@@ -3528,7 +3548,20 @@ echo '</section>';
     var btn = e.target.closest ? e.target.closest('.js-manual-blur-btn') : null;
     if (!btn) return;
     e.preventDefault();
-    openManualBlurModalFromButton(btn);
+    var target = btn.getAttribute('data-target') || 'final';
+    if (target === 'real') {
+      var intensity = parseInt(btn.getAttribute('data-intensity') || '8', 10);
+      if (!isFinite(intensity)) intensity = 8;
+      window.openManualBlurModal(
+        btn.getAttribute('data-job-id') || '',
+        btn.getAttribute('data-photo-id') || '',
+        btn.getAttribute('data-square-src') || '',
+        intensity,
+        'real'
+      );
+    } else {
+      openManualBlurModalFromButton(btn);
+    }
   });
 
   window.submitManualBlur = function() {
@@ -3550,9 +3583,16 @@ echo '</section>';
     document.getElementById('manualBlurStatus').textContent = 'Aplicando blur...';
 
     var fd = new FormData();
-    fd.append('action', 'apply_publicista_manual_blur');
-    fd.append('id', _mbJobId);
-    fd.append('final_id', _mbFinalId);
+    if (_mbTarget === 'real') {
+      fd.append('action', 'apply_publicista_manual_blur_real');
+      fd.append('id', _mbJobId);
+      fd.append('photo_id', _mbPhotoId);
+    } else {
+      fd.append('action', 'apply_publicista_manual_blur');
+      fd.append('id', _mbJobId);
+      fd.append('final_id', _mbFinalId);
+    }
+    fd.append('csrf_token', _mbCsrfToken);
     fd.append('bx', bx.toFixed(6));
     fd.append('by', by.toFixed(6));
     fd.append('bw', bw.toFixed(6));
@@ -3564,16 +3604,30 @@ echo '</section>';
       .then(function(data) {
         if (data.ok) {
           document.getElementById('manualBlurStatus').textContent = '¡Blur aplicado!';
-          var img = document.getElementById('finalBlurImg_' + _mbFinalId);
-          if (img && data.final_path) {
-            img.src = data.final_path + '?t=' + Date.now();
-          }
-          var badge = document.getElementById('finalBlurStatus_' + _mbFinalId);
-          if (badge) {
-            var intensityText = (data.manual_blur_intensity || intensity) + '/20';
-            badge.textContent = 'Blur manual · ' + intensityText;
-            badge.style.background = '#ede9fe';
-            badge.style.color = '#6d28d9';
+          if (_mbTarget === 'real') {
+            var img = document.getElementById('realBlurImg_' + _mbPhotoId);
+            if (img && data.stored_path) {
+              img.src = data.stored_path + '?t=' + Date.now();
+            }
+            var badge = document.getElementById('realBlurStatus_' + _mbPhotoId);
+            if (badge) {
+              var intensityText = (data.manual_blur_intensity || intensity) + '/20';
+              badge.textContent = 'Blur · ' + intensityText;
+              badge.style.background = '#ede9fe';
+              badge.style.color = '#6d28d9';
+            }
+          } else {
+            var img = document.getElementById('finalBlurImg_' + _mbFinalId);
+            if (img && data.final_path) {
+              img.src = data.final_path + '?t=' + Date.now();
+            }
+            var badge = document.getElementById('finalBlurStatus_' + _mbFinalId);
+            if (badge) {
+              var intensityText = (data.manual_blur_intensity || intensity) + '/20';
+              badge.textContent = 'Blur manual · ' + intensityText;
+              badge.style.background = '#ede9fe';
+              badge.style.color = '#6d28d9';
+            }
           }
           setTimeout(function() { closeManualBlurModal(); }, 650);
         } else {

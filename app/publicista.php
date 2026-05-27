@@ -5393,6 +5393,98 @@ function publicista_apply_manual_blur_to_final($jobId, $finalId, $bx, $by, $bw, 
 }
 
 
+function publicista_apply_manual_blur_to_real_photo($jobId, $photoId, $bx, $by, $bw, $bh, $intensity = 8) {
+    $job = publicista_job_get($jobId);
+    if (!$job) return array(false, 'No se encontró el trabajo de Publicista.');
+
+    $photos = is_array($job['real_photos'] ?? null) ? $job['real_photos'] : array();
+    $targetIndex = -1;
+    foreach ($photos as $idx => $rp) {
+        if (trim((string)($rp['id'] ?? '')) === trim((string)$photoId)) {
+            $targetIndex = $idx;
+            break;
+        }
+    }
+    if ($targetIndex < 0) return array(false, 'No se encontró la foto real indicada.');
+
+    $storedRel = trim((string)($photos[$targetIndex]['stored_path'] ?? ''));
+    if ($storedRel === '') return array(false, 'La foto real no tiene ruta guardada.');
+    $storedFs = BASE_PATH . '/' . ltrim($storedRel, '/');
+    if (!file_exists($storedFs)) return array(false, 'No existe en disco la foto real.');
+
+    $bx = max(0.0, min(1.0, (float)$bx));
+    $by = max(0.0, min(1.0, (float)$by));
+    $bw = max(0.01, min(1.0, (float)$bw));
+    $bh = max(0.01, min(1.0, (float)$bh));
+    $intensity = max(1, min(20, (int)$intensity));
+
+    $paths = publicista_job_fs_paths($jobId);
+    $safeBase = preg_replace('/[^a-z0-9_\-]/i', '_', $photoId);
+    $blurFs = $paths['reals_dir'] . '/' . $safeBase . '_manual_blur.jpg';
+    $previewFs = $paths['reals_dir'] . '/' . $safeBase . '_manual_blur_preview.jpg';
+    $analysisFs = $paths['meta_dir'] . '/' . $safeBase . '_real_blur_result.json';
+
+    $worker = BASE_PATH . '/tools/publicista_image_worker.py';
+    if (!file_exists($worker)) return array(false, 'No se encontró el worker Python de Publicista.');
+
+    $command = 'python3 ' . escapeshellarg($worker)
+        . ' apply-manual-blur'
+        . ' --input ' . escapeshellarg($storedFs)
+        . ' --output-face-blur ' . escapeshellarg($blurFs)
+        . ' --output-preview ' . escapeshellarg($previewFs)
+        . ' --output-json ' . escapeshellarg($analysisFs)
+        . ' --bx ' . escapeshellarg((string)$bx)
+        . ' --by ' . escapeshellarg((string)$by)
+        . ' --bw ' . escapeshellarg((string)$bw)
+        . ' --bh ' . escapeshellarg((string)$bh)
+        . ' --intensity ' . escapeshellarg((string)$intensity)
+        . ' --preview-size 320';
+
+    $proc = publicista_proc_command($command, publicista_ai_timeouts()['local_worker'], BASE_PATH);
+    publicista_job_log_write($jobId, $safeBase . '_real_manual_blur', $proc);
+    if (!$proc['ok']) {
+        return array(false, 'Error en worker local (blur manual real): ' . ($proc['stderr'] !== '' ? $proc['stderr'] : 'sin detalle'));
+    }
+
+    $analysis = file_exists($analysisFs) ? json_decode((string)@file_get_contents($analysisFs), true) : null;
+    if (!is_array($analysis) || empty($analysis['ok'])) {
+        return array(false, 'El worker de blur manual no devolvió resultado válido.');
+    }
+
+    $photos[$targetIndex]['stored_path'] = file_exists($blurFs) ? publicista_path_to_web($blurFs) : $photos[$targetIndex]['stored_path'];
+    $photos[$targetIndex]['preview_path'] = file_exists($previewFs) ? publicista_path_to_web($previewFs) : ($photos[$targetIndex]['preview_path'] ?? '');
+    $photos[$targetIndex]['manual_blur_applied'] = 1;
+    $photos[$targetIndex]['manual_blur_intensity'] = $intensity;
+    $photos[$targetIndex]['manual_blur_shape'] = array('bx' => $bx, 'by' => $by, 'bw' => $bw, 'bh' => $bh);
+
+    $job['real_photos'] = array_values($photos);
+    $job['processing'] = array_merge($job['processing'] ?? array(), array(
+        'last_action' => 'apply_manual_blur_real',
+        'last_finished_at' => now_datetime(),
+        'last_error' => '',
+        'last_error_at' => '',
+    ));
+    list($okSave, $saved) = publicista_job_save($job);
+    if (!$okSave) return array(false, is_string($saved) ? $saved : 'No se pudo guardar el blur manual en la foto real.');
+
+    $updated = is_array($saved['real_photos'] ?? null) ? $saved['real_photos'] : array();
+    $updatedPhoto = null;
+    foreach ($updated as $row) {
+        if (trim((string)($row['id'] ?? '')) === trim((string)$photoId)) {
+            $updatedPhoto = $row;
+            break;
+        }
+    }
+    if (!$updatedPhoto) $updatedPhoto = $photos[$targetIndex];
+
+    return array(true, array(
+        'stored_path' => $updatedPhoto['stored_path'] ?? '',
+        'preview_path' => $updatedPhoto['preview_path'] ?? '',
+        'manual_blur_applied' => !empty($updatedPhoto['manual_blur_applied']),
+        'manual_blur_intensity' => (int)($updatedPhoto['manual_blur_intensity'] ?? $intensity),
+    ));
+}
+
 
 function publicista_set_final_variant_choice($jobId, $finalId, $choice) {
     $job = publicista_job_get($jobId);

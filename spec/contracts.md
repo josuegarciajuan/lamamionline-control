@@ -765,3 +765,13 @@ Reglas:
 - La ruta del archivo a eliminar DEBE derivarse de `photoId` + `mime_type`, NO de `stored_path`.
 - Tras eliminar, los IDs DEBEN reindexarse secuencialmente (`real_01`, `real_02`, ...).
 - La eliminación DEBE validar CSRF.
+
+## Contrato PUB-FOTOS-BLUR — Blur manual en fotos reales
+
+### Contrato de blur en fotos reales
+- La función de blur DEBE operar sobre `real_photos[]` del job, con idéntica lógica al blur de finals.
+- El comando al worker Python DEBE usar `escapeshellarg` en TODOS los parámetros (input, output, bx, by, bw, bh, intensity).
+- Los valores bx/by/bw/bh DEBEN clamparse a [0,1] y bW/bh a [0.01, 1].
+- La intensidad DEBE clamparse a [1, 20].
+- El blur reemplaza el `stored_path` de la foto real con la versión con blur aplicado.
+- Los metadatos de blur (`manual_blur_applied`, `manual_blur_intensity`, `manual_blur_shape`) DEBEN guardarse en la entrada de `real_photos[]`.
