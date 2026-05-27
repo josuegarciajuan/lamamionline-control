@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-05-27 — UNIFICACION-LINEAS-F5 (validacion-final)
+
+### Cierre del proyecto
+- **5/5 archivos PHP con lint limpio**: `comercial.php`, `actions.php`, `views.php`, `voice.php`, `index.php`.
+- **Datos íntegros**: `telefonos.json` (14 registros) y `comercial_line_state.json` (14 registros) sin alteraciones.
+- **Resumen de cambios**: +85/-95 líneas netas. CRUD de líneas unificado en `Comercial > Líneas`, 5 URLs migradas, voice routes actualizadas, Josue > Telefonos convertido en aviso de migración.
+
+### Archivos modificados (todo el proyecto)
+- `app/comercial.php` — +63 líneas (form CRUD + layout `.cards.two` en tab lineas)
+- `app/actions.php` — 2 líneas (redirects a `comercial_page_url`)
+- `app/views.php` — -80/+9 líneas (URLs migradas, CRUD antiguo eliminado, aviso migración)
+- `app/voice.php` — +12/-3 líneas (resolver + tab hints + AI prompt)
+- `index.php` — cache-busting v=20260527_9
+
+---
+
 ## 2026-05-27 — UNIFICACION-LINEAS-F4 (migrar-josue-tab)
 
 ### Cambios implementados

@@ -29,10 +29,12 @@
 
 ### FASE-5-VALIDACION-FINAL
 
-- [ ] T5.1 — `php -l` en todos los archivos modificados.
-- [ ] T5.2 — `git diff --stat` de todos los cambios.
-- [ ] T5.3 — Actualizar docs/changelog.md.
-- [ ] T5.4 — Verificar integridad de `telefonos.json` y `comercial_line_state.json`.
+- [x] T5.1 — `php -l` en todos los archivos modificados (5/5 OK).
+- [x] T5.2 — `git diff` de todos los cambios (+85/-95 líneas netas).
+- [x] T5.3 — Actualizar docs/changelog.md con cierre.
+- [x] T5.4 — Verificar integridad de `telefonos.json` (14 registros, IDs OK) y `comercial_line_state.json` (14 registros, IDs OK).
+
+**CIERRE TOTAL DEL PROYECTO UNIFICACION-LINEAS — todas las fases completadas.**
 
 ---
 ## PRF-IDENTIDAD-FOTO-2026 — Mejora de parecido y realismo Publicista
