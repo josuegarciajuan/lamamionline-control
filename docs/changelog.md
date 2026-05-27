@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-05-27 — UNIFICACION-LINEAS-F4 (migrar-josue-tab)
+
+### Cambios implementados
+- **Tab Josue > Telefonos convertido en aviso de migración**: el antiguo panel CRUD + listado se reemplaza por un panel informativo con botón "Abrir Líneas en Comercial".
+- **Subtab renombrado**: "Telefonos" → "Telefonos →" indicando la redirección.
+- El formulario CRUD ya no se renderiza en Josue; toda la gestión está en `Comercial > Líneas`.
+
+### Modificado
+- `app/views.php` — ~85 líneas eliminadas (CRUD antiguo), 6 líneas añadidas (aviso migración) + label subtab
+- `index.php` — cache-busting v=20260527_9
+
+---
+
 ## 2026-05-27 — UNIFICACION-LINEAS-F3 (actualizar-rutas)
 
 ### Cambios implementados

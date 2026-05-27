@@ -23,9 +23,9 @@
 
 ### FASE-4-MIGRAR-JOSUE-TAB
 
-- [ ] T4.1 — Sustituir contenido del tab Josue > Telefonos por aviso de migración + botón a Comercial.
-- [ ] T4.2 — Cambiar etiqueta del subtab en Josue ("Telefonos →").
-- [ ] T4.3 — Actualizar versión assets.
+- [x] T4.1 — Sustituir contenido del tab Josue > Telefonos por aviso de migración + botón a Comercial.
+- [x] T4.2 — Cambiar etiqueta del subtab en Josue ("Telefonos →").
+- [x] T4.3 — Actualizar versión assets.
 
 ### FASE-5-VALIDACION-FINAL
 

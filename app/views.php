@@ -7303,7 +7303,7 @@ function render_josue_page() {
     echo '<section class="panel panel-josue">';
 
     echo '<div class="subtabs">';
-    echo '<a class="subtab ' . ($tab === 'telefonos' ? 'active' : '') . '" href="' . e(comercial_page_url('lineas')) . '">Telefonos</a>';
+    echo '<a class="subtab ' . ($tab === 'telefonos' ? 'active' : '') . '" href="' . e(comercial_page_url('lineas')) . '">Telefonos →</a>';
     echo '<a class="subtab ' . ($tab === 'waha' ? 'active' : '') . '" href="index.php?page=josue&tab=waha">WAHA</a>';
     echo '<a class="subtab ' . ($tab === 'publias' ? 'active' : '') . '" href="index.php?page=josue&tab=publias">PublIas</a>';
     echo '<a class="subtab ' . ($tab === 'captacion' ? 'active' : '') . '" href="index.php?page=josue&tab=captacion">Captacion</a>';
@@ -7332,92 +7332,11 @@ function render_josue_page() {
         echo '<div style="margin-top:12px;"><a class="btn-primary" href="' . e(publicista_page_url('cuentas')) . '">Abrir cuentas en Publicista</a></div>';
         echo '</section>';
     } elseif ($tab === 'telefonos') {
-        $editId = request_get('edit', '');
-        $edit = $editId !== '' ? storage_find_by_id('telefonos.json', $editId) : null;
-
-        $anunciosIndex = array();
-        foreach ($anuncios as $an) {
-            $anunciosIndex[$an['id']] = $an;
-        }
-
-        echo '<div class="cards two">';
-
-        echo '<section class="panel">';
-        echo '<div class="josue-head">';
-        echo '<h2>' . ($edit ? 'Ficha teléfono' : 'Nuevo teléfono') . '</h2>';
-        echo '</div>';
-
-        echo '<form method="post" class="form-grid">';
-        echo '<input type="hidden" name="action" value="save_telefono">';
-        echo '<input type="hidden" name="id" value="' . e($edit['id'] ?? '') . '">';
-        field_input('nombre', 'Nombre', $edit['nombre'] ?? '', true);
-        field_input('tfono', 'Tfono', $edit['tfono'] ?? '', true);
-        field_input('uso', 'Uso', $edit['uso'] ?? '');
-        field_input('pin', 'PIN', $edit['pin'] ?? '');
-        field_input('compania', 'Compañía', $edit['compania'] ?? '');
-        field_input('waha_port', 'WAHA Port', $edit['waha_port'] ?? '');
-        field_input('waha', 'WAHA', $edit['waha'] ?? '');
-        echo '<div class="field">';
-        echo '<label>Destacamos</label>';
-        echo '<select name="destacamos_id">';
-        echo '<option value="">Sin vincular</option>';
-        foreach ($anuncios as $an) {
-            $val = $an['id'] ?? '';
-            $label = trim(($an['url'] ?? '') . ' - ' . ($an['user'] ?? ''));
-            $sel = (($edit['destacamos_id'] ?? '') === $val) ? ' selected' : '';
-            echo '<option value="' . e($val) . '"' . $sel . '>' . e($label) . '</option>';
-        }
-        echo '</select>';
-        echo '</div>';
-        field_textarea('notas', 'Notas', $edit['notas'] ?? '', 4);
-        echo '<div class="full"><button class="btn-primary">Guardar teléfono</button></div>';
-        echo '</form>';
+        echo '<section class="panel panel-space">';
+        echo '<div class="branch-panel-head"><h2>Gestión de líneas movida</h2><span class="summary-badge">Reubicado</span></div>';
+        echo '<div class="info-strip">La gestión de líneas telefónicas (crear, editar, eliminar, ver salud WAHA) ahora está en <strong>Comercial &gt; Líneas</strong>.</div>';
+        echo '<div style="margin-top:12px;"><a class="btn-primary" href="' . e(comercial_page_url('lineas')) . '">Abrir Líneas en Comercial</a></div>';
         echo '</section>';
-
-        echo '<section class="panel">';
-        echo '<h2>Listado teléfonos</h2>';
-        if (empty($telefonos)) {
-            echo '<div class="empty">Todavía no hay teléfonos registrados.</div>';
-        } else {
-            $telefonos = sort_desc_by_key($telefonos, 'created_at');
-            render_live_filter('#telefonosRows tr[data-filter-text]', 'Buscar teléfono...');
-            echo '<div class="table-wrap"><table><thead><tr>';
-            echo '<th>Nombre</th><th>Tfono</th><th>Uso</th><th>WAHA Port</th><th>WAHA</th><th>Destacamos</th><th>Acciones</th>';
-            echo '</tr></thead><tbody id="telefonosRows">';
-            foreach ($telefonos as $row) {
-                $dest = $anunciosIndex[$row['destacamos_id'] ?? ''] ?? null;
-                $destLabel = $dest ? trim(($dest['url'] ?? '') . ' - ' . ($dest['user'] ?? '')) : '-';
-                $searchText = strtolower(trim(
-                    ($row['nombre'] ?? '') . ' ' .
-                    ($row['tfono'] ?? '') . ' ' .
-                    ($row['uso'] ?? '') . ' ' .
-                    ($row['compania'] ?? '') . ' ' .
-                    ($row['waha_port'] ?? '') . ' ' .
-                    ($row['waha'] ?? '') . ' ' .
-                    ($destLabel ?? '')
-                ));
-                echo '<tr data-filter-text="' . e($searchText) . '">';
-                echo '<td>' . e($row['nombre'] ?? '') . '</td>';
-                echo '<td>'; crm_render_phone_value((string)($row['tfono'] ?? '')); echo '</td>';
-                echo '<td>' . e($row['uso'] ?? '') . '</td>';
-                echo '<td>' . e($row['waha_port'] ?? '') . '</td>';
-                echo '<td>' . e($row['waha'] ?? '') . '</td>';
-                echo '<td>' . e($destLabel) . '</td>';
-                echo '<td>';
-                echo '<a class="mini-link" href="' . e(comercial_page_url('lineas', array('edit' => $row['id']))) . '">Editar</a> ';
-                echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar este teléfono?\')">';
-                echo '<input type="hidden" name="action" value="delete_telefono">';
-                echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
-                echo '<button class="btn-danger-mini">Eliminar</button>';
-                echo '</form>';
-                echo '</td>';
-                echo '</tr>';
-            }
-            echo '</tbody></table></div>';
-        }
-        echo '</section>';
-
-        echo '</div>';
     } elseif ($tab === 'agenda') {
         $editId = request_get('edit', '');
         $edit = $editId !== '' ? storage_find_by_id('agenda.json', $editId) : null;
