@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-05-27 — UNIFICACION-LINEAS-F2 (unificar-core)
+
+### Cambios implementados
+- **CRUD de líneas unificado en Comercial**: el formulario de crear/editar/eliminar líneas (nombre, tfono, uso, PIN, compañía, WAHA Port, WAHA, Destacamos, notas) ahora reside en `Comercial > Líneas` en layout `.cards.two` (formulario izquierda, tabla salud derecha).
+- **Redirects actualizados**: `action_save_telefono()` y `action_delete_telefono()` ahora redirigen a `comercial_page_url('lineas')` en lugar de `page=josue&tab=telefonos`.
+- **Datos compartidos**: `telefonos.json` sigue siendo la fuente única. `comercial_line_state.json` sin cambios.
+
+### Modificado
+- `app/comercial.php` — +63 líneas (formulario CRUD en tab lineas, layout `.cards.two`)
+- `app/actions.php` — 2 líneas (redirects save/delete a comercial)
+- `index.php` — cache-busting v=20260527_8
+
+---
+
 ## 2026-05-27 — MUNDOSEX-F6 (mundosex-fix)
 
 ### Revisado y corregido

@@ -3550,7 +3550,7 @@ function action_save_telefono() {
 
     storage_upsert('telefonos.json', $row);
     set_flash('ok', 'Teléfono guardado.');
-    redirect_to('index.php?page=josue&tab=telefonos&edit=' . urlencode($id));
+    redirect_to(comercial_page_url('lineas', array('edit' => $id)));
 }
 
 function action_delete_telefono() {
@@ -3560,7 +3560,7 @@ function action_delete_telefono() {
     }
 
     set_flash('ok', 'Teléfono eliminado.');
-    redirect_to('index.php?page=josue&tab=telefonos');
+    redirect_to(comercial_page_url('lineas'));
 }
 
 function action_save_comercial_distribution() {

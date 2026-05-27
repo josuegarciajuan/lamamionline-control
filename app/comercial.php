@@ -6048,6 +6048,7 @@ function render_comercial_page() {
     $leads = comercial_get_leads();
     $summary = comercial_collect_summary();
     $settings = comercial_get_settings();
+    $anuncios = storage_read('anuncios.json');
 
     page_header('Comercial', 'Motor unificado de envíos, seguimiento y conversión');
     echo '<div class="subtabs">';
@@ -6411,8 +6412,60 @@ HTML;
     }
 
     if ($tab === 'lineas') {
+        $lineEditId = trim((string)request_get('edit', ''));
+        $lineEdit = $lineEditId !== '' ? storage_find_by_id('telefonos.json', $lineEditId) : null;
+
+        $anunciosIndex = array();
+        foreach ($anuncios as $an) {
+            $anunciosIndex[$an['id']] = $an;
+        }
+
+        echo '<div class="cards two">';
+
+        // ── Panel izquierdo: formulario CRUD ──
         echo '<section class="panel">';
-        echo '<h2>Líneas comerciales</h2>';
+        echo '<h2>' . ($lineEdit ? 'Ficha línea' : 'Nueva línea') . '</h2>';
+        if ($lineEdit) {
+            echo '<div style="margin-bottom:8px;"><a class="btn-secondary-mini" href="' . e(comercial_page_url('lineas')) . '">Nueva línea</a></div>';
+        }
+        echo '<form method="post" class="form-grid">';
+        echo '<input type="hidden" name="action" value="save_telefono">';
+        echo '<input type="hidden" name="id" value="' . e($lineEdit['id'] ?? '') . '">';
+        field_input('nombre', 'Nombre', $lineEdit['nombre'] ?? '', true);
+        field_input('tfono', 'Tfono', $lineEdit['tfono'] ?? '', true);
+        field_input('uso', 'Uso', $lineEdit['uso'] ?? '');
+        field_input('pin', 'PIN', $lineEdit['pin'] ?? '');
+        field_input('compania', 'Compañía', $lineEdit['compania'] ?? '');
+        field_input('waha_port', 'WAHA Port', $lineEdit['waha_port'] ?? '');
+        field_input('waha', 'WAHA', $lineEdit['waha'] ?? '');
+        echo '<div class="field">';
+        echo '<label>Destacamos</label>';
+        echo '<select name="destacamos_id">';
+        echo '<option value="">Sin vincular</option>';
+        foreach ($anuncios as $an) {
+            $val = $an['id'] ?? '';
+            $label = trim(($an['url'] ?? '') . ' - ' . ($an['user'] ?? ''));
+            $sel = (($lineEdit['destacamos_id'] ?? '') === $val) ? ' selected' : '';
+            echo '<option value="' . e($val) . '"' . $sel . '>' . e($label) . '</option>';
+        }
+        echo '</select>';
+        echo '</div>';
+        field_textarea('notas', 'Notas', $lineEdit['notas'] ?? '', 4);
+        echo '<div class="full"><button class="btn-primary">Guardar línea</button>';
+        if ($lineEdit) {
+            echo ' <form method="post" class="inline-form" style="display:inline;" onsubmit="return confirm(\'¿Eliminar esta línea?\')">';
+            echo '<input type="hidden" name="action" value="delete_telefono">';
+            echo '<input type="hidden" name="id" value="' . e($lineEdit['id'] ?? '') . '">';
+            echo '<button class="btn-danger-mini">Eliminar</button>';
+            echo '</form>';
+        }
+        echo '</div>';
+        echo '</form>';
+        echo '</section>';
+
+        // ── Panel derecho: salud y estado ──
+        echo '<section class="panel">';
+        echo '<h2>Salud y estado</h2>';
         echo '<div class="toolbar" style="margin-bottom:12px;">';
         echo '<form method="post">';
         echo '<input type="hidden" name="action" value="comercial_check_lines_health">';
@@ -6490,6 +6543,8 @@ HTML;
         }
         echo '</tbody></table></div>';
         echo '</section>';
+
+        echo '</div>'; // cierra .cards.two
         return;
     }
 

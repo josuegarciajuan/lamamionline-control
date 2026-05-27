@@ -11,9 +11,9 @@
 
 ### FASE-2-UNIFICAR-CORE
 
-- [ ] T2.1 — Añadir formulario CRUD (crear/editar) en Comercial > Líneas (`app/comercial.php` L6355).
-- [ ] T2.2 — Cambiar redirects de `action_save_telefono()` y `action_delete_telefono()` a `comercial_page_url('lineas')`.
-- [ ] T2.3 — Actualizar versión de assets en `index.php`.
+- [x] T2.1 — Añadir formulario CRUD (crear/editar) en Comercial > Líneas (`app/comercial.php` L6413).
+- [x] T2.2 — Cambiar redirects de `action_save_telefono()` y `action_delete_telefono()` a `comercial_page_url('lineas')`.
+- [x] T2.3 — Actualizar versión de assets en `index.php`.
 
 ### FASE-3-ACTUALIZAR-RUTAS
 
