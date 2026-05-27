@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="assets/style.css?v=20260527_5">
-    <link rel="stylesheet" href="assets/theme.css?v=20260527_3">
+    <link rel="stylesheet" href="assets/theme.css?v=20260527_5">
 </head>
 <body class="page-<?= e($page) ?>" data-page="<?= e($page) ?>">
 <?php if ($page === 'login'): ?>

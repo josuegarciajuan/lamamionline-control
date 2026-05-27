@@ -406,3 +406,11 @@
 - [x] T7 — Cache-busting: `v=20260527_5`.
 - [x] T8 — Validación técnica: `php -l` OK en 4 archivos PHP.
 - [x] T9 — Documentación: changelog + contracts + tasks actualizados.
+
+### COM-INTEGRIDAD-F4 — Integridad del sistema
+
+- [x] T4.1 — Fortalecer `comercial_find_open_thread_for_inbound()`: priorizar hilos que pertenezcan a la línea receptora conocida y evitar cruce de procesos distintos para un mismo teléfono.
+- [x] T4.2 — Reset de `auto_turn_count` en `comercial_run_tick()`: añadir pasada que resetee el contador en hilos con `last_contact_at > 24h`, sin depender solo de mensajes entrantes.
+- [x] T4.3 — Validar `from_me` en webhook logs: cuando un mensaje entrante tiene `from_me=0` pero el `from` pertenece a una línea propia, loguear warning para detectar si WAHA reporta incorrectamente.
+- [x] T4.4 — Verificar delays humanos: confirmar que los parámetros de typing delay producen rangos realistas (3-17s) y documentar en comentarios.
+- [x] T4.5 — Bump versión en `index.php` para recarga de assets.

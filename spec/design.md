@@ -801,3 +801,32 @@ Mejorar la calidad de las respuestas generadas por IA dotándola de mayor contex
 ### Archivos impactados
 - `app/comercial.php` — 4 funciones modificadas + 1 nueva función
 - `index.php` — normalización de versión assets a `v=20260527_3`
+
+---
+
+## Diseño COM-INTEGRIDAD-F4 — Integridad del sistema
+
+### Objetivo de diseño
+Eliminar condiciones de carrera, edge cases no cubiertos y garantizar la robustez operativa del sistema comercial.
+
+### Decisiones de diseño
+
+#### 1. Fortalecimiento de búsqueda de hilos por línea
+- **Decisión**: Añadir `$fallbackSameLine` en `comercial_find_open_thread_for_inbound()` que prioriza hilos de la misma línea receptora. Excluir `autoresponder` de los fallbacks (igual que `discarded`).
+- **Justificación**: Antes, cuando llegaba un mensaje de un teléfono compartido entre dos procesos, el fallback podía devolver el hilo del proceso equivocado. Ahora la línea receptora tiene prioridad.
+
+#### 2. Mantenimiento de `auto_turn_count` en el tick
+- **Decisión**: Al inicio de `comercial_run_tick()`, recorrer todos los hilos y resetear `auto_turn_count = 0` en aquellos con `last_contact_at > 24h`.
+- **Justificación**: Antes el reset solo ocurría cuando llegaba un nuevo mensaje entrante. Si el cliente nunca más respondía, el contador quedaba congelado. Ahora el tick lo limpia proactivamente.
+
+#### 3. Detección de `from_me` incorrecto
+- **Decisión**: En `comercial_handle_webhook_http()`, tras parsear el payload, si `from_me=0` pero el remitente pertenece a una de nuestras líneas, loguear evento `webhook_from_me_mismatch`.
+- **Justificación**: Si WAHA no detecta correctamente mensajes enviados manualmente desde WhatsApp, el bot podría responder a sus propios mensajes. Este log permite diagnosticar el problema sin afectar el flujo.
+
+#### 4. Documentación de delays humanos
+- **Decisión**: Documentar en `comercial_default_settings()` el rango efectivo: pre-delay (1-3s) + typing (~2-12s según longitud) + jitter (0-2s) = ~3-17s total.
+- **Justificación**: Los parámetros ya son correctos; solo faltaba trazabilidad del rango efectivo.
+
+### Archivos impactados
+- `app/comercial.php` — 3 funciones modificadas
+- `index.php` — normalización assets a `v=20260527_5`

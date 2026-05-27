@@ -73,6 +73,7 @@ function comercial_default_settings() {
         'typing_min_sec' => 2,
         'typing_max_sec' => 12,
         'typing_jitter_sec' => 2,
+        // ── T4.4: rango efectivo de delay humano: pre (1-3s) + typing (~2-12s según longitud) + jitter (0-2s) = ~3-17s total ──
         'curl_timeout_sec' => 30,
         'global_daily_target' => 45,
         'ban_fail_streak_warning' => 3,
@@ -1699,6 +1700,7 @@ function comercial_find_open_thread_for_inbound($fromPhone, $toPhone = '', $line
 
     $fallbackMatched = null;
     $fallbackPhoneOnly = null;
+    $fallbackSameLine = null;
 
     foreach (comercial_get_threads() as $row) {
         if (!comercial_phone_matches((string)$row['target_phone'], $fromPhone)) continue;
@@ -1706,20 +1708,29 @@ function comercial_find_open_thread_for_inbound($fromPhone, $toPhone = '', $line
         if ($linePort !== '' && isset($lines[$row['line_id']]) && trim((string)($lines[$row['line_id']]['waha_port'] ?? '')) === $linePort) {
             return $row;
         }
-        // Si se conoce la línea receptora, el fallback sólo considera hilos de esa misma línea
-        if ($incomingLineId !== '' && trim((string)($row['line_id'] ?? '')) !== $incomingLineId) {
-            continue;
+        // ── T4.1: priorizar hilos de la misma línea receptora ──
+        // Si se conoce la línea receptora, el fallback principal es un hilo de esa misma línea.
+        if ($incomingLineId !== '' && trim((string)($row['line_id'] ?? '')) === $incomingLineId) {
+            if ($fallbackSameLine === null && !in_array((string)$row['stage'], array('discarded', 'autoresponder'), true) && (string)($row['status'] ?? 'open') === 'open') {
+                $fallbackSameLine = $row;
+            }
+            continue; // seguir buscando match exacto, pero ya tenemos candidato same-line
         }
-        if ($fallbackMatched === null && !in_array((string)$row['stage'], array('discarded'), true)) {
+        // Si NO se conoce la línea receptora, aplicar fallback genérico
+        if ($incomingLineId === '') {
+            if ($toPhone === '' && $linePort === '' && !in_array((string)$row['stage'], array('discarded', 'autoresponder'), true) && (string)($row['status'] ?? 'open') === 'open') {
+                return $row;
+            }
+        }
+        if ($fallbackMatched === null && !in_array((string)$row['stage'], array('discarded', 'autoresponder'), true)) {
             $fallbackMatched = $row;
         }
         if ($fallbackPhoneOnly === null && (string)($row['process_slug'] ?? '') !== 'inbound' && (string)($row['status'] ?? 'open') === 'open') {
             $fallbackPhoneOnly = $row;
         }
-        if ($toPhone === '' && $linePort === '' && !in_array((string)$row['stage'], array('discarded'), true) && (string)($row['status'] ?? 'open') === 'open') {
-            return $row;
-        }
     }
+    // ── T4.1: cadena de fallback con prioridad por línea ──
+    if ($fallbackSameLine) return $fallbackSameLine;
     if ($fallbackPhoneOnly) return $fallbackPhoneOnly;
     if ($fallbackMatched) return $fallbackMatched;
     return null;
@@ -2837,6 +2848,30 @@ function comercial_handle_webhook_http() {
         }
 
         comercial_webhook_log_append('received_parsed', $logContext);
+
+        // ── T4.3: validar from_me para detectar mensajes manuales no reportados ──
+        // Si WAHA no marca from_me=true pero el remitente es una de nuestras líneas,
+        // podría indicar que los mensajes manuales desde WhatsApp no se detectan bien.
+        if (empty($payload['from_me'])) {
+            $fromPhone = comercial_only_digits((string)($payload['from'] ?? ''));
+            if ($fromPhone !== '') {
+                $line = comercial_find_line_for_inbound($fromPhone, (string)($payload['port'] ?? ''));
+                if ($line) {
+                    comercial_event_append('webhook_from_me_mismatch', array(
+                        'from' => $fromPhone,
+                        'line_id' => (string)($line['id'] ?? ''),
+                        'line_name' => (string)($line['nombre'] ?? ''),
+                        'message_id' => $messageId,
+                        'text_preview' => voice_safe_substr(trim((string)($payload['text'] ?? '')), 0, 100),
+                    ));
+                    comercial_webhook_log_append('from_me_mismatch_warning', $logContext + array(
+                        'line_id' => (string)($line['id'] ?? ''),
+                        'line_name' => (string)($line['nombre'] ?? ''),
+                        'note' => 'WAHA did not set from_me=true for a message sent from our own line',
+                    ));
+                }
+            }
+        }
 
         $result = comercial_handle_inbound_message($payload);
 
@@ -4987,6 +5022,29 @@ function comercial_schedule_next_run($process, $lineState = null) {
 function comercial_run_tick($forceProcessId = '') {
     $results = array();
     comercial_refresh_lines_health(false);
+
+    // ── T4.2: reset de auto_turn_count en hilos inactivos > 24h ──
+    // Antes dependía solo de que llegara un nuevo mensaje entrante.
+    // Ahora el tick también limpia contadores obsoletos.
+    $threads = comercial_get_threads();
+    $threadsChanged = false;
+    foreach ($threads as $i => $thread) {
+        $lastContactAt = trim((string)($thread['last_contact_at'] ?? ''));
+        if ($lastContactAt !== '' && strtotime($lastContactAt) < (time() - 86400)) {
+            if ((int)($thread['auto_turn_count'] ?? 0) > 0) {
+                $threads[$i]['auto_turn_count'] = 0;
+                $threadsChanged = true;
+            }
+        }
+    }
+    if ($threadsChanged) {
+        comercial_save_threads($threads);
+        comercial_event_append('auto_turn_maintenance_reset', array(
+            'reset_at' => now_datetime(),
+            'threads_checked' => count($threads),
+        ));
+    }
+
     $processes = comercial_get_processes();
 
     foreach ($processes as $process) {

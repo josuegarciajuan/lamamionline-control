@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-05-27 · COM-INTEGRIDAD-F4 — Integridad del sistema
+
+### Cambios implementados (5 tareas)
+1. **Fortalecimiento de `find_open_thread_for_inbound()`** — Nuevo fallback `$fallbackSameLine` que prioriza hilos de la misma línea receptora. Exclusión de `autoresponder` en fallbacks. Cadena de prioridad: exact match → sameLine → phoneOnly → matched → null.
+2. **Reset de `auto_turn_count` en `run_tick()`** — Pasada de mantenimiento al inicio del tick que resetea `auto_turn_count = 0` en hilos con >24h de inactividad. Antes solo se reseteaba al recibir un nuevo mensaje entrante.
+3. **Validación `from_me` en webhook** — Nuevo check en `comercial_handle_webhook_http()`: si `from_me=0` pero el remitente es una línea propia, se loguea `webhook_from_me_mismatch` para diagnosticar si WAHA detecta correctamente mensajes manuales.
+4. **Documentación de delays humanos** — Comentario en `comercial_default_settings()` documentando rango efectivo: pre (1-3s) + typing (~2-12s) + jitter (0-2s) = ~3-17s total.
+5. **Normalización de assets** — `index.php`: style.css, theme.css y app.js unificados a `v=20260527_5`.
+
+### Archivos modificados
+- `app/comercial.php` — 3 funciones modificadas (+30 líneas)
+- `index.php` — normalización versión assets (1 línea)
+- `spec/tasks.md` — nueva fase COM-INTEGRIDAD-F4
+- `spec/design.md` — diseño integridad F4
+- `docs/changelog.md` — esta entrada
+
+### Seguridad
+- ✅ Sin hallazgos: cambios de control de flujo sin nueva superficie. Logging usa funciones seguras existentes. Reset loop O(n) sobre threads sin riesgo DoS.
+
+---
+
 ## 2026-05-27 — UNIFICACION-LINEAS-F1 (verificación-cruzada)
 
 ### Investigación completada
