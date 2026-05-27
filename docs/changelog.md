@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-05-27 · COM-NOTIFICACIONES-F2 — Notificaciones efectivas del bot comercial
+
+### Cambios implementados (5 tareas)
+1. **`notify_only_after_second_reply` activado** — Suprime avisos hasta que `replies_count >= 2`. La primera respuesta del receptor (típicamente curiosidad sin intención) no genera alerta. Evita fatiga de notificaciones.
+2. **Notificaciones para `qualified` con interés real** — `comercial_reply_aviso_is_high_value()` ahora considera `qualified` como high-value cuando el `intent_reason` contiene señales de intención (precio, "me interesa", "cuanto", "tarifa", `affirmative_interest`). Quien pregunta precio ahora genera alerta visible.
+3. **Límite de `conversation_max_defers` implementado** — Si `defer_count >= max_defers` (default: 2), se escala a gestión humana en lugar de otro defer. Corrige el bug donde `defer_count` crecía indefinidamente sin límite.
+4. **Supresión de notificaciones para auto-responders** — `comercial_create_reply_aviso()` retorna sin generar aviso cuando `classification === 'autoresponder'`. Consistencia con el handler que ya silencia estos contactos.
+5. **Bump de assets** — `index.php`: `v=20260527_2`.
+
+### Archivos modificados
+- `app/comercial.php` — 4 funciones modificadas (cambios ya aplicados en commit anterior)
+- `index.php` — bump de versión assets (ya aplicado)
+- `docs/changelog.md` — esta entrada
+
+---
+
 ## 2026-05-27 · COM-CLASIFICACION-F1 — Clasificación inteligente del bot comercial
 
 ### Cambios implementados (6 tareas)
