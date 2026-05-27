@@ -464,11 +464,11 @@
 
 ### COM-BALANCE-F2 — Core Algorithm
 
-- [ ] T2.1 — Reescribir `comercial_order_lines_for_process()`: déficit normalizado, sort ASC, tiebreaker con rotación legacy.
-- [ ] T2.2 — Reescribir `comercial_pick_line_for_process()` con misma lógica de déficit.
-- [ ] T2.3 — Modificar `comercial_register_last_send()` para encadenar `comercial_line_increment_daily_count()`.
-- [ ] T2.4 — En `comercial_send_process_message_with_fallback()`, incrementar contador de la línea que efectivamente envió.
-- [ ] T2.5 — Gate: si `effective_power_factor <= 0`, `deficit = PHP_INT_MAX`.
+- [x] T2.1 — Reescribir `comercial_order_lines_for_process()`: déficit normalizado, sort ASC, tiebreaker con rotación legacy.
+- [x] T2.2 — Reescribir `comercial_pick_line_for_process()` con misma lógica de déficit.
+- [x] T2.3 — Modificar `comercial_register_last_send()` para encadenar `comercial_line_increment_daily_count()`.
+- [x] T2.4 — En `comercial_send_process_message_with_fallback()`, incrementar contador de la línea que efectivamente envió.
+- [x] T2.5 — Gate: si `effective_power_factor <= 0`, `deficit = PHP_INT_MAX`.
 
 ### COM-BALANCE-F3 — Integration & Verification
 

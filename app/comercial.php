@@ -1347,6 +1347,8 @@ function comercial_save_runtime_state($state) {
 }
 
 function comercial_register_last_send($lineId, $targetPhone) {
+    // COM-BALANCE-F2: incrementar contador diario de la línea que efectivamente envió
+    comercial_line_increment_daily_count(trim((string)$lineId));
     return comercial_save_runtime_state(array(
         'last_sent_line_id' => trim((string)$lineId),
         'last_sent_target_phone' => comercial_only_digits((string)$targetPhone),
@@ -3865,46 +3867,59 @@ function comercial_pick_line_for_process($process) {
     }
     if (empty($candidates)) return null;
 
-    $last = trim((string)($process['last_line_id'] ?? ''));
-    $ordered = $candidates;
+    // COM-BALANCE-F2: min-deficit-first ponderado por power factor
+    if (count($candidates) <= 1) {
+        return $candidates[0];
+    }
 
-    if ($last !== '') {
-        $ordered = array();
-        $found = false;
-        foreach ($candidates as $row) {
-            if ($found) {
-                $ordered[] = $row;
-            }
-            if ((string)$row['id'] === $last) {
-                $found = true;
-            }
+    $counts = comercial_line_get_daily_counts_map(array_column($candidates, 'id'));
+    $lastId = trim((string)($process['last_line_id'] ?? ''));
+
+    // Calcular déficit y asignar prioridad a cada candidata
+    $scored = array();
+    foreach ($candidates as $i => $line) {
+        $lineId = (string)$line['id'];
+        $count = isset($counts[$lineId]) ? (int)$counts[$lineId] : 0;
+        $power = isset($line['comercial_state']['effective_power_factor'])
+            ? (float)$line['comercial_state']['effective_power_factor']
+            : 1.0;
+        $deficit = ($power > 0) ? ($count / $power) : PHP_INT_MAX;
+        $scored[] = array(
+            'line' => $line,
+            'deficit' => $deficit,
+            'idx' => $i,
+        );
+    }
+
+    // Ordenar por déficit ASC; empate → rotación legacy por process.last_line_id
+    usort($scored, function ($a, $b) use ($lastId) {
+        if (abs($a['deficit'] - $b['deficit']) > 0.0001) {
+            return ($a['deficit'] < $b['deficit']) ? -1 : 1;
         }
-        foreach ($candidates as $row) {
-            if ((string)$row['id'] === $last) {
-                break;
+        // Tiebreaker: siguiente después de lastId
+        $aIsLast = ((string)($a['line']['id'] ?? '') === $lastId);
+        $bIsLast = ((string)($b['line']['id'] ?? '') === $lastId);
+        if ($aIsLast && !$bIsLast) return 1;
+        if ($bIsLast && !$aIsLast) return -1;
+        // Orden original como último desempate
+        return $a['idx'] - $b['idx'];
+    });
+
+    // Anti-monopolio suave: si la ganadora es la global-last-line y hay otra con mismo déficit, rotar
+    if (count($scored) > 1) {
+        $runtime = comercial_get_runtime_state();
+        $globalLastLineId = trim((string)($runtime['last_sent_line_id'] ?? ''));
+        if ($globalLastLineId !== '' && (string)($scored[0]['line']['id'] ?? '') === $globalLastLineId) {
+            if (abs($scored[0]['deficit'] - $scored[1]['deficit']) < 0.0001) {
+                $rotated = $scored[0];
+                unset($scored[0]);
+                $scored[] = $rotated;
+                $scored = array_values($scored);
             }
-            $ordered[] = $row;
-        }
-        if (empty($ordered)) {
-            $ordered = $candidates;
         }
     }
 
-    if (count($ordered) <= 1) {
-        return $ordered[0];
-    }
-
-    $runtime = comercial_get_runtime_state();
-    $globalLastLineId = trim((string)($runtime['last_sent_line_id'] ?? ''));
-    if ($globalLastLineId !== '' && (string)($ordered[0]['id'] ?? '') === $globalLastLineId) {
-        foreach ($ordered as $row) {
-            if ((string)($row['id'] ?? '') !== $globalLastLineId) {
-                return $row;
-            }
-        }
-    }
-
-    return $ordered[0];
+    return $scored[0]['line'];
 }
 
 function comercial_order_lines_for_process($process, $forceHealthCheck = false) {
@@ -3924,48 +3939,57 @@ function comercial_order_lines_for_process($process, $forceHealthCheck = false) 
     }
     if (empty($candidates)) return array();
 
-    $last = trim((string)($process['last_line_id'] ?? ''));
-    $ordered = $candidates;
-
-    if ($last !== '') {
-        $ordered = array();
-        $found = false;
-        foreach ($candidates as $row) {
-            if ($found) {
-                $ordered[] = $row;
-            }
-            if ((string)$row['id'] === $last) {
-                $found = true;
-            }
-        }
-        foreach ($candidates as $row) {
-            if ((string)$row['id'] === $last) {
-                break;
-            }
-            $ordered[] = $row;
-        }
-        if (empty($ordered)) {
-            $ordered = $candidates;
-        }
+    // COM-BALANCE-F2: min-deficit-first ponderado por power factor
+    if (count($candidates) <= 1) {
+        return array_values($candidates);
     }
 
-    if (count($ordered) > 1) {
+    $counts = comercial_line_get_daily_counts_map(array_column($candidates, 'id'));
+    $lastId = trim((string)($process['last_line_id'] ?? ''));
+
+    // Calcular déficit y asignar prioridad a cada candidata
+    $scored = array();
+    foreach ($candidates as $i => $line) {
+        $lineId = (string)$line['id'];
+        $count = isset($counts[$lineId]) ? (int)$counts[$lineId] : 0;
+        $power = isset($line['comercial_state']['effective_power_factor'])
+            ? (float)$line['comercial_state']['effective_power_factor']
+            : 1.0;
+        $deficit = ($power > 0) ? ($count / $power) : PHP_INT_MAX;
+        $scored[] = array(
+            'line' => $line,
+            'deficit' => $deficit,
+            'idx' => $i,
+        );
+    }
+
+    // Ordenar por déficit ASC; empate → rotación legacy
+    usort($scored, function ($a, $b) use ($lastId) {
+        if (abs($a['deficit'] - $b['deficit']) > 0.0001) {
+            return ($a['deficit'] < $b['deficit']) ? -1 : 1;
+        }
+        $aIsLast = ((string)($a['line']['id'] ?? '') === $lastId);
+        $bIsLast = ((string)($b['line']['id'] ?? '') === $lastId);
+        if ($aIsLast && !$bIsLast) return 1;
+        if ($bIsLast && !$aIsLast) return -1;
+        return $a['idx'] - $b['idx'];
+    });
+
+    // Anti-monopolio suave: si la primera es global-last-line y hay empate, rotar
+    if (count($scored) > 1) {
         $runtime = comercial_get_runtime_state();
         $globalLastLineId = trim((string)($runtime['last_sent_line_id'] ?? ''));
-        if ($globalLastLineId !== '' && (string)($ordered[0]['id'] ?? '') === $globalLastLineId) {
-            foreach ($ordered as $idx => $row) {
-                if ((string)($row['id'] ?? '') !== $globalLastLineId) {
-                    $picked = $row;
-                    unset($ordered[$idx]);
-                    array_unshift($ordered, $picked);
-                    $ordered = array_values($ordered);
-                    break;
-                }
+        if ($globalLastLineId !== '' && (string)($scored[0]['line']['id'] ?? '') === $globalLastLineId) {
+            if (abs($scored[0]['deficit'] - $scored[1]['deficit']) < 0.0001) {
+                $rotated = $scored[0];
+                unset($scored[0]);
+                $scored[] = $rotated;
+                $scored = array_values($scored);
             }
         }
     }
 
-    return array_values($ordered);
+    return array_values(array_map(function ($s) { return $s['line']; }, $scored));
 }
 
 function comercial_send_process_message_with_fallback($process, $targetPhone, $text, $options = array()) {

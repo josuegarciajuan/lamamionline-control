@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-05-27 — COM-BALANCE-F2 (core algorithm)
+
+### Cambiado
+- **Fase 2 del plan COM-BALANCE**: reescritura completa del algoritmo de selección de línea para balanceo ponderado por power factor.
+- `comercial_order_lines_for_process()`: sustituido el round-robin ingenuo por min-deficit-first. Calcula `deficit = daily_sent_count / effective_power_factor` para cada línea candidata, ordena por déficit ascendente, con tiebreaker de rotación legacy y anti-monopolio suave (si la ganadora es global-last-line con empate, rota).
+- `comercial_pick_line_for_process()`: misma lógica de déficit que `order_lines`.
+- `comercial_register_last_send()`: ahora encadena `comercial_line_increment_daily_count()` para actualizar el contador diario tras cada envío exitoso.
+- Gate `effective_power_factor <= 0`: asignación de `PHP_INT_MAX` como déficit (última prioridad) como red de seguridad ante estados corruptos.
+
+### Archivos modificados
+- `app/comercial.php` — 3 funciones reescritas, 0 funciones nuevas.
+
+### Validación
+- `php -l` OK.
+- Tests funcionales (6/6):
+  - T1: 2 líneas con distinto power → déficit menor primero ✓
+  - T2: Tras desbalance → línea con menor déficit gana ✓
+  - T3: Empate de déficit → tiebreaker por rotación ✓
+  - T4: 1 línea disponible → devuelve esa línea ✓
+  - T5: `pick_line_for_process` usa misma lógica ✓
+  - T6: Gate power=0 → PHP_INT_MAX (red de seguridad) ✓
+
+---
+
 ## 2026-05-27 — COM-BALANCE-F1 (data layer)
 
 ### Añadido
