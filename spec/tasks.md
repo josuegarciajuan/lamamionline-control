@@ -427,3 +427,16 @@
 - [x] T8 — Cache-busting: `v=20260527_6`.
 - [x] T9 — Validación técnica: `php -l` OK en 3 archivos.
 - [x] T10 — Documentación: changelog + contracts + tasks actualizados.
+
+---
+
+### MUNDOSEX-F6 — mundosex-fix (revisión y hardening)
+
+- [x] T1 — Revisión completa de `mundosex_browser.js`: login, formulario, fotos, save, Rocket Loader.
+- [x] T2 — Revisión completa de `mundosex.php`: mapping de campos, validación de payload, ejecución Node.
+- [x] T3 — Fix TinyMCE: selector `#tinymce` con fallback a `body` si no visible.
+- [x] T4 — Fix debug: guardar HTML de la página en `/tmp/` cuando falla el submit.
+- [x] T5 — Fix provincia: `dispatchEvent('change')` manual tras seleccionar provincia, timeouts separados.
+- [x] T6 — Fix warnings: incluir selector y valor en mensajes de error de campos.
+- [x] T7 — Validación técnica: `php -l mundosex.php` + `node -c mundosex_browser.js` OK.
+- [x] T8 — Documentación: changelog + tasks actualizados.

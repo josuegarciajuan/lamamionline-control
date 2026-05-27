@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-05-27 — MUNDOSEX-F6 (mundosex-fix)
+
+### Revisado y corregido
+- `subirPublicidad/mundosex_browser.js` — 4 correcciones de robustez:
+  - TinyMCE: fallback a `body` si `#tinymce` no visible.
+  - Debug: volcado HTML a `/tmp/mundosex_debug_*.html` en fallos de submit.
+  - Provincia: `dispatchEvent('change')` manual para forzar selProvList().
+  - Warnings: incluyen selector y valor para diagnóstico.
+- `subirPublicidad/mundosex.php` — revisado: mapping provincia/ciudad correcto, sin cambios necesarios.
+- 6 slots de fotos ya funcionando desde fase six-finals.
+
+### Modificado
+- `subirPublicidad/mundosex_browser.js` — 4 líneas corregidas.
+- `index.php` — cache-busting v=20260527_7.
+
+---
+
 ## 2026-05-27 — PUB-FOTOS-REALES-F4 (platform-photos)
 
 ### Añadido

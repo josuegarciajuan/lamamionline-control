@@ -195,18 +195,25 @@ async function main() {
           }
           touched++;
         } else {
-          result.warnings.push(warn(label + ' no visible: ' + selector));
+          result.warnings.push(warn(label + ' no visible (selector: ' + selector + ', valor: ' + String(value).substring(0, 50) + ')'));
         }
       } catch (e) {
-        result.warnings.push(warn('Error en ' + label + ': ' + e.message));
+        result.warnings.push(warn('Error en ' + label + ' (' + selector + '): ' + e.message));
       }
     };
 
-    if (fields.provincia) await setField('#id_provincia', fields.provincia, 'provincia');
+    if (fields.provincia) {
+      await setField('#id_provincia', fields.provincia, 'provincia');
+      // Disparar manualmente el onchange por si Rocket Loader no lo desbloqueó
+      try {
+        await page.locator('#id_provincia').dispatchEvent('change');
+        log('onchange disparado manualmente en provincia');
+      } catch (e) {}
+      await page.waitForTimeout(2000);
+    }
     if (fields.ciudad) {
       // El selector de provincia dispara selProvList() que rellena el dropdown de ciudad.
-      // Con Cloudflare Rocket Loader, el onchange puede tardar en ejecutarse.
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(1000);
       // Esperar a que el dropdown de ciudad tenga opciones reales (más allá del option "0")
       try {
         await page.waitForFunction(() => {
@@ -234,7 +241,12 @@ async function main() {
         } else {
           // TinyMCE iframe
           const frame = page.frameLocator('#descripcio_ifr');
-          const body = frame.locator('#tinymce');
+          // TinyMCE puede usar #tinymce o simplemente body
+          let body = frame.locator('#tinymce');
+          const bodyVisible = await body.isVisible({ timeout: 1000 }).catch(() => false);
+          if (!bodyVisible) {
+            body = frame.locator('body');
+          }
           await body.fill(fields.description);
           touched++;
         }
@@ -459,6 +471,14 @@ async function main() {
             result.warnings.push('Botón disabled pero sin confirmación explícita');
           } else {
             result.error = 'El formulario no se envió (posible error de validación o Rocket Loader). Revisa los campos: provincia, ciudad, título (min 10 chars, 5 letras), teléfono, condiciones.';
+            // Guardar HTML para debug
+            try {
+              const fs = require('fs');
+              const debugHtml = await page.content();
+              const debugFile = '/tmp/mundosex_debug_' + Date.now() + '.html';
+              fs.writeFileSync(debugFile, debugHtml);
+              result.warnings.push('Debug HTML guardado en ' + debugFile);
+            } catch (e) {}
           }
         } else {
           result.error = 'Redirigido inesperadamente a: ' + page.url();
