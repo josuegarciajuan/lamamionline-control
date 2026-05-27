@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-05-27 — COM-BALANCE-F3 (integration & verification)
+
+### Integrado
+- **Fase 3 del plan COM-BALANCE**: cableado final del algoritmo de balanceo y validación completa.
+- `comercial_run_tick()`: ahora invoca `comercial_reset_daily_counts_if_new_day()` al inicio de cada tick, antes de iterar procesos. Los contadores diarios se resetean automáticamente al cambiar de día.
+- Verificado que envío manual desde UI (`action_comercial_run_tick`) y cron (`cron_comercial.php`) comparten el mismo `comercial_run_tick()` → mismo algoritmo de balanceo.
+- `index.php` — bump versión assets a `v=20260527_10` (css + js).
+
+### Validación (8/8)
+- T1: `reset_daily_counts_if_new_day()` no resetea mismo día ✓
+- T2: `reset_daily_counts_if_new_day()` resetea al cambiar de día (25→0, 10→0) ✓
+- T3: Simulación 75 envíos, 5 procesos, 2 líneas (power 1.0 y 0.5) → 50/25 (ratio exacto 2.0) ✓
+- T4: 0 líneas available → array vacío ✓
+- T5: 1 línea available → única candidata ✓
+- T6: Línea nueva sin estado → defaults correctos ✓
+- T7: Manual UI y cron comparten mismo entrypoint ✓
+- T8: Regresión: power factor, status y health_status intactos ✓
+
+### Archivos modificados
+- `app/comercial.php` — 1 línea añadida (reset call en `comercial_run_tick`)
+- `index.php` — bump versión assets
+
+### El sistema COM-BALANCE está completo y funcional
+Todas las fases core (F0-F3) implementadas. F4 (UI) es opcional para futura iteración.
+
+---
+
 ## 2026-05-27 — COM-BALANCE-F2 (core algorithm)
 
 ### Cambiado

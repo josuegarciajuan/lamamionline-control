@@ -472,11 +472,11 @@
 
 ### COM-BALANCE-F3 — Integration & Verification
 
-- [ ] T3.1 — Cablear reset diario al inicio de `comercial_run_tick()`.
-- [ ] T3.2 — Verificar que envío manual desde UI usa mismo algoritmo de balanceo.
-- [ ] T3.3 — Validar edge cases: 1 línea, 0 líneas, cambio día, power 0, línea nueva.
-- [ ] T3.4 — Simular reparto: 5 procesos, 2 líneas (power 1.0 y 0.5) → verificar proporción ~2:1.
-- [ ] T3.5 — Bump versión en `index.php` para recarga de assets.
+- [x] T3.1 — Cablear reset diario al inicio de `comercial_run_tick()`.
+- [x] T3.2 — Verificar que envío manual desde UI usa mismo algoritmo de balanceo.
+- [x] T3.3 — Validar edge cases: 1 línea, 0 líneas, cambio día, power 0, línea nueva.
+- [x] T3.4 — Simular reparto: 5 procesos, 2 líneas (power 1.0 y 0.5) → verificar proporción ~2:1.
+- [x] T3.5 — Bump versión en `index.php` para recarga de assets.
 
 ### COM-BALANCE-F4 — UI & Monitoring (opcional)
 

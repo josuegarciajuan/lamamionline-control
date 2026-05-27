@@ -5142,6 +5142,9 @@ function comercial_run_tick($forceProcessId = '') {
     $results = array();
     comercial_refresh_lines_health(false);
 
+    // ── COM-BALANCE-F3: reset de contadores diarios al cambiar de día ──
+    comercial_reset_daily_counts_if_new_day();
+
     // ── T4.2: reset de auto_turn_count en hilos inactivos > 24h ──
     // Antes dependía solo de que llegara un nuevo mensaje entrante.
     // Ahora el tick también limpia contadores obsoletos.
