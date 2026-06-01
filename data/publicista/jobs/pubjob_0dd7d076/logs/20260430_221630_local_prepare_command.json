@@ -1,8 +1,0 @@
-{
-    "ok": true,
-    "exit_code": 0,
-    "stdout": "{\"ok\": true, \"input_path\": \"/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_0dd7d076/original/source_original.jpg\", \"original_width\": 1152, \"original_height\": 1325, \"square_size\": 1024, \"preview_size\": 320, \"placed_image\": {\"x\": 67, \"y\": 0, \"w\": 890, \"h\": 1024}, \"scale\": 0.7728301886792452, \"transparent_padding\": true, \"face_detected\": false, \"face_blur_applied\": false, \"output_square\": \"/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_0dd7d076/original/source_square_canvas.png\", \"output_preview\": \"/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_0dd7d076/original/source_preview.jpg\", \"warnings\": [\"Preparación 1:1 sin deformar: la imagen original se mantiene intacta y se centra sobre un lienzo cuadrado.\", \"No se ha aplicado detección facial ni blur automático en esta preparación local.\"]}",
-    "stderr": "",
-    "command": "python3 '/var/www/html/atupuerta/control/tools/publicista_image_worker.py' prepare-source --input '/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_0dd7d076/original/source_original.jpg' --output-json '/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_0dd7d076/meta/local_prepare_result.json' --output-square '/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_0dd7d076/original/source_square_canvas.png' --output-preview '/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_0dd7d076/original/source_preview.jpg' --preview-size 320 --square-size 1024",
-    "timed_out": false
-}

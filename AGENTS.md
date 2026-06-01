@@ -42,6 +42,26 @@ Ambas rutas apuntan al mismo código.
 - No modificar configuraciones globales del servidor sin confirmación.
 - No tocar `/etc`, `/root`, `/var/www/html` fuera de este proyecto ni servicios del sistema salvo que se pida expresamente.
 
+## ⛔ Protección de datos de producción
+
+Los archivos en `data/` contienen los datos de producción (ingresos, leads, clientas, campañas...).
+**NO están en git** (están en `.gitignore`). Viven solo en el working tree.
+
+**Operaciones PROHIBIDAS** (machacan datos de producción):
+- `git stash` → internamente hace `git reset --hard HEAD`
+- `git reset --hard`
+- `git checkout -- data/`
+- `git restore data/`
+- `git clean -fd data/`
+
+**Qué hacer en su lugar:**
+- Para guardar trabajo en progreso: commit normal en una rama
+- Para limpiar el working tree: solo tocar archivos de código (fuera de `data/`)
+- Ante cualquier duda sobre si una operación toca `data/`, consultar primero
+
+Si accidentalmente se pierden datos, el stash de git (`git stash list`) puede contener
+una copia de emergencia (el stash se crea automáticamente antes del reset).
+
 ## Comandos útiles
 
 ```bash

@@ -1,8 +1,0 @@
-{
-    "ok": true,
-    "exit_code": 0,
-    "stdout": "{\"ok\": true, \"input_path\": \"/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_32e02c49/candidates/pollo_batch_03.jpg\", \"original_width\": 2048, \"original_height\": 2048, \"square_size\": 1024, \"preview_size\": 320, \"placed_image\": {\"x\": 0, \"y\": 0, \"w\": 1024, \"h\": 1024}, \"scale\": 0.5, \"transparent_padding\": false, \"face_detected\": false, \"face_blur_applied\": false, \"output_square\": \"/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_32e02c49/candidates/candidate_03_square.jpg\", \"output_preview\": \"/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_32e02c49/candidates/candidate_03_preview.jpg\", \"warnings\": [\"Preparación 1:1 sin deformar: la imagen original se mantiene intacta y se centra sobre un lienzo cuadrado.\", \"No se ha aplicado detección facial ni blur automático en esta preparación local.\"]}",
-    "stderr": "",
-    "command": "python3 '/var/www/html/atupuerta/control/tools/publicista_image_worker.py' prepare-source --input '/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_32e02c49/candidates/pollo_batch_03.jpg' --output-json '/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_32e02c49/meta/candidate_03_local_result.json' --output-square '/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_32e02c49/candidates/candidate_03_square.jpg' --output-preview '/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_32e02c49/candidates/candidate_03_preview.jpg' --preview-size 320 --square-size 1024",
-    "timed_out": false
-}

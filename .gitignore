@@ -1,0 +1,20 @@
+# ── Datos de producción ── NO TRACKEAR EN GIT ──
+# Los datos viven solo en el working tree. Cualquier git reset --hard,
+# stash o checkout los machacaría. El stash de emergencia se crea
+# automáticamente, pero la prevención real es no trackearlos.
+/data/*
+!/data/.gitkeep
+
+# Directorio template vacío (redundante con data/; DATA_PATH en bootstrap.php apunta a data/)
+/DATA_PATH/*
+
+# ── Dependencias ──
+node_modules/
+
+# ── Logs ──
+*.log
+!data/comercial_events.jsonl
+
+# ── Archivos de sistema ──
+.DS_Store
+Thumbs.db

@@ -1,9 +1,0 @@
-{
-    "lead_default_price": 10,
-    "brand": "LaMami CRM",
-    "voice_ai_model": "gpt-5.1",
-    "whitelist_ips": [
-        "84.125.78.95",
-        "79.116.229.72"
-    ]
-}

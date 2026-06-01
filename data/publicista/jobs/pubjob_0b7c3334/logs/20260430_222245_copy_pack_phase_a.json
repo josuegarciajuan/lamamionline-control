@@ -1,6 +1,0 @@
-{
-    "ok": false,
-    "http_code": 429,
-    "error": "We're currently processing too many requests — please try again later.",
-    "request_id": "req_90cedeee22604d2e8ffaa11daec21071"
-}

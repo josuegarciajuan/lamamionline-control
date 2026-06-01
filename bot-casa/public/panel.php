@@ -720,6 +720,7 @@ function getTelefonosLines(): array
             'uso'       => (string) ($t['uso'] ?? ''),
             'waha_port' => (string) ($t['waha_port'] ?? ''),
             'waha'      => (string) ($t['waha'] ?? ''),
+            'notas'     => (string) ($t['notas'] ?? ''),
         ];
     }
 
@@ -878,13 +879,14 @@ function renderRoutingLines(array $lines): string
         $enabled = (bool) ($line['enabled'] ?? true);
         $chk     = $enabled ? 'checked' : '';
 
+        $notas  = h((string) ($line['notas'] ?? ''));
         $html .= <<<ROW
         <tr class="routing-row">
             <td><input type="text" name="routing[lines][{$idx}][last9]" value="{$last9}" placeholder="Últimos 9 dígitos" class="input-cell"></td>
             <td><input type="number" name="routing[lines][{$idx}][port]" value="{$port}" placeholder="3000" class="input-cell" style="width:80px"></td>
             <td><input type="text" name="routing[lines][{$idx}][label]" value="{$label}" placeholder="linea_3000" class="input-cell"></td>
             <td style="text-align:center"><input type="hidden" name="routing[lines][{$idx}][enabled]" value="0"><input type="checkbox" name="routing[lines][{$idx}][enabled]" value="1" {$chk}></td>
-            <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">X</button></td>
+            <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">X</button><input type="hidden" name="routing[lines][{$idx}][notas]" value="{$notas}"></td>
         </tr>
         ROW;
     }
@@ -2691,6 +2693,7 @@ function addRoutingRowFromSelector() {
     var idx = routingRowCount;
     routingRowCount++;
 
+    var notas  = line.notas || '';
     var tr = document.createElement('tr');
     tr.className = 'routing-row';
     tr.innerHTML = [
@@ -2698,7 +2701,7 @@ function addRoutingRowFromSelector() {
         '<td><input type="number" name="routing[lines][' + idx + '][port]" value="' + escHtml(port) + '" placeholder="3000" class="input-cell" style="width:80px"></td>',
         '<td><input type="text" name="routing[lines][' + idx + '][label]" value="' + escHtml(lbl) + '" placeholder="linea_3000" class="input-cell"></td>',
         '<td style="text-align:center"><input type="hidden" name="routing[lines][' + idx + '][enabled]" value="0"><input type="checkbox" name="routing[lines][' + idx + '][enabled]" value="1" checked></td>',
-        '<td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove()">X</button></td>'
+        '<td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove()">X</button><input type="hidden" name="routing[lines][' + idx + '][notas]" value="' + escHtml(notas) + '"></td>'
     ].join('');
     tbody.appendChild(tr);
 

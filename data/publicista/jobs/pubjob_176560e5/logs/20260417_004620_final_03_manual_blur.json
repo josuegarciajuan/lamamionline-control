@@ -1,8 +1,0 @@
-{
-    "ok": true,
-    "exit_code": 0,
-    "stdout": "{\"ok\": true, \"input_path\": \"/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_176560e5/finals/final_03_square.jpg\", \"manual_blur\": true, \"bx\": 0.439742, \"by\": 0.09151, \"bw\": 0.067432, \"bh\": 0.13, \"intensity\": 20.0, \"bx_px\": 450, \"by_px\": 93, \"bw_px\": 69, \"bh_px\": 133, \"output_face_blur\": \"/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_176560e5/finals/final_03_manual_blur.jpg\", \"output_preview\": \"/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_176560e5/finals/final_03_manual_blur_preview.jpg\"}",
-    "stderr": "",
-    "command": "python3 '/var/www/html/atupuerta/control/tools/publicista_image_worker.py' apply-manual-blur --input '/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_176560e5/finals/final_03_square.jpg' --output-face-blur '/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_176560e5/finals/final_03_manual_blur.jpg' --output-preview '/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_176560e5/finals/final_03_manual_blur_preview.jpg' --output-json '/var/www/html/atupuerta/control/data/publicista/jobs/pubjob_176560e5/meta/final_03_manual_blur_result.json' --bx '0.439742' --by '0.09151' --bw '0.067432' --bh '0.13' --intensity '20' --preview-size 320",
-    "timed_out": false
-}

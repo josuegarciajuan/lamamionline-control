@@ -166,6 +166,10 @@ final class ImageSplitter implements PipelineStageInterface
         if (preg_match('#//(?:i\.)?imgur\.com#', $url)) {
             return true;
         }
+        // OG-image shortlink hosts (compartir.site) — WhatsApp link preview
+        if (preg_match('#//(?:[^/]*\.)?compartir\.site/#i', $url)) {
+            return true;
+        }
         return false;
     }
 }
