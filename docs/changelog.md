@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-06-01 — COM-LINEAS-UI-F2 (verificación y cierre)
+
+### Verificado
+- **Fase 2 de COM-LINEAS-UI**: verificación completa de la implementación.
+- `php -l app/comercial.php`: PASS
+- `php -l index.php`: PASS
+- Selectores JS: 18/18 verificados en el HTML generado (modal, form, toolbar, tabla, acciones).
+- Campos del formulario modal: 9/9 presentes (nombre, tfono, uso, pin, compania, waha_port, waha, destacamos_id, notas).
+- Acciones POST: 4/4 conservadas (save_telefono, delete_telefono, save_comercial_line_state, comercial_check_lines_health).
+- Cache versions: `style.css?v=20260601_1`, `theme.css?v=20260601_1`, `app.js?v=20260601_1` ✅.
+- Seguridad: sin XSS (todo con `e()`), sin secretos expuestos, sin nuevos vectores.
+- `node -c assets/app.js`: PASS (sintaxis JS).
+
+### CIERRE TOTAL DEL PROYECTO COM-LINEAS-UI
+Todas las fases (F0, F1, F2) completadas. La sección Comercial-Líneas ahora tiene:
+- Tabla unificada full-width de 8 columnas (eliminada duplicación)
+- Modal emergente para crear/editar líneas
+- Búsqueda unificada
+- Tema oscuro coherente
+
+---
+
 ## 2026-06-01 — COM-LINEAS-UI-F1 (implementación)
 
 ### Implementado

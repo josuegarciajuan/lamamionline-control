@@ -538,15 +538,17 @@
    - `#lineas-unified-search`: `background: var(--input-bg)`, `color: var(--text-color)`, `border: 1px solid var(--border-color)`.
 
 ### COM-LINEAS-UI-F2 — Verificación
-- [ ] T2.1 — `php -l` en archivos modificados: `app/comercial.php`, `index.php`.
-- [ ] T2.2 — Verificar selectores JS no rotos:
+- [x] T2.1 — `php -l` en archivos modificados: `app/comercial.php`, `index.php`.
+- [x] T2.2 — Verificar selectores JS no rotos:
   - `#lineasModalOverlay` existe en el DOM.
   - `#lineaForm` existe y contiene todos los campos esperados (`[name="nombre"]`, `[name="tfono"]`, etc.).
   - `.btn-lineas-edit` presente en cada fila.
   - `#lineas-unified-search` y `#lineasUnifiedTableBody` existen.
   - `#btnNuevaLinea`, `#btnGuardarLinea`, `#btnCancelarLinea`, `#btnModalClose` existen.
-- [ ] T2.3 — Bump versiones cache en `index.php`:
+- [x] T2.3 — Bump versiones cache en `index.php`:
   - `style.css?v=20260528_2` → `style.css?v=20260601_1`
   - `theme.css?v=20260528_1` → `theme.css?v=20260601_1`
   - `app.js?v=20260528_2` → `app.js?v=20260601_1`
-- [ ] T2.4 — Actualizar `docs/changelog.md` con entrada COM-LINEAS-UI.
+- [x] T2.4 — Actualizar `docs/changelog.md` con entrada COM-LINEAS-UI.
+
+**CIERRE TOTAL DEL PROYECTO COM-LINEAS-UI — todas las fases completadas.**
