@@ -1347,4 +1347,129 @@
             }
         });
     });
+
+    // ── Comercial > Líneas: búsqueda unificada ──
+    function initLineasUnifiedSearch() {
+        var searchInput = document.getElementById('lineas-unified-search');
+        if (!searchInput) return;
+        searchInput.addEventListener('input', function () {
+            var query = this.value.toLowerCase().trim();
+            var tbody = document.getElementById('lineasUnifiedTableBody');
+            if (!tbody) return;
+            var rows = tbody.querySelectorAll('tr');
+            for (var i = 0; i < rows.length; i++) {
+                if (query === '') {
+                    rows[i].style.display = '';
+                    continue;
+                }
+                var text = (rows[i].textContent || '').toLowerCase();
+                rows[i].style.display = text.indexOf(query) !== -1 ? '' : 'none';
+            }
+        });
+    }
+
+    // ── Comercial > Líneas: modal nueva/editar ──
+    function openLineasModal(lineData) {
+        var overlay = document.getElementById('lineasModalOverlay');
+        var form = document.getElementById('lineaForm');
+        var title = document.getElementById('lineaModalTitle');
+        var deleteBtn = document.getElementById('btnEliminarLinea');
+        var deleteId = document.querySelector('#deleteLineaForm [name="id"]');
+        if (!overlay || !form) return;
+
+        if (lineData) {
+            if (title) title.textContent = 'Ficha línea';
+            setModalField('id', lineData.id);
+            setModalField('nombre', lineData.nombre);
+            setModalField('tfono', lineData.tfono);
+            setModalField('uso', lineData.uso);
+            setModalField('pin', lineData.pin);
+            setModalField('compania', lineData.compania);
+            setModalField('waha_port', lineData.waha_port);
+            setModalField('waha', lineData.waha);
+            setModalField('destacamos_id', lineData.destacamos_id);
+            setModalField('notas', lineData.notas);
+            if (deleteBtn) deleteBtn.style.display = 'inline-block';
+            if (deleteId) deleteId.value = lineData.id || '';
+        } else {
+            if (title) title.textContent = 'Nueva línea';
+            form.reset();
+            var idField = form.querySelector('[name="id"]');
+            if (idField) idField.value = '';
+            if (deleteBtn) deleteBtn.style.display = 'none';
+            if (deleteId) deleteId.value = '';
+        }
+        overlay.style.display = 'flex';
+        document.body.classList.add('modal-open');
+    }
+
+    function closeLineasModal() {
+        var overlay = document.getElementById('lineasModalOverlay');
+        if (overlay) overlay.style.display = 'none';
+        document.body.classList.remove('modal-open');
+    }
+
+    function setModalField(name, value) {
+        var el = document.querySelector('#lineaForm [name="' + name + '"]');
+        if (el) {
+            el.value = (value === undefined || value === null) ? '' : value;
+        }
+    }
+
+    function initLineasModal() {
+        var btnNueva = document.getElementById('btnNuevaLinea');
+        if (btnNueva) {
+            btnNueva.addEventListener('click', function () { openLineasModal(null); });
+        }
+
+        var btnGuardar = document.getElementById('btnGuardarLinea');
+        if (btnGuardar) {
+            btnGuardar.addEventListener('click', function () {
+                var form = document.getElementById('lineaForm');
+                if (form) form.submit();
+            });
+        }
+
+        var btnCancelar = document.getElementById('btnCancelarLinea');
+        if (btnCancelar) {
+            btnCancelar.addEventListener('click', closeLineasModal);
+        }
+
+        var btnClose = document.getElementById('btnModalClose');
+        if (btnClose) {
+            btnClose.addEventListener('click', closeLineasModal);
+        }
+
+        var overlay = document.getElementById('lineasModalOverlay');
+        if (overlay) {
+            overlay.addEventListener('click', function (e) {
+                if (e.target === overlay) closeLineasModal();
+            });
+        }
+
+        document.addEventListener('keydown', function (e) {
+            var overlay = document.getElementById('lineasModalOverlay');
+            if (overlay && overlay.style.display === 'flex' && e.key === 'Escape') {
+                closeLineasModal();
+            }
+        });
+
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.btn-lineas-edit');
+            if (!btn) return;
+            e.preventDefault();
+            var tr = btn.closest('tr');
+            if (!tr) return;
+            var raw = tr.getAttribute('data-line');
+            if (!raw) return;
+            var lineData;
+            try { lineData = JSON.parse(raw); } catch (_) { return; }
+            openLineasModal(lineData);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        initLineasUnifiedSearch();
+        initLineasModal();
+    });
 })();

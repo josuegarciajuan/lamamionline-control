@@ -3051,3 +3051,185 @@ linear-gradient(180deg,#0b141a 0%,#0f1d22 100%)}
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* ===== COM-LINEAS-UI: Modal ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.modal-container {
+  background: var(--panel-bg, #1a2332);
+  border: 1px solid var(--border-color, #2d3f5a);
+  border-radius: 14px;
+  max-width: 620px;
+  width: 95%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  animation: modalSlideIn 0.2s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from { opacity: 0; transform: translateY(-16px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--border-color, #2d3f5a);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-bright, #e8eef8);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-muted, #667085);
+  padding: 0 4px;
+  transition: color 0.15s;
+}
+
+.modal-close:hover {
+  color: var(--text-bright, #e8eef8);
+}
+
+.modal-body {
+  padding: 20px 22px;
+}
+
+.modal-body .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.modal-body .form-grid .full {
+  grid-column: 1 / -1;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 22px 18px;
+  border-top: 1px solid var(--border-color, #2d3f5a);
+}
+
+body.modal-open {
+  overflow: hidden;
+}
+
+/* ===== COM-LINEAS-UI: Toolbar ===== */
+.lineas-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.lineas-toolbar .muted-small {
+  flex-basis: 100%;
+  margin-top: 2px;
+}
+
+/* ===== COM-LINEAS-UI: Tabla unificada ===== */
+.lineas-unified-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+}
+
+.lineas-unified-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--th-bg, #162033);
+  color: var(--text-muted, #8494a8);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 10px 8px;
+  text-align: left;
+  border-bottom: 2px solid var(--border-color, #2d3f5a);
+}
+
+.lineas-unified-table tbody td {
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(109, 140, 191, 0.12);
+  vertical-align: top;
+  color: var(--text-color, #c8d6e5);
+  word-break: break-word;
+}
+
+.lineas-unified-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.col-nombre   { width: 16%; }
+.col-uso      { width: 11%; }
+.col-waha     { width: 10%; }
+.col-check    { width: 12%; }
+.col-comercial{ width: 14%; }
+.col-procesos { width: 11%; }
+.col-ultimos  { width: 13%; }
+.col-acciones { width: 13%; }
+
+.lineas-unified-table .status-pill {
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.col-acciones .btn-secondary-mini {
+  font-size: 11px;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+/* ===== COM-LINEAS-UI: Responsive ===== */
+@media (max-width: 768px) {
+  .modal-container {
+    width: 98%;
+    max-height: 95vh;
+    border-radius: 10px;
+  }
+
+  .lineas-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .lineas-toolbar > * {
+    width: 100%;
+  }
+
+  .lineas-unified-table {
+    font-size: 11px;
+  }
+
+  .col-acciones .btn-secondary-mini {
+    font-size: 10px;
+    padding: 4px 6px;
+  }
+}
+

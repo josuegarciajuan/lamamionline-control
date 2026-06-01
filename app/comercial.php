@@ -6542,60 +6542,32 @@ HTML;
             $anunciosIndex[$an['id']] = $an;
         }
 
-        echo '<div class="cards two">';
-
-        // ── Panel izquierdo: formulario CRUD ──
+        // ── Toolbar ──
         echo '<section class="panel">';
-        echo '<h2>' . ($lineEdit ? 'Ficha línea' : 'Nueva línea') . '</h2>';
-        if ($lineEdit) {
-            echo '<div style="margin-bottom:8px;"><a class="btn-secondary-mini" href="' . e(comercial_page_url('lineas')) . '">Nueva línea</a></div>';
-        }
-        echo '<form method="post" class="form-grid">';
-        echo '<input type="hidden" name="action" value="save_telefono">';
-        echo '<input type="hidden" name="id" value="' . e($lineEdit['id'] ?? '') . '">';
-        field_input('nombre', 'Nombre', $lineEdit['nombre'] ?? '', true);
-        field_input('tfono', 'Tfono', $lineEdit['tfono'] ?? '', true);
-        field_input('uso', 'Uso', $lineEdit['uso'] ?? '');
-        field_input('pin', 'PIN', $lineEdit['pin'] ?? '');
-        field_input('compania', 'Compañía', $lineEdit['compania'] ?? '');
-        field_input('waha_port', 'WAHA Port', $lineEdit['waha_port'] ?? '');
-        field_input('waha', 'WAHA', $lineEdit['waha'] ?? '');
-        echo '<div class="field">';
-        echo '<label>Destacamos</label>';
-        echo '<select name="destacamos_id">';
-        echo '<option value="">Sin vincular</option>';
-        foreach ($anuncios as $an) {
-            $val = $an['id'] ?? '';
-            $label = trim(($an['url'] ?? '') . ' - ' . ($an['user'] ?? ''));
-            $sel = (($lineEdit['destacamos_id'] ?? '') === $val) ? ' selected' : '';
-            echo '<option value="' . e($val) . '"' . $sel . '>' . e($label) . '</option>';
-        }
-        echo '</select>';
-        echo '</div>';
-        field_textarea('notas', 'Notas', $lineEdit['notas'] ?? '', 4);
-        echo '<div class="full"><button class="btn-primary">Guardar línea</button>';
-        if ($lineEdit) {
-            echo ' <form method="post" class="inline-form" style="display:inline;" onsubmit="return confirm(\'¿Eliminar esta línea?\')">';
-            echo '<input type="hidden" name="action" value="delete_telefono">';
-            echo '<input type="hidden" name="id" value="' . e($lineEdit['id'] ?? '') . '">';
-            echo '<button class="btn-danger-mini">Eliminar</button>';
-            echo '</form>';
-        }
-        echo '</div>';
-        echo '</form>';
-        echo '</section>';
-
-        // ── Panel derecho: salud y estado ──
-        echo '<section class="panel">';
-        echo '<h2>Salud y estado</h2>';
-        echo '<div class="toolbar" style="margin-bottom:12px;">';
-        echo '<form method="post">';
+        echo '<div class="lineas-toolbar">';
+        echo '<button type="button" class="btn-primary" id="btnNuevaLinea">+ Nueva línea</button>';
+        echo '<form method="post" style="display:inline-block;">';
         echo '<input type="hidden" name="action" value="comercial_check_lines_health">';
         echo '<button type="submit" class="btn-primary">Comprobar WAHA ahora</button>';
         echo '</form>';
+        echo '<input type="text" id="lineas-unified-search" placeholder="Buscar línea..." class="field" style="width:100%;max-width:320px;" autocomplete="off">';
         echo '<div class="muted-small">El sistema refresca la salud de cada línea automáticamente dentro del tick comercial si han pasado aproximadamente 60 minutos desde la última comprobación.</div>';
         echo '</div>';
-        echo '<div class="table-wrap"><table><thead><tr><th>Línea</th><th>Puerto</th><th>Uso CRM</th><th>WAHA</th><th>Última comprobación</th><th>Estado comercial</th><th>Último éxito</th><th>Último error</th><th></th></tr></thead><tbody>';
+
+        // ── Tabla unificada ──
+        echo '<div class="table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto;">';
+        echo '<table class="lineas-unified-table">';
+        echo '<thead><tr>';
+        echo '<th class="col-nombre">Nombre / Teléfono</th>';
+        echo '<th class="col-uso">Uso / Puerto</th>';
+        echo '<th class="col-waha">WAHA</th>';
+        echo '<th class="col-check">Comprobación</th>';
+        echo '<th class="col-comercial">Estado Comercial</th>';
+        echo '<th class="col-procesos">Procesos</th>';
+        echo '<th class="col-ultimos">Último éxito / error</th>';
+        echo '<th class="col-acciones">Acciones</th>';
+        echo '</tr></thead>';
+        echo '<tbody id="lineasUnifiedTableBody">';
         foreach ($lines as $line) {
             $state = (array)($line['comercial_state'] ?? array());
             $status = trim((string)($state['status'] ?? 'active'));
@@ -6608,40 +6580,68 @@ HTML;
             $healthOkAt = trim((string)($state['last_health_ok_at'] ?? ''));
             $healthFailAt = trim((string)($state['last_health_failure_at'] ?? ''));
             $usage = implode(', ', (array)($line['comercial_usage'] ?? array()));
-            echo '<tr>';
-            echo '<td><strong>' . e((string)$line['nombre']) . '</strong><br>';
+
+            $lineEditData = json_encode(array(
+                'id'            => $line['id'] ?? '',
+                'nombre'        => $line['nombre'] ?? '',
+                'tfono'         => $line['tfono'] ?? '',
+                'uso'           => $line['uso'] ?? '',
+                'pin'           => $line['pin'] ?? '',
+                'compania'      => $line['compania'] ?? '',
+                'waha_port'     => $line['waha_port'] ?? '',
+                'waha'          => $line['waha'] ?? '',
+                'destacamos_id' => $line['destacamos_id'] ?? '',
+                'notas'         => $line['notas'] ?? '',
+            ), JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS);
+
+            echo '<tr data-line="' . e($lineEditData) . '">';
+
+            // Col 1: Nombre + Teléfono
+            echo '<td class="col-nombre"><strong>' . e((string)$line['nombre']) . '</strong><br>';
             crm_render_phone_value((string)($line['tfono'] ?? ''));
             echo '</td>';
-            echo '<td>' . e((string)($line['waha_port'] ?? '')) . '</td>';
-            echo '<td>' . e($usage !== '' ? $usage : '—') . '</td>';
-            echo '<td><span class="status-pill ' . e(comercial_line_health_css_class($healthStatus)) . '">' . e(comercial_line_health_label($healthStatus)) . '</span>';
+
+            // Col 2: Uso / Puerto WAHA
+            echo '<td class="col-uso"><span>' . e((string)($line['uso'] ?? '—')) . '</span><br><span class="muted-small">WAHA :' . e((string)($line['waha_port'] ?? '')) . '</span></td>';
+
+            // Col 3: Estado WAHA
+            echo '<td class="col-waha"><span class="status-pill ' . e(comercial_line_health_css_class($healthStatus)) . '">' . e(comercial_line_health_label($healthStatus)) . '</span>';
             if ($healthHttpCode > 0 || $healthSessionStatus !== '') {
                 echo '<br><span class="muted-small">';
-                if ($healthHttpCode > 0) {
-                    echo 'HTTP ' . e((string)$healthHttpCode);
-                }
-                if ($healthSessionStatus !== '') {
-                    echo ($healthHttpCode > 0 ? ' · ' : '') . 'sesión ' . e($healthSessionStatus);
-                }
+                if ($healthHttpCode > 0) echo 'HTTP ' . e((string)$healthHttpCode);
+                if ($healthSessionStatus !== '') echo ($healthHttpCode > 0 ? ' · ' : '') . 'sesión ' . e($healthSessionStatus);
                 echo '</span>';
             }
             echo '</td>';
-            echo '<td>' . e($healthCheckedAt !== '' ? $healthCheckedAt : '—');
+
+            // Col 4: Última comprobación
+            echo '<td class="col-check">' . e($healthCheckedAt !== '' ? $healthCheckedAt : '—');
             if ($healthOkAt !== '') {
                 echo '<br><span class="muted-small">último OK: ' . e($healthOkAt) . '</span>';
             } elseif ($healthFailAt !== '') {
                 echo '<br><span class="muted-small">último fallo: ' . e($healthFailAt) . '</span>';
             }
             echo '</td>';
-            echo '<td><span class="status-pill ' . e($cls) . '">' . e($status) . '</span><br><span class="muted-small">fails seguidos: ' . e((string)($state['consecutive_failures'] ?? 0)) . '</span><br><span class="muted-small">potencia: x' . e(number_format((float)($state['effective_power_factor'] ?? 1), 2, '.', '')) . ' · base x' . e(number_format((float)($state['adaptive_power_factor'] ?? 1), 2, '.', '')) . '</span></td>';
-            echo '<td>' . e((string)($state['last_success_at'] ?? '')) . '</td>';
-            echo '<td>';
-            echo e((string)($state['last_error'] ?? ''));
+
+            // Col 5: Estado Comercial
+            echo '<td class="col-comercial"><span class="status-pill ' . e($cls) . '">' . e($status) . '</span><br><span class="muted-small">fails: ' . e((string)($state['consecutive_failures'] ?? 0)) . '</span><br><span class="muted-small">potencia: x' . e(number_format((float)($state['effective_power_factor'] ?? 1), 2, '.', '')) . ' · base x' . e(number_format((float)($state['adaptive_power_factor'] ?? 1), 2, '.', '')) . '</span></td>';
+
+            // Col 6: Procesos asociados
+            echo '<td class="col-procesos">' . e($usage !== '' ? $usage : '—') . '</td>';
+
+            // Col 7: Último éxito / error
+            echo '<td class="col-ultimos">' . e((string)($state['last_success_at'] ?? ''));
+            if (!empty($state['last_error'])) {
+                echo '<br><span class="muted-small">error: ' . e((string)$state['last_error']) . '</span>';
+            }
             if ($healthError !== '') {
                 echo '<br><span class="muted-small">WAHA: ' . e($healthError) . '</span>';
             }
             echo '</td>';
-            echo '<td>';
+
+            // Col 8: Acciones
+            echo '<td class="col-acciones">';
+            echo '<button type="button" class="btn-secondary-mini btn-lineas-edit" style="margin-right:4px;margin-bottom:4px;">Editar</button><br>';
             echo '<form method="post" style="display:inline-block; margin-right:4px; margin-bottom:4px;">';
             echo '<input type="hidden" name="action" value="comercial_check_lines_health">';
             echo '<input type="hidden" name="line_id" value="' . e((string)$line['id']) . '">';
@@ -6664,9 +6664,54 @@ HTML;
             echo '</tr>';
         }
         echo '</tbody></table></div>';
+        if (empty($lines)) {
+            echo '<p class="muted-small" style="margin-top:12px;">No hay líneas todavía.</p>';
+        }
         echo '</section>';
 
-        echo '</div>'; // cierra .cards.two
+        // ── Modal para nueva/editar línea ──
+        echo '<div id="lineasModalOverlay" class="modal-overlay" style="display:none;">';
+        echo '<div class="modal-container">';
+        echo '<div class="modal-header">';
+        echo '<h2 id="lineaModalTitle">Nueva línea</h2>';
+        echo '<button type="button" class="modal-close" id="btnModalClose">&times;</button>';
+        echo '</div>';
+        echo '<div class="modal-body">';
+        echo '<form method="post" class="form-grid" id="lineaForm">';
+        echo '<input type="hidden" name="action" value="save_telefono">';
+        echo '<input type="hidden" name="id" value="">';
+        field_input('nombre', 'Nombre', '', true);
+        field_input('tfono', 'Tfono', '', true);
+        field_input('uso', 'Uso', '');
+        field_input('pin', 'PIN', '');
+        field_input('compania', 'Compañía', '');
+        field_input('waha_port', 'WAHA Port', '');
+        field_input('waha', 'WAHA', '');
+        echo '<div class="field">';
+        echo '<label>Destacamos</label>';
+        echo '<select name="destacamos_id">';
+        echo '<option value="">Sin vincular</option>';
+        foreach ($anuncios as $an) {
+            $val = $an['id'] ?? '';
+            $label = trim(($an['url'] ?? '') . ' - ' . ($an['user'] ?? ''));
+            echo '<option value="' . e($val) . '">' . e($label) . '</option>';
+        }
+        echo '</select>';
+        echo '</div>';
+        field_textarea('notas', 'Notas', '', 4);
+        echo '</form>';
+        echo '</div>';
+        echo '<div class="modal-footer">';
+        echo '<button type="button" class="btn-primary" id="btnGuardarLinea">Guardar línea</button>';
+        echo '<form method="post" id="deleteLineaForm" style="display:inline-block;" onsubmit="return confirm(\'¿Eliminar esta línea?\')">';
+        echo '<input type="hidden" name="action" value="delete_telefono">';
+        echo '<input type="hidden" name="id" value="">';
+        echo '<button type="submit" class="btn-danger-mini" id="btnEliminarLinea" style="display:none;">Eliminar</button>';
+        echo '</form>';
+        echo '<button type="button" class="btn-secondary" id="btnCancelarLinea">Cancelar</button>';
+        echo '</div>';
+        echo '</div>';
+        echo '</div>';
         return;
     }
 

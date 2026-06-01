@@ -495,47 +495,47 @@
 - [x] T0.4 — Tasks tracking en `spec/tasks.md` (§COM-LINEAS-UI)
 
 ### COM-LINEAS-UI-F1 — Implementación (4 tareas paralelas)
-- [ ] T1.1 — **PHP**: Reestructurar sección `lineas` en `app/comercial.php` (líneas 6536–6714):
-  - Eliminar wrapper `<div class="cards two">` y su cierre `</div>`.
-  - Eliminar el `<section class="panel">` del panel izquierdo (formulario CRUD siempre visible).
-  - Sustituir el `<section class="panel">` del panel derecho por una única sección con toolbar + tabla unificada.
-  - Merge de las dos tablas en una sola `<table class="lineas-unified-table">` con las 8 columnas definidas en el diseño.
-  - Mantener un solo `foreach ($lines as $line)`.
-  - Añadir HTML del modal (`#lineasModalOverlay`) al final de la sección (fuera del `<section class="panel">`).
-  - Añadir botón `#btnNuevaLinea` en la toolbar.
-  - Mantener intactos todos los formularios POST existentes (`save_telefono`, `delete_telefono`, `save_comercial_line_state`, `comercial_check_lines_health`).
+- [x] T1.1 — **PHP**: Reestructurar sección `lineas` en `app/comercial.php` (líneas 6536–6714):
+   - Eliminar wrapper `<div class="cards two">` y su cierre `</div>`.
+   - Eliminar el `<section class="panel">` del panel izquierdo (formulario CRUD siempre visible).
+   - Sustituir el `<section class="panel">` del panel derecho por una única sección con toolbar + tabla unificada.
+   - Merge de las dos tablas en una sola `<table class="lineas-unified-table">` con las 8 columnas definidas en el diseño.
+   - Mantener un solo `foreach ($lines as $line)`.
+   - Añadir HTML del modal (`#lineasModalOverlay`) al final de la sección (fuera del `<section class="panel">`).
+   - Añadir botón `#btnNuevaLinea` en la toolbar.
+   - Mantener intactos todos los formularios POST existentes (`save_telefono`, `delete_telefono`, `save_comercial_line_state`, `comercial_check_lines_health`).
 
-- [ ] T1.2 — **JS**: Refactorizar `assets/app.js`:
-  - Eliminar `initLineasSearch()` (L1807–1825).
-  - Eliminar `initLineasEdit()` (L1827–1888).
-  - Añadir `openLineasModal(lineData)`: rellenar formulario modal, mostrar overlay, añadir clase `modal-open`.
-  - Añadir `closeLineasModal()`: ocultar overlay, remover clase `modal-open`.
-  - Añadir `initLineasUnifiedSearch()`: listener en `#lineas-unified-search` para filtrar filas de `#lineasUnifiedTableBody`.
-  - Añadir event listeners en DOMContentLoaded: overlay click (cierre), Escape keydown (cierre), `.btn-lineas-edit` click (abrir modal con data-line), `#btnNuevaLinea` click (abrir modal vacío), `#btnGuardarLinea` click (submit form), `#btnCancelarLinea` click (cerrar modal), `#btnModalClose` click (cerrar modal).
-  - Actualizar llamada en DOMContentLoaded: `initLineasUnifiedSearch()` en lugar de `initLineasSearch()` + `initLineasEdit()`.
+- [x] T1.2 — **JS**: Refactorizar `assets/app.js`:
+   - Eliminar `initLineasSearch()` (L1807–1825).
+   - Eliminar `initLineasEdit()` (L1827–1888).
+   - Añadir `openLineasModal(lineData)`: rellenar formulario modal, mostrar overlay, añadir clase `modal-open`.
+   - Añadir `closeLineasModal()`: ocultar overlay, remover clase `modal-open`.
+   - Añadir `initLineasUnifiedSearch()`: listener en `#lineas-unified-search` para filtrar filas de `#lineasUnifiedTableBody`.
+   - Añadir event listeners en DOMContentLoaded: overlay click (cierre), Escape keydown (cierre), `.btn-lineas-edit` click (abrir modal con data-line), `#btnNuevaLinea` click (abrir modal vacío), `#btnGuardarLinea` click (submit form), `#btnCancelarLinea` click (cerrar modal), `#btnModalClose` click (cerrar modal).
+   - Actualizar llamada en DOMContentLoaded: `initLineasUnifiedSearch()` en lugar de `initLineasSearch()` + `initLineasEdit()`.
 
-- [ ] T1.3 — **CSS**: Añadir estilos en `assets/style.css`:
-  - `.modal-overlay`: fixed, inset 0, bg `rgba(0,0,0,0.7)`, z-index 1000, display flex, center items, hidden por defecto.
-  - `.modal-container`: bg var(--panel-bg), border-radius 8px, max-width 600px, width 95%, max-height 90vh, overflow-y auto, box-shadow.
-  - `.modal-header`: flex, space-between, padding, bottom border.
-  - `.modal-body`: padding, contiene `form.form-grid`.
-  - `.modal-footer`: flex, gap, padding, top border, justify-end.
-  - `.modal-close`: botón sin fondo, font-size 24px, cursor pointer.
-  - `body.modal-open`: overflow hidden.
-  - `.lineas-toolbar`: flex, gap, align-items center, margin-bottom, flex-wrap wrap.
-  - `.lineas-unified-table`: width 100%, font-size 13px, column widths (`.col-nombre`, `.col-uso`, `.col-waha`, `.col-check`, `.col-comercial`, `.col-procesos`, `.col-ultimos`, `.col-acciones`).
-  - Responsive: en `@media (max-width: 768px)`, `.modal-container` width 98%, `.lineas-toolbar` column direction, `.lineas-unified-table` font-size 11px.
+- [x] T1.3 — **CSS**: Añadir estilos en `assets/style.css`:
+   - `.modal-overlay`: fixed, inset 0, bg `rgba(0,0,0,0.7)`, z-index 1000, display flex, center items, hidden por defecto.
+   - `.modal-container`: bg var(--panel-bg), border-radius 8px, max-width 600px, width 95%, max-height 90vh, overflow-y auto, box-shadow.
+   - `.modal-header`: flex, space-between, padding, bottom border.
+   - `.modal-body`: padding, contiene `form.form-grid`.
+   - `.modal-footer`: flex, gap, padding, top border, justify-end.
+   - `.modal-close`: botón sin fondo, font-size 24px, cursor pointer.
+   - `body.modal-open`: overflow hidden.
+   - `.lineas-toolbar`: flex, gap, align-items center, margin-bottom, flex-wrap wrap.
+   - `.lineas-unified-table`: width 100%, font-size 13px, column widths (`.col-nombre`, `.col-uso`, `.col-waha`, `.col-check`, `.col-comercial`, `.col-procesos`, `.col-ultimos`, `.col-acciones`).
+   - Responsive: en `@media (max-width: 768px)`, `.modal-container` width 98%, `.lineas-toolbar` column direction, `.lineas-unified-table` font-size 11px.
 
-- [ ] T1.4 — **CSS Theme**: Añadir overrides tema oscuro en `assets/theme.css`:
-  - `.modal-overlay`: confirmar bg oscuro.
-  - `.modal-container`: `background: var(--panel-bg)`, `border: 1px solid var(--border-color)`, `color: var(--text-color)`.
-  - `.modal-header`: `border-bottom: 1px solid var(--border-color)`.
-  - `.modal-footer`: `border-top: 1px solid var(--border-color)`.
-  - `.lineas-unified-table th`: `background: var(--th-bg)`, `color: var(--text-muted)`.
-  - `.lineas-unified-table td`: `border-bottom: 1px solid var(--border-color)`.
-  - `.lineas-unified-table tr:hover td`: `background: var(--tr-hover-bg)`.
-  - `.modal-close`: `color: var(--text-muted)`, hover: `color: var(--text-color)`.
-  - `#lineas-unified-search`: `background: var(--input-bg)`, `color: var(--text-color)`, `border: 1px solid var(--border-color)`.
+- [x] T1.4 — **CSS Theme**: Añadir overrides tema oscuro en `assets/theme.css`:
+   - `.modal-overlay`: confirmar bg oscuro.
+   - `.modal-container`: `background: var(--panel-bg)`, `border: 1px solid var(--border-color)`, `color: var(--text-color)`.
+   - `.modal-header`: `border-bottom: 1px solid var(--border-color)`.
+   - `.modal-footer`: `border-top: 1px solid var(--border-color)`.
+   - `.lineas-unified-table th`: `background: var(--th-bg)`, `color: var(--text-muted)`.
+   - `.lineas-unified-table td`: `border-bottom: 1px solid var(--border-color)`.
+   - `.lineas-unified-table tr:hover td`: `background: var(--tr-hover-bg)`.
+   - `.modal-close`: `color: var(--text-muted)`, hover: `color: var(--text-color)`.
+   - `#lineas-unified-search`: `background: var(--input-bg)`, `color: var(--text-color)`, `border: 1px solid var(--border-color)`.
 
 ### COM-LINEAS-UI-F2 — Verificación
 - [ ] T2.1 — `php -l` en archivos modificados: `app/comercial.php`, `index.php`.

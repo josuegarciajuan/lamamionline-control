@@ -1,5 +1,46 @@
 # Changelog
 
+## 2026-06-01 — COM-LINEAS-UI-F1 (implementación)
+
+### Implementado
+- **Fase 1 del plan COM-LINEAS-UI**: reestructuración completa de la sección Cmercial > Líneas.
+
+#### PHP (`app/comercial.php`)
+- Eliminado el wrapper `.cards.two` y el panel izquierdo con formulario CRUD siempre visible.
+- Las 2 tablas duplicadas (`Listado de líneas` + `Salud y estado`) se fusionan en una sola tabla unificada de 8 columnas: Nombre/Teléfono, Uso/Puerto, WAHA, Comprobación, Estado Comercial, Procesos, Último éxito/error, Acciones.
+- Un solo `foreach` itera `$lines` (antes había 2).
+- Añadido modal `#lineasModalOverlay` con el formulario CRUD completo para crear/editar líneas.
+- Añadida toolbar superior con botón "+ Nueva línea", "Comprobar WAHA ahora" y campo de búsqueda unificado.
+- Todos los formularios POST existentes (`save_telefono`, `delete_telefono`, `save_comercial_line_state`, `comercial_check_lines_health`) conservan nombres de campos y URLs de redirección sin cambios.
+
+#### JS (`assets/app.js`)
+- Reemplazadas `initLineasSearch()` y `initLineasEdit()` por `initLineasUnifiedSearch()` (búsqueda unificada sobre `#lineasUnifiedTableBody`) y `initLineasModal()` (gestión completa del modal: abrir, cerrar, guardar, Escape, click fuera, editar vía `data-line`).
+- Funciones: `openLineasModal(lineData)`, `closeLineasModal()`, `setModalField(name, value)`.
+- Inicialización vía `DOMContentLoaded` (añadido al archivo que no lo tenía).
+
+#### CSS (`assets/style.css`)
+- Añadidos ~180 líneas: estilos `.modal-overlay`, `.modal-container`, `.modal-header/body/footer` con animación `modalSlideIn`.
+- Estilos `.lineas-toolbar` y `.lineas-unified-table` con 8 columnas de ancho fijo (`col-nombre`, `col-uso`, etc.).
+- `body.modal-open` bloquea scroll del fondo.
+- Responsive `@media (max-width: 768px)` para modal y tabla.
+
+#### CSS Theme (`assets/theme.css`)
+- Añadidos ~90 líneas: overrides de tema oscuro para `.modal-container` (gradiente + borde), `.lineas-unified-table` (cabeceras, bordes, hover), `#lineas-unified-search` (input con borde + focus ring), campos del formulario modal.
+- Limpieza de sección duplicada de un intento previo.
+
+### Archivos modificados
+- `app/comercial.php` — sección `lineas` reestructurada (~160 líneas reemplazadas)
+- `assets/app.js` — funciones lineas reemplazadas + DOMContentLoaded añadido (~120 líneas)
+- `assets/style.css` — +180 líneas CSS
+- `assets/theme.css` — +90 líneas CSS (neto tras limpieza de duplicado)
+- `index.php` — bump versiones cache: `style.css?v=20260601_1`, `theme.css?v=20260601_1`, `app.js?v=20260601_1`
+
+### Lint
+- `php -l app/comercial.php`: PASS
+- `php -l index.php`: PASS
+
+---
+
 ## 2026-06-01 — COM-LINEAS-UI-F0 (especificación)
 
 ### Spec creada
