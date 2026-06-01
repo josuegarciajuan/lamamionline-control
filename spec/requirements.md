@@ -101,3 +101,23 @@ Corregir el desequilibrio en el reparto de envíos de publicidad entre líneas W
 - Compatible con el sistema de power factor y autoregulación existente.
 - No modificar el comportamiento de otros módulos (publicista, avisos, etc.).
 - El balanceo debe operar exclusivamente sobre líneas disponibles (`comercial_line_is_available`).
+
+## COM-LINEAS-UI — Mejora de la sección Comercial > Líneas
+
+### Objetivo
+Mejorar la UI de la sección `Comercial > Líneas` del CRM eliminando la duplicación de listados (dos tablas iterando el mismo array `$lines`), liberando espacio horizontal ocupado por el formulario CRUD siempre visible, y convirtiendo el formulario en un modal emergente. El resultado debe ser una única tabla unificada a ancho completo con todas las columnas relevantes y un modal para crear/editar líneas.
+
+### Fases aprobadas
+1. **COM-LINEAS-UI-F0 — Especificación (Spec)**
+   - Formalizar requisitos, diseño, contratos y tracking de tareas.
+2. **COM-LINEAS-UI-F1 — Implementación**
+   - Reestructurar PHP en `app/comercial.php`, refactorizar JS en `assets/app.js`, añadir estilos CSS en `assets/style.css` y `assets/theme.css`.
+3. **COM-LINEAS-UI-F2 — Verificación**
+   - Lint PHP, validar selectores JS, bump de versiones cache en `index.php`, actualizar changelog.
+
+### Restricciones
+- Cambios mínimos y seguros.
+- Sin dependencias nuevas (sin librerías JS/CSS externas adicionales).
+- Mantener el estilo visual actual (tema oscuro).
+- No modificar el comportamiento de otros módulos (publicista, avisos, procesos, etc.).
+- Las acciones POST existentes (`save_telefono`, `delete_telefono`, `save_comercial_line_state`, `comercial_check_lines_health`) deben seguir funcionando exactamente igual (contrato de no regresión).

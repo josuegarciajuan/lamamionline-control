@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-06-01 — COM-LINEAS-UI-F0 (especificación)
+
+### Spec creada
+- **Fase 0 del plan COM-LINEAS-UI**: especificación completa de la mejora de la sección Cmercial > Líneas.
+- Objetivo: unificar las dos tablas duplicadas en una sola tabla full-width, mover el formulario CRUD a un modal emergente, liberar el 100% del ancho de pantalla para el listado.
+- Diagnóstico documentado de 4 problemas del estado actual (layout .cards.two, 2 tablas duplicadas, form siempre visible, buscador duplicado).
+- 6 decisiones de diseño formalizadas: modal popup, tabla unificada 8 columnas, eliminación wrapper .cards.two, buscador unificado, botón Nueva línea en toolbar, contrato de no regresión.
+
+### Archivos spec
+- `spec/requirements.md` — añadida sección `COM-LINEAS-UI` con objetivo, fases F0-F2 y restricciones.
+- `spec/design.md` — añadida sección `Diseño COM-LINEAS-UI` con diagnóstico, decisiones, pseudocódigo JS del modal, HTML esperado y tabla de archivos impactados.
+- `spec/contracts.md` — añadida sección `Contratos COM-LINEAS-UI` con 5 contratos: tabla unificada, modal CRUD, edición inline, búsqueda unificada, no regresión.
+- `spec/tasks.md` — añadida sección `COM-LINEAS-UI` con tracking de 12 tareas (F0 ✓4, F1 ◻4, F2 ◻4).
+
+### Próximos pasos
+- **F1 — Implementación**: 4 tareas paralelas (PHP, JS, CSS style, CSS theme).
+- **F2 — Verificación**: lint, selectores JS, bump cache, changelog.
+
+---
+
 ## 2026-05-27 — COM-BALANCE-F3 (integration & verification)
 
 ### Integrado

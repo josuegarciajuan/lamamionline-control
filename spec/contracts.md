@@ -852,3 +852,169 @@ La función hermana `comercial_pick_line_for_process($process)` DEBE aplicar la 
 3. Los procesos existentes NO DEBEN requerir reconfiguración manual.
 4. La UI de "Reparto diario y normalización" DEBE seguir funcionando (porcentajes por proceso).
 5. `comercial_line_is_available()` DEBE mantener su contrato actual (health + cooldown).
+
+## Contratos COM-LINEAS-UI — Mejora de la sección Comercial > Líneas
+
+### Contrato de tabla unificada
+
+La sección `Comercial > Líneas` (`tab=lineas`) DEBE renderizar **una sola tabla** con las siguientes características:
+
+#### Columnas fijas (8 columnas)
+1. **Nombre + Teléfono**: `$line['nombre']` en `<strong>` + `crm_render_phone_value($line['tfono'])`.
+2. **Uso / Puerto WAHA**: `$line['uso']` + `$line['waha_port']` en muted.
+3. **Estado WAHA**: `health_status` con `status-pill` + CSS class `comercial_line_health_css_class()`, más `health_http_code` y `health_session_status`.
+4. **Última comprobación**: `last_health_check_at` + `last_health_ok_at` / `last_health_fail_at`.
+5. **Estado Comercial**: `status` pill (active/paused/warning), `consecutive_failures`, `effective_power_factor`, `adaptive_power_factor`.
+6. **Procesos asociados**: `comercial_usage[]` unidos por coma. Si vacío: "—".
+7. **Último éxito / error**: `last_success_at`, `last_error`, `health_error` WAHA.
+8. **Acciones**: Botones Editar (`.btn-lineas-edit`), Test WAHA (form `comercial_check_lines_health` con `line_id`), Activar (form `save_comercial_line_state` con `status=active`), Pausar (form `save_comercial_line_state` con `status=paused`).
+
+#### Atributo data-line
+- Cada `<tr>` DEBE tener el atributo `data-line` con un JSON que contenga TODOS los campos editables de la línea:
+  ```json
+  {
+    "id": "...",
+    "nombre": "...",
+    "tfono": "...",
+    "uso": "...",
+    "pin": "...",
+    "compania": "...",
+    "waha_port": "...",
+    "waha": "...",
+    "destacamos_id": "...",
+    "notas": "..."
+  }
+  ```
+- El JSON DEBE escapar caracteres HTML con `JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS`.
+
+#### Contenedor HTML
+```html
+<section class="panel">
+    <div class="lineas-toolbar">
+        <button type="button" class="btn-primary" id="btnNuevaLinea">+ Nueva línea</button>
+        <form method="post" style="display:inline-block;">
+            <input type="hidden" name="action" value="comercial_check_lines_health">
+            <button type="submit" class="btn-primary">Comprobar WAHA ahora</button>
+        </form>
+        <input type="text" id="lineas-unified-search" placeholder="Buscar línea..." class="field" autocomplete="off">
+    </div>
+    <div class="table-wrap">
+        <table class="lineas-unified-table">
+            <thead>...</thead>
+            <tbody id="lineasUnifiedTableBody">
+                <!-- filas -->
+            </tbody>
+        </table>
+    </div>
+</section>
+```
+
+#### No duplicación
+- Solo DEBE haber **un bucle** `foreach ($lines as $line)` que genere las filas de la tabla.
+- No debe existir `render_live_filter()` ni el input `#lineas-search` antiguo; solo el input `#lineas-unified-search`.
+
+### Contrato de modal CRUD
+
+#### Estructura del modal
+El modal DEBE estar definido como HTML estático al final de la sección `lineas` (fuera del `<section class="panel">`):
+
+```html
+<div id="lineasModalOverlay" class="modal-overlay" style="display:none;">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h2 id="lineaModalTitle">Nueva línea</h2>
+            <button type="button" class="modal-close" id="btnModalClose">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form method="post" class="form-grid" id="lineaForm">
+                <input type="hidden" name="action" value="save_telefono">
+                <input type="hidden" name="id" value="">
+                <!-- campos: nombre, tfono, uso, pin, compania, waha_port, waha, destacamos_id, notas -->
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-primary" id="btnGuardarLinea">Guardar línea</button>
+            <form method="post" id="deleteLineaForm" style="display:none;" onsubmit="return confirm('¿Eliminar esta línea?')">
+                <input type="hidden" name="action" value="delete_telefono">
+                <input type="hidden" name="id" value="">
+                <button type="submit" class="btn-danger-mini" id="btnEliminarLinea">Eliminar</button>
+            </form>
+            <button type="button" class="btn-secondary" id="btnCancelarLinea">Cancelar</button>
+        </div>
+    </div>
+</div>
+```
+
+#### Comportamiento del modal
+1. **Apertura (nueva línea)**:
+   - Al hacer clic en `#btnNuevaLinea`, llamar `openLineasModal(null)`.
+   - Título: "Nueva línea".
+   - Formulario reseteado (`form.reset()`), campo `id` vacío.
+   - Botón Eliminar oculto.
+   - Overlay visible (`display:flex`), clase `modal-open` añadida a `<body>`.
+
+2. **Apertura (editar línea)**:
+   - Al hacer clic en `.btn-lineas-edit`, leer `data-line` del `<tr>` padre, parsear JSON, llamar `openLineasModal(lineData)`.
+   - Título: "Ficha línea".
+   - Todos los campos del formulario rellenos con los valores de `lineData`.
+   - Botón Eliminar visible con el ID correcto en el form de delete.
+
+3. **Cierre**:
+   - Click en `#btnCancelarLinea` → `closeLineasModal()`.
+   - Click en `#btnModalClose` (×) → `closeLineasModal()`.
+   - Click en el overlay (cuando `e.target === overlay`) → `closeLineasModal()`.
+   - Tecla Escape (`keydown` en `document`, `e.key === 'Escape'`) → `closeLineasModal()`.
+   - `closeLineasModal()`: oculta overlay (`display:none`), remueve clase `modal-open` de `<body>`.
+
+4. **Guardado**:
+   - Click en `#btnGuardarLinea` → `document.getElementById('lineaForm').submit()`.
+   - El formulario se envía vía POST normal (no AJAX), la página se recarga y el modal se cierra naturalmente por la recarga.
+
+5. **Eliminación**:
+   - Click en `#btnEliminarLinea` → se muestra `confirm()` del navegador (vía `onsubmit` del form).
+   - Si se confirma, se envía el POST `action=delete_telefono` y la página se recarga.
+
+### Contrato de edición inline (vía modal)
+
+- La función `initLineasEdit()` actual (app.js L1827–1888) DEBE ser reemplazada.
+- En su lugar, un event listener en `document` para clicks en `.btn-lineas-edit`:
+  ```javascript
+  document.addEventListener('click', function(e) {
+      var btn = e.target.closest('.btn-lineas-edit');
+      if (!btn) return;
+      e.preventDefault();
+      var tr = btn.closest('tr');
+      if (!tr) return;
+      var raw = tr.getAttribute('data-line');
+      if (!raw) return;
+      var lineData;
+      try { lineData = JSON.parse(raw); } catch (_) { return; }
+      openLineasModal(lineData);
+  });
+  ```
+
+### Contrato de búsqueda unificada
+
+- Selector del input: `#lineas-unified-search`.
+- Selector del tbody: `#lineasUnifiedTableBody`.
+- Al escribir en el input:
+  1. Obtener `query = this.value.toLowerCase().trim()`.
+  2. Si `query === ''`, mostrar todas las filas (`tr.style.display = ''`).
+  3. Si no, para cada `tr` en el tbody, obtener `tr.textContent.toLowerCase()` y comprobar si incluye `query`. Si no incluye, `tr.style.display = 'none'`; si incluye, `tr.style.display = ''`.
+- Búsqueda case-insensitive, sin debounce (respuesta inmediata en datasets pequeños de líneas, típicamente <20 filas).
+- Debe filtrar por cualquier columna (nombre, teléfono, uso, puerto, procesos, estado, fechas, etc.).
+
+### Contrato de no regresión
+
+Las siguientes acciones POST DEBEN seguir funcionando **exactamente igual** que antes:
+
+| Acción | Formato POST | Comportamiento esperado |
+|--------|-------------|------------------------|
+| `save_telefono` | Form en modal: `action=save_telefono` + campos (id, nombre, tfono, uso, pin, compania, waha_port, waha, destacamos_id, notas) | Crea o actualiza línea en `telefonos.json`, redirige a `comercial_page_url('lineas')` |
+| `delete_telefono` | Form en modal: `action=delete_telefono` + `id` | Elimina línea de `telefonos.json`, redirige a `comercial_page_url('lineas')` |
+| `save_comercial_line_state` | Forms inline en cada fila: `action=save_comercial_line_state` + `line_id` + `status` | Actualiza `comercial_state.status` de la línea, redirige a `comercial_page_url('lineas')` |
+| `comercial_check_lines_health` | Form en toolbar (global) o forms inline (por línea): `action=comercial_check_lines_health` + `line_id` (opcional) | Ejecuta health check vía WAHA, actualiza `comercial_state.health_*`, redirige a `comercial_page_url('lineas')` |
+
+- Los nombres de los campos del formulario (`name`) NO DEBEN cambiar.
+- Las URLs de redirección después de cada acción NO DEBEN cambiar.
+- La validación de CSRF existente para estas acciones NO DEBE romperse.

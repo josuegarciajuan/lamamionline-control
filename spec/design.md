@@ -984,3 +984,192 @@ Eliminar condiciones de carrera, edge cases no cubiertos y garantizar la robuste
 ### Archivos impactados
 - `app/comercial.php` — 3 funciones modificadas
 - `index.php` — normalización assets a `v=20260527_5`
+
+---
+
+## Diseño COM-LINEAS-UI — Mejora de la sección Comercial > Líneas
+
+### Objetivo de diseño
+Unificar las dos tablas duplicadas en una sola tabla full-width, ocultar el formulario CRUD en un modal emergente, ganar espacio horizontal y simplificar la experiencia de usuario en la sección `Comercial > Líneas`.
+
+### Diagnóstico del estado actual
+
+#### Archivo: `app/comercial.php` (líneas 6536–6714), función `render_comercial_lineas()`
+El código actual de la sección `lineas` presenta los siguientes problemas:
+
+#### a) Layout `.cards.two` con form izquierdo + panel derecho con 2 tablas duplicadas
+```html
+<div class="cards two">            <!-- grid 2 columnas -->
+  <section class="panel">          <!-- columna izquierda: formulario CRUD siempre visible -->
+    <form method="post" class="form-grid">
+      <!-- campos: nombre, tfono, uso, pin, compania, waha_port, waha, destacamos_id, notas -->
+      <!-- botones: Guardar línea, Eliminar (solo en edición) -->
+    </form>
+  </section>
+  <section class="panel">          <!-- columna derecha: DOS tablas -->
+    <!-- Tabla 1: Listado simple (nombre, tfono, uso, editar) -->
+    <!-- Tabla 2: Salud y estado (columnas completas + acciones) -->
+  </section>
+</div>
+```
+El formulario CRUD ocupa permanentemente la mitad izquierda de la pantalla (~50% del ancho), forzando que las tablas del panel derecho se compriman en la otra mitad.
+
+#### b) Dos tablas iterando el mismo array `$lines`
+- **Tabla 1** (líneas 6595–6612): Listado simple con columnas: Línea (nombre), Teléfono, Uso, Editar. Itera `$lines` y usa un buscador via `render_live_filter()`.
+- **Tabla 2** (líneas 6629–6710): "Salud y estado" con columnas: Línea (nombre+teléfono), Puerto, Uso CRM, WAHA, Última comprobación, Estado comercial, Último éxito, Último error, Acciones (Editar, Test WAHA, Activar, Pausar). Itera `$lines` de nuevo y usa un buscador independiente `#lineas-search`.
+
+Ambas tablas muestran las mismas líneas pero con distinto nivel de detalle. El usuario debe hacer scroll en dos tablas distintas para ver información relacionada.
+
+#### c) Formulario CRUD siempre visible ocupando mitad izquierda
+El formulario de creación/edición de líneas usa el patrón `?edit=<id>` vía URL para cargar datos en el formulario del panel izquierdo. Además, el JS `initLineasEdit()` (app.js:1827-1888) escucha clicks en `.btn-lineas-edit` y rellena el formulario izquierdo con los datos del `data-line` JSON de la fila, evitando una recarga de página. Sin embargo, cuando no se está editando ninguna línea, el formulario sigue ocupando espacio mostrando el formulario de "Nueva línea".
+
+#### d) Buscador duplicado
+La tabla 1 usa `render_live_filter('#lineasTableBody tr[data-filter-text]', ...)` que genera un `<input>` de búsqueda genérico. La tabla 2 usa `#lineas-search` conectado a `initLineasSearch()` en JS. Dos buscadores distintos para filtrar las mismas líneas en dos tablas diferentes.
+
+### Decisiones de diseño
+
+#### 1. Modal/Popup para formulario CRUD
+- El formulario de "Nueva línea" y "Ficha línea" se mueve a un modal HTML nativo (sin librerías).
+- **Overlay**: `<div id="lineasModalOverlay" class="modal-overlay">` con fondo oscuro semitransparente (`rgba(0,0,0,0.7)`).
+- **Contenedor**: `<div class="modal-container">` centrado en pantalla, ancho máximo 600px, con scroll interno si el contenido excede.
+- **Cabecera**: `<div class="modal-header">` con título dinámico ("Nueva línea" / "Ficha línea") y botón de cierre `×`.
+- **Cuerpo**: `<div class="modal-body">` con el `<form method="post" class="form-grid" id="lineaForm">` y todos los campos actuales (nombre, tfono, uso, pin, compania, waha_port, waha, destacamos_id, notas).
+- **Footer**: `<div class="modal-footer">` con `<button class="btn-primary" id="btnGuardarLinea">Guardar línea</button>` y `<button class="btn-secondary" id="btnCancelarLinea">Cancelar</button>`.
+- **Mecanismos de cierre**:
+  - Click en botón Cancelar o botón `×`.
+  - Click en el overlay (fuera del modal).
+  - Tecla Escape.
+- **Apertura**:
+  - Botón `Nueva línea`: `openLineasModal(null)` → formulario vacío, título "Nueva línea".
+  - Botón `Editar`: `openLineasModal(lineData)` → formulario relleno con datos, título "Ficha línea".
+- **Estados**:
+  - **Abierto**: `<body>` recibe clase `modal-open` para prevenir scroll del fondo. Overlay visible. Modal con `display:flex`.
+  - **Cerrado**: overlay oculto, clase `modal-open` removida del body.
+
+#### Pseudocódigo del modal (JS)
+```javascript
+function openLineasModal(lineData) {
+    var overlay = document.getElementById('lineasModalOverlay');
+    var form = document.getElementById('lineaForm');
+    var title = document.getElementById('lineaModalTitle');
+    var idField = form.querySelector('[name="id"]');
+    var deleteBtn = document.getElementById('btnEliminarLinea');
+
+    if (lineData) {
+        // Modo edición
+        title.textContent = 'Ficha línea';
+        idField.value = lineData.id || '';
+        setFormField('nombre', lineData.nombre);
+        setFormField('tfono', lineData.tfono);
+        setFormField('uso', lineData.uso);
+        setFormField('pin', lineData.pin);
+        setFormField('compania', lineData.compania);
+        setFormField('waha_port', lineData.waha_port);
+        setFormField('waha', lineData.waha);
+        setFormField('destacamos_id', lineData.destacamos_id);
+        setFormField('notas', lineData.notas);
+        if (deleteBtn) deleteBtn.style.display = 'inline-block';
+    } else {
+        // Modo nueva línea
+        title.textContent = 'Nueva línea';
+        form.reset();
+        idField.value = '';
+        if (deleteBtn) deleteBtn.style.display = 'none';
+    }
+
+    overlay.style.display = 'flex';
+    document.body.classList.add('modal-open');
+}
+
+function closeLineasModal() {
+    document.getElementById('lineasModalOverlay').style.display = 'none';
+    document.body.classList.remove('modal-open');
+}
+
+// setFormField helper
+function setFormField(name, value) {
+    var el = document.querySelector('#lineaForm [name="' + name + '"]');
+    if (el) el.value = (value === undefined || value === null) ? '' : value;
+}
+```
+
+#### 2. Tabla unificada full-width
+- **Reemplaza ambas tablas** actuales (listado simple + salud/estado) por **una sola tabla** `<table class="lineas-unified-table">`.
+- **Columnas de la tabla unificada** (8 columnas):
+
+| # | Columna | Fuente de datos | Contenido |
+|---|---------|----------------|-----------|
+| 1 | **Nombre + Teléfono** | `$line['nombre']`, `$line['tfono']` | `<strong>nombre</strong><br>` + `crm_render_phone_value(tfono)` |
+| 2 | **Uso / Puerto WAHA** | `$line['uso']`, `$line['waha_port']` | Uso (texto) + `<br><span class="muted-small">WAHA :port</span>` |
+| 3 | **Estado WAHA** | `$state['health_status']`, `$state['health_http_code']`, `$state['health_session_status']` | `<span class="status-pill css-class">health_label</span>` + HTTP code + session status |
+| 4 | **Última comprobación** | `$state['last_health_check_at']`, `$state['last_health_ok_at']`, `$state['last_health_fail_at']` | Fecha check + última OK/fallo en muted-small |
+| 5 | **Estado Comercial** | `$state['status']`, `$state['consecutive_failures']`, `$state['effective_power_factor']`, `$state['adaptive_power_factor']` | Status pill + fails seguidos + potencia |
+| 6 | **Procesos asociados** | `$line['comercial_usage']` | Lista de procesos separados por coma; si vacío mostrar "—" |
+| 7 | **Último éxito / error** | `$state['last_success_at']`, `$state['last_error']`, `$state['health_error']` | Fecha último éxito + último error + error WAHA |
+| 8 | **Acciones** | — | Botones: Editar, Test WAHA, Activar, Pausar (misma estructura actual) |
+
+- Cada `<tr>` debe tener un atributo `data-line="<JSON>"` con los datos completos de la línea para que el botón "Editar" pueda abrir el modal con los datos vía JS (mismo contrato que el `data-line` actual, líneas 6642–6654 del PHP original).
+- La tabla debe ser responsive con `table-wrap` para scroll horizontal en pantallas pequeñas.
+- Las columnas deben tener anchos proporcionados con clases CSS: col-nombre (18%), col-uso (12%), col-waha (12%), col-check (12%), col-comercial (14%), col-procesos (10%), col-ultimos (12%), col-acciones (10%).
+
+#### HTML esperado de la tabla unificada
+```html
+<section class="panel">
+    <div class="lineas-toolbar">
+        <button type="button" class="btn-primary" id="btnNuevaLinea">+ Nueva línea</button>
+        <form method="post" style="display:inline-block;">
+            <input type="hidden" name="action" value="comercial_check_lines_health">
+            <button type="submit" class="btn-primary">Comprobar WAHA ahora</button>
+        </form>
+        <input type="text" id="lineas-unified-search" placeholder="Buscar línea..." class="field" autocomplete="off">
+    </div>
+    <div class="table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto;">
+        <table class="lineas-unified-table">
+            <thead>
+                <tr>
+                    <th class="col-nombre">Nombre / Teléfono</th>
+                    <th class="col-uso">Uso / Puerto</th>
+                    <th class="col-waha">WAHA</th>
+                    <th class="col-check">Comprobación</th>
+                    <th class="col-comercial">Estado Comercial</th>
+                    <th class="col-procesos">Procesos</th>
+                    <th class="col-ultimos">Último éxito/error</th>
+                    <th class="col-acciones">Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="lineasUnifiedTableBody">
+                <!-- filas generadas por PHP con data-line JSON -->
+            </tbody>
+        </table>
+    </div>
+</section>
+```
+
+#### 3. Eliminar wrapper `.cards.two` en la sección `lineas`
+- El `<div class="cards two">` que envuelve todos los paneles debe eliminarse.
+- El contenido se reemplaza por un único `<section class="panel">` que contiene la toolbar superior y la tabla unificada.
+- Esto libera el 100% del ancho disponible para la tabla.
+
+#### 4. Buscador unificado sobre la tabla
+- Un solo `<input type="text" id="lineas-unified-search">` que filtra las filas de `#lineasUnifiedTableBody tr` por cualquier texto visible (nombre, teléfono, uso, puerto, procesos, fechas), case-insensitive.
+- JS: `initLineasUnifiedSearch()` reemplaza tanto `render_live_filter` como `initLineasSearch()`.
+- Comportamiento: al escribir, oculta filas que no contengan el texto buscado; al borrar, muestra todas.
+
+#### 5. Botón "Nueva línea" visible encima de la tabla
+- Botón `<button class="btn-primary" id="btnNuevaLinea">+ Nueva línea</button>` en la toolbar superior.
+- Al hacer clic, llama a `openLineasModal(null)`.
+
+#### 6. Acciones que deben seguir funcionando (contrato de no regresión)
+- **`save_telefono`**: El formulario `<form method="post">` dentro del modal debe tener `<input type="hidden" name="action" value="save_telefono">`. Al hacer submit, el POST se envía normalmente y al recargar la página el modal se habrá cerrado (porque la página se recarga vía redirect del backend).
+- **`delete_telefono`**: El botón "Eliminar" dentro del modal debe estar en un `<form method="post">` separado con `action=delete_telefono` y `onsubmit="return confirm(...)"`.
+- **`save_comercial_line_state`**: Los botones Activar/Pausar en cada fila de la tabla unificada deben seguir siendo `<form method="post">` individuales con `action=save_comercial_line_state`, `line_id`, y `status`.
+- **`comercial_check_lines_health`**: El botón "Test WAHA" en cada fila y el botón "Comprobar WAHA ahora" en la toolbar deben seguir siendo `<form method="post">` con `action=comercial_check_lines_health`.
+
+### Archivos impactados
+| Archivo | Cambio | Impacto |
+|---------|--------|---------|
+| `app/comercial.php` | Reestructurar líneas 6536–6714: quitar `.cards.two`, unificar 2 tablas en 1, añadir HTML del modal, añadir botón "Nueva línea" en toolbar | ~120 líneas reemplazadas |
+| `assets/app.js` | Reemplazar `initLineasSearch()` (L1807–1825) + `initLineasEdit()` (L1827–1888) por `initLineasUnifiedSearch()` + funciones modal (`openLineasModal`, `closeLineasModal`) y actualizar listener DOMContentLoaded | ~100 líneas reemplazadas + ~60 nuevas |
+| `assets/style.css` | Añadir estilos: `.modal-overlay`, `.modal-container`, `.modal-header`, `.modal-body`, `.modal-footer`, `.lineas-unified-table`, `.lineas-toolbar`, `body.modal-open`, column widths | ~80 líneas nuevas |
+| `assets/theme.css` | Añadir overrides tema oscuro: `.modal-overlay`, `.modal-container` (bg, border, text colors), `.lineas-unified-table` (borders, row hover) | ~40 líneas nuevas |
+| `index.php` | Bump versiones cache: `style.css`, `theme.css`, `app.js` | 3 líneas modificadas |
