@@ -11,6 +11,8 @@
  *   Mismo contrato que destacamos.php — recibe y devuelve el mismo formato.
  */
 
+define('MUNDOSEX_DESC_SEO_SUFFIX', "\n\nBurriana, Vila-real, Vila real, Villareal, Vilareal, Borriana, Castellon, Almazora, Nules, Castellon");
+
 function mundosex_ejecutar_automatizacion(array $payload): array
 {
     $username = trim((string)($payload['username'] ?? ''));
@@ -58,7 +60,12 @@ function mundosex_ejecutar_automatizacion(array $payload): array
         $browserFields['title'] = (string)$fields['title'];
     }
     if (isset($fields['description']) && $fields['description'] !== '') {
-        $browserFields['description'] = (string)$fields['description'];
+        $desc = (string)$fields['description'];
+        // Append SEO keywords if not already present (avoid duplicates on re-uploads)
+        if (!str_ends_with(trim($desc), trim(MUNDOSEX_DESC_SEO_SUFFIX))) {
+            $desc .= MUNDOSEX_DESC_SEO_SUFFIX;
+        }
+        $browserFields['description'] = $desc;
     }
 
     // Teléfono
@@ -72,13 +79,7 @@ function mundosex_ejecutar_automatizacion(array $payload): array
     // WhatsApp siempre activado para Mundosex
     $browserFields['whatsapp'] = true;
 
-    // Provincia / Ciudad — requeridos por el formulario de Mundosex
-    if (!empty($fields['localidad'])) {
-        $browserFields['provincia'] = (string)$fields['localidad'];
-    }
-    if (!empty($fields['city'])) {
-        $browserFields['ciudad'] = (string)$fields['city'];
-    }
+    // Provincia / Ciudad — NO se modifican. El usuario quiere mantener los valores existentes.
 
     $result['touchedFields'] = array_keys($browserFields);
 

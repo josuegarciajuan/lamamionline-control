@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action'])) {
     <title>LaMami CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="assets/style.css?v=20260602_1">
+    <link rel="stylesheet" href="assets/style.css?v=20260602_2">
     <link rel="stylesheet" href="assets/theme.css?v=20260601_2">
 </head>
 <body class="page-<?= e($page) ?>" data-page="<?= e($page) ?>">

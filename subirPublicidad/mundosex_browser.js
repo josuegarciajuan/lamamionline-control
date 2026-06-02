@@ -313,18 +313,26 @@ async function main() {
         } catch (e) {}
       }
       // También hacer clic en los botones de eliminar (dispara la lógica JS del sitio)
+      // Filtrar #remove_tpl (template oculto, no es un botón real)
       const removeBtns = page.locator('input[type="button"][id^="remove_"]');
-      const count = await removeBtns.count();
-      for (let i = 0; i < count; i++) {
+      const removeBtnCount = await removeBtns.count();
+      for (let i = 0; i < removeBtnCount; i++) {
         try {
+          // Obtener el ID real del botón; saltar si es "remove_tpl"
+          const btnId = await removeBtns.nth(i).getAttribute('id');
+          if (btnId === 'remove_tpl') {
+            log('  Saltando remove_tpl (template oculto)');
+            continue;
+          }
           await removeBtns.nth(i).click({ force: true, timeout: 3000 });
           removed++;
+          log('  Botón ' + btnId + ' clickeado');
           await page.waitForTimeout(500);
         } catch (e) {
           result.warnings.push(warn('No se pudo hacer clic en remove_' + i + ': ' + e.message));
         }
       }
-      log('Fotos marcadas para eliminar: ' + removed + ' (hidden: OK, buttons: ' + count + ')');
+      log('Fotos marcadas para eliminar: ' + removed + ' (hidden: OK, buttons: ' + removeBtnCount + ')');
       await page.waitForTimeout(1000);
     }
 

@@ -9,7 +9,7 @@ namespace WasapBot\Services;
  */
 interface OpenAiClientInterface
 {
-    public function chat(string $systemPrompt, string $userMessage, array $context = [], string $model = null): array;
+    public function chat(string $systemPrompt, string $userMessage, array $context = [], string $model = null, array $history = []): array;
     public function classifyTone(string $userMessage): array;
     public function getLastRawResponse(): ?array;
 }

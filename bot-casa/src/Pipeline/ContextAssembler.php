@@ -35,11 +35,18 @@ final class ContextAssembler implements PipelineStageInterface
 
     public function process(array $ctx): ?array
     {
-        // --- thread_id ---
+        // --- thread_id (compound: line + phone — Fix line-mixing bug) ---
+        // Antes: thread_id = from_phone. Eso mezclaba conversaciones del mismo
+        // cliente en distintas líneas WhatsApp. Ahora se prefija con la línea
+        // (last9 del teléfono receptor) para aislar cada conversación.
         $threadId = $ctx['thread_id'] ?? $ctx['__thread_id'] ?? null;
         if ($threadId === null || $threadId === '') {
-            $threadId = (string) ($ctx['from_phone'] ?? '');
-            if ($threadId === '') {
+            $lineLast9 = (string) ($ctx['line_last9'] ?? '');
+            $fromPhone = (string) ($ctx['from_phone'] ?? '');
+            if ($fromPhone !== '') {
+                $threadId = $lineLast9 !== '' ? ($lineLast9 . '_' . $fromPhone) : $fromPhone;
+            }
+            if ($threadId === '' || $threadId === null) {
                 $threadId = 'th-' . floor(microtime(true) * 1000);
             }
             $ctx['thread_id'] = $threadId;
@@ -266,6 +273,9 @@ final class ContextAssembler implements PipelineStageInterface
         // ── NOVA: is_image_sent_by_user ───────────────────────────────────
         $ctx['is_image_sent_by_user'] = ($ctx['is_image_i'] ?? 0) === 1
             || !empty($ctx['__is_image']);
+
+        // ── MAPS: location_url from config (para que el AI tenga la URL real de Google Maps) ──
+        $ctx['location_url'] = $this->config->get('urls.google_maps_location', '');
 
         return $ctx;
     }
@@ -579,9 +589,10 @@ final class ContextAssembler implements PipelineStageInterface
             }
 
             $hasMap = (bool) preg_match('/(?:https?:\/\/)?(?:goo\.gl\/maps|maps\.app\.goo\.gl|google\.com\/maps|maps\.google\.com)/i', $replyRaw);
-            if (preg_match('/maps|ubicacion|direccion|calle|punto|ubi\b|pin\b/iu', $replyNorm) || $hasMap) {
+            // Solo marcar "ubicacion" si se envió una URL de maps real (no basta con mencionar la palabra)
+            if ($hasMap) {
                 $flags[] = 'ubicacion';
-                if ($hasMap) $flags[] = 'ubicacion_precisa';
+                $flags[] = 'ubicacion_precisa';
             }
 
             $hasPhoto = (bool) preg_match('/(?:https?:\/\/(?:ibb\.co|i\.ibb\.co)\/)/i', $replyRaw);

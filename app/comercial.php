@@ -1813,12 +1813,9 @@ function comercial_find_open_thread_for_inbound($fromPhone, $toPhone = '', $line
             }
             continue; // seguir buscando match exacto, pero ya tenemos candidato same-line
         }
-        // Si NO se conoce la línea receptora, aplicar fallback genérico
-        if ($incomingLineId === '') {
-            if ($toPhone === '' && $linePort === '' && !in_array((string)$row['stage'], array('discarded', 'autoresponder'), true) && (string)($row['status'] ?? 'open') === 'open') {
-                return $row;
-            }
-        }
+        // Fix line-mixing: NO devolvemos ningún hilo por solo teléfono cuando
+        // NO se conoce la línea receptora. Es más seguro crear un hilo nuevo
+        // que reutilizar uno de otra línea y confundir al cliente.
         if ($fallbackMatched === null && !in_array((string)$row['stage'], array('discarded', 'autoresponder'), true)) {
             $fallbackMatched = $row;
         }
@@ -1827,8 +1824,9 @@ function comercial_find_open_thread_for_inbound($fromPhone, $toPhone = '', $line
         }
     }
     // ── T4.1: cadena de fallback con prioridad por línea ──
+    // Fix line-mixing: eliminado fallbackPhoneOnly (podía devolver hilo de otra línea).
+    // Prioridad: misma línea > cualquier match válido > null (crear hilo nuevo).
     if ($fallbackSameLine) return $fallbackSameLine;
-    if ($fallbackPhoneOnly) return $fallbackPhoneOnly;
     if ($fallbackMatched) return $fallbackMatched;
     return null;
 }

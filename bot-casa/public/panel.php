@@ -239,7 +239,7 @@ function buildRedirectUrl(string $baseUrl, string $extraParam): string
         'tab-status', 'tab-descripcion', 'tab-prompt', 'tab-leads',
         'tab-waha', 'tab-ia', 'tab-routing', 'tab-delays',
         'tab-variants', 'tab-followup', 'tab-reminder', 'tab-urls',
-        'tab-memory', 'tab-logs',
+        'tab-memory', 'tab-logs', 'tab-learning',
     ];
     $tab = (string) ($_POST['active_tab'] ?? $_GET['tab'] ?? '');
     if (!in_array($tab, $allowedTabs, true)) {
@@ -335,6 +335,140 @@ if ($method === 'GET' && $action === 'get_waha_statuses') {
         'ok'     => true,
         'status' => getWahaStatusesForRouting($config),
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+// ── action=get_learning_stats (GET, JSON response) ────────────────────
+if ($method === 'GET' && $action === 'get_learning_stats') {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(getLearningStats($config), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+// ── action=get_playbook (GET, JSON response) ──────────────────────────
+if ($method === 'GET' && $action === 'get_playbook') {
+    header('Content-Type: application/json; charset=utf-8');
+    $playbookPath = resolveConfigPath('files.playbook', 'data/playbook.md');
+    $content = '';
+    $lastModified = null;
+    if (file_exists($playbookPath) && is_readable($playbookPath)) {
+        $content = (string) @file_get_contents($playbookPath);
+        $lastModified = date('c', filemtime($playbookPath));
+    }
+    echo json_encode([
+        'ok'            => true,
+        'content'       => $content,
+        'last_modified' => $lastModified,
+        'exists'        => $content !== '',
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+// ── action=force_learn (POST only) ────────────────────────────────────
+if ($method === 'POST' && $action === 'force_learn') {
+    header('Content-Type: application/json; charset=utf-8');
+
+    $learnScript = WASAPBOT_ROOT . '/cron/learn.php';
+    if (!file_exists($learnScript)) {
+        echo json_encode(['ok' => false, 'error' => 'learn.php not found']);
+        exit;
+    }
+
+    // Run learn.php in BACKGROUND to avoid web server timeout.
+    // Output goes to a temp file; frontend polls get_learn_status until done.
+    $outFile = sys_get_temp_dir() . '/learn_output_' . date('Ymd_His') . '.txt';
+    $markerFile = sys_get_temp_dir() . '/learn_marker.txt';
+
+    // Mark as "running" (write with trailing newline so shell append works correctly)
+    file_put_contents($markerFile, "running\n" . $outFile . "\n");
+
+    // Run learn.php in BACKGROUND via bash -c to ensure DONE marker is written
+    $shellCmd = sprintf(
+        'php %s --days=1 > %s 2>&1; echo "DONE:$?" >> %s',
+        escapeshellarg($learnScript),
+        escapeshellarg($outFile),
+        escapeshellarg($markerFile)
+    );
+    exec('bash -c ' . escapeshellarg($shellCmd) . ' > /dev/null 2>&1 &');
+
+    echo json_encode([
+        'ok'         => true,
+        'status'     => 'started',
+        'out_file'   => $outFile,
+        'marker_file'=> $markerFile,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+// ── action=get_learn_status (GET, JSON) ──────────────────────────────
+if ($method === 'GET' && $action === 'get_learn_status') {
+    header('Content-Type: application/json; charset=utf-8');
+
+    $markerFile = sys_get_temp_dir() . '/learn_marker.txt';
+    $outFile = '';
+    $status = 'idle';
+    $output = '';
+
+    if (file_exists($markerFile)) {
+        $lines = @file($markerFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($lines) {
+            // Check LAST line for DONE marker (appended after completion)
+            $lastLine = end($lines);
+            if (str_starts_with($lastLine, 'DONE:')) {
+                $status = 'done';
+                $exitCode = (int) substr($lastLine, 5);
+                // Out file path is on line 2 (index 1)
+                $outFile = $lines[1] ?? '';
+                if ($outFile && file_exists($outFile)) {
+                    $output = (string) @file_get_contents($outFile);
+                    @unlink($outFile);
+                    @unlink($markerFile);
+                }
+            } elseif ($lines[0] === 'running') {
+                $status = 'running';
+                $outFile = $lines[1] ?? '';
+            } else {
+                @unlink($markerFile);
+            }
+        } else {
+            @unlink($markerFile);
+        }
+    }
+
+    echo json_encode([
+        'ok'       => true,
+        'status'   => $status,
+        'output'   => $output,
+        'is_error' => ($status === 'done' && isset($exitCode) && $exitCode !== 0),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+// ── action=confirm_outcome (POST, JSON) ───────────────────────────────
+if ($method === 'POST' && $action === 'confirm_outcome') {
+    header('Content-Type: application/json; charset=utf-8');
+    $raw = (string) @file_get_contents('php://input');
+    $body = json_decode($raw, true);
+    if (!is_array($body)) {
+        echo json_encode(['ok' => false, 'error' => 'Invalid JSON']);
+        exit;
+    }
+    $threadId   = (string) ($body['thread_id'] ?? '');
+    $newOutcome = (string) ($body['outcome'] ?? '');
+    if ($threadId === '' || !in_array($newOutcome, ['lead_confirmado', 'lead_ghosted', 'mareador'], true)) {
+        echo json_encode(['ok' => false, 'error' => 'Missing or invalid thread_id/outcome']);
+        exit;
+    }
+    $updated = updateOutcomeHuman($config, $threadId, $newOutcome);
+    echo json_encode(['ok' => $updated, 'thread_id' => $threadId, 'outcome' => $newOutcome]);
+    exit;
+}
+
+// ── action=get_outcomes (GET, JSON) ───────────────────────────────────
+if ($method === 'GET' && $action === 'get_outcomes') {
+    header('Content-Type: application/json; charset=utf-8');
+    $outcomes = getOutcomesForDisplay($config);
+    echo json_encode(['ok' => true, 'outcomes' => $outcomes], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
@@ -1143,12 +1277,105 @@ if (isset($_GET['cleared'])) {
     $notification = '<div class="alert alert-warning">Memoria completamente vaciada.</div>';
 }
 
+// ─── Learning helpers ─────────────────────────────────────────────────────
+
+function getLearningStats(\WasapBot\Core\Config $config): array
+{
+    $outcomesFile = resolveConfigPath('files.conversation_outcomes', 'public/data/conversation_outcomes.ndjson');
+    $playbookFile = resolveConfigPath('files.playbook', 'public/data/playbook.md');
+    $stats = [
+        'total_classified'  => 0,
+        'lead_probable'     => 0,
+        'lead_confirmado'   => 0,
+        'lead_ghosted'      => 0,
+        'mareador'          => 0,
+        'hostil'            => 0,
+        'muerta'            => 0,
+        'playbook_exists'   => false,
+        'playbook_updated'  => null,
+        'playbook_size'     => 0,
+        'pending_review'    => 0,
+    ];
+    if (file_exists($outcomesFile)) {
+        $lines = file($outcomesFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($lines !== false) {
+            foreach ($lines as $line) {
+                $rec = json_decode(trim($line), true);
+                if (!is_array($rec)) continue;
+                $stats['total_classified']++;
+                $outcome = (string) ($rec['outcome'] ?? '');
+                if (isset($stats[$outcome])) $stats[$outcome]++;
+                if ($outcome === 'lead_probable' && empty($rec['human_confirmed'])) $stats['pending_review']++;
+            }
+        }
+    }
+    if (file_exists($playbookFile)) {
+        $stats['playbook_exists'] = true;
+        $stats['playbook_updated'] = date('c', filemtime($playbookFile));
+        $stats['playbook_size'] = filesize($playbookFile) ?: 0;
+    }
+    return $stats;
+}
+
+function getOutcomesForDisplay(\WasapBot\Core\Config $config): array
+{
+    $outcomesFile = resolveConfigPath('files.conversation_outcomes', 'public/data/conversation_outcomes.ndjson');
+    $results = [];
+    if (!file_exists($outcomesFile)) return $results;
+    $lines = file($outcomesFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines === false) return $results;
+    $lines = array_reverse(array_slice($lines, -100));
+    foreach ($lines as $line) {
+        $rec = json_decode(trim($line), true);
+        if (is_array($rec)) $results[] = $rec;
+    }
+    return $results;
+}
+
+function updateOutcomeHuman(\WasapBot\Core\Config $config, string $threadId, string $newOutcome): bool
+{
+    $outcomesFile = resolveConfigPath('files.conversation_outcomes', 'public/data/conversation_outcomes.ndjson');
+    if (!file_exists($outcomesFile)) return false;
+    $lines = file($outcomesFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines === false) return false;
+    $found = false;
+    $updatedLines = [];
+    $updatedRec = null;
+    foreach ($lines as $line) {
+        $rec = json_decode(trim($line), true);
+        if (is_array($rec) && ((string) ($rec['thread_id'] ?? '')) === $threadId) {
+            $rec['outcome'] = $newOutcome;
+            $rec['human_confirmed'] = true;
+            $rec['classified_at'] = date('c');
+            $updatedRec = $rec;
+            $found = true;
+        }
+        $updatedLines[] = json_encode($rec ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+    if ($found) {
+        @file_put_contents($outcomesFile, implode("\n", $updatedLines) . "\n", LOCK_EX);
+        // Also update client profile
+        try {
+            require_once WASAPBOT_ROOT . '/src/Services/ClientProfileService.php';
+            $profileSvc = new \WasapBot\Services\ClientProfileService($config);
+            $profileSvc->updateProfile(
+                (string) ($updatedRec['phone'] ?? ''),
+                $newOutcome,
+                (array) ($updatedRec['tags'] ?? []),
+                (string) ($updatedRec['selected_girl'] ?? '')
+            );
+        } catch (\Throwable $e) {}
+    }
+    return $found;
+}
+
 // ─── Data for the view ───
 $memoryLines  = getMemoryDisplayLines($memory);
 $memoryGroups = getMemoryGroups($memoryLines);
 $routingLines = config_val_array('routing.lines');
 $botStats     = getBotStats($config);
 $leadsDisplay = getLeadsForDisplay($config);
+$learningStats = getLearningStats($config);
 
 // ─── Log file: read last 300 lines ───
 $logLines = [];
@@ -1564,6 +1791,7 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
     <button type="button" data-tab="tab-urls">URLs</button>
     <button type="button" data-tab="tab-memory">Memoria</button>
     <button type="button" data-tab="tab-logs">Logs</button>
+    <button type="button" data-tab="tab-learning">🧠 Aprendizaje</button>
 </div>
 
 <!-- ── Main config form ── -->
@@ -2909,6 +3137,73 @@ document.getElementById('conversationModal').addEventListener('click', function(
 });
 </script>
 
+<!-- ===== TAB: Aprendizaje ===== -->
+<div class="tab-content" id="tab-learning">
+    <div class="card">
+        <h2>🧠 Aprendizaje del Bot</h2>
+        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">
+            El bot analiza sus conversaciones pasadas y extrae patrones que se inyectan en su system prompt (playbook).
+            El aprendizaje mejora automáticamente con cada ciclo de análisis.
+        </p>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px">
+            <div style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;text-align:center">
+                <div style="font-size:1.8rem;font-weight:700;color:var(--primary)"><?php echo $learningStats['total_classified']; ?></div>
+                <div style="font-size:.78rem;color:var(--text-muted);margin-top:4px">Conversaciones analizadas</div>
+            </div>
+            <div style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;text-align:center">
+                <div style="font-size:1.8rem;font-weight:700;color:var(--success)"><?php echo $learningStats['lead_probable'] + $learningStats['lead_confirmado']; ?></div>
+                <div style="font-size:.78rem;color:var(--text-muted);margin-top:4px">Leads</div>
+            </div>
+            <div style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;text-align:center">
+                <div style="font-size:1.8rem;font-weight:700;color:var(--warn)"><?php echo $learningStats['mareador']; ?></div>
+                <div style="font-size:.78rem;color:var(--text-muted);margin-top:4px">Mareadores</div>
+            </div>
+            <div style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;text-align:center">
+                <div style="font-size:1.8rem;font-weight:700;color:var(--danger)"><?php echo $learningStats['lead_ghosted']; ?></div>
+                <div style="font-size:.78rem;color:var(--text-muted);margin-top:4px">Ghosteos</div>
+            </div>
+            <div style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;text-align:center">
+                <div style="font-size:1.8rem;font-weight:700;color:var(--info)"><?php echo $learningStats['pending_review']; ?></div>
+                <div style="font-size:.78rem;color:var(--text-muted);margin-top:4px">Pendientes revisión</div>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;align-items:center">
+            <button type="button" class="btn btn-primary" onclick="forceLearn()" id="btn-force-learn">🚀 Forzar aprendizaje</button>
+            <span id="learn-status" style="font-size:.82rem;color:var(--text-muted)"></span>
+        </div>
+        <div id="learn-output" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-family:monospace;font-size:.75rem;max-height:300px;overflow:auto;white-space:pre-wrap;margin-bottom:16px"></div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:20px">
+            <strong>Playbook:</strong>
+            <?php if ($learningStats['playbook_exists']): ?>
+                <span style="color:var(--success)">✅ Activo</span>
+                <span style="color:var(--text-muted);font-size:.78rem;margin-left:8px">Actualizado: <?php echo h($learningStats['playbook_updated'] ? date('d/m/Y H:i', strtotime((string)$learningStats['playbook_updated'])) : '?'); ?></span>
+                <button type="button" class="btn btn-sm btn-info" style="margin-left:12px" onclick="viewPlaybook()">📖 Ver playbook</button>
+            <?php else: ?>
+                <span style="color:var(--danger)">❌ No generado</span>
+            <?php endif; ?>
+        </div>
+        <div id="playbook-preview" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;max-height:500px;overflow:auto;font-size:.82rem;white-space:pre-wrap;margin-bottom:20px"></div>
+        <h3 style="margin-top:24px;margin-bottom:12px">📋 Conversaciones clasificadas</h3>
+        <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+            <button type="button" class="btn btn-sm" onclick="loadOutcomes()">🔄 Refrescar</button>
+            <span id="outcomes-count" style="font-size:.8rem;color:var(--text-muted)"></span>
+        </div>
+        <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+                <thead><tr style="background:var(--bg)">
+                    <th style="padding:8px;text-align:left;border-bottom:1px solid var(--border)">Teléfono</th>
+                    <th style="padding:8px;text-align:left;border-bottom:1px solid var(--border)">Outcome</th>
+                    <th style="padding:8px;text-align:left;border-bottom:1px solid var(--border)">Msgs</th>
+                    <th style="padding:8px;text-align:left;border-bottom:1px solid var(--border)">Acción</th>
+                </tr></thead>
+                <tbody id="outcomes-tbody">
+                    <tr><td colspan="4" style="padding:20px;text-align:center;color:var(--text-muted)">Cargando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- ===== TAB 13: Logs ===== -->
 <div class="tab-content" id="tab-logs">
     <div class="card">
@@ -3245,6 +3540,140 @@ setInterval(function() {
 }, 60000);
 
 // ── Conversation modal: consolidated in first script block (uses #conversationModal) ──
+</script>
+
+<!-- ==== Learning Tab JS ==== -->
+<script>
+function forceLearn() {
+    var btn = document.getElementById('btn-force-learn');
+    var status = document.getElementById('learn-status');
+    var output = document.getElementById('learn-output');
+
+    btn.disabled = true; btn.textContent = '⏳ Lanzando...';
+    status.textContent = 'Iniciando análisis en segundo plano...'; status.style.color = 'var(--info)';
+    output.style.display = 'block'; output.textContent = '';
+
+    // Step 1: Launch learning in background
+    fetch('?action=force_learn', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.ok) {
+                output.textContent = 'Error: ' + (data.error || 'desconocido');
+                status.textContent = '❌ Error al iniciar'; status.style.color = 'var(--danger)';
+                btn.disabled = false; btn.textContent = '🚀 Forzar aprendizaje';
+                return;
+            }
+            status.textContent = 'Analizando conversaciones con DeepSeek...';
+            output.textContent = 'Procesando... (esto puede tardar 30-90 segundos)\n';
+
+            // Step 2: Poll for completion
+            var attempts = 0, maxAttempts = 75; // 75 * 2s = 2.5 min max
+            function poll() {
+                fetch('?action=get_learn_status')
+                    .then(function(r) { return r.json(); })
+                    .then(function(s) {
+                        attempts++;
+                        if (s.status === 'running') {
+                            status.textContent = 'Analizando... (' + attempts + 's)';
+                            output.textContent += '.';
+                            if (attempts < maxAttempts) setTimeout(poll, 2000);
+                            else {
+                                status.textContent = '⏰ Timeout. Pero el análisis sigue en segundo plano. Refresca en 2 min.';
+                                status.style.color = 'var(--warn)';
+                                btn.disabled = false; btn.textContent = '🚀 Forzar aprendizaje';
+                            }
+                        } else if (s.status === 'done') {
+                            output.textContent = s.output || '(sin output)';
+                            if (s.is_error) {
+                                status.textContent = '❌ Error en el análisis';
+                                status.style.color = 'var(--danger)';
+                            } else {
+                                status.textContent = '✅ Completado. Refrescando...';
+                                status.style.color = 'var(--success)';
+                                setTimeout(function() { location.reload(); }, 2000);
+                            }
+                            btn.disabled = false; btn.textContent = '🚀 Forzar aprendizaje';
+                        } else {
+                            // idle — shouldn't happen, retry
+                            status.textContent = 'Esperando...';
+                            if (attempts < 5) setTimeout(poll, 2000);
+                            else {
+                                status.textContent = '⚠️ No se detectó el proceso. ¿Está el servidor ocupado?';
+                                status.style.color = 'var(--warn)';
+                                btn.disabled = false; btn.textContent = '🚀 Forzar aprendizaje';
+                            }
+                        }
+                    })
+                    .catch(function(err) {
+                        status.textContent = '❌ Error de conexión al comprobar estado';
+                        status.style.color = 'var(--danger)';
+                        btn.disabled = false; btn.textContent = '🚀 Forzar aprendizaje';
+                    });
+            }
+            setTimeout(poll, 3000); // Wait 3s before first poll
+        })
+        .catch(function(err) {
+            output.textContent = 'Error: ' + err.message;
+            status.textContent = '❌ Error de conexión'; status.style.color = 'var(--danger)';
+            btn.disabled = false; btn.textContent = '🚀 Forzar aprendizaje';
+        });
+}
+
+function viewPlaybook() {
+    var preview = document.getElementById('playbook-preview');
+    if (preview.style.display === 'block') { preview.style.display = 'none'; return; }
+    preview.style.display = 'block'; preview.textContent = 'Cargando...';
+    fetch('?action=get_playbook')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            preview.textContent = data.exists ? data.content : '(No hay playbook todavía. Usa "Forzar aprendizaje".)';
+        })
+        .catch(function(err) { preview.textContent = 'Error: ' + err.message; });
+}
+
+function loadOutcomes() {
+    var tbody = document.getElementById('outcomes-tbody');
+    var countEl = document.getElementById('outcomes-count');
+    tbody.innerHTML = '<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--text-muted)">Cargando...</td></tr>';
+    fetch('?action=get_outcomes')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.ok || !data.outcomes) return;
+            countEl.textContent = data.outcomes.length + ' resultados';
+            if (data.outcomes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--text-muted)">Sin datos. Ejecuta el cron de clasificación.</td></tr>';
+                return;
+            }
+            var colors = {lead_probable:'var(--info)',lead_confirmado:'var(--success)',lead_ghosted:'var(--warn)',mareador:'#f59e0b',hostil:'var(--danger)',muerta:'var(--text-muted)'};
+            tbody.innerHTML = data.outcomes.map(function(o) {
+                var label = o.human_confirmed ? (o.outcome + ' ✓') : o.outcome;
+                var color = colors[o.outcome] || 'var(--text-muted)';
+                var btns = '';
+                if (o.outcome === 'lead_probable' || o.outcome === 'lead_detectado') {
+                    btns = '<button class="btn btn-sm btn-success" style="margin:2px" onclick="confirmOutcome(\''+o.thread_id+'\',\'lead_confirmado\')">✅ Vino</button>' +
+                           '<button class="btn btn-sm btn-danger" style="margin:2px" onclick="confirmOutcome(\''+o.thread_id+'\',\'lead_ghosted\')">❌ No vino</button>';
+                }
+                return '<tr style="border-bottom:1px solid var(--border)">' +
+                    '<td style="padding:8px;font-family:monospace;font-size:.75rem">' + (o.phone||'?') + '</td>' +
+                    '<td style="padding:8px"><span style="color:'+color+';font-weight:600">'+label+'</span></td>' +
+                    '<td style="padding:8px">' + (o.message_count||0) + '</td>' +
+                    '<td style="padding:8px">' + btns + '</td></tr>';
+            }).join('');
+        });
+}
+
+function confirmOutcome(threadId, newOutcome) {
+    fetch('?action=confirm_outcome', {
+        method: 'POST',
+        body: JSON.stringify({thread_id: threadId, outcome: newOutcome})
+    }).then(function(r) { return r.json(); }).then(function(d) { if (d.ok) loadOutcomes(); });
+}
+
+(function() {
+    var btn = document.querySelector('.tab-nav button[data-tab="tab-learning"]');
+    if (btn) btn.addEventListener('click', function() { setTimeout(loadOutcomes, 200); });
+    if (document.getElementById('tab-learning') && document.getElementById('tab-learning').classList.contains('active')) loadOutcomes();
+})();
 </script>
 
 </body>

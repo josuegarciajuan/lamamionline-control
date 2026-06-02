@@ -29,10 +29,11 @@ final class OpenAiClient implements OpenAiClientInterface
      * @param string      $userMessage  The user's message text.
      * @param array       $context      Additional context key-value pairs.
      * @param string|null $model        Override model; falls back to config openai.chat_model.
+     * @param array       $history      Previous conversation turns [{role, content}, ...] for multi-turn memory.
      * @return array Parsed JSON from the assistant response.
      *               Falls back to ['user_visible_reply' => rawContent] on parse failure.
      */
-    public function chat(string $systemPrompt, string $userMessage, array $context = [], string $model = null): array
+    public function chat(string $systemPrompt, string $userMessage, array $context = [], string $model = null, array $history = []): array
     {
         $model    ??= $this->config->get('openai.chat_model', 'gpt-5.1');
         $chatUrl    = $this->config->get('openai.chat_url', 'https://api.openai.com/v1/chat/completions');
@@ -43,13 +44,25 @@ final class OpenAiClient implements OpenAiClientInterface
             $userContent .= "\n\n### CONTEXTO\n" . json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
 
+        // Build multi-turn messages: system + history + current user message
+        $messages = [['role' => 'system', 'content' => $systemPrompt]];
+
+        // Insert previous conversation turns (real multi-turn memory)
+        foreach ($history as $turn) {
+            $role    = (string) ($turn['role'] ?? '');
+            $content = (string) ($turn['content'] ?? '');
+            if (($role === 'user' || $role === 'assistant') && $content !== '') {
+                $messages[] = ['role' => $role, 'content' => $content];
+            }
+        }
+
+        // Current user message goes last
+        $messages[] = ['role' => 'user', 'content' => $userContent];
+
         $body = [
             'model'           => $model,
             'response_format' => ['type' => 'json_object'],
-            'messages'        => [
-                ['role' => 'system', 'content' => $systemPrompt],
-                ['role' => 'user',   'content' => $userContent],
-            ],
+            'messages'        => $messages,
             'temperature'     => $temperature,
         ];
 

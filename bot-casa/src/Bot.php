@@ -59,8 +59,9 @@ final class Bot implements BotInterface
         private readonly OpenAiClientInterface     $deepseekClient,
         private readonly GirlsServiceInterface     $girlsService,
         private readonly BlacklistServiceInterface $blacklistService,
-        private readonly TelegramServiceInterface  $telegramService,
-        private readonly SessionMemoryInterface    $sessionMemory,
+        private readonly TelegramServiceInterface     $telegramService,
+        private readonly SessionMemoryInterface       $sessionMemory,
+        private readonly ?\WasapBot\Services\ClientProfileService $clientProfileService = null,
         array                                      $inputGates = [],
         array                                      $processors = [],
         array                                      $sideEffects = [],
@@ -130,7 +131,12 @@ final class Bot implements BotInterface
                 }
             }
 
-            // ── 7. Audio auto-reply shortcut ─────────────────────────
+            // ── 7. Client profile context ─────────────────────────────
+            if ($this->clientProfileService !== null) {
+                $ctx['client_profile_hint'] = $this->clientProfileService->getClientContextHint($fromPhone);
+            }
+
+            // ── 8. Audio auto-reply shortcut ─────────────────────────
             $isAudio = (int) ($ctx['is_audio_i'] ?? 0);
             if ($isAudio === 1) {
                 $variants = (array) $this->config->get('message_variants.audio_auto_reply', []);
@@ -175,6 +181,9 @@ final class Bot implements BotInterface
             $systemPrompt = $this->buildSystemPrompt($ctx);
             $userMessage  = $ctx['user_message'] ?? $messageText;
 
+            // Build multi-turn chat history from session memory
+            $history = $this->buildChatHistory($ctx);
+
             // Select AI client based on routing line config
             $aiProvider = (string) ($ctx['ai_provider'] ?? 'openai');
             $aiModel    = !empty($ctx['ai_model']) ? (string) $ctx['ai_model'] : null;
@@ -190,6 +199,7 @@ final class Bot implements BotInterface
                 (string) $userMessage,
                 $ctx,
                 $aiModel,
+                $history,
             );
 
             $ctx['openai_raw_response'] = $openaiResponse;
@@ -216,6 +226,9 @@ final class Bot implements BotInterface
             if (isset($this->processors[5]) && $this->processors[5]->name() === 'ImageSplitter') {
                 $ctx = $this->processors[5]->process($ctx);
             }
+
+            // ── 14b. POST-AI: inyectar location_url si el AI dice que envía mapa pero no incluye URL ──
+            $ctx = $this->injectLocationUrl($ctx);
 
             $messages = $ctx['splitted_messages'] ?? [$ctx['output_text'] ?? ''];
 
@@ -326,9 +339,10 @@ final class Bot implements BotInterface
         $deepseekClient = new \WasapBot\Services\DeepSeekClient($config, $http, $logger);
 
         // ── Services ─────────────────────────────────────────────────
-        $girlsService    = new \WasapBot\Services\GirlsService($config, $http, $logger);
-        $blacklistService = new \WasapBot\Services\BlacklistService($config, $http, $logger);
-        $telegramService = new \WasapBot\Services\TelegramService($config, $http, $logger);
+        $girlsService      = new \WasapBot\Services\GirlsService($config, $http, $logger);
+        $blacklistService  = new \WasapBot\Services\BlacklistService($config, $http, $logger);
+        $telegramService   = new \WasapBot\Services\TelegramService($config, $http, $logger);
+        $clientProfileSvc  = new \WasapBot\Services\ClientProfileService($config, $logger);
 
         // ── Session Memory ───────────────────────────────────────────
         $sessionMemory = new \WasapBot\Memory\SessionMemory($config, $logger);
@@ -362,20 +376,21 @@ final class Bot implements BotInterface
 
         // ── Bot ──────────────────────────────────────────────────────
         $bot = new self(
-            config:           $config,
-            logger:           $logger,
-            http:             $http,
-            memory:           $memory,
-            wahaApi:          $wahaApi,
-            openaiClient:     $openaiClient,
-            deepseekClient:   $deepseekClient,
-            girlsService:     $girlsService,
-            blacklistService: $blacklistService,
-            telegramService:  $telegramService,
-            sessionMemory:    $sessionMemory,
-            inputGates:       $inputGates,
-            processors:       $processors,
-            sideEffects:      $sideEffects,
+            config:                $config,
+            logger:                $logger,
+            http:                  $http,
+            memory:                $memory,
+            wahaApi:               $wahaApi,
+            openaiClient:          $openaiClient,
+            deepseekClient:        $deepseekClient,
+            girlsService:          $girlsService,
+            blacklistService:      $blacklistService,
+            telegramService:       $telegramService,
+            sessionMemory:         $sessionMemory,
+            clientProfileService:  $clientProfileSvc,
+            inputGates:            $inputGates,
+            processors:            $processors,
+            sideEffects:           $sideEffects,
         );
 
         return [
@@ -390,6 +405,7 @@ final class Bot implements BotInterface
             'blacklistService' => $blacklistService,
             'telegramService'  => $telegramService,
             'sessionMemory'    => $sessionMemory,
+            'clientProfileService' => $clientProfileSvc,
             'inputGates'       => $inputGates,
             'processors'       => $processors,
             'sideEffects'      => $sideEffects,
@@ -439,6 +455,10 @@ final class Bot implements BotInterface
 
         // 4. Append playbook if it exists
         $playbookPath = (string) $this->config->get('files.playbook', 'data/playbook.md');
+        $rootDir = defined('WASAPBOT_ROOT') ? WASAPBOT_ROOT : dirname(__DIR__);
+        if (!str_starts_with($playbookPath, '/')) {
+            $playbookPath = $rootDir . '/' . ltrim($playbookPath, '/');
+        }
         if (file_exists($playbookPath) && is_readable($playbookPath)) {
             $playbookContent = @file_get_contents($playbookPath);
             if ($playbookContent !== false && $playbookContent !== '') {
@@ -447,6 +467,70 @@ final class Bot implements BotInterface
         }
 
         return $base;
+    }
+
+    /**
+     * Build a multi-turn chat history array from session memory.
+     *
+     * Reads the last N conversation turns from session memory for the current
+     * thread and returns them as [{role, content}, ...] for the LLM.
+     *
+     * @param array<string, mixed> $ctx  Current context (must contain thread_id)
+     * @return list<array{role: string, content: string}>
+     */
+    private function buildChatHistory(array $ctx): array
+    {
+        $threadId = (string) ($ctx['thread_id'] ?? '');
+        if ($threadId === '') {
+            return [];
+        }
+
+        try {
+            $rawHistory = $this->sessionMemory->readThread($threadId);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Bot::buildChatHistory — failed to read thread: ' . $e->getMessage());
+            return [];
+        }
+
+        if ($rawHistory === []) {
+            return [];
+        }
+
+        // Filter to recent window (last 6h) and take last N turns
+        $recentWindowH = (int) $this->config->get('memory.recent_window_hours', 6);
+        $maxTurns      = (int) $this->config->get('memory.max_history_turns', 15);
+        $now           = time();
+
+        $recent = [];
+        foreach ($rawHistory as $rec) {
+            $ts = strtotime((string) ($rec['ts'] ?? ''));
+            if ($ts !== false && ($now - $ts) <= $recentWindowH * 3600) {
+                $recent[] = $rec;
+            }
+        }
+
+        // If no recent history, fallback to last N of all history
+        if ($recent === []) {
+            $recent = array_slice($rawHistory, -$maxTurns);
+        } else {
+            $recent = array_slice($recent, -$maxTurns);
+        }
+
+        // Build alternating user/assistant messages
+        $history = [];
+        foreach ($recent as $rec) {
+            $userMsg = (string) ($rec['user_msg'] ?? '');
+            $botMsg  = (string) ($rec['bot_reply'] ?? '');
+
+            if ($userMsg !== '') {
+                $history[] = ['role' => 'user', 'content' => $userMsg];
+            }
+            if ($botMsg !== '') {
+                $history[] = ['role' => 'assistant', 'content' => $botMsg];
+            }
+        }
+
+        return $history;
     }
 
     /**
@@ -564,5 +648,81 @@ final class Bot implements BotInterface
                 $reminderWriter->writeReminder($ctx);
             }
         }
+    }
+
+    /**
+     * POST-AI safety net: if the bot text mentions sending location/maps/GPS
+     * but no actual maps URL is in the response, inject the location_url
+     * from config as a follow-up message.
+     *
+     * Conditions:
+     *  - maps_sent is false (no real maps URL sent yet in this conversation)
+     *  - location_url is available from config
+     *  - AI response mentions location-related words (ubicación, maps, gps, etc.)
+     *  - selected_girl_name is not empty OR choose_loop_count >= 3 (insistencia)
+     *
+     * @param array<string, mixed> $ctx
+     * @return array<string, mixed>
+     */
+    private function injectLocationUrl(array $ctx): array
+    {
+        // Only act if maps hasn't actually been sent yet
+        $mapsSent = (bool) ($ctx['maps_sent'] ?? false);
+        if ($mapsSent) {
+            return $ctx;
+        }
+
+        // Only if we have a location URL to send
+        $locationUrl = (string) ($ctx['location_url'] ?? '');
+        if ($locationUrl === '') {
+            return $ctx;
+        }
+
+        // Must have a selected girl or high insistence (choose_loop_count >= 3)
+        $selectedGirl = (string) ($ctx['selected_girl_name'] ?? '');
+        $chooseLoopCount = (int) ($ctx['choose_loop_count'] ?? 0);
+        if ($selectedGirl === '' && $chooseLoopCount < 3) {
+            return $ctx;
+        }
+
+        // Check if AI response already contains a maps URL
+        $outputText = (string) ($ctx['output_text'] ?? '');
+        if ($outputText === '') {
+            return $ctx;
+        }
+
+        $hasMapsUrl = (bool) preg_match(
+            '/(?:https?:\/\/)?(?:goo\.gl\/maps|maps\.app\.goo\.gl|google\.com\/maps|maps\.google\.com)/i',
+            $outputText
+        );
+        if ($hasMapsUrl) {
+            return $ctx; // Already has URL, nothing to inject
+        }
+
+        // Check if AI response contains location-sending language
+        $locationWords = '/(?:te\s*paso\s*(?:la\s*)?ubicaci[oó]n|aqui\s*(?:va|tienes|esta)\s*(?:el|la)\s*(?:mapa|ubicaci[oó]n|direcci[oó]n|gps)|te\s*(?:mando|env[ií]o)\s*(?:la\s*)?(?:ubicaci[oó]n|direcci[oó]n|mapa|gps)|ubicaci[oó]n\s*exacta|punto\s*exacto)/iu';
+        if (!preg_match($locationWords, $outputText)) {
+            return $ctx; // Not a location-sending message, skip
+        }
+
+        // Inject the maps URL as a follow-up message
+        $messages = $ctx['splitted_messages'] ?? [$outputText];
+        // Append location URL as a new solo message
+        $messages[] = [
+            '__split_index' => count($messages),
+            '__is_first'    => false,
+            'text'          => $locationUrl,
+        ];
+        $ctx['splitted_messages'] = $messages;
+
+        // Also append URL to output_text for session memory consistency
+        $ctx['output_text'] = $outputText . "\n" . $locationUrl;
+
+        $this->logger->info('Bot::injectLocationUrl — injected maps URL as follow-up', [
+            'phone'     => $ctx['from_phone'] ?? '?',
+            'thread_id' => $ctx['thread_id'] ?? '?',
+        ]);
+
+        return $ctx;
     }
 }
