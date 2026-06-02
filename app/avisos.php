@@ -3101,6 +3101,11 @@ function avisos_run_all_generators($sendWhatsapp = true) {
         aviso_cli_log('[publicista_free_bump] status=' . trim((string)($publicistaRun['status'] ?? 'unknown')) . ' next=' . trim((string)($publicistaRun['next_run_at'] ?? '')));
     }
 
+    if (function_exists('publicista_estados_wasap_run_due')) {
+        $estadosWasapRun = publicista_estados_wasap_run_due();
+        aviso_cli_log('[publicista_estados_wasap] published=' . ($estadosWasapRun['published'] ? 'yes' : 'no') . ' reason=' . ($estadosWasapRun['reason'] ?? 'published'));
+    }
+
     $allStats[] = avisos_sync_generated(
         //avisos_generate_after_10am(),
         'hora',

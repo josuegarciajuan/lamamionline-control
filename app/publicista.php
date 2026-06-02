@@ -10360,16 +10360,9 @@ function publicista_estados_wasap_get_waha_settings() {
 }
 
 function publicista_estados_wasap_fetch_active_girls($forceRefresh = false) {
+    // Siempre consultar la API en vivo. La caché solo se usa como red de
+    // seguridad si la API falla (ver $cached abajo en el handler de error).
     $cacheFile = 'publicista_estados_wasap_girls_cache.json';
-    $cacheTTL = 900;
-
-    $cached = storage_read($cacheFile);
-    if (!$forceRefresh && is_array($cached) && !empty($cached['fetched_at'])) {
-        $age = time() - strtotime((string)$cached['fetched_at']);
-        if ($age < $cacheTTL && isset($cached['girls']) && is_array($cached['girls'])) {
-            return $cached['girls'];
-        }
-    }
 
     $url = 'https://casawasap.com/girlsconf/data/girls.json';
     $ch = curl_init($url);
@@ -10382,6 +10375,8 @@ function publicista_estados_wasap_fetch_active_girls($forceRefresh = false) {
     curl_close($ch);
 
     if ($err !== '' || $code !== 200 || empty($body)) {
+        // Fallback: usar la última caché guardada como red de seguridad
+        $cached = storage_read($cacheFile);
         $expired = is_array($cached) && isset($cached['girls']) ? $cached['girls'] : array();
         return $expired;
     }

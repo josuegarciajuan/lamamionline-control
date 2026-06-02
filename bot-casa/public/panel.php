@@ -328,6 +328,16 @@ if ($method === 'GET' && $action === 'get_telefonos_lines') {
     exit;
 }
 
+// ── action=get_waha_statuses (GET, JSON response) ──────────────────────
+if ($method === 'GET' && $action === 'get_waha_statuses') {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'ok'     => true,
+        'status' => getWahaStatusesForRouting($config),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 // ─────────────────────────────────────────────────────────────────────
 //  Save config handler
 // ─────────────────────────────────────────────────────────────────────
@@ -931,6 +941,130 @@ function getMemoryGroups(array $lines): array
 }
 
 /**
+ * Look up the "notas" field from telefonos.json for a given last9 phone digits.
+ * Falls back to "nombre" if no notas found. Returns empty string if not found.
+ *
+ * This mirrors the field that arrives via Telegram lead notification (lineNotas).
+ */
+function getLineDescription(string $last9): string
+{
+    static $telefonosCache = null;
+    if ($telefonosCache === null) {
+        $telefonosCache = getTelefonosLines();
+    }
+
+    if ($last9 === '') {
+        return '';
+    }
+
+    foreach ($telefonosCache as $t) {
+        $tDigits = preg_replace('/[^0-9]/', '', (string) ($t['tfono'] ?? ''));
+        if ($tDigits !== '' && strlen($tDigits) >= 9) {
+            $tLast9 = substr($tDigits, -9);
+            if ($tLast9 === $last9) {
+                $notas = trim((string) ($t['notas'] ?? ''));
+                if ($notas !== '') {
+                    return $notas;
+                }
+                return (string) ($t['nombre'] ?? '');
+            }
+        }
+    }
+
+    return '';
+}
+
+/**
+ * Check WAHA session status for all routing lines.
+ *
+ * Returns a list of arrays with 'port', 'label', 'last9', 'status', 'status_label'.
+ *
+ * @param \WasapBot\Core\ConfigInterface $config
+ * @return list<array{port: string, label: string, last9: string, status: string, status_label: string}>
+ */
+function getWahaStatusesForRouting(\WasapBot\Core\ConfigInterface $config): array
+{
+    $lines     = config_val_array('routing.lines');
+    $baseIp    = (string) $config->get('waha.base_ip', '100.117.92.74');
+    $apiKey    = (string) $config->get('waha.api_key', '');
+    $session   = (string) $config->get('waha.session', 'default');
+    $timeout   = 5; // fast timeout — don't block the panel
+
+    $result = [];
+    foreach ($lines as $line) {
+        if (!is_array($line)) continue;
+        $port   = (string) ($line['port'] ?? '');
+        $label  = (string) ($line['label'] ?? '');
+        $last9  = (string) ($line['last9'] ?? '');
+
+        if ($port === '') {
+            $result[] = [
+                'port'         => $port,
+                'label'        => $label,
+                'last9'        => $last9,
+                'status'       => 'unknown',
+                'status_label' => 'Sin puerto',
+            ];
+            continue;
+        }
+
+        $url = 'http://' . $baseIp . ':' . $port . '/api/sessions/' . rawurlencode($session);
+        $ch  = curl_init($url);
+        if ($ch === false) {
+            $result[] = ['port' => $port, 'label' => $label, 'last9' => $last9, 'status' => 'error', 'status_label' => 'Error'];
+            continue;
+        }
+
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => $timeout,
+            CURLOPT_HTTPHEADER     => [
+                'Accept: application/json',
+                'X-Api-Key: ' . $apiKey,
+            ],
+        ]);
+
+        $body = curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err      = curl_error($ch);
+        curl_close($ch);
+
+        if ($body === false || $err !== '') {
+            $result[] = ['port' => $port, 'label' => $label, 'last9' => $last9, 'status' => 'error', 'status_label' => 'Sin respuesta'];
+            continue;
+        }
+
+        $decoded = json_decode($body, true);
+        $sessionStatus = strtoupper(trim((string) (is_array($decoded) ? ($decoded['status'] ?? '') : '')));
+
+        $statusLabel = match ($sessionStatus) {
+            'WORKING'  => 'Activa',
+            'STARTING' => 'Arrancando',
+            'SCAN_QR'  => 'Esperando QR',
+            'STOPPED'  => 'Detenida',
+            'FAILED'   => 'Fallida',
+            default    => ($sessionStatus !== '' ? $sessionStatus : ($httpCode >= 200 && $httpCode < 300 ? 'OK' : 'HTTP ' . $httpCode)),
+        };
+
+        $cssStatus = match ($sessionStatus) {
+            'WORKING'  => 'up',
+            'STARTING' => 'starting',
+            default    => 'down',
+        };
+
+        $result[] = [
+            'port'         => $port,
+            'label'        => $label,
+            'last9'        => $last9,
+            'status'       => $cssStatus,
+            'status_label' => $statusLabel,
+        ];
+    }
+
+    return $result;
+}
+
+/**
  * Render routing lines table rows as HTML.
  *
  * @param list<array<string, mixed>> $lines
@@ -949,11 +1083,15 @@ function renderRoutingLines(array $lines): string
         $openaiSel  = ($aiProvider === 'openai') ? 'selected' : '';
         $deepseekSel = ($aiProvider === 'deepseek') ? 'selected' : '';
 
+        // Descripción: lookup notas from telefonos.json (same field Telegram lead uses)
+        $descripcion = getLineDescription($last9);
+
         $html .= <<<ROW
-        <tr class="routing-row">
+        <tr class="routing-row" data-port="{$port}" data-last9="{$last9}">
             <td><input type="text" name="routing[lines][{$idx}][last9]" value="{$last9}" placeholder="Últimos 9 dígitos" class="input-cell"></td>
             <td><input type="number" name="routing[lines][{$idx}][port]" value="{$port}" placeholder="3000" class="input-cell" style="width:80px"></td>
             <td><input type="text" name="routing[lines][{$idx}][label]" value="{$label}" placeholder="linea_3000" class="input-cell"></td>
+            <td class="descripcion-cell" title="{$descripcion}">{$descripcion}</td>
             <td>
                 <select name="routing[lines][{$idx}][ai_provider]" class="input-cell" style="width:110px">
                     <option value="openai" {$openaiSel}>OpenAI</option>
@@ -962,6 +1100,7 @@ function renderRoutingLines(array $lines): string
                 <input type="hidden" name="routing[lines][{$idx}][ai_model]" value="{$aiModel}">
             </td>
             <td style="text-align:center"><input type="hidden" name="routing[lines][{$idx}][enabled]" value="0"><input type="checkbox" name="routing[lines][{$idx}][enabled]" value="1" {$chk}></td>
+            <td class="waha-status-cell" data-port="{$port}"><span class="status-dot status-unknown"></span> —</td>
             <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">X</button></td>
         </tr>
         ROW;
@@ -1278,6 +1417,24 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
 }
 .routing-table td { padding: 4px 6px; }
 .input-cell { padding: 5px 8px !important; font-size: .82rem !important; width: 100%; }
+
+/* ── WAHA status indicators ── */
+.status-dot {
+    display: inline-block; width: 10px; height: 10px;
+    border-radius: 50%; vertical-align: middle; margin-right: 4px;
+    transition: background 0.3s ease;
+}
+.status-up       { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,.5); }
+.status-starting { background: #f59e0b; box-shadow: 0 0 6px rgba(245,158,11,.5); animation: pulse-dot 1.8s infinite; }
+.status-down     { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,.4); }
+.status-error    { background: #6b7280; }
+.status-unknown  { background: #374151; }
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.4; }
+}
+.waha-status-cell { font-size: .78rem; white-space: nowrap; text-align: center; }
+.descripcion-cell { font-size: .82rem; color: var(--text-muted); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
@@ -2090,8 +2247,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <th>Teléfono (last9)</th>
                     <th>Puerto WAHA</th>
                     <th>Etiqueta</th>
+                    <th>Descripción</th>
                     <th>IA</th>
                     <th>Activa</th>
+                    <th>WAHA</th>
                     <th></th>
                 </tr>
             </thead>
@@ -2933,12 +3092,16 @@ function addRoutingRowManual() {
 
     var tr = document.createElement('tr');
     tr.className = 'routing-row';
+    tr.setAttribute('data-port', '');
+    tr.setAttribute('data-last9', '');
     tr.innerHTML = [
         '<td><input type="text" name="routing[lines][' + idx + '][last9]" value="" placeholder="Últimos 9 dígitos" class="input-cell"></td>',
         '<td><input type="number" name="routing[lines][' + idx + '][port]" value="" placeholder="3000" class="input-cell" style="width:80px"></td>',
         '<td><input type="text" name="routing[lines][' + idx + '][label]" value="" placeholder="linea_3000" class="input-cell"></td>',
+        '<td class="descripcion-cell"></td>',
         '<td><select name="routing[lines][' + idx + '][ai_provider]" class="input-cell" style="width:110px"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option></select><input type="hidden" name="routing[lines][' + idx + '][ai_model]" value=""></td>',
         '<td style="text-align:center"><input type="hidden" name="routing[lines][' + idx + '][enabled]" value="0"><input type="checkbox" name="routing[lines][' + idx + '][enabled]" value="1" checked></td>',
+        '<td class="waha-status-cell" data-port=""><span class="status-dot status-unknown"></span> —</td>',
         '<td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove()">X</button></td>'
     ].join('');
     tbody.appendChild(tr);
@@ -2983,6 +3146,7 @@ function addRoutingRowFromSelector() {
     var last9  = tfono.length >= 9 ? tfono.slice(-9) : tfono;
     var port   = line.waha_port || '';
     var lbl    = (line.nombre || 'linea').toLowerCase().replace(/[^a-z0-9_]/g, '_') + (port ? '_' + port : '');
+    var desc   = line.notas || line.nombre || '';
 
     var tbody = document.querySelector('#routingTable tbody');
     var idx = routingRowCount;
@@ -2990,12 +3154,16 @@ function addRoutingRowFromSelector() {
 
     var tr = document.createElement('tr');
     tr.className = 'routing-row';
+    tr.setAttribute('data-port', escHtml(port));
+    tr.setAttribute('data-last9', escHtml(last9));
     tr.innerHTML = [
         '<td><input type="text" name="routing[lines][' + idx + '][last9]" value="' + escHtml(last9) + '" placeholder="Últimos 9 dígitos" class="input-cell"></td>',
         '<td><input type="number" name="routing[lines][' + idx + '][port]" value="' + escHtml(port) + '" placeholder="3000" class="input-cell" style="width:80px"></td>',
         '<td><input type="text" name="routing[lines][' + idx + '][label]" value="' + escHtml(lbl) + '" placeholder="linea_3000" class="input-cell"></td>',
+        '<td class="descripcion-cell" title="' + escHtml(desc) + '">' + escHtml(desc) + '</td>',
         '<td><select name="routing[lines][' + idx + '][ai_provider]" class="input-cell" style="width:110px"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option></select><input type="hidden" name="routing[lines][' + idx + '][ai_model]" value=""></td>',
         '<td style="text-align:center"><input type="hidden" name="routing[lines][' + idx + '][enabled]" value="0"><input type="checkbox" name="routing[lines][' + idx + '][enabled]" value="1" checked></td>',
+        '<td class="waha-status-cell" data-port="' + escHtml(port) + '"><span class="status-dot status-unknown"></span> —</td>',
         '<td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove()">X</button></td>'
     ].join('');
     tbody.appendChild(tr);
@@ -3006,6 +3174,75 @@ function addRoutingRowFromSelector() {
 
 // Load telefonos on page load (only when routing tab is visible or eagerly)
 loadTelefonosIntoSelector();
+
+// ── WAHA status checker for routing lines ──
+var _wahaStatusTimeout = null;
+function loadWahaStatuses() {
+    fetch('?action=get_waha_statuses')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.ok || !data.status) return;
+            var statusList = data.status;
+            // Build a map by port
+            var map = {};
+            statusList.forEach(function(s) {
+                map[s.port] = s;
+            });
+
+            var rows = document.querySelectorAll('#routingTable tbody .routing-row');
+            rows.forEach(function(row) {
+                var port = row.getAttribute('data-port') || '';
+                var cell = row.querySelector('.waha-status-cell');
+                if (!cell) return;
+
+                var info = map[port];
+                if (!info || info.status === 'error' || info.status === 'unknown') {
+                    // Try matching by row index if port not found
+                    var idx = Array.from(row.parentNode.children).indexOf(row);
+                    if (statusList[idx]) info = statusList[idx];
+                }
+
+                if (info) {
+                    var dot = cell.querySelector('.status-dot');
+                    if (dot) {
+                        dot.className = 'status-dot status-' + (info.status || 'unknown');
+                    }
+                    cell.innerHTML = '<span class="status-dot status-' + (info.status || 'unknown') + '"></span> ' + escHtml(info.status_label || '—');
+                }
+            });
+        })
+        .catch(function() {
+            // Silently ignore — WAHA may be unreachable
+        });
+}
+
+// Load WAHA statuses when the routing tab becomes visible
+function refreshWahaOnTabSwitch() {
+    var routingTab = document.getElementById('tab-routing');
+    if (routingTab && routingTab.classList.contains('active')) {
+        loadWahaStatuses();
+    }
+}
+
+// Try loading immediately (tab might already be visible)
+if (document.getElementById('tab-routing') && document.getElementById('tab-routing').classList.contains('active')) {
+    loadWahaStatuses();
+}
+
+// Also refresh when switching to the routing tab
+document.querySelectorAll('.tab-nav button[data-tab="tab-routing"]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        setTimeout(loadWahaStatuses, 200); // small delay to let tab render
+    });
+});
+
+// Refresh every 60 seconds when routing tab is visible
+setInterval(function() {
+    var routingTab = document.getElementById('tab-routing');
+    if (routingTab && routingTab.classList.contains('active')) {
+        loadWahaStatuses();
+    }
+}, 60000);
 
 // ── Conversation modal: consolidated in first script block (uses #conversationModal) ──
 </script>
