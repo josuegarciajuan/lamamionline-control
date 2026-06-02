@@ -1979,6 +1979,25 @@ function render_publicista_campanas_page() {
             } else {
                 echo '<form method="post" class="inline-form"><input type="hidden" name="action" value="execute_publicista_campaign"><input type="hidden" name="id" value="' . e($edit['id']) . '"><button class="btn-primary" onclick="return confirm(\'¿Lanzar la subida de anuncios en segundo plano con la configuración actual de la campaña?\')">Subir anuncios</button></form>';
             }
+
+            // ─── Botones globales de resubida por plataforma ───
+            // GirlsConf siempre visible
+            echo '<form method="post" class="inline-form"><input type="hidden" name="action" value="sync_publicista_campaign_to_girlsconf"><input type="hidden" name="id" value="' . e($edit['id']) . '"><button class="btn-secondary" onclick="return confirm(\'¿Sincronizar todos los productos de esta campaña a GirlsConf? Se desactivarán todos los perfiles activos actuales y se crearán los de esta campaña.\')" title="Desactiva todos los perfiles activos y crea uno por producto de esta campaña">📤 GirlsConf</button></form>';
+
+            // Detectar si hay items de cada plataforma para mostrar los botones
+            $hasDestacamos = false;
+            $hasMundosex = false;
+            foreach ($items as $it) {
+                $pc = trim((string)($it['portal_code'] ?? 'destacamos'));
+                if ($pc === 'destacamos') $hasDestacamos = true;
+                if ($pc === 'mundosex') $hasMundosex = true;
+            }
+            if ($hasDestacamos) {
+                echo '<form method="post" class="inline-form"><input type="hidden" name="action" value="resubmit_publicista_campaign_portal"><input type="hidden" name="id" value="' . e($edit['id']) . '"><input type="hidden" name="portal_code" value="destacamos"><button class="btn-secondary" onclick="return confirm(\'¿Resubir solo los anuncios de Destacamos?\')" title="Re-ejecuta la subida solo para los items con portal Destacamos">🔄 Solo Destacamos</button></form>';
+            }
+            if ($hasMundosex) {
+                echo '<form method="post" class="inline-form"><input type="hidden" name="action" value="resubmit_publicista_campaign_portal"><input type="hidden" name="id" value="' . e($edit['id']) . '"><input type="hidden" name="portal_code" value="mundosex"><button class="btn-secondary" onclick="return confirm(\'¿Resubir solo los anuncios de Mundosex?\')" title="Re-ejecuta la subida solo para los items con portal Mundosex">🔄 Solo Mundosex</button></form>';
+            }
             echo '</div>';
 
             echo '<div class="table-wrap"><table><thead><tr><th>#</th><th>Producto</th><th>Cuenta</th><th>Modo</th><th>Copy</th><th>Listing / teléfono</th><th>Estado</th><th>Último resultado</th><th>Acciones</th></tr></thead><tbody>';
@@ -2039,7 +2058,15 @@ function render_publicista_campanas_page() {
                     echo '<details style="margin-top:6px;"><summary>Ver debug detallado</summary><pre style="white-space:pre-wrap;word-break:break-word;max-width:780px;margin-top:8px;">' . e($debugJson) . '</pre></details>';
                 } else echo '<span class="muted">Sin ejecutar</span>';
                 echo '</td>';
-                echo '<td><span class="muted">Aquí puedes corregir listing ID y teléfono antes de subir. El botón "Subir anuncios" siempre vuelve a ejecutar la campaña con esta configuración actual.</span></td>';
+                echo '<td>';
+                echo '<form method="post" class="inline-form" style="margin-bottom:6px;" onsubmit="return confirm(\'¿Subir este anuncio ahora? Se conectará a ' . e($item['portal_code'] ?? 'la plataforma') . ' para publicarlo.\')">';
+                echo '<input type="hidden" name="action" value="upload_single_campaign_item">';
+                echo '<input type="hidden" name="item_id" value="' . e($item['id']) . '">';
+                echo '<input type="hidden" name="campaign_id" value="' . e($edit['id']) . '">';
+                echo '<button class="btn-primary-mini">▲ Subir</button>';
+                echo '</form>';
+                echo '<span class="muted" style="font-size:0.82em;">Aquí puedes corregir listing ID y teléfono antes de subir. El botón "Subir anuncios" siempre vuelve a ejecutar la campaña con esta configuración actual.</span>';
+                echo '</td>';
                 echo '</tr>';
             }
             echo '</tbody></table></div>';
@@ -2622,7 +2649,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     $pipelineButtonLabel = $hasPendingBatch ? 'Relanzar generación' : 'Generar / regenerar 6 candidatas';
     $pipelineWaitingLabel = $hasPendingBatch ? 'Generación en curso / esperando resultado' : 'Generación en curso';
     $pipelineStartedLabel = !empty($processing['last_started_at']) ? format_created_at($processing['last_started_at']) : '';
-    $canCloseProfileAsFinished = (count($finalImages) >= 6) && !empty($currentCopyVersion) && empty($workflow['pack_final']);
+    $canCloseProfileAsFinished = (count($finalImages) >= 4) && !empty($currentCopyVersion) && empty($workflow['pack_final']);
 
     echo '<section class="panel panel-space">';
     echo '<div class="section-head">';
@@ -2660,7 +2687,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     echo '<div class="cards four">';
     echo '<div class="info-strip"><strong>Original</strong><br>' . (!empty($source['stored_path']) ? 'Subida' : 'Pendiente') . '</div>';
     echo '<div class="info-strip"><strong>Candidatas</strong><br>' . e((string)count($candidates)) . '</div>';
-    echo '<div class="info-strip"><strong>Finales</strong><br>' . e((string)count($finalImages)) . '/6</div>';
+    echo '<div class="info-strip"><strong>Finales</strong><br>' . e((string)count($finalImages)) . '</div>';
     echo '<div class="info-strip"><strong>Auto-regenerar</strong><br>' . (!empty($workflow['auto_regenerate']) ? 'Sí (encarece)' : 'No (recomendado)') . '</div>';
     echo '</div>';
     echo '<div class="cards four" style="margin-top:12px;">';
@@ -2968,7 +2995,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     // SECCIÓN 3: FINALES DEL PACK — sin blur + con blur manual
     // -----------------------------------------------------------------------
     echo '<section class="panel panel-space" id="publicistaFinals">';
-    echo '<div class="branch-panel-head"><h3>③ Definitivas del pack</h3><span class="summary-badge">' . e((string)count($finalImages)) . '/6</span></div>';
+    echo '<div class="branch-panel-head"><h3>③ Definitivas del pack</h3><span class="summary-badge">' . e((string)count($finalImages)) . '</span></div>';
     $usesPolloVisualFlow = function_exists('publicista_job_uses_pollo_model') && publicista_job_uses_pollo_model($selectedJob ?? array());
     if (!empty($finalImages)) {
         if ($usesPolloVisualFlow) {
@@ -3178,18 +3205,28 @@ if (empty($allPhotosForSelection)) {
             
             $checked = in_array($pId, $selectedIds, true) ? ' checked' : '';
             $isReal = strpos($pId, 'real_') === 0;
-            $label = $isReal ? 'Real: ' . e($photo['original_filename'] ?? $pId) : e($pId);
+            $isFinal = strpos($pId, 'final_') === 0;
+            if ($isReal) {
+                $label = '📸 ' . e($photo['original_filename'] ?? $pId);
+                $typeBadge = ' <span style="font-size:9px;background:#fef3c7;color:#92400e;padding:1px 4px;border-radius:3px;">REAL</span>';
+            } elseif ($isFinal) {
+                $label = 'Definitiva #' . substr($pId, 6);
+                $typeBadge = ' <span style="font-size:9px;background:#dbeafe;color:#1e40af;padding:1px 4px;border-radius:3px;">DEF</span>';
+            } else {
+                $label = e($pId);
+                $typeBadge = '';
+            }
             $blurBadge = '';
-            if ($isReal && !empty($photo['manual_blur_applied'])) {
-                $blurBadge = ' <span style="font-size:10px;background:#ede9fe;color:#6d28d9;padding:1px 5px;border-radius:3px;">BLUR</span>';
+            if (!empty($photo['manual_blur_applied'])) {
+                $blurBadge = ' <span style="font-size:9px;background:#ede9fe;color:#6d28d9;padding:1px 4px;border-radius:3px;">BLUR</span>';
             }
             
             echo '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;border:2px solid ' . ($checked ? '#6366f1' : '#e5e7eb') . ';border-radius:8px;padding:4px;min-width:110px;transition:border-color .15s;" class="platform-photo-label">';
             if ($pSrc !== '') {
                 echo '<img src="' . e($pSrc) . '" style="width:100px;height:100px;object-fit:cover;border-radius:6px;">';
             }
-            echo '<span style="font-size:10px;color:#374151;text-align:center;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' . $label . $blurBadge . '</span>';
-            echo '<input type="checkbox" name="platform_photos[' . e($pCode) . '][]" value="' . e($pId) . '"' . $checked . ' style="display:none;">';
+            echo '<span style="font-size:10px;color:#374151;text-align:center;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' . $label . $typeBadge . $blurBadge . '</span>';
+            echo '<input type="checkbox" name="platform_photos[' . e($pCode) . '][]" value="' . e($pId) . '"' . $checked . ' style="clip:rect(0,0,0,0);clip-path:inset(50%);position:absolute;width:1px;height:1px;overflow:hidden;white-space:nowrap;">';
             echo '</label>';
         }
         echo '</div>';
@@ -4180,7 +4217,7 @@ function publicista_build_job_guide_data($job) {
     $hasPrepared = trim((string)($localAssets['prepared_square_path'] ?? '')) !== '' || !empty($descriptorData);
     $hasCandidates = count($candidates) > 0;
     $finalCount = count($finalImages);
-    $hasFullFinals = $finalCount >= 6;
+    $hasFullFinals = $finalCount >= 4;
     $hasCopy = !empty($currentCopyVersion);
     $isDefinitive = !empty($workflow['pack_final']);
 
@@ -4442,7 +4479,7 @@ function dashboard_card($title, $value, $money = false) {
 
 function render_bot_casa_page() {
     page_header('Bot Casa', 'Panel de control del bot de WhatsApp');
-    $panelUrl = 'bot-casa/public/panel.php?v=20260522_2';
+    $panelUrl = 'bot-casa/public/panel.php?v=20260602_1';
     echo '<div class="panel panel-space" style="padding:0;overflow:visible;border-radius:var(--radius-md)">';
     echo '<iframe id="bot-casa-iframe" src="' . e($panelUrl) . '" style="width:100%;min-height:calc(100vh - 200px);height:auto;border:none;display:block" title="Panel Bot Casa"></iframe>';
     echo '</div>';

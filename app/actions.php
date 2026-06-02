@@ -208,11 +208,20 @@ function handle_post_actions() {
         case 'execute_publicista_campaign':
             action_execute_publicista_campaign();
             break;
+        case 'sync_publicista_campaign_to_girlsconf':
+            action_sync_publicista_campaign_to_girlsconf();
+            break;
+        case 'resubmit_publicista_campaign_portal':
+            action_resubmit_publicista_campaign_portal();
+            break;
         case 'stop_publicista_campaign_run':
             action_stop_publicista_campaign_run();
             break;
         case 'save_publicista_campaign_item_meta':
             action_save_publicista_campaign_item_meta();
+            break;
+        case 'upload_single_campaign_item':
+            action_upload_single_campaign_item();
             break;
         case 'save_publicista_campaign_auto_rotation':
             action_save_publicista_campaign_auto_rotation();
@@ -3097,6 +3106,51 @@ function action_save_publicista_campaign_item_meta() {
     redirect_to(publicista_page_url('campanas', array('edit' => $campaignId)));
 }
 
+function action_upload_single_campaign_item() {
+    $itemId = trim((string)request_post('item_id'));
+    $campaignId = trim((string)request_post('campaign_id'));
+
+    if ($itemId === '' || $campaignId === '') {
+        set_flash('error', 'Faltan datos para subir el anuncio.');
+        redirect_to(publicista_page_url('campanas'));
+    }
+
+    $item = publicista_campaign_item_get($itemId);
+    if (!$item) {
+        set_flash('error', 'No se encontró el anuncio a subir.');
+        redirect_to(publicista_page_url('campanas', array('edit' => $campaignId)));
+    }
+
+    $campaign = publicista_campaign_get($campaignId);
+    if (!$campaign) {
+        set_flash('error', 'No se encontró la campaña.');
+        redirect_to(publicista_page_url('campanas', array('edit' => $campaignId)));
+    }
+
+    $portalCode = trim((string)($item['portal_code'] ?? 'destacamos'));
+    $portalLabel = $portalCode === 'destacamos' ? 'Destacamos' : ($portalCode === 'mundosex' ? 'MundosexAnuncio' : $portalCode);
+    $accountSnapshot = is_array($item['account_snapshot'] ?? null) ? $item['account_snapshot'] : array();
+    $accountName = trim((string)($accountSnapshot['data']['display_name'] ?? ($accountSnapshot['data']['login_user'] ?? ($item['account_id'] ?? 'desconocida'))));
+    $productSnapshot = is_array($item['product_snapshot'] ?? null) ? $item['product_snapshot'] : array();
+    $productName = trim((string)($productSnapshot['data']['nombre_trabajo'] ?? ($item['product_job_id'] ?? 'producto')));
+
+    set_flash('ok', 'Subida individual lanzada en segundo plano para "' . $productName . '" → ' . $portalLabel . ' (' . $accountName . '). Recarga la página para ver el resultado.');
+    $targetUrl = publicista_page_url('campanas', array('edit' => $campaignId));
+    publicista_finish_redirect_response($targetUrl);
+
+    try {
+        list($ok, $savedItem, $result) = publicista_campaign_execute_item($campaign, $item, array());
+        if ($ok && function_exists('publicista_task_ensure_free_bump_for_item')) {
+            // El free bump ya se crea dentro de execute_item para destacamos, pero por si acaso
+        }
+    } catch (Throwable $e) {
+        // El error ya queda registrado en el item vía publicista_campaign_execute_item
+        // (que hace catch interno y guarda publish_result con estado 'failed')
+    }
+
+    exit;
+}
+
 function action_save_publicista_campaign_auto_rotation() {
     $campaignId = trim((string)request_post('campaign_id'));
     $campaign = $campaignId !== '' ? publicista_campaign_get($campaignId) : null;
@@ -3464,6 +3518,105 @@ function action_execute_publicista_campaign() {
                 'failed' => 0,
                 'results' => array(),
             ),
+            false
+        );
+    }
+
+    exit;
+}
+
+function action_sync_publicista_campaign_to_girlsconf() {
+    $id = trim((string)request_post('id'));
+    $campaign = $id !== '' ? publicista_campaign_get($id) : null;
+    if (!$campaign) {
+        set_flash('error', 'No se encontró la campaña.');
+        redirect_to(publicista_page_url('campanas'));
+    }
+
+    if (!function_exists('publicista_sync_girlsconf_to_girlsconf')) {
+        set_flash('error', 'El módulo de GirlsConf no está disponible.');
+        redirect_to(publicista_page_url('campanas', array('edit' => $id)));
+    }
+
+    try {
+        $ok = publicista_sync_girlsconf_to_girlsconf($id);
+        if ($ok) {
+            set_flash('ok', 'GirlsConf sincronizado correctamente. Se han desactivado todos los perfiles activos y se han creado los de esta campaña.');
+        } else {
+            set_flash('error', 'No se pudo sincronizar GirlsConf. Verifica que la campaña tenga productos con imágenes.');
+        }
+    } catch (Throwable $e) {
+        set_flash('error', 'Error al sincronizar GirlsConf: ' . $e->getMessage());
+    }
+
+    redirect_to(publicista_page_url('campanas', array('edit' => $id)));
+}
+
+function action_resubmit_publicista_campaign_portal() {
+    $id = trim((string)request_post('id'));
+    $portalCode = trim((string)request_post('portal_code'));
+    $campaign = $id !== '' ? publicista_campaign_get($id) : null;
+    if (!$campaign) {
+        set_flash('error', 'No se encontró la campaña.');
+        redirect_to(publicista_page_url('campanas'));
+    }
+    if ($portalCode === '' || !in_array($portalCode, array('destacamos', 'mundosex'), true)) {
+        set_flash('error', 'Portal no válido para resubida.');
+        redirect_to(publicista_page_url('campanas', array('edit' => $id)));
+    }
+
+    list($okDispatch, $savedCampaign, $meta) = publicista_campaign_dispatch_async($id);
+    if (!$okDispatch) {
+        $msg = trim((string)($meta['error'] ?? 'No se pudo lanzar la resubida.'));
+        set_flash('error', $msg);
+        redirect_to(publicista_page_url('campanas', array('edit' => $id)));
+    }
+
+    $runId = trim((string)($meta['run_id'] ?? ''));
+    $msg = 'Resubida solo ' . $portalCode . ' lanzada en segundo plano.';
+    if ($runId !== '') $msg .= ' Run: ' . $runId . '.';
+    set_flash('ok', $msg);
+
+    $targetUrl = publicista_page_url('campanas', array('edit' => $id));
+    publicista_finish_redirect_response($targetUrl);
+
+    try {
+        list($okRun, $finalCampaign, $run, $runMeta) = publicista_campaign_execute($id, array(
+            'run_id' => $runId,
+            'portal_filter' => $portalCode,
+        ));
+        $notifyCampaign = $finalCampaign ?: (publicista_campaign_get($id) ?: $campaign);
+        $notifyRun = $run ?: ($runId !== '' ? publicista_run_get($runId) : array());
+        publicista_campaign_notify_execution_finished($notifyCampaign, $notifyRun, $runMeta, $okRun);
+    } catch (Throwable $e) {
+        $failedCampaign = publicista_campaign_get($id) ?: $campaign;
+        if ($failedCampaign) {
+            $failedCampaign['estado'] = 'error';
+            $failedCampaign['updated_at'] = now_datetime();
+            $failedCampaign['execution_summary'] = array_merge((array)($failedCampaign['execution_summary'] ?? array()), array(
+                'last_phase' => 'error',
+                'last_run_id' => $runId,
+                'last_run_status' => 'failed',
+                'last_run_error' => $e->getMessage(),
+                'last_upload_finished_at' => now_datetime(),
+            ));
+            publicista_campaign_save($failedCampaign);
+        }
+        $failedRun = $runId !== '' ? publicista_run_get($runId) : null;
+        if ($failedRun) {
+            $failedRun['estado'] = 'failed';
+            $failedRun['finished_at'] = now_datetime();
+            $failedRun['summary'] = 'Error fatal durante la resubida ' . $portalCode . ': ' . $e->getMessage();
+            $failedRun['pipeline'] = array_merge((array)($failedRun['pipeline'] ?? array()), array(
+                'status' => 'error', 'stage' => 'fatal_error', 'summary' => $failedRun['summary'],
+            ));
+            $failedRun['updated_at'] = $failedRun['finished_at'];
+            publicista_run_save($failedRun);
+        }
+        publicista_campaign_notify_execution_finished(
+            $failedCampaign ?: array('id' => $id, 'nombre' => 'Campaña ' . $id),
+            $failedRun ?: array('id' => $runId),
+            array('error' => $e->getMessage(), 'published' => 0, 'failed' => 0, 'results' => array()),
             false
         );
     }

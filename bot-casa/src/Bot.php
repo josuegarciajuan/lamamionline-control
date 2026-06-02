@@ -40,6 +40,7 @@ final class Bot implements BotInterface
      * @param MemoryInterface              $memory
      * @param WahaApiInterface             $wahaApi
      * @param OpenAiClientInterface        $openaiClient
+     * @param OpenAiClientInterface        $deepseekClient
      * @param GirlsServiceInterface        $girlsService
      * @param BlacklistServiceInterface    $blacklistService
      * @param TelegramServiceInterface     $telegramService
@@ -55,6 +56,7 @@ final class Bot implements BotInterface
         private readonly MemoryInterface           $memory,
         private readonly WahaApiInterface          $wahaApi,
         private readonly OpenAiClientInterface     $openaiClient,
+        private readonly OpenAiClientInterface     $deepseekClient,
         private readonly GirlsServiceInterface     $girlsService,
         private readonly BlacklistServiceInterface $blacklistService,
         private readonly TelegramServiceInterface  $telegramService,
@@ -169,14 +171,25 @@ final class Bot implements BotInterface
                 $ctx = $this->processors[1]->process($ctx);
             }
 
-            // ── 10. Call OpenAI chat completion ──────────────────────
+            // ── 10. Call AI chat completion (OpenAI or DeepSeek) ──────
             $systemPrompt = $this->buildSystemPrompt($ctx);
             $userMessage  = $ctx['user_message'] ?? $messageText;
 
-            $openaiResponse = $this->openaiClient->chat(
+            // Select AI client based on routing line config
+            $aiProvider = (string) ($ctx['ai_provider'] ?? 'openai');
+            $aiModel    = !empty($ctx['ai_model']) ? (string) $ctx['ai_model'] : null;
+
+            if ($aiProvider === 'deepseek') {
+                $aiClient = $this->deepseekClient;
+            } else {
+                $aiClient = $this->openaiClient;
+            }
+
+            $openaiResponse = $aiClient->chat(
                 $systemPrompt,
                 (string) $userMessage,
                 $ctx,
+                $aiModel,
             );
 
             $ctx['openai_raw_response'] = $openaiResponse;
@@ -308,8 +321,9 @@ final class Bot implements BotInterface
         // ── WAHA API ─────────────────────────────────────────────────
         $wahaApi = new \WasapBot\Services\WahaApi($config, $http, $logger);
 
-        // ── OpenAI Client ────────────────────────────────────────────
-        $openaiClient = new \WasapBot\Services\OpenAiClient($config, $http, $logger);
+        // ── AI Clients ────────────────────────────────────────────────
+        $openaiClient   = new \WasapBot\Services\OpenAiClient($config, $http, $logger);
+        $deepseekClient = new \WasapBot\Services\DeepSeekClient($config, $http, $logger);
 
         // ── Services ─────────────────────────────────────────────────
         $girlsService    = new \WasapBot\Services\GirlsService($config, $http, $logger);
@@ -354,6 +368,7 @@ final class Bot implements BotInterface
             memory:           $memory,
             wahaApi:          $wahaApi,
             openaiClient:     $openaiClient,
+            deepseekClient:   $deepseekClient,
             girlsService:     $girlsService,
             blacklistService: $blacklistService,
             telegramService:  $telegramService,
@@ -370,6 +385,7 @@ final class Bot implements BotInterface
             'memory'           => $memory,
             'wahaApi'          => $wahaApi,
             'openaiClient'     => $openaiClient,
+            'deepseekClient'   => $deepseekClient,
             'girlsService'     => $girlsService,
             'blacklistService' => $blacklistService,
             'telegramService'  => $telegramService,
@@ -393,9 +409,15 @@ final class Bot implements BotInterface
      */
     private function buildSystemPrompt(array $ctx): string
     {
-        // 1. Build base from template + sections (new parametrized approach)
-        $template = (string) $this->config->get('prompt.template', '');
-        $sections = (array) $this->config->get('prompt.sections', []);
+        // 1. Respect prompt mode: use v2 sections if mode is natural_v2
+        $mode = (string) $this->config->get('prompt.mode', '');
+        $isV2 = ($mode === 'natural_v2');
+
+        $templateKey = $isV2 ? 'prompt.template_v2' : 'prompt.template';
+        $sectionsKey = $isV2 ? 'prompt.sections_v2' : 'prompt.sections';
+
+        $template = (string) $this->config->get($templateKey, '');
+        $sections = (array) $this->config->get($sectionsKey, []);
 
         $base = $template;
         if ($template !== '' && !empty($sections)) {

@@ -100,6 +100,7 @@ require_once APP_PATH . '/avisos.php';
 require_once APP_PATH . '/auth.php';
 require_once APP_PATH . '/voice.php';
 require_once APP_PATH . '/publicista.php';
+require_once APP_PATH . '/publicista_girlsconf.php';
 require_once APP_PATH . '/comercial.php';
 require_once APP_PATH . '/actions.php';
 require_once APP_PATH . '/bot_templates.php';

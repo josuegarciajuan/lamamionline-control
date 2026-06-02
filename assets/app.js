@@ -1468,8 +1468,24 @@
         });
     }
 
+    // --- Platform photo selection: visual feedback on click ---
+    function initPlatformPhotoLabels() {
+        document.querySelectorAll('.platform-photo-label').forEach(function (label) {
+            label.addEventListener('click', function () {
+                var cb = this.querySelector('input[type="checkbox"]');
+                if (!cb) return;
+                // Let browser toggle the checkbox first, then update border
+                var self = this;
+                setTimeout(function () {
+                    self.style.borderColor = cb.checked ? '#6366f1' : '#e5e7eb';
+                }, 10);
+            });
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         initLineasUnifiedSearch();
         initLineasModal();
+        initPlatformPhotoLabels();
     });
 })();

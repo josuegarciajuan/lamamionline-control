@@ -115,16 +115,55 @@ function getBotMode(): string
 }
 
 /**
- * Write the bot mode file.
+ * Write the bot mode file. Returns true on success, false on failure.
+ *
+ * Uses multiple fallback strategies (direct write, chmod+write, temp+rename)
+ * to handle permission edge cases (e.g. file owned by root with 0644).
  */
-function setBotMode(string $mode): void
+function setBotMode(string $mode): bool
 {
     global $modeFilePath;
     $dir = dirname($modeFilePath);
     if (!is_dir($dir)) {
         @mkdir($dir, 0750, true);
     }
-    @file_put_contents($modeFilePath, $mode, LOCK_EX);
+
+    $payload = ($mode === 'stop') ? 'stop' : 'start';
+    clearstatcache(true, $modeFilePath);
+
+    // Strategy 1: direct write
+    if (@file_put_contents($modeFilePath, $payload, LOCK_EX) !== false) {
+        @chmod($modeFilePath, 0664);
+        return true;
+    }
+
+    // Strategy 2: chmod + write
+    @chmod($modeFilePath, 0664);
+    clearstatcache(true, $modeFilePath);
+    if (@file_put_contents($modeFilePath, $payload, LOCK_EX) !== false) {
+        @chmod($modeFilePath, 0664);
+        return true;
+    }
+
+    // Strategy 3: temp file + rename (atomic, bypasses ownership)
+    if (is_dir($dir) && is_writable($dir)) {
+        $tmpPath = $dir . '/.bot_mode_tmp_' . uniqid('', true);
+        if (@file_put_contents($tmpPath, $payload, LOCK_EX) !== false) {
+            @chmod($tmpPath, 0664);
+            if (@rename($tmpPath, $modeFilePath)) {
+                @chmod($modeFilePath, 0664);
+                return true;
+            }
+            // rename may fail across filesystems; try unlink+rename
+            if (@unlink($modeFilePath) && @rename($tmpPath, $modeFilePath)) {
+                @chmod($modeFilePath, 0664);
+                return true;
+            }
+            @unlink($tmpPath);
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -147,14 +186,27 @@ function resolveConfigPath(string $configKey, string $defaultValue): string
 
 function generateCsrfToken(): string
 {
-    // Rotates every 8 hours; no storage needed
+    // Rotates every 10 minutes; no storage needed
     $secret = defined('WASAPBOT_ROOT') ? WASAPBOT_ROOT : __DIR__;
     return hash_hmac('sha256', date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
 }
 
 function validateCsrfToken(string $token): bool
 {
-    return hash_equals(generateCsrfToken(), $token);
+    $secret = defined('WASAPBOT_ROOT') ? WASAPBOT_ROOT : __DIR__;
+
+    // Accept current time window
+    $current = hash_hmac('sha256', date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
+    if (hash_equals($current, $token)) {
+        return true;
+    }
+
+    // Also accept previous time window — prevents false negatives when
+    // the page was loaded just before a 10-minute boundary and submitted
+    // shortly after.
+    $prevSlot = max(0, floor((int) date('i') / 10) - 1);
+    $previous = hash_hmac('sha256', date('Y-m-d-H') . $prevSlot, $secret);
+    return hash_equals($previous, $token);
 }
 
 function requireValidCsrf(): void
@@ -185,7 +237,7 @@ function buildRedirectUrl(string $baseUrl, string $extraParam): string
 {
     $allowedTabs = [
         'tab-status', 'tab-descripcion', 'tab-prompt', 'tab-leads',
-        'tab-waha', 'tab-openai', 'tab-routing', 'tab-delays',
+        'tab-waha', 'tab-ia', 'tab-routing', 'tab-delays',
         'tab-variants', 'tab-followup', 'tab-reminder', 'tab-urls',
         'tab-memory', 'tab-logs',
     ];
@@ -211,8 +263,13 @@ if ($method === 'POST' && $action === 'save_config') {
 if ($method === 'POST' && $action === 'toggle_bot') {
     requireValidCsrf();
     $current = getBotMode();
-    setBotMode($current === 'start' ? 'stop' : 'start');
-    header('Location: ' . buildRedirectUrl($baseUrl, 'toggled=1'));
+    $newMode = $current === 'start' ? 'stop' : 'start';
+    $ok = setBotMode($newMode);
+    if ($ok) {
+        header('Location: ' . buildRedirectUrl($baseUrl, 'toggled=1'));
+    } else {
+        header('Location: ' . buildRedirectUrl($baseUrl, 'error=toggle_failed'));
+    }
     exit;
 }
 
@@ -350,6 +407,14 @@ function recursiveSave(\WasapBot\Core\Config $config, array $data, string $prefi
                         } else {
                             $line['enabled'] = (bool) $line['enabled'];
                         }
+                        // ai_provider: ensure valid values only
+                        if (!isset($line['ai_provider']) || !in_array((string) $line['ai_provider'], ['openai', 'deepseek'], true)) {
+                            $line['ai_provider'] = 'openai';
+                        }
+                        // ai_model: null if empty string
+                        if (isset($line['ai_model']) && $line['ai_model'] === '') {
+                            $line['ai_model'] = null;
+                        }
                         $cleanLines[] = $line;
                     }
                     $config->set($fullKey, $cleanLines);
@@ -429,7 +494,8 @@ function castNumericValue(string $key, string $value): mixed
     ];
 
     static $floatKeys = [
-        'openai.tone_temperature', 'human_delays.typing.chunk_pause_factor',
+        'openai.tone_temperature', 'openai.temperature', 'deepseek.temperature',
+        'human_delays.typing.chunk_pause_factor',
         'human_delays.habituation.start_boost', 'human_delays.habituation.decay', 'human_delays.habituation.floor',
         'human_delays.short_typing_sec', 'human_delays.after_send_fallback_sec',
         'dedup_coalesce.lock_acquire_sleep_sec', 'dedup_coalesce.lead_log_lock_sleep_sec',
@@ -873,20 +939,30 @@ function renderRoutingLines(array $lines): string
 {
     $html = '';
     foreach ($lines as $idx => $line) {
-        $last9   = h((string) ($line['last9'] ?? ''));
-        $port    = h((string) ($line['port'] ?? ''));
-        $label   = h((string) ($line['label'] ?? ''));
-        $enabled = (bool) ($line['enabled'] ?? true);
-        $chk     = $enabled ? 'checked' : '';
+        $last9      = h((string) ($line['last9'] ?? ''));
+        $port       = h((string) ($line['port'] ?? ''));
+        $label      = h((string) ($line['label'] ?? ''));
+        $enabled    = (bool) ($line['enabled'] ?? true);
+        $aiProvider = (string) ($line['ai_provider'] ?? 'openai');
+        $aiModel    = (string) ($line['ai_model'] ?? '');
+        $chk        = $enabled ? 'checked' : '';
+        $openaiSel  = ($aiProvider === 'openai') ? 'selected' : '';
+        $deepseekSel = ($aiProvider === 'deepseek') ? 'selected' : '';
 
-        $notas  = h((string) ($line['notas'] ?? ''));
         $html .= <<<ROW
         <tr class="routing-row">
             <td><input type="text" name="routing[lines][{$idx}][last9]" value="{$last9}" placeholder="Últimos 9 dígitos" class="input-cell"></td>
             <td><input type="number" name="routing[lines][{$idx}][port]" value="{$port}" placeholder="3000" class="input-cell" style="width:80px"></td>
             <td><input type="text" name="routing[lines][{$idx}][label]" value="{$label}" placeholder="linea_3000" class="input-cell"></td>
+            <td>
+                <select name="routing[lines][{$idx}][ai_provider]" class="input-cell" style="width:110px">
+                    <option value="openai" {$openaiSel}>OpenAI</option>
+                    <option value="deepseek" {$deepseekSel}>DeepSeek</option>
+                </select>
+                <input type="hidden" name="routing[lines][{$idx}][ai_model]" value="{$aiModel}">
+            </td>
             <td style="text-align:center"><input type="hidden" name="routing[lines][{$idx}][enabled]" value="0"><input type="checkbox" name="routing[lines][{$idx}][enabled]" value="1" {$chk}></td>
-            <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">X</button><input type="hidden" name="routing[lines][{$idx}][notas]" value="{$notas}"></td>
+            <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">X</button></td>
         </tr>
         ROW;
     }
@@ -913,6 +989,9 @@ if (isset($_GET['saved'])) {
 }
 if (isset($_GET['toggled'])) {
     $notification = '<div class="alert alert-info">Estado del bot cambiado.</div>';
+}
+if (isset($_GET['error']) && $_GET['error'] === 'toggle_failed') {
+    $notification = '<div class="alert alert-error">No se pudo cambiar el estado del bot. Revisa los permisos del archivo <code>' . h(basename($modeFilePath)) . '</code> en <code>' . h(dirname($modeFilePath)) . '</code>.</div>';
 }
 if (isset($_GET['deleted'])) {
     $n = (int) $_GET['deleted'];
@@ -1319,7 +1398,7 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
     <button type="button" data-tab="tab-prompt">System Prompt</button>
     <button type="button" data-tab="tab-leads">Leads</button>
     <button type="button" data-tab="tab-waha">WAHA</button>
-    <button type="button" data-tab="tab-openai">OpenAI</button>
+    <button type="button" data-tab="tab-ia">🤖 IA</button>
     <button type="button" data-tab="tab-routing">Routing</button>
     <button type="button" data-tab="tab-delays">Human Delays</button>
     <button type="button" data-tab="tab-variants">Variantes</button>
@@ -1662,7 +1741,7 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
                     <td class="mono" style="font-size:.75rem"><?php echo h($lastFuDisp ?: '—'); ?></td>
                     <td style="text-align:center">
                         <?php if ($threadId !== ''): ?>
-                        <button type="button" class="btn btn-sm btn-primary" onclick="openConversationModal(<?php echo json_encode($threadId, JSON_HEX_APOS | JSON_HEX_QUOT); ?>, <?php echo json_encode($phoneDisp, JSON_HEX_APOS | JSON_HEX_QUOT); ?>)">Ver</button>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="openConversationModal('<?php echo h($threadId); ?>')">Ver</button>
                         <?php else: ?>
                         <span style="color:var(--text-muted)">—</span>
                         <?php endif; ?>
@@ -1733,39 +1812,253 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
     </div>
 </div>
 
-<!-- ===== TAB 5: Configuración OpenAI ===== -->
-<div class="tab-content" id="tab-openai">
+<!-- ===== TAB 5: ConfiguraciÃ³n IA ===== -->
+<div class="tab-content" id="tab-ia">
     <div class="card">
-        <h2>Configuración OpenAI</h2>
-        <div class="form-group">
-            <label>API Key</label>
-            <input type="password" name="openai[api_key]" value="<?php echo config_val('openai.api_key'); ?>">
+        <h2>Configuración IA</h2>
+        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:18px">
+            Configura los proveedores de inteligencia artificial que usarÃ¡ el bot.
+            Cada lÃ­nea de WhatsApp (en la pestaÃ±a Routing) puede elegir quÃ© proveedor usar.
+        </p>
+
+        <!-- ── SECCIÃN OPENAI ── -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px 24px;margin-bottom:20px">
+            <h3 style="margin:0 0 4px;display:flex;align-items:center;gap:8px">
+                <span style="font-size:1.2rem">🧠</span> OpenAI
+            </h3>
+            <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:16px">
+                Proveedor principal. Modelos de alta calidad con buena comprensiÃ³n del espaÃ±ol coloquial.
+            </p>
+
+            <div class="form-group">
+                <label>API Key <span style="color:var(--text-muted);font-weight:400">— tu clave secreta de OpenAI</span></label>
+                <input type="password" name="openai[api_key]" value="<?php echo config_val('openai.api_key'); ?>" placeholder="sk-proj-...">
+            </div>
+
+            <div class="form-row" style="align-items:flex-start">
+                <div class="form-group" style="flex:2">
+                    <label>Modelo de Chat <span style="color:var(--text-muted);font-weight:400">— el que genera las respuestas del bot</span></label>
+                    <select name="openai[chat_model]" id="openaiModelSelect" class="ai-model-select" onchange="showModelInfo('openai')">
+                        <?php
+                        $openaiModels = [
+                            'gpt-5.1'       => 'GPT-5.1 — Flagship. Excelente con prompts largos. ~$1.25/$10 por MTok.',
+                            'gpt-4o'        => 'GPT-4o — ClÃ¡sico y estable. Comportamiento 100% predecible. ~$2.50/$10.',
+                            'gpt-4o-mini'   => 'GPT-4o-mini — El mÃ¡s barato de OpenAI. Muy rÃ¡pido. ~$0.15/$0.60.',
+                            'gpt-5.4'       => 'GPT-5.4 — Nueva generaciÃ³n. Mejor razonamiento que 5.1. ~$2.50/$15.',
+                            'gpt-5.4-mini'  => 'GPT-5.4-mini — Nueva gen. econÃ³mica. ~$0.75/$4.50.',
+                            'gpt-5.5'       => 'GPT-5.5 — El mÃ¡s potente. Para lÃ­neas premium. ~$5/$30.',
+                        ];
+                        $currentOpenaiModel = config_val('openai.chat_model', 'gpt-5.1');
+                        foreach ($openaiModels as $id => $desc) {
+                            $sel = ($id === $currentOpenaiModel) ? 'selected' : '';
+                            echo "<option value=\"{$id}\" {$sel}>{$desc}</option>";
+                        }
+                        ?>
+                    </select>
+                    <div id="openaiModelInfo" class="model-info-box">
+                        <?php echo h($openaiModels[$currentOpenaiModel] ?? ''); ?>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-row" style="align-items:flex-start">
+                <div class="form-group" style="flex:1">
+                    <label>Temperature <span style="color:var(--text-muted);font-weight:400">— creatividad del modelo (0-2)</span></label>
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <input type="range" name="openai[temperature]" id="openaiTemperature" min="0" max="2" step="0.1"
+                               value="<?php echo config_val('openai.temperature', '0'); ?>"
+                               oninput="document.getElementById('openaiTempVal').textContent=this.value;showTempInfo('openai')"
+                               style="flex:1">
+                        <span id="openaiTempVal" style="font-weight:700;min-width:30px;text-align:right"><?php echo config_val('openai.temperature', '0'); ?></span>
+                    </div>
+                    <div id="openaiTempInfo" class="model-info-box" style="margin-top:6px"></div>
+                </div>
+            </div>
+
+            <details style="margin-top:10px">
+                <summary style="cursor:pointer;color:var(--text-muted);font-size:.82rem">▼ ConfiguraciÃ³n avanzada (Tone Classifier)</summary>
+                <div class="form-row" style="margin-top:10px">
+                    <div class="form-group">
+                        <label>Modelo clasificador de tono</label>
+                        <input type="text" name="openai[tone_classifier_model]" value="<?php echo config_val('openai.tone_classifier_model', 'gpt-4o-mini'); ?>">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tone Temperature</label>
+                        <input type="number" step="0.1" name="openai[tone_temperature]" value="<?php echo config_val('openai.tone_temperature', '0'); ?>">
+                    </div>
+                    <div class="form-group">
+                        <label>Tone Max Tokens</label>
+                        <input type="number" name="openai[tone_max_tokens]" value="<?php echo config_val('openai.tone_max_tokens', '50'); ?>">
+                    </div>
+                </div>
+            </details>
         </div>
-        <div class="form-row">
+
+        <!-- ── SECCIÃN DEEPSEEK ── -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px 24px;margin-bottom:20px">
+            <h3 style="margin:0 0 4px;display:flex;align-items:center;gap:8px">
+                <span style="font-size:1.2rem">🐋</span> DeepSeek
+            </h3>
+            <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:16px">
+                Alternativa ultra-econÃ³mica. API compatible con OpenAI. Ideal para lÃ­neas de alto volumen.
+                La API key se precarga desde la configuraciÃ³n existente de Publicista si estÃ¡ disponible.
+            </p>
+
             <div class="form-group">
-                <label>Chat Model</label>
-                <input type="text" name="openai[chat_model]" value="<?php echo config_val('openai.chat_model', 'gpt-5.1'); ?>">
+                <label>API Key <span style="color:var(--text-muted);font-weight:400">— tu clave de DeepSeek</span></label>
+                <?php
+                // Pre-fill DeepSeek API key from CRM publicista settings if available
+                $deepseekDefaultKey = '';
+                $crmSettingsPath = dirname(__DIR__, 2) . '/data/settings.json';
+                if (file_exists($crmSettingsPath) && is_readable($crmSettingsPath)) {
+                    $crmSettings = @json_decode((string) @file_get_contents($crmSettingsPath), true);
+                    if (is_array($crmSettings) && !empty($crmSettings['publicista_copy_api_key'])) {
+                        $deepseekDefaultKey = trim((string) $crmSettings['publicista_copy_api_key']);
+                    }
+                }
+                $currentDsKey = config_val('deepseek.api_key');
+                // If no key set yet and we have a default from CRM, use it
+                $displayKey = ($currentDsKey === '' || $currentDsKey === 'CHANGEME_DEEPSEEK_API_KEY') ? $deepseekDefaultKey : $currentDsKey;
+                ?>
+                <input type="password" name="deepseek[api_key]" value="<?php echo h($displayKey); ?>" placeholder="sk-...">
+                <?php if ($deepseekDefaultKey !== '' && ($currentDsKey === '' || $currentDsKey === 'CHANGEME_DEEPSEEK_API_KEY')): ?>
+                <small style="color:var(--ok)">✓ Precargada desde Publicista</small>
+                <?php endif; ?>
             </div>
-            <div class="form-group">
-                <label>Tone Classifier Model</label>
-                <input type="text" name="openai[tone_classifier_model]" value="<?php echo config_val('openai.tone_classifier_model', 'gpt-4o-mini'); ?>">
+
+            <div class="form-row" style="align-items:flex-start">
+                <div class="form-group" style="flex:2">
+                    <label>Modelo de Chat <span style="color:var(--text-muted);font-weight:400">— el que genera las respuestas</span></label>
+                    <select name="deepseek[chat_model]" id="deepseekModelSelect" class="ai-model-select" onchange="showModelInfo('deepseek')">
+                        <?php
+                        $deepseekModels = [
+                            'deepseek-v4-pro'  => 'DeepSeek V4 Pro — El mÃ¡s potente. Calidad cercana a GPT-5.1. ~$0.44/$0.87 por MTok.',
+                            'deepseek-v4-flash'=> 'DeepSeek V4 Flash — Ultra-econÃ³mico y rÃ¡pido. ~$0.14/$0.28. Ideal para alto volumen.',
+                            'deepseek-chat'    => 'DeepSeek V3 (legacy) — Obsoleto en julio 2026. Solo compatibilidad.',
+                        ];
+                        $currentDsModel = config_val('deepseek.chat_model', 'deepseek-v4-flash');
+                        foreach ($deepseekModels as $id => $desc) {
+                            $sel = ($id === $currentDsModel) ? 'selected' : '';
+                            echo "<option value=\"{$id}\" {$sel}>{$desc}</option>";
+                        }
+                        ?>
+                    </select>
+                    <div id="deepseekModelInfo" class="model-info-box">
+                        <?php echo h($deepseekModels[$currentDsModel] ?? ''); ?>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-row" style="align-items:flex-start">
+                <div class="form-group" style="flex:1">
+                    <label>Temperature <span style="color:var(--text-muted);font-weight:400">— creatividad (0-2). Default DeepSeek: 0.7</span></label>
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <input type="range" name="deepseek[temperature]" id="deepseekTemperature" min="0" max="2" step="0.1"
+                               value="<?php echo config_val('deepseek.temperature', '0.7'); ?>"
+                               oninput="document.getElementById('deepseekTempVal').textContent=this.value;showTempInfo('deepseek')"
+                               style="flex:1">
+                        <span id="deepseekTempVal" style="font-weight:700;min-width:30px;text-align:right"><?php echo config_val('deepseek.temperature', '0.7'); ?></span>
+                    </div>
+                    <div id="deepseekTempInfo" class="model-info-box" style="margin-top:6px"></div>
+                </div>
             </div>
         </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label>Tone Temperature</label>
-                <input type="number" step="0.1" name="openai[tone_temperature]" value="<?php echo config_val('openai.tone_temperature', '0'); ?>">
-            </div>
-            <div class="form-group">
-                <label>Tone Max Tokens</label>
-                <input type="number" name="openai[tone_max_tokens]" value="<?php echo config_val('openai.tone_max_tokens', '50'); ?>">
-            </div>
-        </div>
+
         <div style="margin-top:10px">
-            <button type="submit" class="btn btn-primary btn-lg">Guardar OpenAI</button>
+            <button type="submit" class="btn btn-primary btn-lg">Guardar IA</button>
         </div>
     </div>
 </div>
+
+<script>
+// ── Model descriptions (static data for JS) ──
+const modelDescriptions = {
+    openai: {
+        'gpt-5.1':       { desc: 'Modelo mÃ¡s equilibrado de OpenAI. Excelente para prompts largos y complejos como el System Prompt del bot.', pros: '✔ Mejor seguimiento de instrucciones largas\n✔ Buen espaÃ±ol coloquial\n✔ Razonamiento configurable', cons: '✘ Latencia media (~2-4s)\n✘ MÃ¡s caro que alternativas ($10/MTok output)', temp: true },
+        'gpt-4o':        { desc: 'Modelo clÃ¡sico, muy estable y predecible. Comportamiento consistente en todas las conversaciones.', pros: '✔ 100% predecible\n✔ Bien probado en producciÃ³n\n✔ Respuestas rÃ¡pidas', cons: '✘ TecnologÃ­a anterior\n✘ MÃ¡s caro que 5.1 ($10/MTok)\n✘ Peor con prompts muy largos', temp: true },
+        'gpt-4o-mini':   { desc: 'El mÃ¡s barato de OpenAI. Muy rÃ¡pido pero menos sofisticado. Ideal si el presupuesto es la prioridad.', pros: '✔ Coste mÃ­nimo ($0.60/MTok)\n✔ Muy rÃ¡pido (< 1s)\n✔ Bueno para respuestas simples', cons: '✘ Puede sonar robÃ³tico\n✘ Menos creativo\n✘ No ideal para prompts complejos', temp: true },
+        'gpt-5.4':       { desc: 'Nueva generaciÃ³n. Mejor razonamiento que 5.1, manteniendo buena relaciÃ³n calidad/precio.', pros: '✔ MÃ¡s inteligente que 5.1\n✔ Mejor con contexto largo\n✔ Buenos matices conversacionales', cons: '✘ MÃ¡s caro en output ($15/MTok)\n✘ Puede ser "demasiado listo" para respuestas simples', temp: true },
+        'gpt-5.4-mini':  { desc: 'Nueva generaciÃ³n econÃ³mica. Muy buena relaciÃ³n calidad/precio para uso general.', pros: '✔ Excelente calidad/precio\n✔ Moderno y rÃ¡pido\n✔ Buen espaÃ±ol', cons: '✘ Contexto mÃ¡ximo 400K (vs 1M)\n✘ Menos potente que los modelos grandes', temp: true },
+        'gpt-5.5':       { desc: 'El mÃ¡s potente de OpenAI. Para lÃ­neas premium donde la calidad es crÃ­tica.', pros: '✔ MÃ¡xima calidad de respuesta\n✔ El mejor espaÃ±ol\n✔ Contexto de 1M tokens', cons: '✘ Muy caro ($30/MTok output)\n✘ Overkill para respuestas de 1-2 frases\n✘ Mayor latencia', temp: true }
+    },
+    deepseek: {
+        'deepseek-v4-pro':  { desc: 'El mÃ¡s potente de DeepSeek. Calidad comparable a GPT-5.1 por ~1/10 del precio.', pros: '✔ Excelente relaciÃ³n calidad/precio\n✔ API OpenAI-compatible\n✔ Buen espaÃ±ol\n✔ Thinking mode disponible', cons: '✘ Latencia mayor desde Europa (~3-6s)\n✘ Menos conocido/probado que OpenAI', temp: true },
+        'deepseek-v4-flash':{ desc: 'Ultra-econÃ³mico y rÃ¡pido. Perfecto para lÃ­neas de alto volumen donde el coste importa.', pros: '✔ Precio imbatible ($0.28/MTok)\n✔ Muy rÃ¡pido\n✔ Ideal para alto volumen', cons: '✘ Menos sofisticado en conversaciones complejas\n✘ Puede fallar con prompts muy largos', temp: true },
+        'deepseek-chat':    { desc: 'Modelo legacy (DeepSeek V3). SerÃ¡ deprecado en julio 2026. Solo para compatibilidad.', pros: '✔ Compatible con cÃ³digo existente\n✔ Barato', cons: '✘ Obsoleto pronto\n✘ Migrar a v4-flash recomendado', temp: true }
+    }
+};
+
+// ── Temperature descriptions ──
+function getTempDescription(val) {
+    val = parseFloat(val);
+    if (val === 0) return '🧊 <strong>0 — Determinista.</strong> El bot responderÃ¡ siempre igual ante la misma pregunta. Predecible pero puede sonar repetitivo entre conversaciones distintas.';
+    if (val <= 0.3) return '❄️ <strong>' + val.toFixed(1) + ' — Muy enfocado.</strong> Ligera variaciÃ³n. El bot mantiene consistencia pero evita repetir frases idÃ©nticas. ⭐ <em>Recomendado para este bot.</em>';
+    if (val <= 0.6) return '🌤️ <strong>' + val.toFixed(1) + ' — Equilibrado.</strong> Creatividad moderada. El bot improvisa mÃ¡s frases y varÃ­a el vocabulario. Bueno para sonar natural.';
+    if (val <= 0.9) return '🔥 <strong>' + val.toFixed(1) + ' — Creativo.</strong> El bot improvisa bastante. Puede inventar frases que no estÃ¡n en el prompt. Ãtil para evitar sonar robÃ³tico pero puede desviarse del guion.';
+    if (val <= 1.3) return '🌪️ <strong>' + val.toFixed(1) + ' — Muy creativo.</strong> Respuestas impredecibles. Puede salirse del System Prompt. Usar con precauciÃ³n.';
+    return '🎲 <strong>' + val.toFixed(1) + ' — Impredecible.</strong> El bot serÃ¡ muy aleatorio. No recomendado para atenciÃ³n al cliente. Riesgo de respuestas incoherentes.';
+}
+
+function showModelInfo(provider) {
+    var sel = document.getElementById(provider + 'ModelSelect');
+    var infoDiv = document.getElementById(provider + 'ModelInfo');
+    if (!sel || !infoDiv) return;
+    var model = sel.value;
+    var data = modelDescriptions[provider] && modelDescriptions[provider][model];
+    if (data) {
+        var html = '<div style="margin-top:2px"><strong>' + data.desc + '</strong></div>';
+        html += '<div style="display:flex;gap:16px;margin-top:6px;flex-wrap:wrap">';
+        html += '<div style="flex:1;min-width:180px"><small style="color:var(--ok)">' + data.pros.replace(/\n/g, '<br>') + '</small></div>';
+        html += '<div style="flex:1;min-width:180px"><small style="color:var(--danger)">' + data.cons.replace(/\n/g, '<br>') + '</small></div>';
+        html += '</div>';
+        infoDiv.innerHTML = html;
+    }
+}
+
+function showTempInfo(provider) {
+    var slider = document.getElementById(provider + 'Temperature');
+    var infoDiv = document.getElementById(provider + 'TempInfo');
+    if (!slider || !infoDiv) return;
+    infoDiv.innerHTML = getTempDescription(slider.value);
+}
+
+// Init on page load
+document.addEventListener('DOMContentLoaded', function() {
+    showModelInfo('openai');
+    showModelInfo('deepseek');
+    showTempInfo('openai');
+    showTempInfo('deepseek');
+});
+</script>
+
+<style>
+.ai-model-select {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: .9rem;
+    line-height: 1.5;
+}
+.ai-model-select option {
+    padding: 8px;
+    white-space: normal;
+}
+.model-info-box {
+    margin-top: 8px;
+    padding: 12px 14px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    font-size: .82rem;
+    line-height: 1.6;
+    color: var(--text);
+}
+</style>
 
 <!-- ===== TAB 6: Routing de números ===== -->
 <div class="tab-content" id="tab-routing">
@@ -1797,6 +2090,7 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
                     <th>Teléfono (last9)</th>
                     <th>Puerto WAHA</th>
                     <th>Etiqueta</th>
+                    <th>IA</th>
                     <th>Activa</th>
                     <th></th>
                 </tr>
@@ -2643,6 +2937,7 @@ function addRoutingRowManual() {
         '<td><input type="text" name="routing[lines][' + idx + '][last9]" value="" placeholder="Últimos 9 dígitos" class="input-cell"></td>',
         '<td><input type="number" name="routing[lines][' + idx + '][port]" value="" placeholder="3000" class="input-cell" style="width:80px"></td>',
         '<td><input type="text" name="routing[lines][' + idx + '][label]" value="" placeholder="linea_3000" class="input-cell"></td>',
+        '<td><select name="routing[lines][' + idx + '][ai_provider]" class="input-cell" style="width:110px"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option></select><input type="hidden" name="routing[lines][' + idx + '][ai_model]" value=""></td>',
         '<td style="text-align:center"><input type="hidden" name="routing[lines][' + idx + '][enabled]" value="0"><input type="checkbox" name="routing[lines][' + idx + '][enabled]" value="1" checked></td>',
         '<td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove()">X</button></td>'
     ].join('');
@@ -2693,15 +2988,15 @@ function addRoutingRowFromSelector() {
     var idx = routingRowCount;
     routingRowCount++;
 
-    var notas  = line.notas || '';
     var tr = document.createElement('tr');
     tr.className = 'routing-row';
     tr.innerHTML = [
         '<td><input type="text" name="routing[lines][' + idx + '][last9]" value="' + escHtml(last9) + '" placeholder="Últimos 9 dígitos" class="input-cell"></td>',
         '<td><input type="number" name="routing[lines][' + idx + '][port]" value="' + escHtml(port) + '" placeholder="3000" class="input-cell" style="width:80px"></td>',
         '<td><input type="text" name="routing[lines][' + idx + '][label]" value="' + escHtml(lbl) + '" placeholder="linea_3000" class="input-cell"></td>',
+        '<td><select name="routing[lines][' + idx + '][ai_provider]" class="input-cell" style="width:110px"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option></select><input type="hidden" name="routing[lines][' + idx + '][ai_model]" value=""></td>',
         '<td style="text-align:center"><input type="hidden" name="routing[lines][' + idx + '][enabled]" value="0"><input type="checkbox" name="routing[lines][' + idx + '][enabled]" value="1" checked></td>',
-        '<td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove()">X</button><input type="hidden" name="routing[lines][' + idx + '][notas]" value="' + escHtml(notas) + '"></td>'
+        '<td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove()">X</button></td>'
     ].join('');
     tbody.appendChild(tr);
 

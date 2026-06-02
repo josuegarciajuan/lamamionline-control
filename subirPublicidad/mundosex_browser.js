@@ -69,10 +69,21 @@ async function main() {
     userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     viewport: { width: 1366, height: 768 },
     locale: 'es-ES',
+    timezoneId: 'Europe/Madrid',
   });
 
   const page = await context.newPage();
   page.setDefaultTimeout(TIMEOUT);
+
+  // ─── Stealth anti-detección ──────────────────────────────────
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    window.chrome = { runtime: {} };
+    Object.defineProperty(navigator, 'plugins', { get: () => [1,2,3,4,5] });
+    Object.defineProperty(navigator, 'languages', { get: () => ['es-ES','es','en-US','en'] });
+    Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 4 });
+    Object.defineProperty(navigator, 'deviceMemory', { get: () => 4 });
+  });
 
   // Debug: capturar errores y logs del navegador
   page.on('console', msg => {
@@ -165,19 +176,25 @@ async function main() {
       process.exit(1);
     }
     log('Formulario cargado, esperando inicialización JS...');
-    // Esperar a que Cloudflare Rocket Loader + Prototype + TinyMCE terminen de cargar
-    await page.waitForTimeout(3000);
-    // Cloudflare Rocket Loader: el onsubmit del form y los onchange de los select
-    // están guardados por window.__cfRLUnblockHandlers. Hay que esperar a que
-    // Rocket Loader los desbloquee, o el formulario NO se enviará al hacer submit.
+    // Esperar un tiempo razonable a que scripts básicos carguen
+    await page.waitForTimeout(5000);
+    // Cloudflare Rocket Loader: ejecutar los handlers manualmente en lugar de
+    // esperar pasivamente (el timeout de 25s casi siempre falla).
     try {
-      await page.waitForFunction(() => !window.__cfRLUnblockHandlers, { timeout: 25000 });
-      log('Rocket Loader finalizado');
+      const executed = await page.evaluate(() => {
+        const handlers = window.__cfRLUnblockHandlers;
+        if (handlers && handlers.length) {
+          window.__cfRLUnblockHandlers = undefined;
+          handlers.forEach(fn => { try { fn(); } catch (e) {} });
+          return handlers.length;
+        }
+        return 0;
+      });
+      log('Rocket Loader handlers ejecutados: ' + executed);
     } catch (e) {
-      log('Timeout esperando Rocket Loader — continuando igualmente');
-      result.warnings.push(warn('Rocket Loader no finalizó a tiempo'));
+      log('Rocket Loader ya procesado o no presente');
     }
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000);
 
     // ═══════════════════════════════════════════
     // STEP 4: Fill fields
@@ -371,119 +388,107 @@ async function main() {
     log('Fotos subidas: ' + photosOk + '/' + photos.length);
 
     // ═══════════════════════════════════════════
-    // STEP 7: Save — escuchar respuesta ANTES de hacer clic
+    // STEP 7: Save — vía fetch() directo con token reCAPTCHA v3
     // ═══════════════════════════════════════════
-    log('Clicando Guardar cambios...');
-
-    // Verificar Rocket Loader antes de submit (el onsubmit tiene guard)
-    try {
-      const rlReady = await page.evaluate(() => !window.__cfRLUnblockHandlers);
-      if (!rlReady) {
-        log('Rocket Loader aún activo antes de save, esperando...');
-        await page.waitForFunction(() => !window.__cfRLUnblockHandlers, { timeout: 15000 }).catch(() => {});
-      }
-    } catch (e) {}
-
-    // El formulario usa target="pubresfrm" (iframe) — no hay navegación de página.
-    // Capturamos la respuesta de red del POST al iframe.
-    let capturedBody = null;
-    const responseHandler = async (response) => {
-      const url = response.url();
-      if (url.includes('/publicar/insertar/' + listingId) && response.status() === 200) {
-        try {
-          capturedBody = await response.text();
-          log('Respuesta capturada: ' + capturedBody.substring(0, 300));
-        } catch (e) {}
-      }
-    };
-    page.on('response', responseHandler);
-
-    // También esperar posible navegación (por si el servidor redirige la página principal)
-    const navPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => null);
-
-    // Hacer clic en el botón de guardar
-    await page.locator('#sendButton').click({ timeout: 10000 });
+    log('Enviando formulario vía fetch()...');
     result.saveClicked = true;
 
-    // Esperar a que la respuesta del iframe llegue
-    await page.waitForTimeout(6000);
+    // Ejecutar reCAPTCHA v3 y enviar el formulario con fetch()
+    const fetchResult = await page.evaluate(async (listingId) => {
+      const formEl = document.getElementById('form_pub');
+      if (!formEl) return { ok: false, error: 'Formulario #form_pub no encontrado' };
 
-    // Quitar listener
-    page.off('response', responseHandler);
+      // Sincronizar TinyMCE al textarea antes de capturar FormData
+      if (typeof tinymce !== 'undefined' && typeof tinymce.triggerSave === 'function') {
+        tinymce.triggerSave();
+      }
 
-    // Esperar navegación si ocurrió
-    await navPromise;
-    await page.waitForTimeout(2000);
+      const fd = new FormData(formEl);
 
-    if (capturedBody) {
+      // Asegurar campos críticos que a veces no se incluyen en el FormData
+      // si fueron modificados por el usuario (no por setAttribute)
+      if (!fd.has('condiciones') || fd.get('condiciones') === '') {
+        fd.set('condiciones', 'on');
+      }
+
+      // Generar token reCAPTCHA v3
+      let recaptchaToken = null;
+      if (typeof grecaptcha !== 'undefined') {
+        recaptchaToken = await new Promise((resolve) => {
+          grecaptcha.ready(() => {
+            // Obtener la site key del script en la página
+            const scripts = document.querySelectorAll('script');
+            let siteKey = '6LekFnsUAAAAAG90W11qao5GjXawTHCo-TK8zwih';
+            for (const s of scripts) {
+              if (s.textContent && s.textContent.includes('RCP')) {
+                const m = s.textContent.match(/RCP\s*=\s*'([^']+)'/);
+                if (m) { siteKey = m[1]; break; }
+              }
+            }
+            grecaptcha.execute(siteKey, { action: 'publicar' })
+              .then(t => resolve(t))
+              .catch(() => resolve(null));
+          });
+        });
+      }
+
+      // Enviar con fetch al endpoint de inserción
       try {
-        let json = JSON.parse(capturedBody);
-        result.saveResult = json;
-        log('Respuesta JSON: ' + JSON.stringify(json).substring(0, 200));
+        const resp = await fetch('/publicar/insertar/' + listingId, {
+          method: 'POST',
+          body: fd,
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const text = await resp.text();
+        return {
+          ok: true,
+          status: resp.status,
+          body: text,
+          success: text.includes('insertado correctamente') || text.includes('anuncio ha sido modificado'),
+          tokenOk: !!recaptchaToken,
+        };
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    }, listingId);
 
+    log('Fetch result: ' + JSON.stringify({ status: fetchResult.status, success: fetchResult.success, tokenOk: fetchResult.tokenOk }).substring(0, 200));
+
+    if (fetchResult.success) {
+      result.ok = true;
+      result.saveResult = { estado: 1, mensaje: 'Anuncio publicado correctamente (fetch)' };
+      log('✓ Save confirmado vía fetch');
+    } else if (fetchResult.body) {
+      // Intentar parsear JSON
+      try {
+        const json = JSON.parse(fetchResult.body);
+        result.saveResult = json;
         if (json.estado === 1) {
           result.ok = true;
           log('✓ Save confirmado (estado=1)');
         } else {
           result.error = json.mensaje || 'Servidor rechazó el guardado (estado=' + (json.estado ?? '?') + ')';
+          log('✗ Rechazado: ' + result.error);
         }
       } catch (e) {
-        // Puede no ser JSON; si contiene "estado":1 igual es válido
-        if (capturedBody.includes('"estado":1') || capturedBody.includes('"estado": 1')) {
+        // No es JSON — comprobar si la respuesta HTML contiene éxito
+        if (fetchResult.body.includes('insertado correctamente') || fetchResult.body.includes('anuncio ha sido modificado')) {
           result.ok = true;
-          log('✓ Save confirmado (JSON parcial con estado=1)');
+          log('✓ Save confirmado (HTML con mensaje de éxito)');
         } else {
-          result.error = 'Error parseando respuesta: ' + e.message + ' | body=' + capturedBody.substring(0, 200);
+          result.error = 'Error desconocido en la respuesta del servidor';
+          log('✗ Respuesta no reconocida');
+          // Guardar HTML para debug
+          try {
+            const fs = require('fs');
+            const debugFile = '/tmp/mundosex_debug_' + Date.now() + '.html';
+            fs.writeFileSync(debugFile, fetchResult.body.substring(0, 50000));
+            result.warnings.push('Debug HTML guardado en ' + debugFile);
+          } catch (e2) {}
         }
       }
     } else {
-      // No se capturó la respuesta de red → chequeo visual
-      log('Respuesta de red no capturada, chequeo visual...');
-
-      const okVis1 = await page.locator('text=anuncio ha sido modificado').isVisible({ timeout: 3000 }).catch(() => false);
-      const okVis2 = await page.locator('.flash_ok').isVisible({ timeout: 3000 }).catch(() => false);
-      const okVis3 = page.url().includes('/confirmacion/');
-
-      if (okVis1 || okVis2 || okVis3) {
-        result.ok = true;
-        log('✓ Confirmación visual detectada');
-      } else {
-        // Buscar errores visibles antes de asumir éxito
-        const flashKo = await page.locator('.flash_ko').textContent({ timeout: 2000 }).catch(() => '');
-        const menErr = await page.locator('#men').textContent({ timeout: 2000 }).catch(() => '');
-        const anyError = flashKo || menErr || '';
-
-        if (anyError && anyError.includes('editado recientemente')) {
-          result.error = 'Rate-limit: anuncio editado recientemente';
-        } else if (anyError && anyError.trim()) {
-          result.error = anyError.trim();
-        } else if (page.url().includes('/misAnuncios') || page.url().includes('/privado/')) {
-          // Redirigido al panel de usuario → probablemente éxito
-          result.ok = true;
-          result.warnings.push('Redirigido a panel (asumido éxito)');
-        } else if (page.url().includes('/publicar/editar/')) {
-          // Seguimos en la página de edición → el submit probablemente falló
-          // Comprobar si el botón está disabled (se deshabilita al hacer submit exitoso)
-          const btnDisabled = await page.locator('#sendButton').isDisabled({ timeout: 2000 }).catch(() => false);
-          if (btnDisabled) {
-            // El botón está disabled → el JS de submit se ejecutó (probablemente éxito)
-            result.ok = true;
-            result.warnings.push('Botón disabled pero sin confirmación explícita');
-          } else {
-            result.error = 'El formulario no se envió (posible error de validación o Rocket Loader). Revisa los campos: provincia, ciudad, título (min 10 chars, 5 letras), teléfono, condiciones.';
-            // Guardar HTML para debug
-            try {
-              const fs = require('fs');
-              const debugHtml = await page.content();
-              const debugFile = '/tmp/mundosex_debug_' + Date.now() + '.html';
-              fs.writeFileSync(debugFile, debugHtml);
-              result.warnings.push('Debug HTML guardado en ' + debugFile);
-            } catch (e) {}
-          }
-        } else {
-          result.error = 'Redirigido inesperadamente a: ' + page.url();
-        }
-      }
+      result.error = fetchResult.error || 'Error desconocido en fetch';
     }
 
     // ═══════════════════════════════════════════

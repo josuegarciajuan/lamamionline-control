@@ -496,11 +496,12 @@ final class ContextAssembler implements PipelineStageInterface
             $msgCorta = (bool) preg_match('/^[0-9a-z€\s]{1,25}$/iu', $u);
             $acepta = $hasAcepta || $msgCorta;
 
-            if ($acepta && preg_match('/\b30\s*(?:euros?|eur|€)?\b/iu', $u)) return '30';
+            if ($acepta && preg_match('/\b40\s*(?:euros?|eur|€)?\b/iu', $u)) return '40';
+            if ($acepta && preg_match('/\b30\s*(?:euros?|eur|€)?\b/iu', $u)) return '40'; // legacy: 30 ya no existe, redirigir a 40
             if ($acepta && preg_match('/\b50\s*(?:euros?|eur|€)?\b/iu', $u)) return '50';
             if ($acepta && preg_match('/\b100\s*(?:euros?|eur|€)?\b/iu', $u)) return '100';
 
-            if ($acepta && preg_match('/(?:rapid|rapidito|10\s*min|diez\s*min)/iu', $u)) return '30';
+            if ($acepta && preg_match('/(?:rapid|rapidito|10\s*min|diez\s*min)/iu', $u)) return '40';
             if ($acepta && preg_match('/(?:media\s*h|mediahora|media\s+hora|30\s*min)/iu', $u)) return '50';
             if ($acepta && preg_match('/(?:una\s+hora|la\s+hora|1h|60\s*min)/iu', $u)) return '100';
         }
@@ -573,7 +574,7 @@ final class ContextAssembler implements PipelineStageInterface
             $replyNorm = $this->normalizeStr($replyRaw);
             if ($replyRaw === '') continue;
 
-            if (preg_match('/\b(?:30\s*€|1h|50\s*€|100\s*€|tarifa|precio|precios)\b/iu', $replyNorm)) {
+            if (preg_match('/\b(?:30\s*€|40\s*€|1h|50\s*€|100\s*€|tarifa|precio|precios)\b/iu', $replyNorm)) {
                 $flags[] = 'precios';
             }
 

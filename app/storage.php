@@ -3252,7 +3252,7 @@ function publicista_campaign_result_requests_copy_retry($result) {
     }
 
     $errorCode = trim((string)($result['error_code'] ?? ''));
-    if (in_array($errorCode, array('duplicate_copy', 'content_moderation'), true)) {
+    if (in_array($errorCode, array('duplicate_copy', 'content_moderation', 'flagged_as_fraud'), true)) {
         return true;
     }
 
@@ -3278,6 +3278,9 @@ function publicista_campaign_result_requests_copy_retry($result) {
         'camuflar algunas expresiones prohibidas',
         'expresiones prohibidas',
         'revisa el contenido de tu perfil',
+        'aviso de estafa',
+        'intentado editar un aviso',
+        'perfil del estafador',
     ) as $needle) {
         if (strpos($haystack, $needle) !== false) {
             return true;
@@ -3307,10 +3310,16 @@ function publicista_campaign_pick_images($product, $limit = 6, $portalCode = '')
                 $pid = trim((string)$pid);
                 foreach ($allPhotos as $photo) {
                     if (trim((string)($photo['id'] ?? '')) === $pid) {
-                        // Asegurar que tenga final_path (para compatibilidad con image_paths)
+                        // Asegurar que tenga final_path (para compatibilidad con image_paths downstream)
                         $img = $photo;
-                        if (empty($img['final_path']) && !empty($img['stored_path'])) {
-                            $img['final_path'] = $img['stored_path'];
+                        if (empty($img['final_path'])) {
+                            if (!empty($img['square_path'])) {
+                                $img['final_path'] = $img['square_path'];
+                            } elseif (!empty($img['preview_path'])) {
+                                $img['final_path'] = $img['preview_path'];
+                            } elseif (!empty($img['stored_path'])) {
+                                $img['final_path'] = $img['stored_path'];
+                            }
                         }
                         $images[] = $img;
                         break;
@@ -3383,8 +3392,8 @@ function publicista_campaign_validate_for_generation($campaign) {
     foreach ($accounts as $account) {
         $portalCode = trim((string)($account['portal_code'] ?? ''));
         if ($portalCode !== '' && $planningPortal !== '' && $portalCode !== $planningPortal && $portalCode !== 'otro') {
-            $warnings[] = 'La cuenta "' . trim((string)($account['display_name'] ?? $account['login_user'] ?? $account['id'])) . '" no coincide con el portal del planning.';
-            continue;
+            // Solo avisar, no excluir la cuenta — la estrategia es simbólica
+            $warnings[] = 'La cuenta "' . trim((string)($account['display_name'] ?? $account['login_user'] ?? $account['id'])) . '" (' . $portalCode . ') no coincide con el portal del planning (' . $planningPortal . '), pero se incluye igual.';
         }
         if (in_array(($account['estado'] ?? ''), array('blocked'), true)) {
             $warnings[] = 'La cuenta "' . trim((string)($account['display_name'] ?? $account['login_user'] ?? $account['id'])) . '" está bloqueada.';
@@ -3457,8 +3466,7 @@ function publicista_campaign_selected_listing_slots($campaign, $accounts, $exclu
         $parsed = publicista_campaign_parse_listing_ref($ref);
         if ($parsed['account_id'] === '' || $parsed['listing_id'] === '') continue;
         if (!isset($accountsById[$parsed['account_id']])) {
-            $errors[] = 'Se ha seleccionado un anuncio para una cuenta que no forma parte de la campaña.';
-            continue;
+            $warnings[] = 'El anuncio "' . $parsed['listing_id'] . '" pertenece a una cuenta que no coincide con el portal del planning, pero se incluye igual.';
         }
         if (!isset($availableByRef[$ref])) {
             $errors[] = 'El anuncio interno "' . $parsed['listing_id'] . '" ya no existe en la cuenta seleccionada.';
@@ -4227,6 +4235,7 @@ function publicista_campaign_rebalance_distribution($campaign, $distributionMatr
             $item['product_job_id'] = $targetPid;
             $item['product_snapshot'] = publicista_snapshot_from_entity('product', $productEntity);
             $item['account_id'] = $targetAid;
+            $item['portal_code'] = trim((string)($accountEntity['portal_code'] ?? 'destacamos'));
             $item['account_snapshot'] = publicista_snapshot_from_entity('account', $accountEntity);
             $item['external_ad_id'] = $newListingId;
             $item['phone_id'] = '';
@@ -4612,7 +4621,7 @@ function publicista_campaign_generate_items($campaign) {
         $item = publicista_campaign_item_defaults();
         $item['campaign_id'] = $campaign['id'];
         $item['estado'] = 'ready';
-        $item['portal_code'] = trim((string)($planning['portal_code'] ?? 'destacamos'));
+        $item['portal_code'] = trim((string)($account['portal_code'] ?? ($planning['portal_code'] ?? 'destacamos')));
         $item['product_job_id'] = trim((string)($product['id'] ?? ''));
         $item['product_snapshot'] = publicista_snapshot_from_entity('product', $product);
         $item['account_id'] = trim((string)($account['id'] ?? ''));
@@ -6765,9 +6774,6 @@ function publicista_campaign_item_ready_for_execution($item) {
         if (trim((string)($item['external_ad_id'] ?? '')) === '') {
             $errors[] = 'Falta el listing ID / external_ad_id para ejecutar el adaptador de Mundosex.';
         }
-        if (!$phone) {
-            $errors[] = 'No hay teléfono vinculado ni teléfono por defecto en la cuenta.';
-        }
     } else {
         $errors[] = 'No existe adaptador automático implementado para este portal todavía.';
     }
@@ -7349,6 +7355,38 @@ function publicista_campaign_execute($campaignId, $options = array()) {
         }
     }
 
+    // Filtro por portal (para botones de resubida "Solo Destacamos" / "Solo Mundosex")
+    $portalFilter = trim((string)($options['portal_filter'] ?? ''));
+    if ($portalFilter !== '' && in_array($portalFilter, array('destacamos', 'mundosex'), true)) {
+        $itemsBefore = count($items);
+        $items = array_values(array_filter($items, function($item) use ($portalFilter) {
+            return trim((string)($item['portal_code'] ?? 'destacamos')) === $portalFilter;
+        }));
+        $omitted = $itemsBefore - count($items);
+        $savedRun['summary'] = ($savedRun['summary'] ?? '') . ' [Filtro ' . $portalFilter . ': ' . $omitted . ' items omitidos de otras plataformas]';
+        $savedRun['progress']['total_items'] = count($items);
+        $savedRun['updated_at'] = now_datetime();
+        publicista_run_save($savedRun);
+    }
+
+    // ─── GIRLSCONF: sincronizar antes de subir a las plataformas ───
+    // Se desactivan todos los perfiles activos y se crea 1 entrada por producto de la campaña
+    if (function_exists('publicista_sync_girlsconf_to_girlsconf')) {
+        try {
+            $girlsconfOk = publicista_sync_girlsconf_to_girlsconf($campaignId);
+            $savedRun['summary'] = ($savedRun['summary'] ?? '') . ' [GirlsConf: ' . ($girlsconfOk ? 'OK' : 'falló') . ']';
+            $savedRun['updated_at'] = now_datetime();
+            publicista_run_save($savedRun);
+        } catch (Throwable $e) {
+            if (function_exists('bootstrap_runtime_log_exception')) {
+                bootstrap_runtime_log_exception('publicista_sync_girlsconf_pre_upload', $e);
+            }
+            $savedRun['summary'] = ($savedRun['summary'] ?? '') . ' [GirlsConf: error]';
+            $savedRun['updated_at'] = now_datetime();
+            publicista_run_save($savedRun);
+        }
+    }
+
     $results = array();
     $published = 0;
     $failed = 0;
@@ -7363,6 +7401,8 @@ function publicista_campaign_execute($campaignId, $options = array()) {
     $activeSession = null;
     $activeSessionAccountId = '';
     $activeSessionPortalCode = '';
+    $accountHardFails = array();        // contador de hard fails consecutivos por cuenta
+    $maxHardFailsPerAccount = 3;         // umbral para marcar cuenta como rota
 
     try {
     foreach ($items as $idx => $item) {
@@ -7406,6 +7446,38 @@ function publicista_campaign_execute($campaignId, $options = array()) {
             }
         }
 
+        // Saltar items en cuentas ya marcadas como rotas (3+ hard fails consecutivos)
+        if (($accountHardFails[$currentAccountId] ?? 0) >= $maxHardFailsPerAccount) {
+            $item['estado'] = 'failed';
+            $item['publish_result'] = array(
+                'ok' => false,
+                'error_code' => 'account_broken_skipped',
+                'error' => 'Cuenta ' . $currentAccountId . ' omitida: ' . ($accountHardFails[$currentAccountId] ?? 0) . ' hard fails consecutivos.',
+                'executed_at' => now_datetime(),
+            );
+            $item['updated_at'] = now_datetime();
+            list($_saveOk, $savedItem) = publicista_campaign_item_save($item);
+            $results[] = array(
+                'campaign_item_id' => $savedItem['id'] ?? ($item['id'] ?? ''),
+                'ok' => false,
+                'estado' => 'failed',
+                'result' => $item['publish_result'],
+            );
+            $failed++;
+            $hardFailedCount++;
+            $savedRun['items'] = $results;
+            $savedRun['summary'] = 'Cuenta ' . $currentAccountId . ' rota (saltando). Procesados ' . count($results) . '/' . count($items) . '. OK: ' . $published . ' · Fallidos: ' . $failed;
+            $savedRun['progress']['processed_items'] = count($results);
+            $savedRun['progress']['failed'] = $failed;
+            $savedRun['progress']['current_item_id'] = $savedItem['id'] ?? ($item['id'] ?? '');
+            $savedRun['progress']['current_account_id'] = $currentAccountId;
+            $savedRun['pipeline']['summary'] = 'Cuenta rota detectada. Saltando items de ' . $currentAccountId . '.';
+            $savedRun['updated_at'] = now_datetime();
+            publicista_run_save($savedRun);
+            $lastAccountId = $currentAccountId;
+            continue;
+        }
+
         $item['estado'] = 'queued';
         publicista_campaign_item_save($item);
 
@@ -7444,6 +7516,20 @@ function publicista_campaign_execute($campaignId, $options = array()) {
                     $copyPlan['body'] = destacamos_filter_moderation_words($copyPlan['body'], $filterMode);
                     $copyPlan['title'] = destacamos_filter_moderation_words($copyPlan['title'], $filterMode);
                     $copyPlan['reason'] = $copyPlan['reason'] . ':moderation_filtered:' . $filterMode;
+                }
+
+                // Saneo anti-fraude: si el error es flagged_as_fraud, limpiar palabras sospechosas
+                if ($lastErrorCode === 'flagged_as_fraud' && function_exists('destacamos_sanitize_fraud_triggers')) {
+                    $filterMode = $attemptNumber >= 3 ? 'strict' : 'moderate';
+                    $copyPlan['body'] = destacamos_sanitize_fraud_triggers($copyPlan['body'], $filterMode);
+                    $copyPlan['title'] = destacamos_sanitize_fraud_triggers($copyPlan['title'], $filterMode);
+                    $copyPlan['reason'] = $copyPlan['reason'] . ':fraud_sanitized:' . $filterMode;
+                    // Quitar emojis en reintentos anti-fraude (pueden parecer sospechosos)
+                    if ($attemptNumber >= 2) {
+                        $copyPlan['title'] = preg_replace('/[\x{1F300}-\x{1F9FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]/u', '', $copyPlan['title']);
+                        $copyPlan['body'] = preg_replace('/[\x{1F300}-\x{1F9FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]/u', '', $copyPlan['body']);
+                        $copyPlan['reason'] .= ':emojis_removed';
+                    }
                 }
                 
                 $itemOptions['field_overrides'] = array(
@@ -7527,8 +7613,12 @@ function publicista_campaign_execute($campaignId, $options = array()) {
         $failureKind = publicista_result_failure_kind($result);
         if ($failureKind === 'business_rejected') {
             $businessRejectedCount++;
+            $accountHardFails[$currentAccountId] = 0; // resetear hard fails en cuenta
         } elseif ($failureKind === 'hard_failed') {
             $hardFailedCount++;
+            $accountHardFails[$currentAccountId] = ($accountHardFails[$currentAccountId] ?? 0) + 1;
+        } else {
+            $accountHardFails[$currentAccountId] = 0; // OK o soft warning resetea contador
         }
 
         $savedRun['items'] = $results;
@@ -7608,19 +7698,7 @@ function publicista_campaign_execute($campaignId, $options = array()) {
     $campaign['updated_at'] = now_datetime();
     publicista_campaign_save($campaign);
 
-    // Sync to girlsconf after successful publish
-    $portalCode = trim((string)($campaign['planning_snapshot']['data']['portal_code'] ?? 'destacamos'));
-    if ($published > 0 && in_array($portalCode, array('destacamos', 'mundosex'), true)) {
-        if (function_exists('publicista_sync_girlsconf_to_girlsconf')) {
-            try {
-                publicista_sync_girlsconf_to_girlsconf($campaignId);
-            } catch (Throwable $e) {
-                if (function_exists('bootstrap_runtime_log_exception')) {
-                    bootstrap_runtime_log_exception('publicista_sync_girlsconf', $e);
-                }
-            }
-        }
-    }
+    // GirlsConf sync ya se ejecutó al inicio del bucle (antes de procesar plataformas)
 
     $savedRun['estado'] = $runStatus;
     $savedRun['finished_at'] = now_datetime();
@@ -7671,7 +7749,7 @@ function publicista_result_failure_kind($result) {
     if (!empty($result['ok'])) return 'ok';
     if (is_array($result['save_soft_mismatch'] ?? null) && !empty($result['save_soft_mismatch'])) return 'soft_warning';
     $code = trim((string)($result['error_code'] ?? ''));
-    if (in_array($code, array('duplicate_copy', 'content_moderation', 'validation_error', 'missing_required'), true)) {
+    if (in_array($code, array('duplicate_copy', 'content_moderation', 'validation_error', 'missing_required', 'flagged_as_fraud'), true)) {
         return 'business_rejected';
     }
     return 'hard_failed';

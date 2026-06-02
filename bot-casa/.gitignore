@@ -1,0 +1,31 @@
+# Datos en runtime — no versionar (contienen PII)
+data/*.ndjson
+data/**/*.ndjson
+data/locks/*
+data/**/locks/*
+data/*.tmp
+data/*.log
+data/wa_last_raw.json
+data/.bot_mode
+
+# composer.lock se committea (proyecto, builds reproducibles)
+# Si se desea ignorarlo: descomentar linea siguiente
+# composer.lock
+
+# Config — NUNCA committear config.json (contiene secretos reales)
+# Solo config.dist.json (template con placeholders) va a git
+config.json
+config.local.json
+
+# Built-in server pid
+.php-server-pid
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

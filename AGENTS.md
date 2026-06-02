@@ -62,6 +62,68 @@ Los archivos en `data/` contienen los datos de producción (ingresos, leads, cli
 Si accidentalmente se pierden datos, el stash de git (`git stash list`) puede contener
 una copia de emergencia (el stash se crea automáticamente antes del reset).
 
+## ⛔ Protección contra divergencia git ↔ producción
+
+El código en este repo se sirve directamente en producción vía bind mount.
+Cualquier edición hecha directamente en el servidor de producción (fuera de git)
+se perderá al sobreescribir desde el repo.
+
+### Riesgo real detectado
+
+Ya ha ocurrido una pérdida de funcionalidad: la llamada automática
+`publicista_estados_wasap_run_due()` existía en producción pero no en git.
+Al refrescar el working tree, la llamada se perdió y el sistema dejó de
+publicar estados de WhatsApp automáticamente.
+
+### Protocolo obligatorio antes de cualquier cambio
+
+**Siempre, sin excepción**, antes de modificar un solo archivo:
+
+```bash
+git status          # ¿Hay archivos modificados sin commitear?
+git diff            # ¿Qué ha cambiado exactamente?
+```
+
+1. **Si `git status` muestra archivos modificados (modified) o untracked:**
+   - Esos cambios son código de producción que NO está en git.
+   - **Commitéalos PRIMERO** antes de hacer cualquier otra cosa.
+   - Pregunta al usuario si hay dudas sobre qué son.
+
+2. **Si `git diff` muestra diferencias en archivos que vas a tocar:**
+   - Ese código es funcionalidad viva de producción.
+   - **No lo borres ni lo sobreescribas sin confirmar.**
+   - Si necesitas modificarlo, hazlo sobre la versión de producción.
+
+3. **Nunca asumas que el código en git refleja la realidad:**
+   - La fuente de verdad es el servidor de producción, no git.
+   - Si hay divergencia, producción manda. Git se actualiza para reflejar producción.
+
+### Operaciones PROHIBIDAS adicionales
+
+- `git checkout -- <archivo>` — machaca producción con versión de git
+- `git restore <archivo>` — igual que arriba
+- `git stash` — ya prohibido en sección anterior
+- Reescribir un archivo sin haber hecho `git diff` primero
+
+### Cómo preservar código de producción
+
+Si encuentras divergencias (archivos modified):
+
+```bash
+git add <archivo_modificado>
+git commit -m "sync: preservar cambios de producción (<descripción breve>)"
+```
+
+Así la funcionalidad viva queda registrada en git y no se perderá.
+
+### Qué NUNCA commitear
+
+- Archivos con contraseñas, API keys o secretos reales (buscar `password`, `api_key`, `token`, `secret`)
+- El directorio `data/` (ya está en .gitignore)
+- Backups de `data/` (`data_backup_*`)
+- `__pycache__/`
+- `contrato_firmado.php` (contiene datos sensibles)
+
 ## Comandos útiles
 
 ```bash

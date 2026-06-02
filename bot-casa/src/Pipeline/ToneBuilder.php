@@ -213,7 +213,7 @@ final class ToneBuilder implements PipelineStageInterface
                 . 'Responde corto y termina con una variante de cierre (te espero, '
                 . 'avisame cuando salgas, dime cuanto tardas). No alargues la charla. '
                 . 'No hagas preguntas abiertas. Si el cliente no avanza en 2 mensajes, '
-                . 'responde solo con un emoji o despídete.';
+                . 'responde muy corto (2-3 palabras) o despídete.';
         }
 
         // ------------------------------------------------------------------ //
@@ -238,7 +238,7 @@ final class ToneBuilder implements PipelineStageInterface
         $isImageFromUser = !empty($ctx['is_image_sent_by_user']);
         if ($isImageFromUser) {
             $directives[] = 'El cliente acaba de mandar una imagen/foto. '
-                . 'Reacciona MUY breve: 1 emoji + 1 frase corta (ej: "buenas vistas 😏", "foto maja 😄"). '
+                . 'Reacciona MUY breve: 1 frase corta (ej: "buenas vistas 😏", "foto maja"). '
                 . 'Después sigue el hilo normal de la conversación. NO preguntes por la foto.';
         }
 
@@ -249,6 +249,7 @@ final class ToneBuilder implements PipelineStageInterface
         $directives[] = 'Reactivo: Responde SOLO lo que preguntan. NO hagas preguntas de follow-up. NO sondees.';
         $directives[] = 'Sin auto-identificación: NUNCA digas "soy la encargada", "atiendo yo", "soy la que está aquí" ni similares.';
         $directives[] = 'Sin signos de apertura (¿ ¡) y faltas de ortografía leves para sonar humana.';
+        $directives[] = 'Emojis: usa 1 emoji en ~2 de cada 3 mensajes, como parte natural de la conversación. Si el anterior tuyo llevó, este puede llevarlo o no. Lo importante es no forzar: a veces sí, a veces no.';
 
         // ------------------------------------------------------------------ //
         //  13. Inject into context                                            //

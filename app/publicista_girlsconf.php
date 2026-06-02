@@ -135,6 +135,33 @@ function _girlsconf_write_data(array $data): void {
 }
 
 /**
+ * Renombra una entrada existente cuyo slug colisiona con un product_job_id distinto.
+ * Añade barras bajas al id y nombre hasta encontrar uno libre. Modifica $data por ref.
+ */
+function _girlsconf_avoid_slug_collision(array &$data, string $slugId, string $name, string $myProductJobId): void {
+    foreach ($data['girls'] as $idx => $girl) {
+        if (trim((string)($girl['id'] ?? '')) !== $slugId) continue;
+        if (trim((string)($girl['product_job_id'] ?? '')) === $myProductJobId) continue;
+        // Colisión detectada: renombrar la entrada vieja
+        $suffix = '_';
+        $newId = $slugId . $suffix;
+        $newName = $name . $suffix;
+        $taken = array();
+        foreach ($data['girls'] as $g) {
+            $taken[trim((string)($g['id'] ?? ''))] = true;
+        }
+        while (isset($taken[$newId])) {
+            $suffix .= '_';
+            $newId = $slugId . $suffix;
+            $newName = $name . $suffix;
+        }
+        $data['girls'][$idx]['id'] = $newId;
+        $data['girls'][$idx]['nombre'] = $newName;
+        break;
+    }
+}
+
+/**
  * Sync published campaign items (portal=destacamos) to the girlsconf project's girls.json.
  *
  * - Deactivates ALL previous entries from this campaign before syncing
@@ -148,117 +175,91 @@ function publicista_sync_girlsconf_to_girlsconf(string $campaignId): bool {
     $baseUrl = GIRLSCONF_BASE_URL;
     $maxPhotos = GIRLSCONF_MAX_PHOTOS;
 
+    $campaign = publicista_campaign_get($campaignId);
+    if (!$campaign) return false;
+
     // 1. Read current girls.json
     $data = _girlsconf_read_data();
 
-    // 2. Deactivate ALL existing entries that belong to this campaign
-    //    This ensures that if profiles are removed from the campaign or
-    //    their publish_name changes, old entries don't linger as active.
+    // 2. Deactivate ALL currently active profiles (not just from this campaign)
+    $deactivated = 0;
     foreach ($data['girls'] as $idx => $girl) {
-        $girlCampaignId = trim((string)($girl['source_campaign_id'] ?? ''));
-        if ($girlCampaignId !== '' && $girlCampaignId === $campaignId) {
+        if (!empty($girl['activa'])) {
             $data['girls'][$idx]['activa'] = false;
+            $deactivated++;
         }
     }
 
-    // 3. Fetch published campaign items (estado='published')
+    // 3. Get campaign products — ONE entry per product (not per item)
+    $productIds = array_values(array_filter(array_map('trim', (array)($campaign['product_ids'] ?? array()))));
+    if (empty($productIds)) return false;
+
+    // Collect unique products from campaign
+    $usedProductJobIds = array();
+
+    // Also collect image paths from items for each product (take first item's images)
+    $productImages = array();
     $allItems = publicista_campaign_items_for_campaign($campaignId);
-    $publishedItems = array();
     foreach ($allItems as $item) {
-        if (trim((string)($item['estado'] ?? '')) === 'published') {
-            $publishedItems[] = $item;
-        }
-    }
-
-    // Collect the product_job_ids from this campaign's published items
-    // Used to find legacy entries (from before source_campaign_id was added)
-    // and to deactivate old entries that are no longer in the campaign.
-    $campaignProductJobIds = array();
-    foreach ($publishedItems as $item) {
         $pjid = trim((string)($item['product_job_id'] ?? ''));
-        if ($pjid !== '') {
-            $campaignProductJobIds[$pjid] = true;
+        if ($pjid === '' || isset($productImages[$pjid])) continue; // first item wins for images
+        $imagePaths = publicista_campaign_item_image_paths($item);
+        if (!empty($imagePaths)) {
+            $productImages[$pjid] = $imagePaths;
         }
     }
 
-    // Also deactivate legacy entries that share a product_job_id with this
-    // campaign but have no source_campaign_id (migration case).
-    if (!empty($campaignProductJobIds)) {
-        foreach ($data['girls'] as $idx => $girl) {
-            $girlProductJobId = trim((string)($girl['product_job_id'] ?? ''));
-            if (
-                $girlProductJobId !== ''
-                && isset($campaignProductJobIds[$girlProductJobId])
-                && !empty($girl['activa'])
-            ) {
-                $girlCampaignId = trim((string)($girl['source_campaign_id'] ?? ''));
-                // Only deactivate if not from this campaign (it will be
-                // re-activated below if still published).
-                if ($girlCampaignId !== $campaignId) {
-                    $data['girls'][$idx]['activa'] = false;
-                }
-            }
-        }
-    }
-
-    // 4. Keep lookup maps: by slug-based id AND by product_job_id
-    $lookupById = array();
+    // 4. Keep lookup maps for upsert
     $lookupByProductJobId = array();
     foreach ($data['girls'] as $idx => $girl) {
-        $girlId = trim((string)($girl['id'] ?? ''));
-        if ($girlId !== '') {
-            $lookupById[$girlId] = $idx;
-        }
         $girlProductJobId = trim((string)($girl['product_job_id'] ?? ''));
         if ($girlProductJobId !== '') {
             $lookupByProductJobId[$girlProductJobId] = $idx;
         }
     }
 
-    // 5. Process each published item
-    foreach ($publishedItems as $item) {
-        // FIX Bug A: Use publish_name from the actual product job,
-        // NOT nombre_trabajo (which is the internal pack name / apodo).
-        // publish_name is the "Nombre de publicación" shown in ads.
-        $productJobId = trim((string)($item['product_job_id'] ?? ''));
-        $nombre = '';
+    // 5. Process each campaign product
+    if (!function_exists('publicista_job_get')) return false;
 
-        // Look up the product job to get publish_name
-        if ($productJobId !== '' && function_exists('publicista_job_get')) {
-            $productJob = publicista_job_get($productJobId);
-            if ($productJob && is_array($productJob)) {
-                $nombre = trim((string)($productJob['publish_name'] ?? ''));
+    foreach ($productIds as $productJobId) {
+        $productJobId = trim((string)$productJobId);
+        if ($productJobId === '') continue;
+
+        $productJob = publicista_job_get($productJobId);
+        if (!$productJob || !is_array($productJob)) continue;
+
+        // Use publish_name (the "Nombre de publicación" shown in ads)
+        $nombre = trim((string)($productJob['publish_name'] ?? ''));
+        if ($nombre === '') {
+            $nombre = trim((string)($productJob['nombre_trabajo'] ?? ''));
+        }
+        if ($nombre === '') continue;
+
+        // Description: use the copy body from first item of this product
+        $descripcion = $nombre;
+        foreach ($allItems as $item) {
+            if (trim((string)($item['product_job_id'] ?? '')) === $productJobId) {
+                $body = publicista_campaign_item_copy_body($item);
+                if ($body !== '') { $descripcion = $body; break; }
             }
         }
 
-        // Fallback: if publish_name is empty, try nombre_trabajo from snapshot
-        if ($nombre === '') {
-            $productSnapshot = is_array($item['product_snapshot'] ?? null) ? $item['product_snapshot'] : array();
-            $dataField = is_array($productSnapshot['data'] ?? null) ? $productSnapshot['data'] : $productSnapshot;
-            $nombre = trim((string)($dataField['nombre_trabajo'] ?? ''));
+        // Images: from first item that has them, fallback to product job's finales
+        $imagePaths = $productImages[$productJobId] ?? array();
+        if (empty($imagePaths) && function_exists('publicista_job_image_paths')) {
+            $imagePaths = publicista_job_image_paths($productJob, $maxPhotos);
         }
-
-        // Last resort fallback: use product_job_id
-        if ($nombre === '') {
-            $nombre = $productJobId;
-        }
-
-        // Skip items with empty name
-        if ($nombre === '') continue;
-
-        // Get description from copy_snapshot
-        $descripcion = publicista_campaign_item_copy_body($item);
-        if ($descripcion === '') $descripcion = $nombre;
-
-        // Generate ID by slugifying the name
-        $id = _girlsconf_slugify($nombre);
-
-        // Get image filesystem paths, take up to MAX_PHOTOS
-        $imagePaths = publicista_campaign_item_image_paths($item);
+        $imagePaths = array_values(array_filter($imagePaths, 'file_exists'));
         $imagePaths = array_slice($imagePaths, 0, $maxPhotos);
 
-        // Skip items with no images
         if (empty($imagePaths)) continue;
+
+        // Generate slug-based ID
+        $id = _girlsconf_slugify($nombre);
+
+        // Evitar colisión: si existe otra entrada con el mismo slug pero distinto product_job_id,
+        // renombrar la vieja añadiendo _ para que no se machaquen datos entre perfiles distintos
+        _girlsconf_avoid_slug_collision($data, $id, $nombre, $productJobId);
 
         // Ensure imgs directory exists
         if (!is_dir($imgsDir)) {
@@ -271,35 +272,23 @@ function publicista_sync_girlsconf_to_girlsconf(string $campaignId): bool {
         foreach ($imagePaths as $srcPath) {
             if (!file_exists($srcPath)) continue;
 
-            // Generate unique folder name
             $folderName = _girlsconf_next_img_folder($imgsDir);
             $folderPath = $imgsDir . DIRECTORY_SEPARATOR . $folderName;
 
-            // Create the folder
-            if (!@mkdir($folderPath, 0777, true) && !is_dir($folderPath)) {
-                continue;
-            }
+            if (!@mkdir($folderPath, 0777, true) && !is_dir($folderPath)) continue;
 
-            // Detect MIME and extension
             $mime = _girlsconf_mime_type($srcPath);
             $ext = _girlsconf_mime_to_ext($mime);
-
-            // Destination file: {foldername}.{ext}
             $dstFile = $folderPath . DIRECTORY_SEPARATOR . $folderName . '.' . $ext;
 
-            // Copy the image
             if (!@copy($srcPath, $dstFile)) {
-                // Cleanup failed folder
                 @unlink($dstFile);
                 @rmdir($folderPath);
                 continue;
             }
 
-            // Build public URLs
             $publicFolderUrl = $baseUrl . $folderName . '/';
             $publicImageUrl = $baseUrl . $folderName . '/' . $folderName . '.' . $ext;
-
-            // Create OG index.php in the folder
             $descWords = mb_substr(preg_replace('/\s+/u', ' ', trim($descripcion)), 0, 60) ?: $nombre;
             $ogIndex = _girlsconf_build_og_index($nombre, $descWords, $publicFolderUrl, $publicImageUrl, $mime);
             @file_put_contents($folderPath . DIRECTORY_SEPARATOR . 'index.php', $ogIndex);
@@ -307,10 +296,9 @@ function publicista_sync_girlsconf_to_girlsconf(string $campaignId): bool {
             $fotos[] = $publicFolderUrl;
         }
 
-        // Skip if no photos were successfully processed
         if (empty($fotos)) continue;
 
-        // Build the entry
+        // Build entry
         $entry = array(
             'id' => $id,
             'nombre' => $nombre,
@@ -321,42 +309,18 @@ function publicista_sync_girlsconf_to_girlsconf(string $campaignId): bool {
             'product_job_id' => $productJobId,
         );
 
-        // Update or create, preferring product_job_id as the stable key.
-        // This handles renames: if publish_name changes, product_job_id
-        // still matches the existing entry and updates it in place.
-        $targetIndex = null;
-        if ($productJobId !== '' && isset($lookupByProductJobId[$productJobId])) {
-            // Found by product_job_id — stable across publish_name changes.
-            // If the name changed, the ID changes too, which is correct:
-            // the slug-based ID follows the display name.
-            $targetIndex = $lookupByProductJobId[$productJobId];
-        } elseif ($productJobId !== '' && isset($lookupById[$id])) {
-            // Found by slug ID but product_job_id not yet in lookup
-            // (e.g., legacy entry before product_job_id was tracked).
-            $targetIndex = $lookupById[$id];
-        } elseif (isset($lookupById[$id])) {
-            $targetIndex = $lookupById[$id];
-        }
-
-        if ($targetIndex !== null) {
-            // Update existing entry in place
-            $data['girls'][$targetIndex] = $entry;
-            // Update lookup maps
-            $lookupById[$id] = $targetIndex;
-            if ($productJobId !== '') {
-                $lookupByProductJobId[$productJobId] = $targetIndex;
-            }
+        // Upsert by product_job_id
+        if (isset($lookupByProductJobId[$productJobId])) {
+            $data['girls'][$lookupByProductJobId[$productJobId]] = $entry;
         } else {
             $data['girls'][] = $entry;
-            $newIdx = count($data['girls']) - 1;
-            $lookupById[$id] = $newIdx;
-            if ($productJobId !== '') {
-                $lookupByProductJobId[$productJobId] = $newIdx;
-            }
+            $lookupByProductJobId[$productJobId] = count($data['girls']) - 1;
         }
+
+        $usedProductJobIds[$productJobId] = true;
     }
 
-    // 6. Write back the JSON atomically
+    // 6. Write back atomically
     _girlsconf_write_data($data);
 
     return true;

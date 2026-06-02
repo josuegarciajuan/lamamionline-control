@@ -15,6 +15,15 @@ node_modules/
 *.log
 !data/comercial_events.jsonl
 
+# ── Archivos sensibles ──
+/contrato_firmado.php
+
+# ── Backups locales ──
+/data_backup_*/
+
+# ── Python cache ──
+__pycache__/
+
 # ── Archivos de sistema ──
 .DS_Store
 Thumbs.db

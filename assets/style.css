@@ -3233,3 +3233,11 @@ body.modal-open {
   }
 }
 
+/* ===== PUBLICISTA: Platform photo selection ===== */
+.platform-photo-label:has(input[type="checkbox"]:checked) {
+  border-color: #6366f1 !important;
+}
+.platform-photo-label:has(input[type="checkbox"]:not(:checked)) {
+  border-color: #e5e7eb !important;
+}
+

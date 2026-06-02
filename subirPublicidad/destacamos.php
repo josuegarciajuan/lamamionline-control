@@ -949,6 +949,7 @@ function destacamos_extract_edit_error_messages($html) {
             '/Escribe un texto un poco diferente(?:\s+al\s+del\s+resto\s+de\s+anuncios)?/iu',
             '/Escribe un t[ií]tulo un poco diferente(?:\s+al\s+del\s+resto\s+de\s+anuncios)?/iu',
             '/Parece que est[aá]s intentando camuflar algunas expresiones prohibidas[^<\n\r]*?revisa el contenido de tu perfil\.?/iu',
+            '/Parece que has intentado editar un aviso de estafa[^<\n\r]*/iu',
         );
         foreach ($knownPatterns as $pattern) {
             if (preg_match($pattern, $html, $match)) {
@@ -990,7 +991,85 @@ function destacamos_edit_error_code($messages) {
         }
     }
 
+    // Detección de listados marcados como fraude/estafa por el portal
+    foreach (array(
+        'aviso de estafa',
+        'intentado editar un aviso',
+        'perfil del estafador',
+    ) as $needle) {
+        if (destacamos_strpos($joined, $needle) !== false) {
+            return 'flagged_as_fraud';
+        }
+    }
+
     return 'validation_error';
+}
+
+/**
+ * Elimina palabras que pueden activar el anti-fraude de destacamos.net.
+ * Modos: 'moderate' (sustituye palabras sueltas) y 'strict' (elimina frases completas).
+ */
+function destacamos_sanitize_fraud_triggers($text, $mode = 'moderate') {
+    $text = (string)$text;
+    if ($text === '') return $text;
+
+    // Palabras que pueden activar detección de estafa/fraude
+    $triggerWords = array(
+        'roba', 'robó', 'robar', 'robado', 'robando',
+        'estafa', 'estafador', 'estafadores', 'estafar',
+        'timar', 'timo', 'timador',
+        'engaño', 'engañar', 'engañoso',
+        'fraude', 'fraudulento',
+    );
+
+    // Palabras inofensivas para sustituir en modo moderate
+    $safeReplacements = array(
+        'roba' => 'quita',
+        'robó' => 'quitó',
+        'robar' => 'llevarse',
+        'robado' => 'cautivado',
+        'robando' => 'cautivando',
+    );
+
+    if ($mode === 'strict') {
+        // Modo estricto: eliminar completamente frases que contengan estas palabras
+        foreach ($triggerWords as $word) {
+            // Si aparece, recortar esa parte del texto y poner un cierre neutro
+            if (function_exists('mb_stripos') && mb_stripos($text, $word) !== false) {
+                $text = preg_replace(
+                    '/\b' . preg_quote($word, '/') . '\b[^.!?\n]{0,120}[.!?]/iu',
+                    '.',
+                    $text
+                );
+                $text = preg_replace(
+                    '/\b' . preg_quote($word, '/') . '\b[^.!?\n]{0,120}$/iu',
+                    '',
+                    $text
+                );
+            } elseif (stripos($text, $word) !== false) {
+                $text = preg_replace(
+                    '/\b' . preg_quote($word, '/') . '\b[^.!?\n]{0,120}[.!?]/i',
+                    '.',
+                    $text
+                );
+                $text = preg_replace(
+                    '/\b' . preg_quote($word, '/') . '\b[^.!?\n]{0,120}$/i',
+                    '',
+                    $text
+                );
+            }
+        }
+        return trim(preg_replace('/\s{2,}/', ' ', $text));
+    }
+
+    // Modo moderate: sustituir palabra por palabra
+    $lower = function_exists('mb_strtolower') ? mb_strtolower($text, 'UTF-8') : strtolower($text);
+    foreach ($safeReplacements as $bad => $safe) {
+        if (stripos($lower, $bad) !== false) {
+            $text = preg_replace('/\b' . preg_quote($bad, '/') . '\b/iu', $safe, $text);
+        }
+    }
+    return $text;
 }
 
 

@@ -10,12 +10,19 @@
         "api_key": "CHANGEME_OPENAI_API_KEY",
         "chat_url": "https://api.openai.com/v1/chat/completions",
         "chat_model": "gpt-5.1",
+        "temperature": 0,
         "tone_classifier_model": "gpt-4o-mini",
         "tone_temperature": 0,
         "tone_max_tokens": 50,
         "response_format": {
             "type": "json_object"
         }
+    },
+    "deepseek": {
+        "api_key": "CHANGEME_DEEPSEEK_API_KEY",
+        "chat_url": "https://api.deepseek.com/v1/chat/completions",
+        "chat_model": "deepseek-v4-flash",
+        "temperature": 0.7
     },
     "waha": {
         "api_key": "CHANGEME_WAHA_API_KEY",
@@ -39,25 +46,33 @@
                 "last9": "624934900",
                 "port": 3004,
                 "enabled": true,
-                "label": "linea_3004"
+                "label": "linea_3004",
+                "ai_provider": "openai",
+                "ai_model": null
             },
             {
                 "last9": "631349504",
                 "port": 3009,
                 "enabled": true,
-                "label": "linea_3009"
+                "label": "linea_3009",
+                "ai_provider": "openai",
+                "ai_model": null
             },
             {
                 "last9": "658283748",
                 "port": 3008,
                 "enabled": true,
-                "label": "linea_3008"
+                "label": "linea_3008",
+                "ai_provider": "openai",
+                "ai_model": null
             },
             {
                 "last9": "641865662",
                 "port": 3000,
                 "enabled": true,
-                "label": "linea_3000"
+                "label": "linea_3000",
+                "ai_provider": "openai",
+                "ai_model": null
             }
         ],
         "sender_blacklist": [
