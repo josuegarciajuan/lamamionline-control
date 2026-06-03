@@ -2349,6 +2349,68 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
                     <div id="deepseekTempInfo" class="model-info-box" style="margin-top:6px"></div>
                 </div>
             </div>
+
+            <details style="margin-top:10px">
+                <summary style="cursor:pointer;color:var(--text-muted);font-size:.82rem">▼ Configuración avanzada (Tone Classifier)</summary>
+                <div class="form-row" style="margin-top:10px">
+                    <div class="form-group">
+                        <label>Modelo clasificador de tono</label>
+                        <input type="text" name="deepseek[tone_classifier_model]" value="<?php echo config_val('deepseek.tone_classifier_model', 'deepseek-v4-pro'); ?>">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tone Temperature</label>
+                        <input type="number" step="0.1" name="deepseek[tone_temperature]" value="<?php echo config_val('deepseek.tone_temperature', '0'); ?>">
+                    </div>
+                    <div class="form-group">
+                        <label>Tone Max Tokens</label>
+                        <input type="number" name="deepseek[tone_max_tokens]" value="<?php echo config_val('deepseek.tone_max_tokens', '50'); ?>">
+                    </div>
+                </div>
+            </details>
+        </div>
+
+        <!-- ── SELECTOR GLOBAL DE PROVEEDORES ── -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px 24px;margin-bottom:20px">
+            <h3 style="margin:0 0 4px;display:flex;align-items:center;gap:8px">
+                <span style="font-size:1.2rem">⚙️</span> Proveedores globales
+            </h3>
+            <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:16px">
+                Selecciona qué proveedor usar para cada funcionalidad. DeepSeek es el proveedor por defecto recomendado.
+            </p>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label>Tone Classifier (clasificación de tono)</label>
+                    <select name="global_providers[tone_classifier]">
+                        <option value="deepseek" <?php echo config_val('global_providers.tone_classifier', 'deepseek') === 'deepseek' ? 'selected' : ''; ?>>DeepSeek</option>
+                        <option value="openai" <?php echo config_val('global_providers.tone_classifier', 'deepseek') === 'openai' ? 'selected' : ''; ?>>OpenAI</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label>Voice AI (órdenes por voz)</label>
+                    <select name="global_providers[voice_ai]">
+                        <option value="deepseek" <?php echo config_val('global_providers.voice_ai', 'deepseek') === 'deepseek' ? 'selected' : ''; ?>>DeepSeek</option>
+                        <option value="openai" <?php echo config_val('global_providers.voice_ai', 'deepseek') === 'openai' ? 'selected' : ''; ?>>OpenAI</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label>Publicista — Copy / Descriptor</label>
+                    <select name="global_providers[publicista_copy]">
+                        <option value="deepseek" <?php echo config_val('global_providers.publicista_copy', 'deepseek') === 'deepseek' ? 'selected' : ''; ?>>DeepSeek</option>
+                        <option value="openai" <?php echo config_val('global_providers.publicista_copy', 'deepseek') === 'openai' ? 'selected' : ''; ?>>OpenAI</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label>Publicista — Imagen</label>
+                    <select name="global_providers[publicista_image]">
+                        <option value="pollo" <?php echo config_val('global_providers.publicista_image', 'pollo') === 'pollo' ? 'selected' : ''; ?>>Pollo.ai</option>
+                    </select>
+                    <small style="color:var(--text-muted)">Solo Pollo.ai disponible para generación de imágenes</small>
+                </div>
+            </div>
         </div>
 
         <div style="margin-top:10px">

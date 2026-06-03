@@ -58,7 +58,39 @@ final class ToneBuilder implements PipelineStageInterface
         $speakerMode = is_string($ctx['speaker_mode'] ?? null) ? $ctx['speaker_mode'] : '';
 
         if ($speakerMode === 'encargada') {
-            $directives[] = 'NO digas que eres la encargada ni que atiendes tú. Habla como si fueras la chica.';
+            $directives[] = 'NO digas que eres la encargada ni que atiendes tú. '
+                . "NUNCA digas 'no soy [nombre]' ni aclares quién NO eres. "
+                . 'Simplemente presenta las chicas disponibles sin referirte a ti misma. '
+                . 'Habla como si fueras la chica.';
+        }
+
+        // ------------------------------------------------------------------ //
+        //  4b. First contact — proactive catalog                             //
+        // ⛔ NO mostrar catálogo si el cliente viene de un anuncio concreto    //
+        //    (viene buscando a UNA chica específica, mostrar otras le enfada)  //
+        // ------------------------------------------------------------------ //
+        $isNewConversation = !empty($ctx['__is_new_conversation']);
+        $messageText = (string) ($ctx['message_text'] ?? '');
+        $comesFromAd = (bool) preg_match(
+            '/(?:nuevapasion\.com\/anuncio|milanuncios\.com\/contacto|adultguia\.com|destacamos\.com|pasions\.com|sexoservicios\.com)/i',
+            $messageText,
+        );
+        if ($isNewConversation && $speakerMode === 'encargada' && !$comesFromAd) {
+            $directives[] = 'PRIMER CONTACTO: El cliente acaba de llegar. '
+                . 'Preséntale las chicas disponibles mencionando sus nombres de forma natural '
+                . 'y usa photo_action="catalog" en tu JSON para que el sistema adjunte 1 foto de cada una. '
+                . 'No le preguntes "cuál te gusta" sin haberle enseñado las fotos primero. '
+                . 'Si ya has mostrado el catálogo antes en esta conversación, ignora esta directiva.';
+        }
+
+        // ── 4c. Cliente viene de anuncio concreto → NO catálogo ──
+        if ($comesFromAd) {
+            $directives[] = 'ATENCIÓN: El cliente viene del enlace de un anuncio concreto '
+                . '(viene buscando a UNA chica específica). NO muestres catálogo de otras chicas. '
+                . 'NO uses photo_action="catalog". Céntrate en la chica del anuncio. '
+                . 'Si no sabes el nombre de la chica del anuncio, dedúcelo del enlace o pregúntalo '
+                . 'de forma natural pero SIN mostrar otras chicas. '
+                . 'NUNCA digas "mira que chicas tengo" ni "te presento a mis amigas".';
         }
 
         // ------------------------------------------------------------------ //
@@ -67,7 +99,9 @@ final class ToneBuilder implements PipelineStageInterface
         $wantsMoreGirls = !empty($ctx['wants_more_girls']);
 
         if ($wantsMoreGirls) {
-            $directives[] = 'El cliente quiere ver TODAS las chicas. Muestra el catálogo completo.';
+            $directives[] = 'El cliente pidió ver más chicas antes. '
+                . 'Si su mensaje actual va de eso, usa photo_action="catalog". '
+                . 'Si está preguntando OTRA COSA distinta, NO mandes fotos ni catálogo.';
         }
 
         if (!empty($ctx['info_pack_ready'])) {
@@ -168,6 +202,16 @@ final class ToneBuilder implements PipelineStageInterface
                 . "Los datos de cita/ubicación son de {$selectedGirlName}.";
         }
 
+        // ── 10b. PROHIBICIÓN DE CATÁLOGO cuando hay selected_girl ──
+        if ($selectedGirlName !== '') {
+            $directives[] = "CLIENTE YA ELIGIÓ A {$selectedGirlName}. "
+                . 'PROHIBIDO TOTAL: mencionar otras chicas, decir "mira que chicas tengo", '
+                . 'ofrecer catálogo, usar photo_action="catalog", preguntar "cual prefieres", '
+                . "ni sugerir que hay más chicas. Céntrate EXCLUSIVAMENTE en {$selectedGirlName}. "
+                . "NUNCA escribas frases que empiecen con 'mira que chicas', 'tengo a', "
+                . "'estas son', 'te presento a' ni similares.";
+        }
+
         // ------------------------------------------------------------------ //
         //  11. Haggle (regateo)                                               //
         // ------------------------------------------------------------------ //
@@ -187,10 +231,22 @@ final class ToneBuilder implements PipelineStageInterface
         // ------------------------------------------------------------------ //
         //  12. NOVA: Post-maps ETA mode (rotating variants)                  //
         // ------------------------------------------------------------------ //
-        $mapsSent        = !empty($ctx['maps_sent']);
-        $etaFromUserFlag = !empty($ctx['eta_from_user_flag']);
+        $mapsSent          = !empty($ctx['maps_sent']);
+        $mapsBeingSentNow  = !empty($ctx['maps_being_sent_now']);
+        $etaFromUserFlag   = !empty($ctx['eta_from_user_flag']);
 
-        if ($mapsSent && !$etaFromUserFlag) {
+        // ── 12a. Preemptive: maps being sent RIGHT NOW → ETA en mismo mensaje ──
+        if ($mapsBeingSentNow && !$etaFromUserFlag) {
+            $directives[] = 'ATTA MODE: Vas a enviar el maps/ubicación AHORA MISMO. '
+                . 'Incluye la petición de ETA EN EL MISMO MENSAJE. '
+                . 'Ejemplos: "te paso el maps cari, dime cuanto tardas? 😊", '
+                . '"aqui tienes la ubicacion, en cuantos min vienes?", '
+                . '"este es el punto, avisame cuando salgas". '
+                . 'NO envíes el maps sin preguntar ETA.';
+        }
+
+        // ── 12b. POST-MAPS ETA mode (rotating variants) ──
+        if (($mapsSent || $mapsBeingSentNow) && !$etaFromUserFlag) {
             $variants = (array) $this->config->get('message_variants.eta_request_variants', []);
             if ($variants === []) {
                 $variants = ['cuanto tardas amor?', 'avisame cuando salgas', 'dime cuantos min?'];
@@ -247,7 +303,7 @@ final class ToneBuilder implements PipelineStageInterface
         // ------------------------------------------------------------------ //
         $directives[] = 'Saludo minimalista: Saludo MÁX 4 palabras. No preguntes "cómo estás" ni similares.';
         $directives[] = 'Reactivo: Responde SOLO lo que preguntan. NO hagas preguntas de follow-up. NO sondees.';
-        $directives[] = 'Sin auto-identificación: NUNCA digas "soy la encargada", "atiendo yo", "soy la que está aquí" ni similares.';
+        $directives[] = 'Sin auto-identificación: NUNCA digas "soy la encargada", "atiendo yo", "soy la que está aquí", "no soy [nombre]", "yo no soy", ni similares.';
         $directives[] = 'Sin signos de apertura (¿ ¡) y faltas de ortografía leves para sonar humana.';
         $directives[] = 'Emojis: usa 1 emoji en ~2 de cada 3 mensajes, como parte natural de la conversación. Si el anterior tuyo llevó, este puede llevarlo o no. Lo importante es no forzar: a veces sí, a veces no.';
 

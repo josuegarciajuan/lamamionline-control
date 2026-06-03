@@ -3106,6 +3106,11 @@ function avisos_run_all_generators($sendWhatsapp = true) {
         aviso_cli_log('[publicista_estados_wasap] published=' . ($estadosWasapRun['published'] ? 'yes' : 'no') . ' reason=' . ($estadosWasapRun['reason'] ?? 'published'));
     }
 
+    if (function_exists('publicista_campaign_auto_rotation_run_due')) {
+        $campaignAutoRotationRun = publicista_campaign_auto_rotation_run_due();
+        aviso_cli_log('[publicista_campaign_auto_rotation] status=' . trim((string)($campaignAutoRotationRun['status'] ?? 'unknown')) . ' campaign_id=' . trim((string)($campaignAutoRotationRun['campaign_id'] ?? '')) . ' next=' . trim((string)($campaignAutoRotationRun['next_run_at'] ?? '')));
+    }
+
     $allStats[] = avisos_sync_generated(
         //avisos_generate_after_10am(),
         'hora',

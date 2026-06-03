@@ -100,8 +100,9 @@ final class DedupeReply implements PipelineStageInterface
         }
 
         $photoInsistCount = $ctx['photo_insist_count'] ?? 0;
+        $photoAction      = $ctx['photo_action'] ?? 'none';
 
-        $categoryVariant = $this->resolveCategoryVariant($outputText, $yaEnviado, $photosSentPerGirl, $photoInsistCount);
+        $categoryVariant = $this->resolveCategoryVariant($outputText, $yaEnviado, $photosSentPerGirl, $photoInsistCount, $photoAction);
 
         if ($categoryVariant !== null) {
             $ctx['output_text']             = $categoryVariant;
@@ -177,7 +178,7 @@ final class DedupeReply implements PipelineStageInterface
      * @param  list<mixed> $yaEnviado
      * @param  list<string> $photosSentPerGirl
      */
-    private function resolveCategoryVariant(string $outputText, array $yaEnviado, array $photosSentPerGirl = [], int $photoInsistCount = 0): ?string
+    private function resolveCategoryVariant(string $outputText, array $yaEnviado, array $photosSentPerGirl = [], int $photoInsistCount = 0, string $photoAction = 'none'): ?string
     {
         if ($yaEnviado === []) {
             return null;
@@ -193,19 +194,15 @@ final class DedupeReply implements PipelineStageInterface
                 return null; // Allow photos to go through
             }
 
-            // Check if output mentions a girl whose photos haven't been sent yet
-            $outputNorm = $this->normalize($outputText);
-            $hasNewGirlPhotos = false;
-            foreach ($photosSentPerGirl as $girlName) {
-                // If output contains a girl name NOT in photos_sent_per_... wait,
-                // $photosSentPerGirl contains girls ALREADY sent. We need the reverse.
+            // ── LLM-DRIVEN: if the LLM explicitly set photo_action, trust it ──
+            // The LLM knows the context (selected_girl, catalog vs full photos, etc.)
+            // and has decided photos should be sent. Don't override with "ya te las mandé".
+            if ($photoAction !== 'none') {
+                return null; // LLM says send → allow through
             }
-            // Actually, check if the output contains a girl name that is NOT in photosSentPerGirl.
-            // Since we don't have the full active girls list here, check the reverse:
-            // If NO girl from photosSentPerGirl appears in the output, it might be new photos.
-            // But we don't have the active girls list in DedupeReply.
-            // Simpler approach: if there are ANY photosSentPerGirl entries but NONE of them
-            // appear in the output, these are likely new photos of a different girl.
+
+            // Legacy per-girl awareness (photos_sent_per_girl — rarely populated)
+            $outputNorm = $this->normalize($outputText);
             if ($photosSentPerGirl !== []) {
                 $foundKnownGirl = false;
                 foreach ($photosSentPerGirl as $gn) {

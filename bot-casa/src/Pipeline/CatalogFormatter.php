@@ -41,13 +41,27 @@ final class CatalogFormatter implements PipelineStageInterface
         $messageText     = (string) ($ctx['message_text'] ?? '');
         $normalizedInput = mb_strtolower(trim($messageText), 'UTF-8');
 
-        // --- Detect triggers ---
-        $mentionsGirls  = $this->detectsGirls($normalizedInput);
-        $mentionsFriends = $this->detectsFriends($normalizedInput);
-        $wantsMore      = !empty($ctx['wants_more_girls']) || $mentionsFriends;
+        // ── LLM-DRIVEN PHOTO TRIGGER (primary) ────────────────────────────
+        // The LLM now sets photo_action in its JSON response to tell the system
+        // what kind of photo delivery is needed. This replaces regex-only detection.
+        $photoAction = $ctx['photo_action'] ?? 'none';
+        $llmWantsPhotos = $photoAction !== 'none';
 
-        if (!$mentionsGirls && !$wantsMore) {
-            $mentionsGirls = !empty($ctx['wants_more_girls']);
+        // --- LLM-driven mode: use photo_action directly ---
+        if ($llmWantsPhotos) {
+            // Bypass regex detection entirely — the LLM knows best
+            $mentionsGirls  = true;
+            $mentionsFriends = ($photoAction === 'catalog');
+            $wantsMore      = ($photoAction === 'catalog');
+        } else {
+            // --- Fallback: regex-based detection (legacy safety net) ---
+            $mentionsGirls  = $this->detectsGirls($normalizedInput);
+            $mentionsFriends = $this->detectsFriends($normalizedInput);
+            $wantsMore      = !empty($ctx['wants_more_girls']) || $mentionsFriends;
+
+            if (!$mentionsGirls && !$wantsMore) {
+                $mentionsGirls = !empty($ctx['wants_more_girls']);
+            }
         }
 
         // If no mention of girls and output doesn't already have photo links, skip
@@ -76,9 +90,25 @@ final class CatalogFormatter implements PipelineStageInterface
         $shown          = [];
         $unshown        = [];
 
+        // CASE: LLM-driven selected_all → ALL photos of selected girl
+        if ($llmWantsPhotos && $photoAction === 'selected_all' && $selectedGirl !== null) {
+            $shown    = [$selectedGirl];
+            $unshown  = array_values(array_filter(
+                $girlsConfig,
+                static fn(array $g): bool => ($g['id'] ?? '') !== ($selectedGirl['id'] ?? '')
+            ));
+            $formattedLines = $this->formatAllPhotos($selectedGirl);
+        // CASE: LLM-driven selected_all but NO selected girl → degrade to catalog
+        } elseif ($llmWantsPhotos && $photoAction === 'selected_all' && $selectedGirl === null) {
+            foreach ($girlsConfig as $girl) {
+                if (!is_array($girl)) continue;
+                $shown[] = $girl;
+                $line = $this->formatGirlOneLine($girl, $sentUrls);
+                if ($line !== '') $formattedLines[] = $line;
+            }
         // CASE: user asks for more photos of selected girl (no possessive pronoun)
         // → send ALL photos of the selected girl, NOT the catalog
-        if ($morePhotosResult['matched'] && !$morePhotosResult['has_possessive']) {
+        } elseif ($morePhotosResult['matched'] && !$morePhotosResult['has_possessive']) {
             $shown    = [$selectedGirl];
             $unshown  = array_values(array_filter(
                 $girlsConfig,
@@ -260,6 +290,11 @@ final class CatalogFormatter implements PipelineStageInterface
             '/\bcat[aá]logo\b/i',
             '/\b(?:cu[aá]ntas|cuantas)\s+(?:chicas|hay)\b/i',
             '/\b(?:qui[eé]nes?|cuales)\s+(?:hay|est[aá]n?|tienen?)\b/i',
+            // NOVA: natural Spanish patterns ("las otras tres", "las que faltan"...)
+            '/\blas\s+otras?\b/i',
+            '/\blas?\s+que\s+faltan?\b/i',
+            '/\bel\s+resto\b/i',
+            '/\b(?:env[ií]ame|m[aá]ndame|p[aá]same)\s+(?:las|el|los)\b/i',
         ];
 
         foreach ($patterns as $pattern) {
@@ -286,6 +321,9 @@ final class CatalogFormatter implements PipelineStageInterface
             '/\bens[eé][ñn]ame\s+(todas|m[aá]s)\b/i',
             '/\bmu[eé]strame\s+(todas|m[aá]s)\b/i',
             '/\bquiero\s+ver\s+(todas|m[aá]s)\b/i',
+            // NOVA: natural patterns for "the others" in catalog context
+            '/\blas\s+otras?\b/i',
+            '/\blas?\s+que\s+faltan?\b/i',
         ];
 
         foreach ($patterns as $pattern) {

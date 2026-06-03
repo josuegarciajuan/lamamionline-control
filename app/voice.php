@@ -626,18 +626,22 @@ function voice_ai_config_form_state() {
 
     $storedKey = trim((string)($settings['voice_ai_api_key'] ?? ''));
     $storedModel = trim((string)($settings['voice_ai_model'] ?? ''));
+    $storedProvider = trim((string)($settings['voice_ai_provider'] ?? ''));
 
     $formKey = $storedKey !== '' ? $storedKey : (string)($defaults['api_key'] ?? '');
-    $formModel = $storedModel !== '' ? $storedModel : 'gpt-5.1';
+    $formModel = $storedModel !== '' ? $storedModel : 'deepseek-v4-pro';
     if ($formModel === '') {
         $formModel = voice_ai_default_model();
     }
+    $formProvider = $storedProvider !== '' ? $storedProvider : 'deepseek';
 
     return array(
         'form_api_key' => $formKey,
         'form_model' => $formModel,
+        'form_provider' => $formProvider,
         'stored_api_key' => $storedKey,
         'stored_model' => $storedModel,
+        'stored_provider' => $storedProvider,
         'default_api_key' => (string)($defaults['api_key'] ?? ''),
         'default_model' => voice_ai_default_model(),
         'env_api_key' => $envKey,
@@ -651,6 +655,13 @@ function voice_ai_config_form_state() {
 function voice_ai_config() {
     $settings = storage_read('settings.json');
 
+    // ── Resolver proveedor ──────────────────────────────────────────
+    $provider = trim((string)($settings['voice_ai_provider'] ?? ''));
+    if ($provider === '') {
+        $provider = 'deepseek'; // default
+    }
+
+    // ── Resolver API key ────────────────────────────────────────────
     $apiKey = trim((string)getenv('OPENAI_API_KEY'));
     $apiKeySource = $apiKey !== '' ? 'env' : 'none';
     if ($apiKey === '' && !empty($settings['voice_ai_api_key'])) {
@@ -664,6 +675,7 @@ function voice_ai_config() {
         }
     }
 
+    // ── Resolver modelo ─────────────────────────────────────────────
     $model = trim((string)getenv('OPENAI_VOICE_MODEL'));
     $modelSource = $model !== '' ? 'env' : 'none';
     if ($model === '' && !empty($settings['voice_ai_model'])) {
@@ -675,8 +687,15 @@ function voice_ai_config() {
         $modelSource = 'bot_template';
     }
     if ($model === '') {
-        $model = 'gpt-5.1';
+        $model = 'deepseek-v4-pro';
         $modelSource = 'default';
+    }
+
+    // ── Resolver URL del endpoint según proveedor ───────────────────
+    if ($provider === 'deepseek') {
+        $chatUrl = 'https://api.deepseek.com/v1/chat/completions';
+    } else {
+        $chatUrl = 'https://api.openai.com/v1/chat/completions';
     }
 
     $org = trim((string)getenv('OPENAI_ORGANIZATION'));
@@ -685,6 +704,8 @@ function voice_ai_config() {
     return array(
         'api_key' => $apiKey,
         'model' => $model,
+        'provider' => $provider,
+        'chat_url' => $chatUrl,
         'organization' => $org,
         'project' => $project,
         'configured' => ($apiKey !== ''),
@@ -1107,7 +1128,7 @@ function voice_interpret_with_ai($text, $context = array(), $speechMeta = array(
     }
 
     $responseHeaders = array();
-    $ch = curl_init('https://api.openai.com/v1/chat/completions');
+    $ch = curl_init($cfg['chat_url']);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));

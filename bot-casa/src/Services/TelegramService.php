@@ -22,6 +22,12 @@ final class TelegramService implements TelegramServiceInterface
 
     private readonly string $botToken;
 
+    /** Dedup window in seconds: skip alert if one was already sent for the same phone within this window. */
+    private readonly int $dedupWindowSec;
+
+    /** Directory for Telegram alert dedup lock files. */
+    private readonly string $dedupDir;
+
     public function __construct(
         private readonly ConfigInterface $config,
         private readonly HttpClientInterface $http,
@@ -38,6 +44,11 @@ final class TelegramService implements TelegramServiceInterface
         if ($this->botToken === 'CHANGEME_TELEGRAM_BOT_TOKEN' || $this->botToken === '') {
             $this->logger->warning('Telegram bot token is not configured — alerts will not be sent');
         }
+
+        $this->dedupWindowSec = (int) $this->config->get('telegram.alert_dedup_window_sec', 60);
+
+        $baseDataDir = (string) $this->config->get('files.base_data_dir', 'data');
+        $this->dedupDir = rtrim($baseDataDir, '/') . '/locks/telegram_alert';
     }
 
     /**
@@ -71,6 +82,12 @@ final class TelegramService implements TelegramServiceInterface
 
         $phoneRaw  = (string) ($leadData['from_phone'] ?? $leadData['phone'] ?? '?');
         $phone     = ($phoneRaw !== '' && $phoneRaw !== '?') ? preg_replace('/[^0-9]/', '', $phoneRaw) ?? $phoneRaw : $phoneRaw;
+
+        // ── Dedup: skip if alert was already sent for this phone within the dedup window ──
+        if ($this->isDuplicateAlert($phone)) {
+            $this->logger->info("Telegram alert dedup: skipping duplicate for phone {$phone} (last alert < {$this->dedupWindowSec}s ago)");
+            return;
+        }
         $lineLabel = (string) ($leadData['line_label'] ?? '');
         $lineNotas = (string) ($leadData['line_notas'] ?? '');
         $lineLast9 = (string) ($leadData['line_last9'] ?? '');
@@ -117,6 +134,28 @@ final class TelegramService implements TelegramServiceInterface
             $text .= "⏱ ETA: {$etaMin} min\n";
         }
 
+        // ── Add lead signals for transparency ─────────────────────
+        $leadSignals = $leadData['lead_signals'] ?? [];
+        if (is_array($leadSignals) && $leadSignals !== [] && !in_array('none', $leadSignals, true)) {
+            $signalsMap = [
+                'eta_explicit'       => '⏱ ETA explícita',
+                'eta_implicit'       => '🗣 Intención de venir',
+                'coming_soon'        => '🏃 Viene ya',
+                'selected_girl'      => '👤 Chica elegida',
+                'maps_requested'     => '📍 Pidió ubicación',
+                'maps_sent'          => '🗺 Ubicación enviada',
+                'price_asked'        => '💶 Preguntó precios',
+                'urgent_tone'        => '⚡ Tono urgente',
+                'recurring_client'   => '🔄 Cliente recurrente',
+                'coordination_phase' => '📋 Fase coordinación',
+            ];
+            $signalLabels = [];
+            foreach ($leadSignals as $s) {
+                $signalLabels[] = $signalsMap[$s] ?? $s;
+            }
+            $text .= "🔍 Señales: " . implode(', ', $signalLabels) . "\n";
+        }
+
         // ── Add recent conversation excerpt ──────────────────────
         if ($lastUser !== '' || $lastBot !== '') {
             $text .= "\n💬 Conversación:\n";
@@ -133,6 +172,9 @@ final class TelegramService implements TelegramServiceInterface
         foreach ($this->chatIds as $chatId) {
             $this->sendMessage($chatId, $text);
         }
+
+        // ── Record alert timestamp for dedup ─────────────────────────
+        $this->touchAlertSent($phone);
     }
 
     /**
@@ -216,5 +258,72 @@ final class TelegramService implements TelegramServiceInterface
         }
 
         return min(100, $score);
+    }
+
+    /**
+     * Check whether a Telegram alert was already sent for this phone within the dedup window.
+     *
+     * Uses a lock file in data/locks/telegram_alert/{phone}.alert.
+     * If the file exists and its mtime is within dedupWindowSec, it's a duplicate.
+     */
+    private function isDuplicateAlert(string $phone): bool
+    {
+        if ($phone === '' || $phone === '?') {
+            return false; // cannot dedup without a phone
+        }
+
+        $lockFile = $this->dedupAlertPath($phone);
+
+        if (!is_file($lockFile)) {
+            return false;
+        }
+
+        $mtime = @filemtime($lockFile);
+        if ($mtime === false) {
+            return false; // can't read mtime, allow through
+        }
+
+        $elapsed = time() - $mtime;
+        return $elapsed < $this->dedupWindowSec;
+    }
+
+    /**
+     * Record that a Telegram alert was sent for this phone.
+     *
+     * Creates/updates a lock file, ensuring the directory exists.
+     */
+    private function touchAlertSent(string $phone): void
+    {
+        if ($phone === '' || $phone === '?') {
+            return;
+        }
+
+        $lockFile = $this->dedupAlertPath($phone);
+        $dir = dirname($lockFile);
+
+        $this->ensureDir($dir);
+
+        @touch($lockFile);
+    }
+
+    /**
+     * Resolve the lock file path for a given phone number.
+     *
+     * Phone is sanitized to avoid path traversal.
+     */
+    private function dedupAlertPath(string $phone): string
+    {
+        $safe = preg_replace('/[^0-9]/', '', $phone);
+        return $this->dedupDir . '/' . $safe . '.alert';
+    }
+
+    /**
+     * Ensure a directory exists, creating it if necessary.
+     */
+    private function ensureDir(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0777, true);
+        }
     }
 }

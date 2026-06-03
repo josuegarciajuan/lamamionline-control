@@ -2506,7 +2506,6 @@ function render_publicista_crear_perfiles_page($embedded = false) {
             echo '<div class="field">';
             echo '<label>Modelo de imagen <span style="color:#6b7280;font-weight:normal;">(afecta solo a la generación de candidatas)</span></label>';
             echo '<select name="image_model_selector" id="pollo_image_model_selector" onchange="publicistaModelChange(this.value)">';
-            echo '<option value="gpt">GPT (OpenAI · configurado en sistema)</option>';
             if (function_exists('publicista_pollo_models')) {
                 foreach (publicista_pollo_models() as $polloKey => $polloCfg) {
                     $sel = ($polloKey === 'pollo-image-v2') ? ' selected' : '';
@@ -2514,7 +2513,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
                 }
             }
             echo '</select>';
-            echo '<div class="field-help">Con GPT usa el pipeline habitual con OpenAI. Con modelos Pollo.ai usa la cookie de sesión guardada en ConfigM para generar imágenes vía texto (sin referencia directa de imagen, pero con el mismo prompt detallado).</div>';
+            echo '<div class="field-help">Modelos Pollo.ai para generación de imágenes vía texto. Usa la cookie de sesión guardada en ConfigM.</div>';
             echo '</div>';
 
             // ---- Info cookie Pollo.ai (se muestra al elegir modelo Pollo) ----
@@ -7059,13 +7058,25 @@ function render_config_section() {
     echo '<div class="field-help">Por defecto se usa la key detectada en el Bearer de la plantilla del bot. Si algún día la cambias aquí, esta configuración tendrá prioridad frente a ese valor por defecto. Si además defines OPENAI_API_KEY en el servidor, esa variable tendrá prioridad sobre todo lo demás.</div>';
     echo '</div>';
     echo '<div class="field">';
+    echo '<label>Proveedor</label>';
+    echo '<select name="voice_ai_provider">';
+    $currentProvider = $voiceForm['form_provider'] ?? 'deepseek';
+    $selDeepseek = ($currentProvider === 'deepseek') ? 'selected' : '';
+    $selOpenai = ($currentProvider === 'openai') ? 'selected' : '';
+    echo '<option value="deepseek" ' . $selDeepseek . '>DeepSeek</option>';
+    echo '<option value="openai" ' . $selOpenai . '>OpenAI</option>';
+    echo '</select>';
+    echo '<div class="field-help">Proveedor de IA para las órdenes por voz. DeepSeek es el recomendado por defecto.</div>';
+    echo '</div>';
+    echo '<div class="field">';
     echo '<label>Modelo</label>';
-    echo '<input type="text" name="voice_ai_model" value="' . e($voiceForm['form_model']) . '" placeholder="gpt-5.1" autocomplete="off">';
-    echo '<div class="field-help">Se guardará aquí y, si no hay nada, el sistema usará gpt-5.1 por defecto.</div>';
+    echo '<input type="text" name="voice_ai_model" value="' . e($voiceForm['form_model']) . '" placeholder="deepseek-v4-pro" autocomplete="off">';
+    echo '<div class="field-help">Se guardará aquí y, si no hay nada, el sistema usará deepseek-v4-pro por defecto.</div>';
     echo '</div>';
     echo '<div class="field">';
     echo '<label>Estado actual</label>';
     echo '<div class="info-strip"><strong>IA activa:</strong> ' . ($voiceCfg['configured'] ? 'Sí' : 'No') . '</div>';
+    echo '<div class="info-strip" style="margin-top:10px;"><strong>Proveedor activo:</strong> ' . e(ucfirst((string)($voiceCfg['provider'] ?? 'deepseek'))) . '</div>';
     echo '<div class="info-strip" style="margin-top:10px;"><strong>Modelo activo:</strong> ' . e((string)$voiceCfg['model']) . '</div>';
     echo '<div class="info-strip" style="margin-top:10px;"><strong>Fuente de la key:</strong> ' . e((string)$voiceCfg['api_key_source']) . '</div>';
     echo '<div class="info-strip" style="margin-top:10px;"><strong>Fuente del modelo:</strong> ' . e((string)$voiceCfg['model_source']) . '</div>';

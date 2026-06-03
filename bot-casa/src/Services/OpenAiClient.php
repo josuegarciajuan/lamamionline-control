@@ -182,7 +182,23 @@ final class OpenAiClient implements OpenAiClientInterface
                 return $parsed;
             }
         } catch (\JsonException $e) {
-            // Content is not JSON — wrap it as user_visible_reply
+            // Content is not pure JSON — try regex extraction before giving up
+        }
+
+        // ── Recovery: extract any valid JSON object with user_visible_reply ──
+        // Handles cases where AI appends extra text like " response{...}" after JSON.
+        if (preg_match_all('/\{(?:[^{}]|(?R))*\}/s', (string) $content, $matches)) {
+            foreach ($matches[0] as $candidate) {
+                try {
+                    $recovered = json_decode($candidate, true, 512, JSON_THROW_ON_ERROR);
+                    if (is_array($recovered) && isset($recovered['user_visible_reply'])) {
+                        $this->logger->info('OpenAI response recovered via regex extraction');
+                        return $recovered;
+                    }
+                } catch (\JsonException $e) {
+                    // Try next candidate
+                }
+            }
         }
 
         return ['user_visible_reply' => (string) $content];

@@ -2,8 +2,8 @@
 
 function publicista_ai_default_models() {
     return array(
-        'descriptor' => 'gpt-5.4-mini',
-        'image' => 'gpt-image-1-mini',
+        'descriptor' => 'deepseek-v4-pro',
+        'image' => 'pollo-image-v2',
     );
 }
 
@@ -72,6 +72,8 @@ function publicista_ai_config() {
     }
 
     // --- API sin censura para copy (DeepSeek / OpenAI-compatible) ---
+    // --- Provider global: deepseek por defecto, openai como fallback ---
+    $copyProvider = trim((string)($settings['publicista_copy_provider'] ?? 'deepseek'));
     $copyApiKey = trim((string)getenv('PUBLICISTA_COPY_API_KEY'));
     if ($copyApiKey === '') {
         $copyApiKey = trim((string)($settings['publicista_copy_api_key'] ?? ''));
@@ -88,8 +90,11 @@ function publicista_ai_config() {
         $copyModel = trim((string)($settings['publicista_copy_model'] ?? ''));
     }
     if ($copyModel === '') {
-        $copyModel = 'deepseek-chat';
+        $copyModel = 'deepseek-v4-pro';
     }
+
+    // --- Descriptor provider (usa copy_api cuando es deepseek) ---
+    $descriptorProvider = trim((string)($settings['publicista_descriptor_provider'] ?? 'deepseek'));
 
     return array(
         'api_key' => $apiKey,
@@ -103,11 +108,13 @@ function publicista_ai_config() {
         'prompt_cache_retention' => $promptCacheRetention,
         'use_batch_images' => !in_array(strtolower(trim((string)$useBatchImages)), array('0', 'false', 'no', 'off'), true),
         'timeouts' => publicista_ai_timeouts(),
-        // API sin censura
+        // API sin censura / DeepSeek
+        'copy_provider' => $copyProvider,
         'copy_api_key' => $copyApiKey,
         'copy_api_url' => $copyApiUrl,
         'copy_model' => $copyModel,
         'copy_configured' => ($copyApiKey !== ''),
+        'descriptor_provider' => $descriptorProvider,
     );
 }
 
@@ -139,14 +146,31 @@ function publicista_uncensored_chat_request($payload, $timeoutSec = 120) {
         foreach ($payload['input'] as $msg) {
             $role = isset($msg['role']) ? (string)$msg['role'] : 'user';
             $content = '';
+            $contentParts = array();
+            $hasImage = false;
             if (is_string($msg['content'] ?? null)) {
                 $content = (string)$msg['content'];
             } elseif (is_array($msg['content'] ?? null)) {
                 foreach ($msg['content'] as $part) {
-                    if (isset($part['text']) && is_string($part['text'])) $content .= $part['text'];
+                    if (isset($part['text']) && is_string($part['text'])) {
+                        $textPart = $part['text'];
+                        $contentParts[] = array('type' => 'text', 'text' => $textPart);
+                        $content .= $textPart;
+                    } elseif (isset($part['type']) && $part['type'] === 'input_image' && !empty($part['image_url'])) {
+                        $contentParts[] = array(
+                            'type' => 'image_url',
+                            'image_url' => array('url' => $part['image_url']),
+                        );
+                        $hasImage = true;
+                    }
                 }
             }
-            if ($content !== '') $messages[] = array('role' => $role, 'content' => $content);
+            if ($hasImage) {
+                // Usar array de content parts con imágenes (formato Chat Completions con vision)
+                $messages[] = array('role' => $role, 'content' => $contentParts);
+            } elseif ($content !== '') {
+                $messages[] = array('role' => $role, 'content' => $content);
+            }
         }
     }
     if (isset($payload['text']['format']) && is_array($payload['text']['format'])) {
@@ -2505,8 +2529,13 @@ function publicista_describe_source_with_openai($jobId) {
     }
 
     $cfg = publicista_ai_config();
-    if (!$cfg['configured']) {
+    $descriptorProvider = (string)($cfg['descriptor_provider'] ?? 'deepseek');
+
+    if (!$cfg['configured'] && $descriptorProvider === 'openai') {
         return array(false, 'OpenAI no está configurado. Revisa la API key en Josue > Config o en OPENAI_API_KEY.');
+    }
+    if (!$cfg['copy_configured'] && $descriptorProvider === 'deepseek') {
+        return array(false, 'DeepSeek no está configurado para Publicista. Revisa la API key en Josue > Config.');
     }
 
     $sourceRel = trim((string)($job['source_image']['stored_path'] ?? ''));
@@ -2526,11 +2555,13 @@ function publicista_describe_source_with_openai($jobId) {
 
     $base64Image = base64_encode((string)@file_get_contents($sourceFs));
     if ($base64Image === '') {
-        return array(false, 'No se pudo leer la imagen original para enviarla a OpenAI.');
+        return array(false, 'No se pudo leer la imagen original para enviarla.');
     }
 
-    $payload = array_merge(publicista_response_payload_defaults('descriptor', $cfg['descriptor_model']), array(
-        'model' => $cfg['descriptor_model'],
+    $descriptorModel = $descriptorProvider === 'deepseek' ? $cfg['copy_model'] : $cfg['descriptor_model'];
+
+    $payload = array_merge(publicista_response_payload_defaults('descriptor', $descriptorModel), array(
+        'model' => $descriptorModel,
         'store' => false,
         'input' => array(
             array(
@@ -2556,15 +2587,20 @@ function publicista_describe_source_with_openai($jobId) {
         ),
     ));
 
-    $response = publicista_openai_json_request('/v1/responses', $payload, $cfg['timeouts']['responses'], array(
-        'on_retry' => function($retryLog) use ($jobId) {
-            publicista_job_log_write($jobId, 'openai_descriptor_retry', array(
-                'ts' => now_datetime(),
-                'phase' => 'descriptor_pipeline',
-                'retry' => $retryLog,
-            ));
-        },
-    ));
+    // ── Ruta según proveedor ──────────────────────────────────────────
+    if ($descriptorProvider === 'deepseek') {
+        $response = publicista_uncensored_chat_request($payload, $cfg['timeouts']['responses']);
+    } else {
+        $response = publicista_openai_json_request('/v1/responses', $payload, $cfg['timeouts']['responses'], array(
+            'on_retry' => function($retryLog) use ($jobId) {
+                publicista_job_log_write($jobId, 'openai_descriptor_retry', array(
+                    'ts' => now_datetime(),
+                    'phase' => 'descriptor_pipeline',
+                    'retry' => $retryLog,
+                ));
+            },
+        ));
+    }
 
     $rawToStore = $response;
     if (!empty($rawToStore['raw_body']) && strlen($rawToStore['raw_body']) > 150000) {
@@ -2573,17 +2609,18 @@ function publicista_describe_source_with_openai($jobId) {
     publicista_job_log_write($jobId, 'openai_descriptor', $rawToStore);
 
     if (!$response['ok']) {
-        return array(false, 'OpenAI descriptor falló: ' . ($response['error'] !== '' ? $response['error'] : 'sin detalle'));
+        $providerLabel = $descriptorProvider === 'deepseek' ? 'DeepSeek' : 'OpenAI';
+        return array(false, $providerLabel . ' descriptor falló: ' . ($response['error'] !== '' ? $response['error'] : 'sin detalle'));
     }
 
     $outputText = publicista_response_output_text($response['decoded']);
     if ($outputText === '') {
-        return array(false, 'OpenAI respondió sin output_text utilizable para el descriptor.');
+        return array(false, 'El modelo no devolvió output_text utilizable para el descriptor.');
     }
 
     $parsed = json_decode($outputText, true);
     if (!is_array($parsed)) {
-        return array(false, 'OpenAI devolvió texto, pero no se pudo parsear como JSON descriptor.');
+        return array(false, 'El modelo devolvió texto, pero no se pudo parsear como JSON descriptor.');
     }
 
     list($metaOk1, $rawPath) = publicista_job_meta_write($jobId, 'openai_descriptor_raw.json', $response['decoded']);

@@ -945,12 +945,11 @@ function action_create_publicista_job() {
         ? publicista_normalize_outfit_params($_POST)
         : array();
 
-    // Guardar modelo de imagen seleccionado (GPT por defecto, o un modelo Pollo.ai)
-    $imageModelSelector = trim((string)request_post('image_model_selector', 'gpt'));
+    // Guardar modelo de imagen seleccionado (Pollo.ai por defecto)
+    $imageModelSelector = trim((string)request_post('image_model_selector', 'pollo-image-v2'));
     if (function_exists('publicista_is_pollo_model') && publicista_is_pollo_model($imageModelSelector)) {
         $job['models']['image'] = $imageModelSelector;
     }
-    // Si es 'gpt' (o invalido), se deja vacio para que publicista_ai_config() elija el modelo configurado
 
     $uploadedFile = isset($_FILES['source_image']) && is_array($_FILES['source_image']) ? $_FILES['source_image'] : null;
     if (!$uploadedFile || (int)($uploadedFile['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
@@ -1901,16 +1900,21 @@ function action_save_voice_ai_config() {
 
     $apiKey = trim((string)request_post('voice_ai_api_key'));
     $model = trim((string)request_post('voice_ai_model'));
+    $provider = trim((string)request_post('voice_ai_provider'));
 
     if ($apiKey === '') {
         $apiKey = voice_ai_default_api_key();
     }
     if ($model === '') {
-        $model = 'gpt-5.1';
+        $model = 'deepseek-v4-pro';
+    }
+    if ($provider === '') {
+        $provider = 'deepseek';
     }
 
     $settings['voice_ai_api_key'] = $apiKey;
     $settings['voice_ai_model'] = $model;
+    $settings['voice_ai_provider'] = $provider;
     $settings['updated_at'] = now_datetime();
     storage_write('settings.json', $settings);
 
@@ -3458,6 +3462,45 @@ function action_execute_publicista_campaign() {
     if (!$campaign) {
         set_flash('error', 'No se encontró la campaña a ejecutar.');
         redirect_to(publicista_page_url('campanas'));
+    }
+    // Si esta campaña tiene auto-rotación habilitada, es la candidata a ser la activa
+    $campaignForRotation = publicista_campaign_get($id);
+    if ($campaignForRotation) {
+        $rotSchedule = publicista_campaign_auto_rotation_schedule_normalize((array)($campaignForRotation['auto_rotation_schedule'] ?? array()));
+        if (!empty($rotSchedule['enabled'])) {
+            // Desactivar auto-rotación en todas las demás campañas
+            foreach (publicista_campaigns_get() as $other) {
+                $otherId = trim((string)($other['id'] ?? ''));
+                if ($otherId === '' || $otherId === $id) continue;
+                $otherSchedule = publicista_campaign_auto_rotation_schedule_normalize((array)($other['auto_rotation_schedule'] ?? array()));
+                if (empty($otherSchedule['enabled'])) continue;
+                $otherSchedule['enabled'] = false;
+                $otherSchedule['status'] = 'disabled';
+                $otherSchedule['updated_at'] = now_datetime();
+                $other['auto_rotation_schedule'] = $otherSchedule;
+                $other['execution_summary'] = array_merge((array)($other['execution_summary'] ?? array()), array(
+                    'auto_rotation_status' => 'inactive',
+                    'auto_rotation_last_status' => 'Desactivada: otra campaña recibió Subir anuncios.',
+                ));
+                $other['updated_at'] = now_datetime();
+                publicista_campaign_save($other);
+            }
+            // Asegurar que esta campaña siga activa para auto-rotación
+            $rotSchedule['enabled'] = true;
+            $rotSchedule['status'] = 'active';
+            $rotSchedule['updated_at'] = now_datetime();
+            if (trim((string)$rotSchedule['next_run_at']) === '') {
+                $rotSchedule['next_run_at'] = now_datetime();
+            }
+            $campaignForRotation['auto_rotation_schedule'] = $rotSchedule;
+            $campaignForRotation['execution_summary'] = array_merge((array)($campaignForRotation['execution_summary'] ?? array()), array(
+                'auto_rotation_status' => 'active',
+                'auto_rotation_last_status' => 'Activada al recibir Subir anuncios.',
+                'auto_rotation_updated_at' => now_datetime(),
+            ));
+            $campaignForRotation['updated_at'] = now_datetime();
+            publicista_campaign_save($campaignForRotation);
+        }
     }
     list($ok, $savedCampaign, $meta) = publicista_campaign_dispatch_async($id);
     if (!$ok) {

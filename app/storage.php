@@ -59,7 +59,8 @@ function bootstrap_storage() {
         'settings.json' => array(
             'lead_default_price' => 10,
             'brand' => 'LaMami CRM',
-            'voice_ai_model' => 'gpt-5.1',
+            'voice_ai_model' => 'deepseek-v4-pro',
+            'voice_ai_provider' => 'deepseek',
             'whitelist_ips' => array(
                 '84.125.78.95',
                 '79.116.229.72'
@@ -2299,7 +2300,7 @@ function publicista_campaign_auto_rotation_run_due($options = array()) {
         return array('status' => 'outside_window', 'campaign_id' => $campaignId, 'next_run_at' => $schedule['next_run_at']);
     }
 
-    list($okDispatch, $savedCampaign, $meta) = publicista_campaign_dispatch_async($campaignId);
+    list($okDispatch, $savedCampaign, $meta) = publicista_campaign_dispatch_async($campaignId, array('auto_rotation' => true));
     $targetCampaign = $savedCampaign ?: $activeCampaign;
     $targetCampaign = publicista_campaign_normalize($targetCampaign);
     $targetSchedule = publicista_campaign_auto_rotation_schedule_normalize((array)($targetCampaign['auto_rotation_schedule'] ?? array()));
@@ -7067,7 +7068,7 @@ function publicista_campaign_notify_execution_finished($campaign, $run, $meta, $
     //);
 }
 
-function publicista_campaign_dispatch_async($campaignId) {
+function publicista_campaign_dispatch_async($campaignId, $options = array()) {
     $campaignId = trim((string)$campaignId);
     $campaign = $campaignId !== '' ? publicista_campaign_get($campaignId) : null;
     if (!$campaign) {
@@ -7111,7 +7112,8 @@ function publicista_campaign_dispatch_async($campaignId) {
 
     $run = publicista_run_defaults();
     $run['campaign_id'] = $campaignId;
-    $run['run_type'] = 'campaign_upload';
+    $isAutoRotation = !empty($options['auto_rotation']);
+    $run['run_type'] = $isAutoRotation ? 'auto_rotation' : 'campaign_upload';
     $run['estado'] = 'pending';
     $run['summary'] = 'Subida de anuncios en cola.';
     $run['progress'] = array(

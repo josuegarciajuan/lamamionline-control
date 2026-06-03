@@ -117,10 +117,22 @@ final class ContextAssembler implements PipelineStageInterface
         // --- hot_curious_chat ---
         $ctx['hot_curious_chat_current'] = $this->detectHotCurious($normalizedText);
 
-        // --- wants_more_girls (persistente como en n8n) ---
+        // --- wants_more_girls (persistente pero con reset cuando se cumple) ---
+        // El flag solo persiste si el cliente lo pidió Y el bot AÚN no ha enviado
+        // fotos DESPUÉS de esa petición. Si ya se cumplió, se resetea para no
+        // contaminar mensajes posteriores (ej: "quien eres?", "sandra").
         $wantsMoreCurrent = $this->detectWantsMoreGirls($normalizedText);
         $wantsMorePersisted = $this->hasWantsMoreInHistory($history);
-        $ctx['wants_more_girls'] = $wantsMoreCurrent || $wantsMorePersisted;
+
+        if ($wantsMoreCurrent) {
+            $ctx['wants_more_girls'] = true;
+        } elseif ($wantsMorePersisted) {
+            // Solo mantener si la petición aún NO se ha cumplido (no se enviaron fotos tras ella)
+            $wasFulfilled = $this->wantsMoreGirlsWasFulfilled($history);
+            $ctx['wants_more_girls'] = !$wasFulfilled;
+        } else {
+            $ctx['wants_more_girls'] = false;
+        }
 
         // --- last_bot_reply / last_user_message ---
         $ctx['last_bot_reply']    = $ctx['last_bot_reply']    ?? $this->lastBotReplyFromHistory($recent);
@@ -270,12 +282,36 @@ final class ContextAssembler implements PipelineStageInterface
         $girlSelected = $selectedGirlName !== '';
         $ctx['info_pack_ready'] = $girlSelected && $pricesSent && $exactLocationSent;
 
+        // ── NOVA: maps_being_sent_now ────────────────────────────────────
+        // Predict if maps is being sent in THIS response (preemptive ETA mode).
+        // Conditions: girl selected, user asks for location, maps not sent yet.
+        $mapsBeingSentNow = false;
+        if (!$exactLocationSent && $selectedGirlName !== '') {
+            $userAsksLocation = $ctx['topic_actual'] === 'ubicacion'
+                || !empty($ctx['ubicacion_pedida_fuerte'])
+                || $this->userWantsMapWords($normalizedText);
+            if ($userAsksLocation) {
+                $mapsBeingSentNow = true;
+            }
+        }
+        $ctx['maps_being_sent_now'] = $mapsBeingSentNow;
+
+        // Update info_pack_ready to consider maps being sent now (preemptive)
+        if ($mapsBeingSentNow) {
+            $ctx['info_pack_ready'] = $girlSelected && $pricesSent; // location is being sent now
+        }
+
         // ── NOVA: is_image_sent_by_user ───────────────────────────────────
         $ctx['is_image_sent_by_user'] = ($ctx['is_image_i'] ?? 0) === 1
             || !empty($ctx['__is_image']);
 
         // ── MAPS: location_url from config (para que el AI tenga la URL real de Google Maps) ──
         $ctx['location_url'] = $this->config->get('urls.google_maps_location', '');
+
+        // ── NOVA: __is_new_conversation ──────────────────────────────────────
+        // True when there's no history AND no recent messages. Used by ToneBuilder
+        // to trigger proactive catalog on first contact.
+        $ctx['__is_new_conversation'] = ($recent === [] && $history === []);
 
         return $ctx;
     }
@@ -440,6 +476,46 @@ final class ContextAssembler implements PipelineStageInterface
         return false;
     }
 
+    /**
+     * ¿La petición de wants_more_girls YA fue cumplida?
+     *
+     * Busca el registro más reciente con wants_more_girls=true y comprueba
+     * si alguna respuesta del bot POSTERIOR a ese registro contiene fotos.
+     * Si es así, la petición está cumplida y el flag debe resetearse.
+     *
+     * Esto evita que el flag persista a través de mensajes intermedios
+     * (ej: seq 638 "mas fotos de sandra" → cumplido en seq 638,
+     * pero seq 639 "pues ella" y seq 640 "y las tarifas" no tienen fotos,
+     * lo que antes reactivaba el flag en seq 641).
+     */
+    private function wantsMoreGirlsWasFulfilled(array $records): bool
+    {
+        // 1. Encontrar el registro más reciente con wants_more_girls=true
+        $triggerIdx = -1;
+        for ($i = count($records) - 1; $i >= 0; $i--) {
+            if (!empty($records[$i]['wants_more_girls'])) {
+                $triggerIdx = $i;
+                break;
+            }
+        }
+        if ($triggerIdx < 0) {
+            return false; // No hay petición de wants_more_girls en el historial
+        }
+
+        // 2. Comprobar si alguna respuesta del bot DESDE ese registro contiene fotos
+        for ($i = $triggerIdx; $i < count($records); $i++) {
+            $reply = (string) ($records[$i]['bot_reply'] ?? '');
+            if ($reply === '') continue;
+            if (preg_match(
+                '/https?:\/\/(?:compartir\.site|i\.ibb\.co|ibb\.co|i\.imgur\.com|imgur\.com)/i',
+                $reply
+            )) {
+                return true; // Fotos enviadas → petición cumplida
+            }
+        }
+        return false; // Petición pendiente de cumplir
+    }
+
     // ==================================================================
     // HELPERS — Last messages from history
     // ==================================================================
@@ -563,6 +639,11 @@ final class ContextAssembler implements PipelineStageInterface
             '/\bsolo\s+me\s+mandaste\b/i',
             '/\bme\s+faltan\b/i',
             '/\bpasame\s+el\s+resto\b/i',
+            // NOVA: natural Spanish patterns ("las otras", "envíame las"...)
+            '/\blas\s+otras?\b/i',
+            '/\blas?\s+que\s+faltan?\b/i',
+            '/\bel\s+resto\b/i',
+            '/\b(?:env[ií]ame|m[aá]ndame|p[aá]same)\s+(?:las|el|los)\b/i',
         ];
         foreach ($patterns as $p) {
             if (preg_match($p, $normalizedText)) {
@@ -595,7 +676,7 @@ final class ContextAssembler implements PipelineStageInterface
                 $flags[] = 'ubicacion_precisa';
             }
 
-            $hasPhoto = (bool) preg_match('/(?:https?:\/\/(?:ibb\.co|i\.ibb\.co)\/)/i', $replyRaw);
+            $hasPhoto = (bool) preg_match('/(?:https?:\/\/(?:compartir\.site|ibb\.co|i\.ibb\.co)\/)/i', $replyRaw);
             $ts = strtotime((string) ($rec['ts'] ?? ''));
             $isRecent = $ts !== false && (time() - $ts) <= 6 * 3600;
             if ($hasPhoto && $isRecent) {

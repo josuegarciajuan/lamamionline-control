@@ -117,6 +117,29 @@ final class ResponseNormalizer implements PipelineStageInterface
                 $ctx['eta_minutes'] = 0;
             }
 
+            // --- photo_action (LLM decides when to send photos) ---
+            $photoAction = $inner['photo_action'] ?? 'none';
+            $validActions = ['none', 'catalog', 'selected_all'];
+            $ctx['photo_action'] = is_string($photoAction) && in_array($photoAction, $validActions, true)
+                ? $photoAction
+                : 'none';
+
+            // --- lead_signals (LLM explains why it thinks it's a lead) ---
+            $leadSignals = $inner['lead_signals'] ?? null;
+            $validSignals = [
+                'eta_explicit', 'eta_implicit', 'coming_soon', 'selected_girl',
+                'maps_requested', 'maps_sent', 'price_asked', 'urgent_tone',
+                'recurring_client', 'coordination_phase', 'none',
+            ];
+            if (is_array($leadSignals)) {
+                $ctx['lead_signals'] = array_values(array_filter(
+                    array_map('strval', $leadSignals),
+                    static fn(string $s) => in_array($s, $validSignals, true)
+                ));
+            } else {
+                $ctx['lead_signals'] = ['none'];
+            }
+
             // --- selected_girl (determinista: ContextAssembler ya lo resolvió) ---
             // Solo usamos OpenAI como fallback si ContextAssembler no lo detectó
             if (empty($ctx['selected_girl_id']) && isset($inner['selected_girl_id']) && $inner['selected_girl_id'] !== null) {
@@ -164,6 +187,18 @@ final class ResponseNormalizer implements PipelineStageInterface
         // Clean up — remove redundant newlines and trim, but preserve paragraphs
         $userVisibleReply = preg_replace('/\n{3,}/', "\n\n", (string) $userVisibleReply);
         $userVisibleReply = trim((string) $userVisibleReply);
+
+        // ── Defensive: if reply looks like leaked JSON, extract the inner text ──
+        if ($userVisibleReply !== '' && str_starts_with($userVisibleReply, '{')) {
+            try {
+                $inner = json_decode($userVisibleReply, true, 512, JSON_THROW_ON_ERROR);
+                if (is_array($inner) && !empty($inner['user_visible_reply'])) {
+                    $userVisibleReply = (string) $inner['user_visible_reply'];
+                }
+            } catch (\JsonException $e) {
+                // Not JSON, leave as-is
+            }
+        }
 
         $ctx['output_text'] = $userVisibleReply;
 
