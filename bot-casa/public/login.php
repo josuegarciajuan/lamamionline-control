@@ -58,6 +58,8 @@ $csrfToken = $_SESSION['csrf_token'];
 // ── Procesar POST ──
 $error = '';
 $hasAttempt = false;
+$um = new \WasapBot\Core\UserManager(WASAPBOT_ROOT);
+$needsSeeding = !$um->hasUsersFile();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $hasAttempt = true;
@@ -76,7 +78,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($username === '' || $password === '') {
             $error = 'Usuario y contraseña son obligatorios.';
         } else {
-            $um = new \WasapBot\Core\UserManager(WASAPBOT_ROOT);
+            // Si es el primer acceso, seedear el admin por defecto
+            if ($needsSeeding) {
+                $um->seedDefaultAdmin();
+            }
+
             $user = $um->authenticate($username, $password);
 
             if ($user !== null) {
@@ -244,7 +250,12 @@ body {
     </form>
 
     <div class="login-footer">
+        <?php if ($needsSeeding): ?>
+        <p style="color:#f59e0b;margin-bottom:4px"><strong>Primer acceso:</strong> usuario <code>admin</code> / contraseña <code>admin123</code></p>
+        <p style="font-size:.72rem">Cámbiala cuanto antes desde el panel.</p>
+        <?php else: ?>
         Acceso restringido · bot-casa v2.0
+        <?php endif; ?>
     </div>
 </div>
 </body>

@@ -88,9 +88,22 @@ function botcasa_require_auth(): void
 
 /**
  * Require admin role. If not admin, show 403.
+ * If users.json doesn't exist yet (legacy mode), skip auth entirely.
  */
 function botcasa_require_admin(): void
 {
+    // Legacy mode: if users.json doesn't exist, panel is open (no auth)
+    static $checked = false;
+    static $legacyMode = false;
+    if (!$checked) {
+        $checked = true;
+        $usersFile = WASAPBOT_ROOT . '/data/users.json';
+        $legacyMode = !file_exists($usersFile);
+    }
+    if ($legacyMode) {
+        return;
+    }
+
     botcasa_require_auth();
     if (($_SESSION['role'] ?? '') !== 'admin') {
         http_response_code(403);

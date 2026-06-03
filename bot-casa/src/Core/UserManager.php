@@ -293,24 +293,11 @@ final class UserManager
             @mkdir($dir, 0700, true);
         }
 
+        // ⚠️ NO auto-crear users.json nunca.
+        // En producción el panel/bot funcionan sin autenticación
+        // hasta que el admin visita /login explícitamente (que llama a seedDefaultAdmin).
         if (!file_exists($this->usersFile)) {
-            // Seed: crear admin por defecto
-            $default = [
-                'users' => [
-                    [
-                        'id' => 1,
-                        'username' => 'admin',
-                        'password_hash' => password_hash('admin123', PASSWORD_BCRYPT, ['cost' => 12]),
-                        'role' => 'admin',
-                        'name' => 'Administrador',
-                        'created_at' => date('c'),
-                        'active' => true,
-                    ],
-                ],
-                'next_id' => 2,
-            ];
-            $this->writeFile($default);
-            $this->cache = $default;
+            $this->cache = ['users' => [], 'next_id' => 1];
             return $this->cache;
         }
 
@@ -342,6 +329,54 @@ final class UserManager
 
         $this->cache = $data;
         return $this->cache;
+    }
+
+    /**
+     * Comprueba si el archivo users.json existe (indica que el sistema
+     * multi-usuario está activado). Si no existe, el panel funciona
+     * en modo legacy sin autenticación.
+     */
+    public function hasUsersFile(): bool
+    {
+        return file_exists($this->usersFile);
+    }
+
+    /**
+     * Crea el archivo users.json con el admin por defecto.
+     * Solo se llama desde login.php en el primer acceso.
+     *
+     * @return array{ok: bool, user?: array}
+     */
+    public function seedDefaultAdmin(): array
+    {
+        if (file_exists($this->usersFile)) {
+            return ['ok' => false, 'error' => 'Users file already exists.'];
+        }
+
+        $dir = dirname($this->usersFile);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0700, true);
+        }
+
+        $default = [
+            'users' => [
+                [
+                    'id' => 1,
+                    'username' => 'admin',
+                    'password_hash' => password_hash('admin123', PASSWORD_BCRYPT, ['cost' => 12]),
+                    'role' => 'admin',
+                    'name' => 'Administrador',
+                    'created_at' => date('c'),
+                    'active' => true,
+                ],
+            ],
+            'next_id' => 2,
+        ];
+
+        $this->writeFile($default);
+        $this->cache = $default;
+
+        return ['ok' => true, 'user' => $default['users'][0]];
     }
 
     /** @param array<string, mixed> $data */
