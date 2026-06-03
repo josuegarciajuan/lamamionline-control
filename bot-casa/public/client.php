@@ -1585,102 +1585,32 @@ document.querySelectorAll('#tabNav button[data-tab]').forEach(function(btn){
         if (tabLoaders[tabId] && !loadedTabs[tabId]) { loadedTabs[tabId]=true; tabLoaders[tabId](); }
     });
 });
-// ── Tab switching ──
+</script>
+
+<script>
+// ── Tab switching (isolated — runs even if main JS has errors) ──
 (function() {
     var btns = document.querySelectorAll('#tabNav button[data-tab]');
     var tabs = document.querySelectorAll('.tab-content');
-    var activeInput = document.querySelector('.js-active-tab-input');
-    var stored = localStorage.getItem('botcasa_client_tab');
     btns.forEach(function(btn) {
         btn.addEventListener('click', function() {
             btns.forEach(function(b) { b.classList.remove('active'); });
             tabs.forEach(function(t) { t.classList.remove('active'); });
             btn.classList.add('active');
             var target = document.getElementById(btn.getAttribute('data-tab'));
-            if (target) { target.classList.add('active'); }
-            if (activeInput) { activeInput.value = btn.getAttribute('data-tab'); }
-            localStorage.setItem('botcasa_client_tab', btn.getAttribute('data-tab'));
+            if (target) target.classList.add('active');
+            var activeInput = document.querySelector('.js-active-tab-input');
+            if (activeInput) activeInput.value = btn.getAttribute('data-tab');
+            try { localStorage.setItem('botcasa_client_tab', btn.getAttribute('data-tab')); } catch(e) {}
         });
     });
+    var stored = null;
+    try { stored = localStorage.getItem('botcasa_client_tab'); } catch(e) {}
     if (stored) {
         var btn = document.querySelector('#tabNav button[data-tab="' + stored + '"]');
         if (btn) btn.click();
     }
 })();
-
-// ── Prompt preview ──
-function buildPreview() {
-    try {
-    var tono = document.querySelector('select[name="prompt[sections][estilo_tipo]"]');
-    if (!tono) return; // Only build if Personalidad tab elements exist
-    var tonoLabel = tono ? tono.options[tono.selectedIndex].text.split(' ').slice(1).join(' ') : 'Latina de barrio';
-    var speaker = document.querySelector('select[name="prompt[sections][speaker_mode]"]');
-    var speakerLabel = speaker ? speaker.options[speaker.selectedIndex].text : 'Como la chica';
-    var emoji = document.querySelector('select[name="prompt[sections][emoji_level]"]');
-    var emojiLabel = emoji ? emoji.options[emoji.selectedIndex].text : 'Moderado';
-    var len = document.querySelector('select[name="prompt[sections][reply_length]"]');
-    var lenLabel = len ? len.options[len.selectedIndex].text : 'Corta';
-    var tarifas = document.querySelector('textarea[name="prompt[sections][tarifas]"]');
-    var zona = document.querySelector('input[name="prompt[sections][zona]"]');
-    var servicios = document.querySelector('textarea[name="prompt[sections][servicios]"]');
-
-    // Count price lines (e.g. "30€...") in tarifas
-    var tarifasVal = tarifas ? tarifas.value.trim() : '';
-    var priceCount = (tarifasVal.match(/[\d]+[€$]/g) || []).length;
-    var hasTarifas = tarifasVal.length > 10;
-    var hasZona = zona && zona.value.trim().length > 0;
-    var hasServicios = servicios && servicios.value.trim().length > 10;
-
-    var html = '';
-    html += '<div style="margin-bottom:12px"><strong style="color:var(--accent)">🎨 Estilo:</strong> ' + escHtml(tonoLabel) + '</div>';
-    html += '<div style="margin-bottom:12px"><strong>🗣 Habla:</strong> ' + escHtml(speakerLabel) + ' · ' + escHtml(emojiLabel) + ' · ' + escHtml(lenLabel) + '</div>';
-
-    html += '<div style="margin-bottom:12px"><strong>💰 Tarifas:</strong> ';
-    if (hasTarifas) {
-        html += '<span style="color:var(--ok)">✅ ' + priceCount + ' precios configurados</span>';
-    } else {
-        html += '<span style="color:var(--warn)">⚠️ Sin configurar</span>';
-    }
-    html += '</div>';
-
-    html += '<div style="margin-bottom:12px"><strong>📍 Ubicación:</strong> ';
-    if (hasZona) {
-        html += '<span style="color:var(--ok)">✅ ' + escHtml(zona.value.trim().substring(0,40)) + '</span>';
-    } else {
-        html += '<span style="color:var(--warn)">⚠️ Sin configurar</span>';
-    }
-    html += '</div>';
-
-    html += '<div style="margin-bottom:12px"><strong>🛏️ Servicios:</strong> ';
-    if (hasServicios) {
-        html += '<span style="color:var(--ok)">✅ Configurados</span>';
-    } else {
-        html += '<span style="color:var(--warn)">⚠️ Sin configurar</span>';
-    }
-    html += '</div>';
-
-    var configured = (hasTarifas ? 1 : 0) + (hasZona ? 1 : 0) + (hasServicios ? 1 : 0);
-    html += '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);text-align:center;color:var(--text-muted);font-size:.78rem">';
-    html += configured + '/3 secciones configuradas';
-    html += '</div>';
-
-    var summary = document.getElementById('prompt-summary');
-    if (summary) summary.innerHTML = html;
-
-    var stats = document.getElementById('prompt-stats');
-    if (stats) stats.innerHTML = '';
-    } catch(e) { /* silently ignore if elements not found */ }
-}
-
-// Reset field to default value
-function resetField(name, defaultValue) {
-    var el = document.querySelector('[name="' + name + '"]');
-    if (el) {
-        el.value = defaultValue;
-        el.dispatchEvent(new Event('input', {bubbles:true}));
-        buildPreview();
-    }
-}
 </script>
 </body>
 </html>
