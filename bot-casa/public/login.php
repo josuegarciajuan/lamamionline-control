@@ -119,24 +119,28 @@ header('X-Permitted-Cross-Domain-Policies: none');
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>bot-casa — Acceso</title>
+<title>casawasap.com — Acceso</title>
 <style>
 :root {
-    --bg: #080d17;
-    --panel: #111b2e;
-    --border: #1c2d4a;
-    --text: #f0f3fa;
-    --text-muted: #8b9ec0;
-    --accent: #f59e0b;
-    --accent-dark: #d97706;
+    --bg: #050510;
+    --panel: #141426;
+    --border: rgba(255,255,255,0.06);
+    --text: #f7f7ff;
+    --text-muted: #b5b5cc;
+    --accent: #ff3b8d;
+    --accent-secondary: #7c5cff;
     --danger: #f87171;
-    --radius: 14px;
+    --input-bg: rgba(8,8,20,0.9);
+    --radius: 18px;
     --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
     font-family: var(--font);
-    background: var(--bg);
+    background:
+        radial-gradient(ellipse 80% 60% at 20% 0%, rgba(255,59,141,0.10) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 80% 100%, rgba(124,92,255,0.10) 0%, transparent 60%),
+        var(--bg);
     color: var(--text);
     min-height: 100vh;
     display: flex;
@@ -148,84 +152,115 @@ body {
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 32px;
+    padding: 36px 32px 32px;
     width: 100%;
     max-width: 420px;
-    box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    box-shadow:
+        0 20px 60px rgba(0,0,0,0.50),
+        0 0 0 1px rgba(255,255,255,0.04);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
 }
 .login-card h1 {
-    font-size: 1.5rem;
+    font-size: 1.6rem;
     font-weight: 700;
-    margin-bottom: 6px;
-    color: var(--accent);
+    margin-bottom: 0;
+    color: #f7f7ff;
+    text-align: center;
 }
 .login-card .subtitle {
     color: var(--text-muted);
-    font-size: .85rem;
+    font-size: .84rem;
     margin-bottom: 24px;
+    text-align: center;
 }
 .form-group { margin-bottom: 16px; }
 .form-group label {
     display: block;
-    font-size: .82rem;
+    font-size: .80rem;
     color: var(--text-muted);
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     font-weight: 500;
+    letter-spacing: 0.01em;
 }
 .form-group input {
     width: 100%;
-    padding: 10px 12px;
-    background: #0c1522;
+    padding: 11px 14px;
+    background: var(--input-bg);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 12px;
     color: var(--text);
     font-size: .95rem;
     font-family: var(--font);
-    transition: border-color .2s;
+    transition: border-color .25s, box-shadow .25s;
 }
 .form-group input:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgba(245,158,11,.22);
+    box-shadow: 0 0 0 3px rgba(255,59,141,0.18);
 }
 .btn {
     display: block;
     width: 100%;
-    padding: 12px;
+    padding: 13px;
     border: none;
-    border-radius: 10px;
+    border-radius: 999px;
     cursor: pointer;
     font-size: .95rem;
     font-weight: 600;
     font-family: var(--font);
-    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-    color: #1a1206;
-    transition: all .2s;
-    box-shadow: 0 4px 12px rgba(0,0,0,.25);
+    letter-spacing: 0.02em;
+    background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+    color: #fff;
+    transition: all .25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 20px rgba(255,59,141,0.25);
     margin-top: 8px;
 }
-.btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(245,158,11,.35); }
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 28px rgba(255,59,141,0.40), 0 0 0 2px rgba(124,92,255,0.15);
+}
+.btn:active { transform: translateY(0); box-shadow: 0 2px 12px rgba(255,59,141,0.30); }
 .error-msg {
-    background: rgba(248,113,113,.10);
-    border: 1px solid rgba(248,113,113,.30);
-    color: var(--danger);
+    background: rgba(248,113,113,0.08);
+    border: 1px solid rgba(248,113,113,0.25);
+    color: #fca5a5;
     padding: 10px 14px;
-    border-radius: 10px;
+    border-radius: 12px;
     margin-bottom: 16px;
-    font-size: .85rem;
+    font-size: .84rem;
     font-weight: 500;
+    text-align: center;
 }
 .login-footer {
-    margin-top: 16px;
+    margin-top: 20px;
     text-align: center;
     font-size: .78rem;
     color: var(--text-muted);
+}
+.login-footer .seed-info {
+    color: var(--accent);
+    margin-bottom: 8px;
+    font-size: .80rem;
+    font-weight: 500;
+}
+.login-footer .seed-hint {
+    font-size: .72rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+.login-footer code {
+    background: rgba(255,59,141,0.10);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.92em;
 }
 </style>
 </head>
 <body>
 <div class="login-card">
-    <h1>bot-casa</h1>
+    <h1>casawasap<span style="font-size:0.55em;opacity:0.7;font-weight:400">.com</span></h1>
+    <img src="https://casawasap.com/img/hero-casawasap.png" alt="CasaWasap" style="width:120px;margin:0 auto 16px;display:block;border-radius:16px;opacity:0.85">
     <p class="subtitle">Panel de administración para tu bot de WhatsApp</p>
 
     <?php if ($error !== ''): ?>
@@ -251,11 +286,10 @@ body {
 
     <div class="login-footer">
         <?php if ($needsSeeding): ?>
-        <p style="color:#f59e0b;margin-bottom:4px"><strong>Primer acceso:</strong> usuario <code>admin</code> / contraseña <code>admin123</code></p>
-        <p style="font-size:.72rem">Cámbiala cuanto antes desde el panel.</p>
-        <?php else: ?>
-        Acceso restringido · bot-casa v2.0
+        <div class="seed-info"><strong>Primer acceso:</strong> usuario <code>admin</code> / contraseña <code>admin123</code></div>
+        <div class="seed-hint">Cámbiala cuanto antes desde el panel.</div>
         <?php endif; ?>
+        casawasap.com · Telefonista virtual 24/7
     </div>
 </div>
 </body>

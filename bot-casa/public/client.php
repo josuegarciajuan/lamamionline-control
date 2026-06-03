@@ -273,15 +273,38 @@ if ($method === 'POST' && $action === 'save_config') {
 if ($method === 'POST' && $action === 'toggle_bot') {
     requireValidCsrf();
     $newMode = ($botMode === 'start') ? 'stop' : 'start';
-    $dir = dirname($modeFilePath);
-    if (!is_dir($dir)) @mkdir($dir, 0750, true);
-    if (@file_put_contents($modeFilePath, $newMode, LOCK_EX) !== false) {
-        @chmod($modeFilePath, 0664);
+
+    // A4: Block turning ON if not fully configured
+    if ($newMode === 'start') {
+        $errors = [];
+        if ($linesForUser <= 0) $errors[] = 'No tienes ninguna línea WhatsApp vinculada. Ve a 📱 Líneas.';
+        if (!$promptConfigured) $errors[] = 'No has configurado tus tarifas. Ve a 🎭 Personalidad.';
+        // Check active girls
+        $activeGirls = 0;
+        $gf = WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/girls.json';
+        if (file_exists($gf)) {
+            $gd = @json_decode((string)@file_get_contents($gf), true);
+            if (is_array($gd)) $activeGirls = count(array_filter($gd['girls']??[], fn($g)=>!empty($g['activa'])));
+        }
+        if ($activeGirls <= 0) $errors[] = 'No tienes chicas activas. Añade al menos una en 👩 Chicas.';
+        if (!empty($errors)) {
+            $notification = '<div class="alert alert-warning"><strong>⚠️ No se puede encender el bot todavía:</strong><br>• ' . implode('<br>• ', $errors) . '</div>';
+        } else {
+            $dir = dirname($modeFilePath);
+            if (!is_dir($dir)) @mkdir($dir, 0750, true);
+            if (@file_put_contents($modeFilePath, $newMode, LOCK_EX) !== false) @chmod($modeFilePath, 0664);
+            $botMode = $newMode;
+            $botStatusClass = 'status-on'; $botStatusLabel = 'ENCENDIDO';
+            $notification = '<div class="alert alert-success">✅ Bot ENCENDIDO. ¡A recibir clientes!</div>';
+        }
+    } else {
+        $dir = dirname($modeFilePath);
+        if (!is_dir($dir)) @mkdir($dir, 0750, true);
+        if (@file_put_contents($modeFilePath, $newMode, LOCK_EX) !== false) @chmod($modeFilePath, 0664);
+        $botMode = $newMode;
+        $botStatusClass = 'status-off'; $botStatusLabel = 'APAGADO';
+        $notification = '<div class="alert alert-success">✅ Bot APAGADO.</div>';
     }
-    $botMode = $newMode;
-    $botStatusClass = $botMode === 'start' ? 'status-on' : 'status-off';
-    $botStatusLabel = $botMode === 'start' ? 'ENCENDIDO' : 'APAGADO';
-    $notification = '<div class="alert alert-success">✅ Bot ' . ($botMode === 'start' ? 'ENCENDIDO' : 'APAGADO') . '.</div>';
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -357,7 +380,7 @@ $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucci
 
 <div class="header">
     <div>
-        <h1>🤖 bot-casa</h1>
+        <h1>casawasap<span style="font-size:.55em;opacity:.7;font-weight:400">.com</span></h1>
         <span class="subtitle"><?php echo $clientName; ?></span>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -377,6 +400,11 @@ $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucci
 <?php echo $notification; ?>
 
 <?php
+// ── Config check for A6 ──
+$defaultTarifasPrefix = 'TARIFAS ÚNICAS Y FIJAS:';
+$tarifasVal = (string)$config->get('prompt.sections.tarifas','');
+$promptConfigured = strlen($tarifasVal) > 20 && mb_strpos($tarifasVal, $defaultTarifasPrefix) !== 0;
+
 // ── Progress indicator ──
 $progressTotal = 4;
 $progressDone = 0;
@@ -524,14 +552,15 @@ function dismissWizard() {
     <div class="card">
         <h2>🤖 ¿Cómo funciona tu bot?</h2>
         <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">
-            Tu bot atiende automáticamente a los clientes que te escriben por WhatsApp. Les responde de forma natural,
-            negocia tarifas, envía fotos y ubicación, y te avisa cuando alguien va a venir.
+            Tu bot atiende automáticamente a los clientes que te escriben por WhatsApp. 
+            Responde de forma natural, negocia tarifas, envía fotos y ubicación, y te avisa 
+            cuando hay un <strong style="color:var(--accent)">cliente serio de camino</strong>.
         </p>
 
         <div style="margin-top:16px">
             <h3>✅ Configuración necesaria</h3>
             <?php
-            $promptConfigured = strlen((string) $config->get('prompt.sections.tarifas', '')) > 20;
+            $promptConfigured = $promptConfigured; // already computed above
             $linesConfigured = $linesForUser > 0;
             $checkItems = [
                 ['✅ Vincular WhatsApp', $linesConfigured, 'Configura tus líneas en la pestaña 📱 Líneas.'],
@@ -557,12 +586,28 @@ function dismissWizard() {
 
     <div class="card">
         <h2>🚀 Empezar</h2>
-        <p style="color:var(--text-muted);font-size:.85rem">
-            1. Configura tu <strong>Personalidad</strong> (tarifas, estilo, ubicación)<br>
-            2. Vincula tus <strong>líneas de WhatsApp</strong> en la pestaña 📱 Líneas<br>
-            3. Añade tu <strong>catálogo de chicas</strong> en la pestaña 👩 Chicas<br>
-            4. ¡Enciende el bot y empieza a recibir clientes!
-        </p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:8px">
+            <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center">
+                <div style="font-size:2rem;margin-bottom:4px">🎭</div>
+                <strong>Personalidad</strong>
+                <p style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Define tarifas, estilo y ubicación</p>
+            </div>
+            <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center">
+                <div style="font-size:2rem;margin-bottom:4px">📱</div>
+                <strong>Líneas WhatsApp</strong>
+                <p style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Vincula tus números</p>
+            </div>
+            <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center">
+                <div style="font-size:2rem;margin-bottom:4px">👩</div>
+                <strong>Catálogo de chicas</strong>
+                <p style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Añade tu equipo</p>
+            </div>
+            <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center">
+                <div style="font-size:2rem;margin-bottom:4px">🚀</div>
+                <strong>¡A funcionar!</strong>
+                <p style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Enciende y recibe clientes</p>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -589,7 +634,7 @@ function dismissWizard() {
                         <select name="prompt[sections][estilo_tipo]" onchange="buildPreview()">
                             <?php
                             $tonos = [
-                                'latina_barrio'  => '💃 Latina de barrio (directa, pícara, coloquial)',
+                                'latina_barrio'  => '💃 Cercana y directa (coloquial, natural)',
                                 'carinosa_dulce' => '🌸 Cariñosa y dulce',
                                 'formal_educada' => '👔 Formal y educada',
                                 'directa_pro'    => '⚡ Directa y profesional',
@@ -611,15 +656,20 @@ function dismissWizard() {
                         <select name="prompt[sections][speaker_mode]">
                             <?php
                             $speakerModes = [
-                                'chica'        => 'Como la chica (1ª persona)',
-                                'recepcionista'=> 'Como recepcionista (3ª persona)',
+                                'mixto'         => '🔄 Mixto — recomendado (detecta automáticamente)',
+                                'chica'         => '👩 Como la chica — 1ª persona (solo 1 chica)',
+                                'recepcionista' => '👔 Como encargada — 3ª persona (varias chicas)',
                             ];
-                            $currentSpeaker = (string) $config->get('prompt.sections.speaker_mode', 'chica');
+                            $currentSpeaker = (string) $config->get('prompt.sections.speaker_mode', 'mixto');
                             foreach ($speakerModes as $val => $label) {
                                 echo '<option value="' . $val . '"' . selected($val === $currentSpeaker) . '>' . $label . '</option>';
                             }
                             ?>
                         </select>
+                        <small style="color:var(--text-muted);font-size:.72rem;margin-top:4px;display:block">
+                            <strong>Mixto:</strong> Si el cliente sabe qué chica es (ej: viene de un anuncio de Destacamos con nombre), 
+                            el bot habla como ella en 1ª persona. Si no lo sabe, habla como encargada en 3ª persona.
+                        </small>
                     </div>
                 </div>
 
@@ -628,7 +678,7 @@ function dismissWizard() {
                         <label>Uso de emojis</label>
                         <select name="prompt[sections][emoji_level]">
                             <?php
-                            $emojiLevels = ['moderado' => '😊 Moderado (1 por mensaje)', 'poco' => '🙂 Poco (ocasional)', 'nada' => '🚫 Sin emojis'];
+                            $emojiLevels = ['moderado' => '😊 Moderado (1 por mensaje)', 'normal' => '🙂 Normal (1 cada 2-3 mensajes, adaptable)', 'poco' => '😐 Poco (ocasional)', 'nada' => '🚫 Sin emojis'];
                             $currentEmoji = (string) $config->get('prompt.sections.emoji_level', 'moderado');
                             foreach ($emojiLevels as $val => $label) {
                                 echo '<option value="' . $val . '"' . selected($val === $currentEmoji) . '>' . $label . '</option>';
@@ -651,68 +701,85 @@ function dismissWizard() {
                 </div>
             </div>
 
-            <!-- Tarifas -->
-            <div class="card">
-                <h2>💰 Tarifas y precios
-                    <span class="tooltip-wrap"><span class="tooltip-icon">?</span>
-                        <span class="tooltip-box">Define tus precios. El bot usará EXACTAMENTE estos valores.</span>
-                    </span>
-                    <button type="button" class="btn btn-sm" style="float:right;background:var(--input-bg);color:var(--text-muted);font-size:.7rem"
-                        onclick="resetField('prompt\\[sections\\]\\[tarifas\\]','30€ = rapidito 10 min\n50€ = media hora completo\n100€ = 1 hora completo')">🔄 Restaurar</button>
-                </h2>
-                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:12px">
-                    Escribe tus tarifas en formato libre. Ejemplo:<br>
-                    <code style="background:var(--input-bg);padding:2px 6px;border-radius:3px">30€ = rapidito 10 min / 50€ = media hora / 100€ = 1 hora completo</code>
+            <!-- Tarifas (A11: accordion + bigger) -->
+            <details class="prompt-details" open>
+                <summary class="prompt-summary">💰 Tarifas y precios</summary>
+                <div style="padding:12px;border-top:1px solid var(--border)">
+                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:8px">
+                    Escribe tus tarifas en lenguaje natural. Ejemplo: "30€ rapidito 10 min, 50€ media hora, 100€ 1 hora completo"
                 </p>
-                <textarea name="prompt[sections][tarifas]" class="code-area" style="width:100%;min-height:100px" spellcheck="false"><?php echo cv('prompt.sections.tarifas'); ?></textarea>
-            </div>
+                <textarea name="prompt[sections][tarifas]" class="code-area" style="width:100%;min-height:180px" spellcheck="false"><?php echo cv('prompt.sections.tarifas'); ?></textarea>
+                <div style="margin-top:8px;display:flex;gap:6px">
+                    <button type="submit" class="btn btn-primary btn-sm">💾 Guardar tarifas</button>
+                    <button type="button" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted)" 
+                        onclick="if(confirm('¿Restaurar tarifas por defecto?'))resetField('prompt\\[sections\\]\\[tarifas\\]','30€ = rapidito 10 min\\n50€ = media hora completo\\n100€ = 1 hora completo')">🔄 Restaurar</button>
+                </div>
+                </div>
+            </details>
 
-            <!-- Ubicación -->
-            <div class="card">
-                <h2>📍 Ubicación
-                    <span class="tooltip-wrap"><span class="tooltip-icon">?</span>
-                        <span class="tooltip-box">Zona general. El bot dirá esto cuando le pregunten. No pongas dirección exacta.</span>
-                    </span>
-                    <button type="button" class="btn btn-sm" style="float:right;background:var(--input-bg);color:var(--text-muted);font-size:.7rem"
-                        onclick="resetField('prompt\\[sections\\]\\[zona\\]','');resetField('prompt\\[sections\\]\\[ubicacion\\]','');resetField('urls\\[google_maps_location\\]','')">🔄 Restaurar</button>
-                </h2>
+            <!-- Anti-regateo (A12) -->
+            <details class="prompt-details">
+                <summary class="prompt-summary">🛡️ Anti-regateo</summary>
+                <div style="padding:12px;border-top:1px solid var(--border)">
+                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:8px">Cómo reacciona el bot cuando un cliente intenta negociar el precio.</p>
+                <label class="checkbox-label" style="margin-bottom:8px">
+                    <input type="hidden" name="prompt[sections][no_regateo]" value="0">
+                    <input type="checkbox" name="prompt[sections][no_regateo]" value="1" <?php echo checked((bool)$config->get('prompt.sections.no_regateo',false)); ?>> No aceptar regateo de ningún tipo
+                </label>
+                <div class="form-row">
+                    <div class="form-group"><label>1er regateo</label><input type="text" name="prompt[sections][regateo_1]" value="<?php echo cv('prompt.sections.regateo_1','precio fijo cari, por eso la calidad es buena 😏'); ?>" placeholder="Respuesta al primer regateo"></div>
+                    <div class="form-group"><label>2º regateo</label><input type="text" name="prompt[sections][regateo_2]" value="<?php echo cv('prompt.sections.regateo_2','no puedo bajar mas amor, son los precios que tengo'); ?>" placeholder="Respuesta si insiste"></div>
+                    <div class="form-group"><label>3er regateo</label><input type="text" name="prompt[sections][regateo_3]" value="<?php echo cv('prompt.sections.regateo_3','si buscas mas barato no soy yo, suerte 😘'); ?>" placeholder="Respuesta final"></div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm" style="margin-top:6px">💾 Guardar anti-regateo</button>
+                </div>
+            </details>
+
+            <!-- Ubicación (A13: simplificado) -->
+            <details class="prompt-details">
+                <summary class="prompt-summary">📍 Ubicación</summary>
+                <div style="padding:12px;border-top:1px solid var(--border)">
                 <div class="form-row">
                     <div class="form-group" style="flex:2">
                         <label>Zona / ciudad</label>
-                        <input type="text" name="prompt[sections][zona]" value="<?php echo cv('prompt.sections.zona'); ?>" placeholder="Ej: Zona centro, piso discreto">
+                        <input type="text" name="prompt[sections][zona]" value="<?php echo cv('prompt.sections.zona'); ?>" placeholder="Ej: Madrid centro, zona tranquila">
                     </div>
                     <div class="form-group" style="flex:1">
                         <label>Enlace Google Maps</label>
                         <input type="url" name="urls[google_maps_location]" value="<?php echo cv('urls.google_maps_location'); ?>" placeholder="https://maps.app.goo.gl/...">
                     </div>
                 </div>
-                <textarea name="prompt[sections][ubicacion]" class="code-area" style="width:100%;min-height:60px;margin-top:8px" spellcheck="false"><?php echo cv('prompt.sections.ubicacion'); ?></textarea>
-            </div>
+                <label class="checkbox-label" style="margin-top:8px">
+                    <input type="hidden" name="prompt[sections][maps_solo_chica]" value="0">
+                    <input type="checkbox" name="prompt[sections][maps_solo_chica]" value="1" <?php echo checked((bool)$config->get('prompt.sections.maps_solo_chica',true)); ?>> Enviar ubicación solo cuando el cliente haya elegido chica
+                </label>
+                <button type="submit" class="btn btn-primary btn-sm" style="margin-top:8px">💾 Guardar ubicación</button>
+                </div>
+            </details>
 
-            <!-- Servicios -->
-            <div class="card">
-                <h2>🛏️ Servicios
-                    <button type="button" class="btn btn-sm" style="float:right;background:var(--input-bg);color:var(--text-muted);font-size:.7rem"
-                        onclick="resetField('prompt\\[sections\\]\\[servicios\\]','Servicio completo con preservativo.\nFrancés natural solo en tarifa de 1h si el cliente lo pide.\nGriego solo si el cliente pregunta expresamente.\nNo salidas a domicilio.')">🔄 Restaurar</button>
-                </h2>
-                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:8px">
-                    Describe los servicios disponibles. El bot usará esta información cuando le pregunten.
-                </p>
-                <textarea name="prompt[sections][servicios]" class="code-area" style="width:100%;min-height:80px" spellcheck="false"><?php echo cv('prompt.sections.servicios'); ?></textarea>
-            </div>
+            <!-- Servicios (A11: accordion + bigger) -->
+            <details class="prompt-details">
+                <summary class="prompt-summary">🛏️ Servicios</summary>
+                <div style="padding:12px;border-top:1px solid var(--border)">
+                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:6px">Describe los servicios disponibles. El bot usará esta información cuando le pregunten.</p>
+                <textarea name="prompt[sections][servicios]" class="code-area" style="width:100%;min-height:150px" spellcheck="false"><?php echo cv('prompt.sections.servicios'); ?></textarea>
+                <div style="margin-top:6px;display:flex;gap:6px">
+                    <button type="submit" class="btn btn-primary btn-sm">💾 Guardar servicios</button>
+                    <button type="button" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted)"
+                        onclick="if(confirm('¿Restaurar servicios por defecto?'))resetField('prompt\\[sections\\]\\[servicios\\]','Servicio completo con preservativo.\\nFrancés natural solo en tarifa de 1h si el cliente lo pide.\\nGriego solo si el cliente pregunta expresamente.\\nNo salidas a domicilio.')">🔄 Restaurar</button>
+                </div>
+                </div>
+            </details>
 
-            <!-- Ofertas -->
-            <div class="card">
-                <h2>🎁 Ofertas especiales (opcional)
-                    <button type="button" class="btn btn-sm" style="float:right;background:var(--input-bg);color:var(--text-muted);font-size:.7rem"
-                        onclick="resetField('prompt\\[sections\\]\\[ofertas\\]','')">🔄 Restaurar</button>
-                </h2>
-                <textarea name="prompt[sections][ofertas]" class="code-area" style="width:100%;min-height:60px" spellcheck="false"><?php echo cv('prompt.sections.ofertas'); ?></textarea>
-            </div>
-
-            <div style="margin-top:16px">
-                <button type="submit" class="btn btn-primary btn-lg">💾 Guardar Personalidad</button>
-            </div>
+            <!-- Ofertas (A14: simplificado) -->
+            <details class="prompt-details">
+                <summary class="prompt-summary">🎁 Ofertas especiales (opcional)</summary>
+                <div style="padding:12px;border-top:1px solid var(--border)">
+                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:6px">Describe ofertas o promociones temporales. El bot las mencionará cuando sea relevante para la conversación.</p>
+                <textarea name="prompt[sections][ofertas]" class="code-area" style="width:100%;min-height:100px" spellcheck="false"><?php echo cv('prompt.sections.ofertas'); ?></textarea>
+                <button type="submit" class="btn btn-primary btn-sm" style="margin-top:6px">💾 Guardar ofertas</button>
+                </div>
+            </details>
         </div>
 
         <!-- Preview column (friendly summary) -->
@@ -723,7 +790,7 @@ function dismissWizard() {
                     Resumen de cómo está configurado tu bot ahora mismo.
                 </p>
                 <div id="prompt-summary" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;font-size:.82rem;line-height:1.6;color:var(--text);max-height:60vh;overflow-y:auto">
-                    <p style="color:var(--text-muted)">Completa los campos de la izquierda para ver el resumen.</p>
+                    <span style="color:var(--text-muted)">Cargando resumen...</span>
                 </div>
                 <div id="prompt-stats" class="prompt-stats"></div>
             </div>
@@ -765,7 +832,7 @@ function dismissWizard() {
 
         <!-- Lines table -->
         <div id="lines-container">
-            <p style="color:var(--text-muted);text-align:center;padding:20px">Cargando líneas...</p>
+            <p style="color:var(--text-muted);text-align:center;padding:20px">No hay líneas configuradas.</p>
         </div>
 
         <!-- QR modal (hidden) -->
@@ -857,54 +924,49 @@ function dismissWizard() {
 
         <!-- Config form -->
         <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:20px">
-            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
-                <div>
-                    <label style="font-size:.78rem;color:var(--text-muted)">Activado</label>
-                    <label class="checkbox-label"><input type="checkbox" id="estados-enabled" onchange="saveEstadosConfig()"> Publicar estados</label>
-                </div>
-                <div style="flex:1;min-width:120px">
-                    <label style="font-size:.78rem;color:var(--text-muted)">Frecuencia</label>
+            <!-- ON/OFF + Save -->
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+                <label class="checkbox-label" style="font-size:.9rem"><input type="checkbox" id="estados-enabled" onchange="saveEstadosConfig()"> Activar publicador de estados</label>
+                <span style="flex:1"></span>
+                <button type="button" class="btn btn-primary btn-sm" onclick="saveEstadosConfig()">💾 Guardar configuración</button>
+                <button type="button" class="btn btn-success btn-sm" onclick="publishEstado()">📢 Publicar ahora</button>
+            </div>
+            <!-- Settings row -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Frecuencia</label>
                     <select id="estados-freq-tipo" onchange="saveEstadosConfig()">
                         <option value="cada_x_horas">Cada X horas</option>
                         <option value="x_veces_al_dia">X veces al día</option>
                     </select>
                 </div>
-                <div style="width:80px">
-                    <label style="font-size:.78rem;color:var(--text-muted)">Valor</label>
-                    <input type="number" id="estados-freq-valor" value="6" min="1" max="24" onchange="saveEstadosConfig()" style="width:100%">
+                <div class="form-group" style="max-width:70px">
+                    <label>Cada</label>
+                    <input type="number" id="estados-freq-valor" value="6" min="1" max="24" onchange="saveEstadosConfig()">
                 </div>
-                <div style="flex:1;min-width:160px">
-                    <label style="font-size:.78rem;color:var(--text-muted)">Formato</label>
+                <div class="form-group">
+                    <label>Formato</label>
                     <select id="estados-formato" onchange="saveEstadosConfig()">
+                        <option value="mix_aleatorio">🎲 Aleatorio (recomendado)</option>
                         <option value="chicas_de_hoy">Todas las chicas, 1 foto</option>
                         <option value="chica_del_dia">1 chica aleatoria, 2 fotos</option>
                         <option value="duo_sexy">2 chicas, 1 foto c/u</option>
                         <option value="catalogo_rapido">Solo nombres</option>
-                        <option value="mix_aleatorio">Aleatorio cada ciclo</option>
                     </select>
                 </div>
-                <div>
-                    <button type="button" class="btn btn-success" onclick="publishEstado()">📢 Publicar ahora</button>
-                </div>
             </div>
-            <div style="display:flex;gap:10px;margin-top:10px;align-items:flex-end">
-                <div style="width:100px">
-                    <label style="font-size:.78rem;color:var(--text-muted)">Desde</label>
-                    <input type="time" id="estados-hora-inicio" value="08:00" onchange="saveEstadosConfig()">
-                </div>
-                <div style="width:100px">
-                    <label style="font-size:.78rem;color:var(--text-muted)">Hasta</label>
-                    <input type="time" id="estados-hora-fin" value="23:00" onchange="saveEstadosConfig()">
-                </div>
-                <div id="estados-lines-checkboxes" style="flex:1;display:flex;flex-wrap:wrap;gap:10px"></div>
+            <div class="form-row">
+                <div class="form-group"><label>Horario inicio</label><input type="time" id="estados-hora-inicio" value="08:00" onchange="saveEstadosConfig()"></div>
+                <div class="form-group"><label>Horario fin</label><input type="time" id="estados-hora-fin" value="23:00" onchange="saveEstadosConfig()"></div>
             </div>
+            <div id="estados-lines-checkboxes" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px"></div>
             <div id="estados-status" style="margin-top:8px;font-size:.82rem;color:var(--text-muted)"></div>
         </div>
 
         <!-- History -->
         <h3>📋 Historial de publicaciones</h3>
         <div id="estados-history" style="margin-top:8px">
-            <p style="color:var(--text-muted);text-align:center;padding:10px">Cargando...</p>
+            <p style="color:var(--text-muted);text-align:center;padding:10px">No hay publicaciones todavía.</p>
         </div>
     </div>
 </div>
@@ -934,18 +996,23 @@ function dismissWizard() {
             <div class="form-row">
                 <div class="form-group" style="flex:2">
                     <label>Chat IDs de Telegram (uno por línea)</label>
-                    <textarea name="telegram[chat_ids]" rows="3" class="code-area" spellcheck="false"><?php echo cv('telegram.chat_ids'); ?></textarea>
+                    <textarea name="telegram[chat_ids]" rows="2" class="code-area" spellcheck="false"><?php echo cv('telegram.chat_ids'); ?></textarea>
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label>Teléfonos WhatsApp para avisos (uno por línea)</label>
+                    <textarea name="telegram[whatsapp_phones]" rows="2" class="code-area" spellcheck="false" placeholder="34600111222"><?php echo cv('telegram.whatsapp_phones'); ?></textarea>
+                    <small style="color:var(--warn);font-size:.7rem">⚠️ No pueden ser números que tengas como líneas del bot.</small>
                 </div>
                 <div class="form-group" style="display:flex;align-items:flex-end">
                     <label class="checkbox-label"><input type="hidden" name="telegram[alert_enabled]" value="0"><input type="checkbox" name="telegram[alert_enabled]" value="1" <?php echo checked((bool)$config->get('telegram.alert_enabled',false)); ?>> Alertas activadas</label>
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary btn-sm">💾 Guardar Telegram</button>
+            <button type="submit" class="btn btn-primary btn-sm">💾 Guardar avisos</button>
         </div>
 
         <!-- Leads table -->
         <div id="clientes-table-container">
-            <p style="color:var(--text-muted);text-align:center;padding:20px">Cargando leads...</p>
+            <p style="color:var(--text-muted);text-align:center;padding:20px">No hay leads registrados todavía.</p>
         </div>
     </div>
 </div>
@@ -955,16 +1022,20 @@ function dismissWizard() {
     <div class="card">
         <h2>💬 Historial de Conversaciones
             <span class="tooltip-wrap"><span class="tooltip-icon">?</span>
-                <span class="tooltip-box">Busca conversaciones por número de teléfono. Puedes ver el historial completo y marcar conversaciones como lead.</span>
+                <span class="tooltip-box">Aquí verás todas las conversaciones que ha tenido tu bot. Busca por teléfono, revisa el historial, y marca conversaciones como lead (cliente que fue a la casa).</span>
             </span>
         </h2>
+        <div class="section-guide">
+            💡 Desde aquí puedes ver las conversaciones que el bot ha notificado como lead y también marcar manualmente 
+            cualquier conversación como "cliente que llegó a la casa", haya sido notificada o no por el bot. Esto sirve para las estadísticas.
+        </div>
 
         <div style="display:flex;gap:10px;margin-bottom:16px">
             <input type="text" id="msg-search" placeholder="Buscar por teléfono..." style="flex:1" oninput="searchThreads()">
         </div>
 
         <div id="mensajes-threads-container">
-            <p style="color:var(--text-muted);text-align:center;padding:20px">Cargando conversaciones...</p>
+            <p style="color:var(--text-muted);text-align:center;padding:20px">No hay conversaciones todavía.</p>
         </div>
 
         <!-- Chat modal -->
@@ -993,26 +1064,28 @@ function dismissWizard() {
             <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:.9rem">⏱ Humanización (Delays)</summary>
             <div style="padding:12px 16px;border-top:1px solid var(--border)">
                 <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:10px">
-                    Estos tiempos hacen que el bot parezca humano al responder. Simula que "lee" el mensaje, "piensa" y "escribe". 
-                    Valores muy bajos hacen que el bot parezca artificial (responde al instante). Valores muy altos hacen esperar demasiado al cliente.
+                    Estos tiempos hacen que el bot parezca humano al responder. Simula que "lee", "piensa" y "escribe".
+                    Valores bajos = parece artificial (responde al instante). Valores altos = cliente espera demasiado.
                 </p>
                 <div class="form-row">
-                    <div class="form-group">
-                        <label>Seen delay (seg) <span style="color:var(--text-muted)">— Tiempo que tarda en "ver" el mensaje. Recomendado: 1-3</span></label>
-                        <input type="number" step="0.1" name="human_delays[seen][fallback_sec]" value="<?php echo cv('human_delays.seen.fallback_sec','1'); ?>">
-                    </div>
-                    <div class="form-group">
-                        <label>Typing fallback (seg) <span style="color:var(--text-muted)">— Tiempo base de "escribir". Recomendado: 2-4</span></label>
-                        <input type="number" step="0.1" name="human_delays[typing][fallback_sec]" value="<?php echo cv('human_delays.typing.fallback_sec','4'); ?>">
-                    </div>
-                    <div class="form-group">
-                        <label>Read delay min (ms) <span style="color:var(--text-muted)">— Mínimo para "leer". Recomendado: 900</span></label>
-                        <input type="number" name="human_delays[read][base_min_ms]" value="<?php echo cv('human_delays.read.base_min_ms','900'); ?>">
-                    </div>
-                    <div class="form-group">
-                        <label>Read delay max (ms) <span style="color:var(--text-muted)">— Máximo para "leer". Recomendado: 2200</span></label>
-                        <input type="number" name="human_delays[read][base_max_ms]" value="<?php echo cv('human_delays.read.base_max_ms','2200'); ?>">
-                    </div>
+                    <div class="form-group"><label>Espera antes de "ver" mensaje (seg) <span style="color:var(--ok)">Recomendado: 1</span></label><input type="number" step="0.1" name="human_delays[seen][fallback_sec]" value="<?php echo cv('human_delays.seen.fallback_sec','1'); ?>"></div>
+                    <div class="form-group"><label>Espera aleatoria mínima "visto" (seg) <span style="color:var(--ok)">Recomendado: 1</span></label><input type="number" step="0.1" name="human_delays[seen][random_min_sec]" value="<?php echo cv('human_delays.seen.random_min_sec','1'); ?>"></div>
+                    <div class="form-group"><label>Espera aleatoria máxima "visto" (seg) <span style="color:var(--ok)">Recomendado: 3</span></label><input type="number" step="0.1" name="human_delays[seen][random_max_sec]" value="<?php echo cv('human_delays.seen.random_max_sec','3'); ?>"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Tiempo base "escribiendo" (seg) <span style="color:var(--ok)">Recomendado: 4</span></label><input type="number" step="0.1" name="human_delays[typing][fallback_sec]" value="<?php echo cv('human_delays.typing.fallback_sec','4'); ?>"></div>
+                    <div class="form-group"><label>Caracteres/segundo mín <span style="color:var(--ok)">Recomendado: 38</span></label><input type="number" name="human_delays[typing][chars_per_sec_min]" value="<?php echo cv('human_delays.typing.chars_per_sec_min','38'); ?>"></div>
+                    <div class="form-group"><label>Caracteres/segundo máx <span style="color:var(--ok)">Recomendado: 85</span></label><input type="number" name="human_delays[typing][chars_per_sec_max]" value="<?php echo cv('human_delays.typing.chars_per_sec_max','85'); ?>"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Tiempo lectura mín (ms) <span style="color:var(--ok)">Recomendado: 900</span></label><input type="number" name="human_delays[read][base_min_ms]" value="<?php echo cv('human_delays.read.base_min_ms','900'); ?>"></div>
+                    <div class="form-group"><label>Tiempo lectura máx (ms) <span style="color:var(--ok)">Recomendado: 2200</span></label><input type="number" name="human_delays[read][base_max_ms]" value="<?php echo cv('human_delays.read.base_max_ms','2200'); ?>"></div>
+                    <div class="form-group"><label>Espera entre mensajes (seg) <span style="color:var(--ok)">Recomendado: 15</span></label><input type="number" step="0.1" name="human_delays[presend_sleep_sec]" value="<?php echo cv('human_delays.presend_sleep_sec','15'); ?>"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Habituación inicio <span style="color:var(--ok)">Recomendado: 6.2</span></label><input type="number" step="0.1" name="human_delays[habituation][start_boost]" value="<?php echo cv('human_delays.habituation.start_boost','6.2'); ?>"></div>
+                    <div class="form-group"><label>Habituación decaimiento <span style="color:var(--ok)">Recomendado: 0.92</span></label><input type="number" step="0.01" name="human_delays[habituation][decay]" value="<?php echo cv('human_delays.habituation.decay','0.92'); ?>"></div>
+                    <div class="form-group"><label>Habituación suelo <span style="color:var(--ok)">Recomendado: 1.25</span></label><input type="number" step="0.01" name="human_delays[habituation][floor]" value="<?php echo cv('human_delays.habituation.floor','1.25'); ?>"></div>
                 </div>
             </div>
         </details>
@@ -1021,17 +1094,23 @@ function dismissWizard() {
             <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:.9rem">🎲 Variantes de mensajes</summary>
             <div style="padding:12px 16px;border-top:1px solid var(--border)">
                 <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:6px">
-                    Frases que el bot elige al azar cuando recibe un audio (una por línea). Cuantas más pongas, más variado parecerá.
+                    Frases que el bot elige al azar cuando recibe un audio (una por línea).
                     <button type="button" class="btn btn-sm" style="margin-left:8px;background:var(--input-bg);color:var(--text-muted);font-size:.65rem"
-                        onclick="this.parentElement.nextElementSibling.value='no puedo escuchar audios amor, me lo escribes mejor?\namor por aqui no escucho audios, escribeme y te digo 😘\ncari no puedo oir audios ahora, me lo pones en texto?\nme va mejor si me lo escribes amor, los audios no puedo escucharlos'">🔄 Restaurar</button>
+                        onclick="if(confirm('¿Restaurar frases por defecto?'))this.parentElement.nextElementSibling.value='no puedo escuchar audios amor, me lo escribes mejor?\namor por aqui no escucho audios, escribeme y te digo 😘\ncari no puedo oir audios ahora, me lo pones en texto?\nme va mejor si me lo escribes amor, los audios no puedo escucharlos\nguapo no puedo reproducir audios, escribeme un momentito y te contesto\nay amor, sin audio mejor, escribeme y asi te respondo rapido\ncielo no escucho audios por aqui, me lo mandas escrito?\nno puedo con audios ahora cari, escribeme mejor'">🔄 Restaurar</button>
                 </p>
-                <textarea name="message_variants[audio_auto_reply]" rows="4" class="code-area" spellcheck="false"><?php echo cv('message_variants.audio_auto_reply'); ?></textarea>
+                <textarea name="message_variants[audio_auto_reply]" rows="4" class="code-area" spellcheck="false"><?php
+                    $audioVal = trim(cv('message_variants.audio_auto_reply'));
+                    echo $audioVal !== '' ? $audioVal : "no puedo escuchar audios amor, me lo escribes mejor?\namor por aqui no escucho audios, escribeme y te digo 😘\ncari no puedo oir audios ahora, me lo pones en texto?\nme va mejor si me lo escribes amor, los audios no puedo escucharlos\nguapo no puedo reproducir audios, escribeme un momentito y te contesto\nay amor, sin audio mejor, escribeme y asi te respondo rapido\ncielo no escucho audios por aqui, me lo mandas escrito?\nno puedo con audios ahora cari, escribeme mejor";
+                ?></textarea>
                 <p style="color:var(--text-muted);font-size:.78rem;margin:10px 0 6px">
-                    Variantes para pedir la hora de llegada (ETA) al cliente. El bot las rota.
+                    Variantes para pedir la hora de llegada (ETA). El bot las rota.
                     <button type="button" class="btn btn-sm" style="margin-left:8px;background:var(--input-bg);color:var(--text-muted);font-size:.65rem"
-                        onclick="this.parentElement.nextElementSibling.value='cuanto tardas amor?\navisame cuando salgas\nen cuantos min vienes?\ncuando llegas papi?\nme dices cuanto tardas?\nsal y avisame que te espero'">🔄 Restaurar</button>
+                        onclick="if(confirm('¿Restaurar frases por defecto?'))this.parentElement.nextElementSibling.value='cuanto tardas amor?\navisame cuando salgas\nen cuantos min vienes?\ncuando llegas papi?\nme dices cuanto tardas?\nsal y avisame que te espero'">🔄 Restaurar</button>
                 </p>
-                <textarea name="message_variants[eta_request_variants]" rows="3" class="code-area" spellcheck="false"><?php echo cv('message_variants.eta_request_variants'); ?></textarea>
+                <textarea name="message_variants[eta_request_variants]" rows="3" class="code-area" spellcheck="false"><?php
+                    $etaVal = trim(cv('message_variants.eta_request_variants'));
+                    echo $etaVal !== '' ? $etaVal : "cuanto tardas amor?\navisame cuando salgas\nen cuantos min vienes?\ncuando llegas papi?\nme dices cuanto tardas?\nsal y avisame que te espero";
+                ?></textarea>
             </div>
         </details>
 
@@ -1059,13 +1138,13 @@ function dismissWizard() {
             <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:.9rem">⏰ Recordatorios ETA</summary>
             <div style="padding:12px 16px;border-top:1px solid var(--border)">
                 <p style="color:var(--text-muted);font-size:.8rem;margin-bottom:8px">
-                    <strong>¿Qué hace?</strong> Si un cliente dice "llego en 20 minutos", el bot programa un recordatorio y se lo envía pasado ese tiempo. 
-                    Así el cliente no se olvida de venir.<br><br>
-                    <strong>Importante:</strong> Este recordatorio se envía aunque no hayas marcado el lead como "llegó". Es automático y se basa en lo que el cliente dijo.
+                    <strong>¿Qué hace?</strong> Si un cliente dice "llego en 20 minutos", el bot le enviará UN SOLO recordatorio pasado ese tiempo.
                 </p>
+                <div class="alert-warning" style="margin-bottom:10px;font-size:.85rem;padding:12px 14px;border-radius:8px;border:2px solid var(--warn);background:rgba(251,191,36,.12)">
+                    ⚠️ <strong style="font-size:.95rem">IMPORTANTE:</strong> Este recordatorio se envía automáticamente aunque no hayas marcado el lead como "llegó" en la pestaña Clientes. El bot se basa solo en lo que el cliente dijo.
+                </div>
                 <div class="form-row">
                     <div class="form-group"><label class="checkbox-label"><input type="hidden" name="cron[reminder][enabled]" value="0"><input type="checkbox" name="cron[reminder][enabled]" value="1" <?php echo checked((bool)$config->get('cron.reminder.enabled',false)); ?>> Activado</label></div>
-                    <div class="form-group"><label>Máx por ejecución</label><input type="number" name="cron[reminder][max_per_run]" value="<?php echo cv('cron.reminder.max_per_run','5'); ?>"></div>
                 </div>
             </div>
         </details>
@@ -1284,7 +1363,7 @@ function saveGirl() {
     fd.append('nombre', document.getElementById('girl-nombre').value.trim());
     fd.append('descripcion', document.getElementById('girl-desc').value.trim());
     fd.append('activa', '1');
-    fd.append('csrf_token', _csrf);
+    fd.append('csrf_token', (typeof _csrf!=='undefined'?_csrf:''));
     fetch('api/girls.php?action=save', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
         if (d.ok) { document.getElementById('girl-edit-id').value=''; document.getElementById('girl-nombre').value=''; document.getElementById('girl-desc').value=''; document.getElementById('girl-form-title').textContent='➕ Nueva chica'; loadGirls(); }
         else alert('Error: '+(d.error||'Desconocido'));
@@ -1297,27 +1376,6 @@ function editGirl(id, nombre, desc) {
     document.getElementById('girl-form-title').textContent = '✏️ Editar chica';
     document.getElementById('girl-nombre').focus();
 }
-function editGirl(id, nombre, desc) {
-    document.getElementById('girl-edit-id').value = id;
-    document.getElementById('girl-nombre').value = nombre;
-    document.getElementById('girl-desc').value = desc;
-    document.getElementById('girl-form-title').textContent = '✏️ Editar chica';
-    document.getElementById('girl-nombre').focus();
-}
-function addGirlPhoto() {
-    // Legacy: URL-based photo add (kept for backward compat)
-    var url = document.getElementById('girl-photo-url');
-    if (!url) return;
-    var id = document.getElementById('girl-edit-id').value;
-    if (!url.value.trim() || !id) return alert('Primero guarda la chica y luego añade fotos');
-    var fd = new FormData(); fd.append('id', id); fd.append('photo_url', url.value.trim());
-    fd.append('csrf_token', _csrf);
-    fetch('api/girls.php?action=add_photo', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-        if (d.ok) { url.value=''; loadGirls(); }
-        else alert('Error: '+(d.error||'Desconocido'));
-    });
-}
-// New: file upload
 function uploadGirlPhoto() {
     var id = document.getElementById('girl-edit-id').value;
     var fileInput = document.getElementById('girl-photo-file');
@@ -1327,14 +1385,14 @@ function uploadGirlPhoto() {
     if (file.size > 5*1024*1024) return alert('La imagen no puede superar 5 MB.');
     var status = document.getElementById('upload-status');
     status.textContent = '⏳ Subiendo...';
-    var fd = new FormData(); fd.append('id', id); fd.append('photo', file); fd.append('csrf_token', _csrf);
+    var fd = new FormData(); fd.append('id', id); fd.append('photo', file); fd.append('csrf_token', (typeof _csrf!=='undefined'?_csrf:''));
     fetch('api/girls.php?action=upload_photo', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
         if (d.ok) { fileInput.value=''; status.textContent='✅ Subida'; loadGirls(); }
         else { status.textContent='❌ '+(d.error||'Error'); }
     }).catch(function(){ status.textContent='❌ Error de conexión'; });
 }
-function toggleGirl(id) { var fd = new FormData(); fd.append('id', id); fd.append('csrf_token', _csrf); fetch('api/girls.php?action=toggle',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{ if(d.ok) loadGirls(); }); }
-function deleteGirl(id) { if(!confirm('¿Eliminar esta chica?')) return; var fd = new FormData(); fd.append('id', id); fd.append('csrf_token', _csrf); fetch('api/girls.php?action=delete',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{ if(d.ok) loadGirls(); }); }
+function toggleGirl(id) { var fd = new FormData(); fd.append('id', id); fd.append('csrf_token', (typeof _csrf!=='undefined'?_csrf:'')); fetch('api/girls.php?action=toggle',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{ if(d.ok) loadGirls(); }); }
+function deleteGirl(id) { if(!confirm('¿Eliminar esta chica?')) return; var fd = new FormData(); fd.append('id', id); fd.append('csrf_token', (typeof _csrf!=='undefined'?_csrf:'')); fetch('api/girls.php?action=delete',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{ if(d.ok) loadGirls(); }); }
 
 // ── Estados ──
 function loadEstadosConfig() {
@@ -1342,11 +1400,11 @@ function loadEstadosConfig() {
         if (!d.ok) return;
         var c = d.config;
         document.getElementById('estados-enabled').checked = !!c.enabled;
-        document.getElementById('estados-freq-tipo').value = c.frecuencia_tipo;
-        document.getElementById('estados-freq-valor').value = c.frecuencia_valor;
-        document.getElementById('estados-formato').value = c.formato;
-        document.getElementById('estados-hora-inicio').value = c.hora_inicio;
-        document.getElementById('estados-hora-fin').value = c.hora_fin;
+        document.getElementById('estados-freq-tipo').value = c.frecuencia_tipo || 'cada_x_horas';
+        document.getElementById('estados-freq-valor').value = c.frecuencia_valor || 6;
+        document.getElementById('estados-formato').value = c.formato || 'mix_aleatorio';
+        document.getElementById('estados-hora-inicio').value = c.hora_inicio || '08:00';
+        document.getElementById('estados-hora-fin').value = c.hora_fin || '23:00';
         // Lines checkboxes
         var lcb = document.getElementById('estados-lines-checkboxes');
         lcb.innerHTML = (c.available_lines||[]).map(function(l){
@@ -1549,7 +1607,7 @@ function loadEstadisticas() {
 
         document.getElementById('estadisticas-container').innerHTML = html;
     }).catch(function(){
-        document.getElementById('estadisticas-container').innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:30px">Sin datos todavía. ¡Empieza a usar el bot!</p>';
+        document.getElementById('estadisticas-container').innerHTML = '<div style="text-align:center;padding:40px"><p style="color:var(--text-muted);font-size:1.1rem">📊 Sin datos todavía</p><p style="color:var(--text-muted);margin-top:4px">Las estadísticas aparecerán cuando el bot empiece a recibir mensajes.</p></div>';
     });
 }
 

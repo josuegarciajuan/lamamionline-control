@@ -55,7 +55,7 @@ function defaultConfig(): array {
         'frecuencia_valor' => 6,
         'hora_inicio' => '08:00',
         'hora_fin' => '23:00',
-        'formato' => 'chicas_de_hoy',
+        'formato' => 'mix_aleatorio',
         'lineas' => [],
         'last_scheduled_run_at' => null,
         'log' => [],

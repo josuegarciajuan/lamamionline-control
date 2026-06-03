@@ -32,8 +32,8 @@ try {
     $todayStr = (new DateTimeImmutable('now', new DateTimeZone('Europe/Madrid')))->format('Y-m-d');
     $weekAgo  = (new DateTimeImmutable('-7 days'))->format('Y-m-d');
 
-    // Leads
-    $leads = readNdjson($leadsFile);
+    // Leads (return empty if file doesn't exist)
+    $leads = file_exists($leadsFile) ? readNdjson($leadsFile) : [];
     $leadsTotal = count($leads);
     $leadsToday = 0;
     $leadsWeek  = 0;
@@ -45,8 +45,8 @@ try {
         if (!empty($l['arrived'])) $leadsArrived++;
     }
 
-    // Conversations
-    $records = readNdjson($memoryFile);
+    // Conversations (return empty if file doesn't exist)
+    $records = file_exists($memoryFile) ? readNdjson($memoryFile) : [];
     $allThreads = []; $todayThreads = []; $weekThreads = [];
     foreach ($records as $r) {
         $tid = (string) ($r['thread_id'] ?? '');

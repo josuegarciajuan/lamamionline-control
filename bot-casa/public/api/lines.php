@@ -72,22 +72,28 @@ try {
 
         case 'list':
             $lines = loadLines();
-            // Cross-reference with real WAHA status
-            $realStatus = $wm->scanInstances();
-            foreach ($lines as &$line) {
-                $port = (int) ($line['port'] ?? 0);
-                if ($port > 0 && isset($realStatus[$port])) {
-                    $rs = $realStatus[$port];
-                    $sess = $rs['sessions'][0] ?? [];
-                    $line['health_status'] = $sess['status'] ?? 'unknown';
-                    $line['health_phone'] = $rs['phone'] ?? '';
-                } elseif ($port > 0) {
-                    $line['health_status'] = 'down';
-                } else {
-                    $line['health_status'] = 'pending';
+            // Try to cross-reference with WAHA status (fails gracefully)
+            try {
+                $realStatus = $wm->scanInstances();
+                foreach ($lines as &$line) {
+                    $port = (int) ($line['port'] ?? 0);
+                    if ($port > 0 && isset($realStatus[$port])) {
+                        $rs = $realStatus[$port];
+                        $sess = $rs['sessions'][0] ?? [];
+                        $line['health_status'] = $sess['status'] ?? 'unknown';
+                        $line['health_phone'] = $rs['phone'] ?? '';
+                    } elseif ($port > 0) {
+                        $line['health_status'] = 'unknown';
+                    } else {
+                        $line['health_status'] = 'pending';
+                    }
                 }
+                unset($line);
+            } catch (\Throwable $e) {
+                // WAHA not available — just show local data
+                foreach ($lines as &$line) { $line['health_status'] = $line['health_status'] ?? 'unknown'; }
+                unset($line);
             }
-            unset($line);
             echo json_encode(['ok' => true, 'lines' => $lines]);
             break;
 
@@ -126,8 +132,13 @@ try {
                 $port = (int) ($status['next_port'] ?? 3020);
             }
 
-            // Create WAHA instance
-            $result = $wm->createInstance($port);
+            // Try to create WAHA instance (fails gracefully if WAHA not available)
+            $result = ['ok' => false, 'error' => 'WAHA no disponible — línea creada localmente.'];
+            try {
+                $result = $wm->createInstance($port);
+            } catch (\Throwable $e) {
+                $result = ['ok' => false, 'error' => 'WAHA no disponible'];
+            }
 
             $nextId = count($lines) > 0 ? max(array_column($lines, 'id')) + 1 : 1;
             $line = [

@@ -3120,7 +3120,7 @@ document.getElementById('conversationModal').addEventListener('click', function(
                     $ucreated  = (string) ($u['created_at'] ?? '');
                     $ucreatedDisp = '';
                     if ($ucreated !== '') {
-                        try { $dt = new DateTimeImmutable($ucreated); $ucreatedDisp = $dt->format('d/m/Y H:i'); }
+                        try { $dt = (new DateTimeImmutable($ucreated))->setTimezone(new DateTimeZone('Europe/Madrid')); $ucreatedDisp = $dt->format('d/m/Y H:i'); }
                         catch (\Exception) { $ucreatedDisp = $ucreated; }
                     }
                     $roleBadge = $urole === 'admin'
