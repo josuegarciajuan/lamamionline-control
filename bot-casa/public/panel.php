@@ -3,12 +3,33 @@
 declare(strict_types=1);
 
 /**
- * panel.php — Admin panel for wasapBot (standalone, no login required).
+ * panel.php — Admin panel for wasapBot (requires admin login via index.php).
  *
  * Access: GET /panel
  * Actions: ?action=save_config | toggle_bot | delete_memory_thread
- *           | delete_memory_line | clear_memory
+ *           | delete_memory_line | clear_memory | save_user | delete_user
  */
+
+// ─────────────────────────────────────────────────────────────────────
+//  Session/auth gate (defense in depth)
+// ─────────────────────────────────────────────────────────────────────
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+$isAdmin = !empty($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'admin';
+if (!$isAdmin) {
+    // Check if legacy mode (users.json doesn't exist yet)
+    $usersFile = WASAPBOT_ROOT . '/data/users.json';
+    if (file_exists($usersFile)) {
+        http_response_code(403);
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>403 Prohibido</title></head><body style="background:#080d17;color:#f0f3fa;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><div style="text-align:center"><h1 style="color:#f87171;font-size:3rem">403</h1><p>Acceso restringido.</p><p style="margin-top:16px"><a href="login" style="color:#f59e0b">Iniciar sesión</a></p></div></body></html>';
+        exit;
+    }
+    // Legacy mode: no users.json, panel open
+}
+$adminUsername = $_SESSION['username'] ?? '';
+$adminRole = $_SESSION['role'] ?? '';
 
 // ─────────────────────────────────────────────────────────────────────
 //  Bootstrap
@@ -181,19 +202,45 @@ function resolveConfigPath(string $configKey, string $defaultValue): string
 }
 
 // ─────────────────────────────────────────────────────────────────────
-//  CSRF protection (time-based token, no sessions needed)
+//  CSRF protection (time-based token with persistent random secret)
 // ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Load or generate a persistent random CSRF secret stored in a file.
+ * This prevents token forgery even if the filesystem path is known.
+ *
+ * @return string 64-character hex secret
+ */
+function getCsrfSecret(): string
+{
+    $secretFile = (defined('WASAPBOT_ROOT') ? WASAPBOT_ROOT : __DIR__) . '/data/.csrf_secret';
+    if (file_exists($secretFile)) {
+        $secret = trim((string) @file_get_contents($secretFile));
+        if (strlen($secret) >= 32) {
+            return $secret;
+        }
+    }
+    // Generate a new random secret (cryptographically secure)
+    $secret = bin2hex(random_bytes(32));
+    $dir = dirname($secretFile);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0700, true);
+    }
+    @file_put_contents($secretFile, $secret, LOCK_EX);
+    @chmod($secretFile, 0600);
+    return $secret;
+}
 
 function generateCsrfToken(): string
 {
-    // Rotates every 10 minutes; no storage needed
-    $secret = defined('WASAPBOT_ROOT') ? WASAPBOT_ROOT : __DIR__;
+    // Rotates every 10 minutes; uses persistent random secret
+    $secret = getCsrfSecret();
     return hash_hmac('sha256', date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
 }
 
 function validateCsrfToken(string $token): bool
 {
-    $secret = defined('WASAPBOT_ROOT') ? WASAPBOT_ROOT : __DIR__;
+    $secret = getCsrfSecret();
 
     // Accept current time window
     $current = hash_hmac('sha256', date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
@@ -233,15 +280,15 @@ $baseUrl = rtrim($baseUrl, '/');
  * same tab after any POST action instead of being thrown back to "Estado".
  * The active tab is sent as a hidden field `active_tab` in every form.
  */
-function buildRedirectUrl(string $baseUrl, string $extraParam): string
+function buildRedirectUrl(string $baseUrl, string $extraParam, string $overrideTab = ''): string
 {
     $allowedTabs = [
         'tab-status', 'tab-descripcion', 'tab-prompt', 'tab-leads',
         'tab-waha', 'tab-ia', 'tab-routing', 'tab-delays',
         'tab-variants', 'tab-followup', 'tab-reminder', 'tab-urls',
-        'tab-memory', 'tab-logs', 'tab-learning',
+        'tab-memory', 'tab-logs', 'tab-learning', 'tab-users',
     ];
-    $tab = (string) ($_POST['active_tab'] ?? $_GET['tab'] ?? '');
+    $tab = $overrideTab !== '' ? $overrideTab : (string) ($_POST['active_tab'] ?? $_GET['tab'] ?? '');
     if (!in_array($tab, $allowedTabs, true)) {
         $tab = '';
     }
@@ -469,6 +516,58 @@ if ($method === 'GET' && $action === 'get_outcomes') {
     header('Content-Type: application/json; charset=utf-8');
     $outcomes = getOutcomesForDisplay($config);
     echo json_encode(['ok' => true, 'outcomes' => $outcomes], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  User management actions (admin only)
+// ─────────────────────────────────────────────────────────────────────
+
+$userManager = new \WasapBot\Core\UserManager(WASAPBOT_ROOT);
+
+// ── action=save_user (POST) ──────────────────────────────────────────
+if ($method === 'POST' && $action === 'save_user') {
+    requireValidCsrf();
+    $userId   = (int) ($_POST['user_id'] ?? 0);
+    $username = trim((string) ($_POST['username'] ?? ''));
+    $password = (string) ($_POST['password'] ?? '');
+    $role     = (string) ($_POST['role'] ?? 'user');
+    $name     = trim((string) ($_POST['name'] ?? ''));
+    $active   = isset($_POST['active']) ? (bool) $_POST['active'] : true;
+
+    if ($userId > 0) {
+        // Update existing user
+        $fields = ['username' => $username, 'role' => $role, 'name' => $name, 'active' => $active];
+        if ($password !== '') {
+            $fields['password'] = $password;
+        }
+        $result = $userManager->updateUser($userId, $fields);
+        if ($result['ok']) {
+            $redirectMsg = 'user_updated=1';
+        } else {
+            $redirectMsg = 'user_error=' . urlencode($result['error'] ?? 'Error desconocido');
+        }
+    } else {
+        // Create new user
+        $result = $userManager->createUser($username, $password, $role, $name);
+        if ($result['ok']) {
+            $redirectMsg = 'user_created=1';
+        } else {
+            $redirectMsg = 'user_error=' . urlencode($result['error'] ?? 'Error desconocido');
+        }
+    }
+    header('Location: ' . buildRedirectUrl($baseUrl, $redirectMsg, 'tab-users'));
+    exit;
+}
+
+// ── action=delete_user (POST) ────────────────────────────────────────
+if ($method === 'POST' && $action === 'delete_user') {
+    requireValidCsrf();
+    $userId = (int) ($_POST['user_id'] ?? 0);
+    if ($userId > 0 && $userId !== 1) {
+        $userManager->deleteUser($userId);
+    }
+    header('Location: ' . buildRedirectUrl($baseUrl, 'user_deleted=1', 'tab-users'));
     exit;
 }
 
@@ -1399,370 +1498,23 @@ if (file_exists($logFilePath) && is_readable($logFilePath)) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>wasapBot — Admin Panel</title>
-<style>
-/* ── Luxe Sapphire + Warm Gold theme ── */
-:root {
-    --bg:              #080d17;
-    --bg-surface:      #0c1522;
-    --panel:           #111b2e;
-    --panel-hover:     #152036;
-    --text:            #f0f3fa;
-    --text-muted:      #8b9ec0;
-    --accent:          #f59e0b;
-    --accent-light:    #fbbf24;
-    --accent-dark:     #d97706;
-    --accent2:         #f97316;
-    --danger:          #f87171;
-    --danger-bg:       rgba(248,113,113,.10);
-    --ok:              #34d399;
-    --ok-bg:           rgba(52,211,153,.10);
-    --warn:            #fbbf24;
-    --warn-bg:         rgba(251,191,36,.10);
-    --info:            #60a5fa;
-    --info-bg:         rgba(96,165,250,.10);
-    --money:           #34d399;
-    --border:          #1c2d4a;
-    --border-soft:     #243758;
-    --input-bg:        #0c1522;
-    --tab-active:      #1a2e4a;
-    --shadow-sm:       0 4px 12px rgba(0,0,0,.25);
-    --shadow-md:       0 8px 28px rgba(0,0,0,.35);
-    --radius-sm:       10px;
-    --radius-md:       14px;
-    --radius-lg:       18px;
-    --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap');
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-    font-family: var(--font);
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    line-height: 1.5;
-}
-a { color: var(--accent-light); text-decoration: none; }
-a:hover { text-decoration: underline; }
-
-/* ── Header ── */
-.header {
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-    padding: 14px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 10px;
-    border-radius: var(--radius-md) var(--radius-md) 0 0;
-}
-.header h1 { font-size: 1.3rem; font-weight: 700; color: var(--text-bright, #fff); }
-.header .subtitle { color: var(--text-muted); font-size: .85rem; font-weight: 400; }
-
-/* ── Notification ── */
-.alert { padding: 10px 18px; margin: 0 20px 10px; border-radius: var(--radius-sm); font-size: .9rem; font-weight: 500; }
-.alert-success { background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok); }
-.alert-info { background: var(--info-bg); color: var(--info); border: 1px solid var(--info); }
-.alert-warning { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); }
-
-/* ── Tabs ── */
-.tab-nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px;
-    padding: 0 20px;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-    overflow-x: auto;
-}
-.tab-nav button {
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    padding: 10px 16px;
-    cursor: pointer;
-    font-size: .85rem;
-    font-weight: 500;
-    font-family: var(--font);
-    white-space: nowrap;
-    border-bottom: 2px solid transparent;
-    transition: all .2s;
-}
-.tab-nav button:hover { color: var(--text); }
-.tab-nav button.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
-    background: var(--tab-active);
-}
-
-/* ── Tab content ── */
-.tab-content { display: none; padding: 20px; }
-.tab-content.active { display: block; }
-
-/* ── Main form container ── */
-.main-form { max-width: 1100px; margin: 0 auto; }
-
-/* ── Cards ── */
-.card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 20px;
-    margin-bottom: 16px;
-    box-shadow: var(--shadow-sm);
-}
-.card h2 {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 14px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-}
-.card h3 {
-    font-size: .95rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    margin: 14px 0 8px;
-}
-
-/* ── Form elements ── */
-.form-group { margin-bottom: 12px; }
-.form-group label {
-    display: block;
-    font-size: .82rem;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-    font-weight: 500;
-}
-.form-row { display: flex; gap: 12px; flex-wrap: wrap; }
-.form-row .form-group { flex: 1; min-width: 140px; }
-
-input[type="text"],
-input[type="number"],
-input[type="password"],
-input[type="url"],
-select,
-textarea {
-    width: 100%;
-    padding: 8px 10px;
-    background: var(--input-bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--text);
-    font-size: .9rem;
-    font-family: var(--font);
-    transition: border-color .2s;
-}
-input:focus, textarea:focus, select:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--accent-glow, rgba(245,158,11,.22));
-}
-textarea { resize: vertical; min-height: 60px; }
-textarea.code-area { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; font-size: .82rem; }
-input[type="checkbox"] { width: auto; margin-right: 6px; }
-.checkbox-label { display: inline-flex; align-items: center; cursor: pointer; font-size: .85rem; font-weight: 500; }
-
-/* ── Buttons ── */
-.btn {
-    display: inline-block;
-    padding: 8px 18px;
-    border: none;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-size: .88rem;
-    font-weight: 600;
-    font-family: var(--font);
-    transition: all .2s;
-    box-shadow: var(--shadow-sm);
-}
-.btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #1a1206; }
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(245,158,11,.35); }
-.btn-danger { background: var(--danger); color: #fff; }
-.btn-danger:hover { background: #ef4444; box-shadow: 0 6px 20px rgba(248,113,113,.35); }
-.btn-success { background: linear-gradient(135deg, var(--ok), #10b981); color: #fff; }
-.btn-success:hover { box-shadow: 0 6px 20px rgba(52,211,153,.35); }
-.btn-warning { background: var(--warn); color: #1a1206; }
-.btn-warning:hover { box-shadow: 0 6px 20px rgba(251,191,36,.35); }
-.btn-sm { padding: 4px 10px; font-size: .78rem; }
-.btn-lg { padding: 12px 28px; font-size: 1rem; }
-.btn-block { display: block; width: 100%; text-align: center; }
-
-/* ── Bot status badge ── */
-.bot-status {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-}
-.bot-indicator {
-    display: inline-block;
-    width: 14px; height: 14px;
-    border-radius: 50%;
-    margin-right: 6px;
-    animation: pulse 2s infinite;
-}
-.status-on { background: var(--ok); box-shadow: 0 0 12px rgba(52,211,153,.5); }
-.status-off { background: var(--danger); box-shadow: 0 0 12px rgba(248,113,113,.5); }
-.status-unknown { background: var(--text-muted); }
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: .5; }
-}
-.bot-status-text { font-size: 1.1rem; font-weight: 600; }
-
-/* ── Memory table ── */
-.memory-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
-.memory-table th {
-    background: var(--input-bg);
-    color: var(--text-muted);
-    padding: 8px 10px;
-    text-align: left;
-    font-weight: 600;
-    font-size: .78rem;
-    white-space: nowrap;
-}
-.memory-table td {
-    padding: 6px 10px;
-    border-bottom: 1px solid var(--border);
-    vertical-align: top;
-}
-.memory-table tr:hover td { background: rgba(245,158,11,.04); }
-.memory-table .mono { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; font-size: .78rem; }
-.memory-table .preview { max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* ── Routing table ── */
-.routing-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
-.routing-table th {
-    background: var(--input-bg);
-    color: var(--text-muted);
-    padding: 6px 8px;
-    text-align: left;
-    font-weight: 600;
-    font-size: .78rem;
-}
-.routing-table td { padding: 4px 6px; }
-.input-cell { padding: 5px 8px !important; font-size: .82rem !important; width: 100%; }
-
-/* ── WAHA status indicators ── */
-.status-dot {
-    display: inline-block; width: 10px; height: 10px;
-    border-radius: 50%; vertical-align: middle; margin-right: 4px;
-    transition: background 0.3s ease;
-}
-.status-up       { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,.5); }
-.status-starting { background: #f59e0b; box-shadow: 0 0 6px rgba(245,158,11,.5); animation: pulse-dot 1.8s infinite; }
-.status-down     { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,.4); }
-.status-error    { background: #6b7280; }
-.status-unknown  { background: #374151; }
-@keyframes pulse-dot {
-    0%, 100% { opacity: 1; }
-    50%      { opacity: 0.4; }
-}
-.waha-status-cell { font-size: .78rem; white-space: nowrap; text-align: center; }
-.descripcion-cell { font-size: .82rem; color: var(--text-muted); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* ── Responsive ── */
-@media (max-width: 768px) {
-    .tab-nav { gap: 0; }
-    .tab-nav button { padding: 8px 10px; font-size: .75rem; }
-    .header { padding: 10px 14px; }
-    .tab-content { padding: 12px; }
-    .prompt-layout { flex-direction: column !important; }
-    .prompt-edit-col, .prompt-preview-col { flex: 1 1 100% !important; max-width: 100% !important; }
-    .prompt-preview-card { position: static !important; max-height: 50vh !important; }
-}
-
-/* ── Prompt parametrizado ── */
-.prompt-layout { display: flex; gap: 20px; align-items: flex-start; }
-.prompt-edit-col { flex: 0 0 60%; min-width: 0; }
-.prompt-preview-col { flex: 0 0 40%; min-width: 0; }
-.prompt-preview-card { position: sticky; top: 20px; max-height: 92vh; display: flex; flex-direction: column; }
-.prompt-preview-box {
-    flex: 1;
-    overflow-y: auto;
-    background: #0a0e17;
-    color: #c9d1d9;
-    padding: 14px 16px;
-    border-radius: var(--radius-sm);
-    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-    font-size: .76rem;
-    line-height: 1.55;
-    white-space: pre-wrap;
-    word-break: break-word;
-    margin: 0;
-    max-height: calc(92vh - 120px);
-    border: 1px solid var(--border);
-}
-.prompt-stats {
-    margin-top: 8px;
-    font-size: .76rem;
-    color: var(--text-muted);
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-}
-.prompt-stats .stat-ok { color: var(--ok); }
-.prompt-stats .stat-warn { color: var(--warn); }
-.prompt-chip {
-    display: inline-block;
-    padding: 3px 8px;
-    background: var(--input-bg);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: .78rem;
-    color: var(--accent-light);
-    cursor: pointer;
-    user-select: none;
-    transition: all .15s;
-}
-.prompt-chip:hover { background: var(--accent); color: #1a1206; border-color: var(--accent); }
-.prompt-chip-empty { opacity: .45; border-style: dashed; }
-.prompt-details {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    margin-bottom: 6px;
-    overflow: hidden;
-}
-.prompt-details[open] { border-color: var(--accent); }
-.prompt-summary {
-    padding: 10px 14px;
-    cursor: pointer;
-    font-size: .84rem;
-    font-weight: 600;
-    color: var(--text);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    user-select: none;
-}
-.prompt-summary:hover { background: rgba(245,158,11,.06); }
-.prompt-summary-badge {
-    font-size: .72rem;
-    color: var(--text-muted);
-    font-weight: 400;
-    font-family: monospace;
-}
-.prompt-section-ta {
-    margin: 0;
-    border: none;
-    border-top: 1px solid var(--border);
-    border-radius: 0;
-    display: block;
-}
-</style>
+<link rel="stylesheet" href="assets/style.css?v=20260603_2">
 </head>
 <body>
 
 <div class="header">
     <div>
         <h1>wasapBot — Panel de Administración</h1>
-        <span class="subtitle">PHP <?php echo h(PHP_VERSION); ?> &middot; <?php echo h(date('Y-m-d H:i:s')); ?></span>
+        <span class="subtitle">PHP <?php echo h(PHP_VERSION); ?> &middot; <?php echo h(date('Y-m-d H:i:s')); ?>
+        <?php if ($adminUsername !== ''): ?>
+        &middot; 👤 <?php echo h($adminUsername); ?>
+        <?php endif; ?>
+        </span>
     </div>
     <div style="display:flex;gap:8px">
+        <?php if ($adminUsername !== ''): ?>
+        <a href="logout" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted);text-decoration:none;display:inline-flex;align-items:center;font-size:.8rem">Cerrar sesión</a>
+        <?php endif; ?>
         <form method="post" action="<?php echo h($baseUrl); ?>?action=toggle_bot" style="display:inline">
             <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
             <input type="hidden" name="active_tab" class="js-active-tab-input" value="tab-status">
@@ -1792,6 +1544,9 @@ input[type="checkbox"] { width: auto; margin-right: 6px; }
     <button type="button" data-tab="tab-memory">Memoria</button>
     <button type="button" data-tab="tab-logs">Logs</button>
     <button type="button" data-tab="tab-learning">🧠 Aprendizaje</button>
+    <?php if ($isAdmin): ?>
+    <button type="button" data-tab="tab-users" style="color:var(--accent)">👥 Usuarios</button>
+    <?php endif; ?>
 </div>
 
 <!-- ── Main config form ── -->
@@ -3301,6 +3056,173 @@ document.getElementById('conversationModal').addEventListener('click', function(
         <?php endif; ?>
     </div>
 </div>
+
+<!-- ===== TAB: Usuarios (solo admin) ===== -->
+<?php if ($isAdmin): ?>
+<div class="tab-content" id="tab-users">
+    <div class="card">
+        <h2>Gestión de Usuarios</h2>
+        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">
+            Crea, edita y gestiona los usuarios con acceso al sistema bot-casa.
+        </p>
+
+        <?php
+        // ── Notification messages ──
+        $userMsg = '';
+        if (isset($_GET['user_created'])) { $userMsg = '<div class="alert alert-success">Usuario creado correctamente.</div>'; }
+        if (isset($_GET['user_updated'])) { $userMsg = '<div class="alert alert-success">Usuario actualizado correctamente.</div>'; }
+        if (isset($_GET['user_deleted'])) { $userMsg = '<div class="alert alert-info">Usuario desactivado.</div>'; }
+        if (isset($_GET['user_error'])) { $userMsg = '<div class="alert alert-warning">Error: ' . h((string) $_GET['user_error']) . '</div>'; }
+        echo $userMsg;
+        ?>
+
+        <!-- Lista de usuarios -->
+        <div style="overflow-x:auto;margin-bottom:24px">
+            <table class="memory-table" style="font-size:.83rem">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Usuario</th>
+                        <th>Nombre</th>
+                        <th>Rol</th>
+                        <th>Activo</th>
+                        <th>Creado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php
+                $allUsers = $userManager->listUsers();
+                foreach ($allUsers as $u):
+                    $uid       = (int) ($u['id'] ?? 0);
+                    $uname     = h((string) ($u['username'] ?? ''));
+                    $unameFull = h((string) ($u['name'] ?? ''));
+                    $urole     = (string) ($u['role'] ?? 'user');
+                    $uactive   = (bool) ($u['active'] ?? true);
+                    $ucreated  = (string) ($u['created_at'] ?? '');
+                    $ucreatedDisp = '';
+                    if ($ucreated !== '') {
+                        try { $dt = new DateTimeImmutable($ucreated); $ucreatedDisp = $dt->format('d/m/Y H:i'); }
+                        catch (\Exception) { $ucreatedDisp = $ucreated; }
+                    }
+                    $roleBadge = $urole === 'admin'
+                        ? '<span style="background:var(--accent);color:#1a1206;padding:2px 8px;border-radius:4px;font-size:.75rem;font-weight:600">Admin</span>'
+                        : '<span style="background:var(--input-bg);padding:2px 8px;border-radius:4px;font-size:.75rem">Usuario</span>';
+                    $activeBadge = $uactive
+                        ? '<span style="color:var(--ok);font-weight:600">✅</span>'
+                        : '<span style="color:var(--danger)">❌</span>';
+                ?>
+                <tr>
+                    <td class="mono"><?php echo $uid; ?></td>
+                    <td><strong><?php echo $uname; ?></strong></td>
+                    <td><?php echo $unameFull; ?></td>
+                    <td><?php echo $roleBadge; ?></td>
+                    <td style="text-align:center"><?php echo $activeBadge; ?></td>
+                    <td class="mono" style="font-size:.75rem"><?php echo h($ucreatedDisp); ?></td>
+                    <td style="white-space:nowrap">
+                        <!-- Suplantar -->
+                        <form method="post" action="cliente" style="display:inline" target="_blank">
+                            <input type="hidden" name="suplantar_user_id" value="<?php echo $uid; ?>">
+                            <input type="hidden" name="csrf_token" value="<?php echo h((string)($_SESSION['csrf_token'] ?? '')); ?>">
+                            <button type="submit" class="btn btn-sm" style="background:var(--info);color:#fff;margin-right:4px" title="Ver panel como este usuario">🔍 Ver</button>
+                        </form>
+                        <?php if ($uid !== 1): ?>
+                        <!-- Editar / Eliminar -->
+                        <button type="button" class="btn btn-sm btn-warning"
+                                onclick="editUser(<?php echo $uid; ?>, <?php echo htmlspecialchars(json_encode((string)($u['username'] ?? ''), JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>, <?php echo htmlspecialchars(json_encode((string)($u['name'] ?? ''), JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>, <?php echo htmlspecialchars(json_encode($urole), ENT_QUOTES, 'UTF-8'); ?>, <?php echo $uactive ? 'true' : 'false'; ?>)"
+                                style="margin-right:4px">✏️</button>
+                        <form method="post" action="<?php echo h($baseUrl); ?>?action=delete_user" style="display:inline" onsubmit="return confirm('¿Desactivar al usuario <?php echo $uname; ?>?')">
+                            <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
+                            <input type="hidden" name="user_id" value="<?php echo $uid; ?>">
+                            <input type="hidden" name="active_tab" value="tab-users">
+                            <button type="submit" class="btn btn-sm btn-danger">🗑️</button>
+                        </form>
+                        <?php else: ?>
+                        <span style="color:var(--text-muted);font-size:.75rem">Principal</span>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+                <?php if (empty($allUsers)): ?>
+                <tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted)">No hay usuarios registrados.</td></tr>
+                <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Formulario crear/editar usuario -->
+        <h3 id="user-form-title" style="margin-bottom:12px">➕ Nuevo usuario</h3>
+        <form method="post" action="<?php echo h($baseUrl); ?>?action=save_user" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px">
+            <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
+            <input type="hidden" name="user_id" id="user-form-id" value="">
+            <input type="hidden" name="active_tab" value="tab-users">
+
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label>Usuario *</label>
+                    <input type="text" name="username" id="user-form-username" required placeholder="nombre de usuario">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label>Rol</label>
+                    <select name="role" id="user-form-role">
+                        <option value="user">Usuario</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label>Nombre completo</label>
+                    <input type="text" name="name" id="user-form-name" placeholder="Nombre descriptivo">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label>Contraseña <span style="color:var(--text-muted);font-weight:400">(mín 8 chars)</span></label>
+                    <input type="password" name="password" id="user-form-password" placeholder="Dejar vacío para no cambiar" minlength="8">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="hidden" name="active" value="0">
+                    <input type="checkbox" name="active" id="user-form-active" value="1" checked> Usuario activo
+                </label>
+            </div>
+
+            <div style="display:flex;gap:10px;margin-top:8px">
+                <button type="submit" class="btn btn-primary">💾 Guardar usuario</button>
+                <button type="button" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted)" onclick="resetUserForm()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// ── User form helpers ──
+function editUser(id, username, name, role, active) {
+    document.getElementById('user-form-title').textContent = '✏️ Editar usuario';
+    document.getElementById('user-form-id').value = id;
+    document.getElementById('user-form-username').value = username;
+    document.getElementById('user-form-name').value = name;
+    document.getElementById('user-form-role').value = role;
+    document.getElementById('user-form-active').checked = active;
+    document.getElementById('user-form-password').value = '';
+    document.getElementById('user-form-password').placeholder = 'Dejar vacío para no cambiar';
+    // Scroll to form
+    document.getElementById('user-form-title').scrollIntoView({ behavior: 'smooth' });
+}
+function resetUserForm() {
+    document.getElementById('user-form-title').textContent = '➕ Nuevo usuario';
+    document.getElementById('user-form-id').value = '';
+    document.getElementById('user-form-username').value = '';
+    document.getElementById('user-form-name').value = '';
+    document.getElementById('user-form-role').value = 'user';
+    document.getElementById('user-form-active').checked = true;
+    document.getElementById('user-form-password').value = '';
+    document.getElementById('user-form-password').placeholder = 'Mínimo 8 caracteres';
+}
+</script>
+<?php endif; ?>
 
 <script>
 // Auto-scroll log to bottom on load

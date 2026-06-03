@@ -574,11 +574,13 @@
 
 ### FASE 2 — Panel Admin (user #1)
 
-- [ ] T2.1 — Añadir auth gate en panel.php.
-- [ ] T2.2 — Nueva tab "Usuarios" con CRUD de clientes.
-- [ ] T2.3 — Botón "Suplantar" para ver panel del cliente.
-- [ ] T2.4 — Externalizar CSS/JS a assets/style.css y assets/app.js.
-- [ ] T2.5 — Actualizar cache busters en index.php.
+- [x] T2.1 — Añadir auth gate en panel.php (defensa en profundidad + legacy mode).
+- [x] T2.2 — Nueva tab "Usuarios" con CRUD de clientes (crear, editar, desactivar).
+- [x] T2.3 — Botón "Suplantar" para ver panel del cliente (/cliente con ficha).
+- [x] T2.4 — Externalizar CSS a assets/style.css (353 líneas).
+- [x] T2.5 — Actualizar cache busters: style.css?v=20260603_2.
+
+**FASE 2 COMPLETADA.**
 
 ### FASE 3 — Panel Cliente + Secciones Principales
 

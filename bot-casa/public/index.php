@@ -149,12 +149,98 @@ try {
             }
             break;
 
-        // ── GET /cliente → client panel (requires auth) ──────────
-        case $method === 'GET' && $uri === '/cliente':
-            botcasa_require_auth();
+        // ── GET|POST /cliente → client panel (auth + suplantar) ──
+        case ($method === 'GET' || $method === 'POST') && $uri === '/cliente':
+            botcasa_require_admin(); // Solo admin puede acceder/suplantar
+            $suplantarUserId = 0;
+            $suplantarUser = null;
+
+            // Handle suplantar POST from admin panel
+            if ($method === 'POST') {
+                $postToken = (string) ($_POST['csrf_token'] ?? '');
+                $sessionToken = (string) ($_SESSION['csrf_token'] ?? '');
+                if ($postToken !== '' && hash_equals($sessionToken, $postToken)) {
+                    $suplantarUserId = (int) ($_POST['suplantar_user_id'] ?? 0);
+                }
+            }
+
+            // Also check existing suplantar session
+            $storedSuplantar = (int) ($_SESSION['suplantar_user_id'] ?? 0);
+            if ($suplantarUserId > 0) {
+                $_SESSION['suplantar_user_id'] = $suplantarUserId;
+                $storedSuplantar = $suplantarUserId;
+            }
+
+            // Cargar datos del usuario suplantado
+            if ($storedSuplantar > 0) {
+                $tempUm = new \WasapBot\Core\UserManager(WASAPBOT_ROOT);
+                $suplantarUser = $tempUm->getUser($storedSuplantar);
+                // Validate user is active
+                if ($suplantarUser !== null && empty($suplantarUser['active'])) {
+                    $suplantarUser = null;
+                    unset($_SESSION['suplantar_user_id']);
+                }
+            }
+
             http_response_code(200);
             header('Content-Type: text/html; charset=utf-8');
-            echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>bot-casa — Panel Cliente</title><style>body{background:#080d17;color:#f0f3fa;font-family:Inter,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center}.card{background:#111b2e;border:1px solid #1c2d4a;border-radius:14px;padding:32px;max-width:500px;box-shadow:0 12px 40px rgba(0,0,0,.35)}h1{color:#f59e0b;margin-bottom:8px}p{color:#8b9ec0;margin-bottom:20px}a{color:#f59e0b}</style></head><body><div class="card"><h1>Panel Cliente</h1><p>El panel de cliente estará disponible en la Fase 3. Mientras tanto, puedes usar el panel de administración.</p><a href="logout">Cerrar sesión</a></div></body></html>';
+            header('X-Frame-Options: DENY');
+            header('X-Content-Type-Options: nosniff');
+            ?>
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>bot-casa — Panel Cliente</title>
+<style>
+:root{--bg:#080d17;--panel:#111b2e;--border:#1c2d4a;--text:#f0f3fa;--text-muted:#8b9ec0;--accent:#f59e0b;--ok:#34d399;--danger:#f87171;--radius:14px;--font:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:32px;max-width:550px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+h1{color:var(--accent);margin-bottom:8px;font-size:1.4rem}
+h2{color:var(--text);margin-bottom:16px;font-size:1rem}
+p{color:var(--text-muted);margin-bottom:12px;font-size:.9rem}
+.badge{display:inline-block;padding:4px 12px;border-radius:6px;font-size:.8rem;font-weight:600;margin-bottom:16px}
+.badge-admin{background:var(--accent);color:#1a1206}
+.badge-user{background:var(--input-bg, #0c1522);color:var(--text-muted)}
+.info-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:.85rem}
+.info-row:last-child{border-bottom:none}
+.info-label{color:var(--text-muted)}
+.info-value{color:var(--text);font-weight:500}
+.btn-row{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+.btn{display:inline-block;padding:8px 18px;border:none;border-radius:10px;cursor:pointer;font-size:.88rem;font-weight:600;font-family:var(--font);text-decoration:none;transition:all .2s}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#d97706);color:#1a1206}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(245,158,11,.35)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text-muted)}
+.btn-outline:hover{background:rgba(255,255,255,.05)}
+</style></head><body>
+<div class="card">
+    <h1>Panel Cliente</h1>
+    <?php if ($suplantarUser): ?>
+        <span class="badge <?php echo ($suplantarUser['role'] ?? '') === 'admin' ? 'badge-admin' : 'badge-user'; ?>">
+            <?php echo ($suplantarUser['role'] ?? '') === 'admin' ? 'Admin' : 'Usuario'; ?>
+        </span>
+        <h2>Viendo panel de: <?php echo htmlspecialchars((string)($suplantarUser['name'] ?? $suplantarUser['username'] ?? '?'), ENT_QUOTES, 'UTF-8'); ?></h2>
+        <div class="info-row"><span class="info-label">Usuario</span><span class="info-value"><?php echo htmlspecialchars((string)($suplantarUser['username'] ?? '?'), ENT_QUOTES, 'UTF-8'); ?></span></div>
+        <div class="info-row"><span class="info-label">ID</span><span class="info-value"><?php echo (int)($suplantarUser['id'] ?? 0); ?></span></div>
+        <div class="info-row"><span class="info-label">Creado</span><span class="info-value"><?php echo htmlspecialchars((string)($suplantarUser['created_at'] ?? '?'), ENT_QUOTES, 'UTF-8'); ?></span></div>
+        <div class="info-row"><span class="info-label">Activo</span><span class="info-value"><?php echo !empty($suplantarUser['active']) ? '✅ Sí' : '❌ No'; ?></span></div>
+        <p style="margin-top:16px;font-size:.82rem">El panel completo de cliente estará disponible en la Fase 3. Desde aquí podrás configurar su bot, chicas, líneas y estados.</p>
+        <div class="btn-row">
+            <form method="post" action="cliente" style="display:inline">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+                <input type="hidden" name="suplantar_user_id" value="0">
+                <button type="submit" class="btn btn-outline">👤 Volver a mi usuario</button>
+            </form>
+            <a href="panel" class="btn btn-outline">Volver al panel admin</a>
+        </div>
+    <?php else: ?>
+        <p>Selecciona un usuario para suplantar desde el panel de administración (pestaña <strong>Usuarios</strong> → botón <strong>🔍 Ver</strong>).</p>
+        <p style="font-size:.82rem">El panel de cliente estará disponible en la Fase 3.</p>
+        <div class="btn-row">
+            <a href="panel" class="btn btn-primary">Ir al panel admin</a>
+            <a href="logout" class="btn btn-outline">Cerrar sesión</a>
+        </div>
+    <?php endif; ?>
+</div>
+</body></html>
+            <?php
             break;
 
         // ── GET /health → health check (no heavy bootstrap) ────

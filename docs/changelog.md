@@ -1,5 +1,34 @@
 # Changelog
 
+## 2026-06-03 — BOT-CASA-MULTIUSER FASE 2 (panel admin + usuarios + suplantar)
+
+### Implementado
+- **Auth gate en panel.php**: Defensa en profundidad con verificación de sesión admin. Legacy mode: si no existe users.json, panel abierto.
+- **Tab "Usuarios"**: CRUD completo de usuarios del sistema (crear, editar, desactivar). Listado con ID, username, nombre, rol, activo, fecha creación. Solo visible para admin.
+- **Suplantar usuario**: Botón "🔍 Ver" en cada fila de usuarios → abre `/cliente` con los datos del usuario suplantado. Permite volver al panel admin o cambiar a otro usuario. Valida que el usuario esté activo.
+- **CSS externalizado**: 353 líneas de CSS movidas de inline a `bot-casa/public/assets/style.css?v=20260603_2`.
+- **Header con sesión**: Muestra el username autenticado y botón "Cerrar sesión".
+- **Ruta /cliente**: Acepta POST (desde panel) y GET. Muestra ficha del usuario suplantado con datos. Prep para Fase 3.
+
+### Seguridad
+- CSRF token reforzado: `random_bytes(32)` persistente en `data/.csrf_secret`
+- Suplantar form usa token de sesión (no time-based)
+- XSS prevenido: `htmlspecialchars(json_encode())` en atributos JS onclick
+- Validación de usuario activo en suplantar
+- Security headers añadidos en /cliente
+
+### Archivos
+- **Nuevos (1):** `bot-casa/public/assets/style.css`
+- **Modificados (3):** `panel.php`, `index.php`, `.gitignore`
+- **Documentación:** `changelog.md`, `spec/tasks.md`
+
+### Verificación
+- `php -l panel.php`: PASS
+- `php -l index.php`: PASS
+- CSS externalizado: 353 líneas, 0 PHP tags
+- Tab Usuarios: crear, editar, desactivar funcionales
+- Suplantar: POST→GET flow con active validation OK
+
 ## 2026-06-03 — BOT-CASA-MULTIUSER FASE 1 (fundación multi-tenant + auth)
 
 ### Implementado

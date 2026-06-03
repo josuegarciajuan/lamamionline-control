@@ -5,6 +5,7 @@
 **/data/*.log
 **/data/wa_last_raw.json
 **/data/.bot_mode
+**/data/.csrf_secret
 **/data/.gitkeep
 
 # composer.lock se committea (proyecto, builds reproducibles)
