@@ -143,9 +143,15 @@ function readNdjson(string $filePath): array {
 $modeFilePath = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $clientUserId, '.bot_mode');
 function getBotMode(): string {
     global $modeFilePath;
-    if (!file_exists($modeFilePath)) return 'unknown';
+    if (!file_exists($modeFilePath)) {
+        // New user: create .bot_mode with 'stop'
+        $dir = dirname($modeFilePath);
+        if (!is_dir($dir)) @mkdir($dir, 0700, true);
+        @file_put_contents($modeFilePath, 'stop', LOCK_EX);
+        return 'stop';
+    }
     $content = trim((string) @file_get_contents($modeFilePath));
-    return in_array($content, ['start', 'stop'], true) ? $content : 'unknown';
+    return in_array($content, ['start', 'stop'], true) ? $content : 'stop';
 }
 $botMode = getBotMode();
 $botStatusClass = $botMode === 'start' ? 'status-on' : ($botMode === 'stop' ? 'status-off' : 'status-unknown');
@@ -477,9 +483,9 @@ function dismissWizard() {
             $promptConfigured = strlen((string) $config->get('prompt.sections.tarifas', '')) > 20;
             $linesConfigured = $linesForUser > 0;
             $checkItems = [
-                ['✅ Vincular WhatsApp', $linesConfigured, 'Configura tus líneas en la sección Líneas (próximamente).'],
-                ['✅ Configurar tarifas', $promptConfigured, 'Define tus precios en la pestaña Personalidad.'],
-                ['⏳ Personalidad completa', false, 'Ajusta el tono y estilo del bot.'],
+                ['✅ Vincular WhatsApp', $linesConfigured, 'Configura tus líneas en la pestaña 📱 Líneas.'],
+                ['✅ Configurar tarifas', $promptConfigured, 'Define tus precios en la pestaña 🎭 Personalidad.'],
+                ['⏳ Chicas configuradas', false, 'Añade tu catálogo en la pestaña 👩 Chicas.'],
             ];
             ?>
             <div class="config-checklist">
@@ -1280,7 +1286,7 @@ function markAsLeadFromChat() {
 // ── Estadísticas ──
 function loadEstadisticas() {
     fetch('api/stats.php').then(r=>r.json()).then(d=>{
-        if (!d.ok) return;
+        if (!d.ok) { document.getElementById('estadisticas-container').innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:30px">Error al cargar estadísticas.</p>'; return; }
         var s = d.stats;
         var html = '';
         html += '<div class="stats-grid">';
@@ -1321,12 +1327,14 @@ function loadEstadisticas() {
 function loadRegistro() {
     fetch('api/logs.php').then(r=>r.json()).then(d=>{
         if (d.ok) {
-            document.getElementById('registro-pre').textContent = d.log || '(sin registros)';
+            document.getElementById('registro-pre').textContent = d.log || '(sin actividad todavía)';
         } else {
             document.getElementById('registro-pre').textContent = 'Error al cargar registros';
         }
         var pre = document.getElementById('registro-pre');
         if (pre) pre.scrollTop = pre.scrollHeight;
+    }).catch(function(){
+        document.getElementById('registro-pre').textContent = '(sin actividad todavía)';
     });
 }
 

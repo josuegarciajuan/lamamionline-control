@@ -3139,7 +3139,7 @@ document.getElementById('conversationModal').addEventListener('click', function(
                     <td class="mono" style="font-size:.75rem"><?php echo h($ucreatedDisp); ?></td>
                     <td style="white-space:nowrap">
                         <!-- Suplantar -->
-                        <form method="post" action="cliente" style="display:inline" target="_blank">
+                        <form method="post" action="<?php echo $fromCRM ? '/control/bot-casa/public/index.php/cliente' : 'cliente'; ?>" style="display:inline" target="_blank">
                             <input type="hidden" name="suplantar_user_id" value="<?php echo $uid; ?>">
                             <input type="hidden" name="csrf_token" value="<?php echo h((string)($_SESSION['csrf_token'] ?? '')); ?>">
                             <button type="submit" class="btn btn-sm" style="background:var(--info);color:#fff;margin-right:4px" title="Ver panel como este usuario">🔍 Ver</button>

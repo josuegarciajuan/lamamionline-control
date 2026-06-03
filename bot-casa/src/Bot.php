@@ -373,13 +373,24 @@ final class Bot implements BotInterface
      */
     public static function resolveUserDataPath(string $rootDir, int $userId, string $relative): string
     {
+        // For non-admin users (ID > 1), ALWAYS use user-specific path
+        // to prevent data mixing between users
+        if ($userId > 1) {
+            $userDataDir = rtrim($rootDir, '/') . '/data/users/' . $userId;
+            if (!is_dir($userDataDir)) {
+                @mkdir($userDataDir, 0700, true);
+            }
+            return $userDataDir . '/' . ltrim($relative, '/');
+        }
+
+        // For admin (userId=1) or legacy (userId=0): 
+        // use user-specific path if it exists, otherwise root
         if ($userId > 0) {
             $userDataDir = rtrim($rootDir, '/') . '/data/users/' . $userId;
             $userFilePath = $userDataDir . '/' . ltrim($relative, '/');
             if (is_dir($userDataDir) || file_exists($userFilePath)) {
-                // Ensure directory exists
                 if (!is_dir($userDataDir)) {
-                    @mkdir($userDataDir, 0755, true);
+                    @mkdir($userDataDir, 0750, true);
                 }
                 return $userFilePath;
             }
