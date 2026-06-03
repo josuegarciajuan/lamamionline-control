@@ -37,9 +37,7 @@ function execCmd(string $cmd): array {
 }
 
 function getNextPort(): int {
-    $base = 3020;
     $existing = [];
-    // Check /srv/ for existing waha dirs
     $dirs = @scandir('/srv/');
     if ($dirs) {
         foreach ($dirs as $d) {
@@ -48,11 +46,13 @@ function getNextPort(): int {
             }
         }
     }
-    // Find first free port starting from 3020
-    for ($p = $base; $p < 3100; $p++) {
-        if (!isset($existing[$p])) return $p;
+    // Convention: wahaN → port N-1. Existing: waha1..waha11 = ports 3000..3011
+    // New lines start at port 3020 = waha3021
+    $startWaha = 3021; // port 3020
+    for ($n = $startWaha; $n < 3100; $n++) {
+        if (!isset($existing[$n])) return $n - 1; // return port
     }
-    return $base + count($existing);
+    return $startWaha - 1; // fallback
 }
 
 // ─────────────────────────────────────────────────────────
@@ -122,8 +122,9 @@ try {
             if ($method !== 'POST') { echo json_encode(['ok'=>false,'error'=>'POST required']); break; }
             $port = (int) ($_POST['port'] ?? 0);
             if ($port <= 0) { $port = getNextPort(); }
-            $containerPort = $port - 1;
-            $instanceDir = "/srv/waha{$port}";
+            // Convention: wahaN → docker port = N-1. So port 3020 → waha3021
+            $wahaNum = $port + 1;
+            $instanceDir = "/srv/waha{$wahaNum}";
 
             if (is_dir($instanceDir)) {
                 echo json_encode(['ok' => false, 'error' => "Directory {$instanceDir} already exists"]);
@@ -139,12 +140,12 @@ try {
             // Write docker-compose.yml
             $compose = <<<YAML
 services:
-  waha{$port}:
+  waha{$wahaNum}:
     image: devlikeapro/waha:latest
-    container_name: waha{$port}
+    container_name: waha{$wahaNum}
     restart: unless-stopped
     ports:
-      - "{$containerPort}:3000"
+      - "{$port}:3000"
     pids_limit: -1
     ulimits:
       nproc: 65535
@@ -180,7 +181,7 @@ YAML;
             // Wait a moment and configure webhook
             sleep(2);
             $webhookUrl = 'https://lamami.online/control/bot-casa/public/webhook.php';
-            $ch = curl_init("http://127.0.0.1:{$containerPort}/api/sessions/default");
+            $ch = curl_init("http://127.0.0.1:{$port}/api/sessions/default");
             $payload = json_encode([
                 'name' => 'default',
                 'config' => ['webhooks' => [['url' => $webhookUrl, 'events' => ['message']]]],
@@ -208,14 +209,11 @@ YAML;
             $port = (int) ($_POST['port'] ?? 0);
             if ($port <= 0) { echo json_encode(['ok'=>false,'error'=>'port required']); break; }
 
-            $instanceDir = "/srv/waha" . ($port + 1);
+            $wahaNum = $port + 1;
+            $instanceDir = "/srv/waha{$wahaNum}";
             if (!is_dir($instanceDir)) {
-                // Try other naming
-                $instanceDir = "/srv/waha{$port}";
-                if (!is_dir($instanceDir)) {
-                    echo json_encode(['ok' => false, 'error' => "Instance directory not found"]);
-                    break;
-                }
+                echo json_encode(['ok' => false, 'error' => "Instance directory {$instanceDir} not found"]);
+                break;
             }
 
             $result = execCmd("cd {$instanceDir} && docker compose down 2>/dev/null; rm -rf {$instanceDir}");
