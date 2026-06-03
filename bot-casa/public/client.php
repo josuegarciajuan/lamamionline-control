@@ -740,7 +740,7 @@ function dismissWizard() {
         </div>
 
         <!-- QR modal (hidden) -->
-        <div id="qr-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+        <div id="qr-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;align-items:center;justify-content:center">
             <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);padding:24px;max-width:400px;text-align:center">
                 <h3>📱 Escanea el QR</h3>
                 <p style="color:var(--text-muted);font-size:.82rem;margin:8px 0">Abre WhatsApp → Ajustes → Vincular dispositivo</p>
@@ -751,7 +751,7 @@ function dismissWizard() {
         </div>
 
         <!-- Test modal -->
-        <div id="test-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+        <div id="test-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;align-items:center;justify-content:center">
             <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);padding:24px;max-width:400px;text-align:center">
                 <h3>📤 Enviar mensaje de prueba</h3>
                 <input type="text" id="test-phone" placeholder="Número de teléfono (con prefijo)" style="width:100%;margin:12px 0">
@@ -777,28 +777,29 @@ function dismissWizard() {
         <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:20px">
             <h3 id="girl-form-title" style="margin-bottom:10px">➕ Nueva chica</h3>
             <input type="hidden" id="girl-edit-id">
-            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-                <div style="flex:2;min-width:140px">
-                    <label style="font-size:.78rem;color:var(--text-muted)">Nombre *</label>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;min-width:140px">
+                    <label>Nombre *</label>
                     <input type="text" id="girl-nombre" placeholder="Ej: Sandra" style="width:100%">
                 </div>
-                <div style="flex:3;min-width:200px">
-                    <label style="font-size:.78rem;color:var(--text-muted)">Descripción corta</label>
-                    <input type="text" id="girl-desc" placeholder="Ej: Morena, 25 años, cariñosa..." style="width:100%">
+                <div class="form-group" style="flex:2;min-width:250px">
+                    <label>Descripción</label>
+                    <textarea id="girl-desc" rows="3" placeholder="Ej: Morena, 25 años, cariñosa, simpática..." style="width:100%;min-height:60px"></textarea>
                 </div>
-                <div>
+                <div style="display:flex;align-items:flex-end;gap:6px">
                     <button type="button" class="btn btn-primary" onclick="saveGirl()">💾 Guardar</button>
                 </div>
             </div>
-            <!-- Photo URL add -->
+            <!-- Photo upload -->
             <div style="margin-top:10px;display:flex;gap:8px;align-items:flex-end">
                 <div style="flex:1">
-                    <label style="font-size:.78rem;color:var(--text-muted)">Añadir foto (URL)</label>
-                    <input type="url" id="girl-photo-url" placeholder="https://compartir.site/imgs/abc/foto.jpg" style="width:100%">
+                    <label style="font-size:.78rem;color:var(--text-muted)">Añadir foto (JPG, PNG, WebP — máx 5MB)</label>
+                    <input type="file" id="girl-photo-file" accept="image/jpeg,image/png,image/webp" style="width:100%">
                 </div>
                 <div>
-                    <button type="button" class="btn btn-sm btn-success" onclick="addGirlPhoto()">+ Foto</button>
+                    <button type="button" class="btn btn-sm btn-success" onclick="uploadGirlPhoto()" id="btn-upload-photo">📤 Subir</button>
                 </div>
+                <span id="upload-status" style="font-size:.75rem;color:var(--text-muted)"></span>
             </div>
         </div>
 
@@ -814,9 +815,14 @@ function dismissWizard() {
     <div class="card">
         <h2>📢 Publicador de Estados
             <span class="tooltip-wrap"><span class="tooltip-icon">?</span>
-                <span class="tooltip-box">Publica automáticamente estados de WhatsApp con tus chicas. Los clientes que tengan tu número verán las publicaciones.</span>
+                <span class="tooltip-box">El bot publica estados de WhatsApp automáticamente. Los genera basándose en las chicas activas de tu catálogo, combinando nombres, fotos y textos atractivos.</span>
             </span>
         </h2>
+        <div class="section-guide">
+            📢 <strong>¿Cómo funciona?</strong> El bot crea y publica estados de WhatsApp automáticamente según la frecuencia que configures. 
+            Los estados se generan con las chicas que tengas activas en la pestaña 👩 Chicas. Si no hay chicas activas, no se publicará nada.
+            Puedes elegir entre varios formatos (catálogo completo, chica del día, dúo, etc.) y el bot los irá alternando.
+        </div>
 
         <!-- Config form -->
         <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:20px">
@@ -1145,10 +1151,10 @@ function saveGirl() {
     var id = document.getElementById('girl-edit-id').value;
     var fd = new FormData();
     if (id) fd.append('id', id);
-    fd.append('csrf_token', _csrf);
     fd.append('nombre', document.getElementById('girl-nombre').value.trim());
     fd.append('descripcion', document.getElementById('girl-desc').value.trim());
     fd.append('activa', '1');
+    fd.append('csrf_token', _csrf);
     fetch('api/girls.php?action=save', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
         if (d.ok) { document.getElementById('girl-edit-id').value=''; document.getElementById('girl-nombre').value=''; document.getElementById('girl-desc').value=''; document.getElementById('girl-form-title').textContent='➕ Nueva chica'; loadGirls(); }
         else alert('Error: '+(d.error||'Desconocido'));
@@ -1161,15 +1167,41 @@ function editGirl(id, nombre, desc) {
     document.getElementById('girl-form-title').textContent = '✏️ Editar chica';
     document.getElementById('girl-nombre').focus();
 }
+function editGirl(id, nombre, desc) {
+    document.getElementById('girl-edit-id').value = id;
+    document.getElementById('girl-nombre').value = nombre;
+    document.getElementById('girl-desc').value = desc;
+    document.getElementById('girl-form-title').textContent = '✏️ Editar chica';
+    document.getElementById('girl-nombre').focus();
+}
 function addGirlPhoto() {
-    var url = document.getElementById('girl-photo-url').value.trim();
+    // Legacy: URL-based photo add (kept for backward compat)
+    var url = document.getElementById('girl-photo-url');
+    if (!url) return;
     var id = document.getElementById('girl-edit-id').value;
-    if (!url || !id) return alert('Primero guarda la chica y luego añade fotos');
-    var fd = new FormData(); fd.append('id', id); fd.append('photo_url', url); fd.append('csrf_token', _csrf);
+    if (!url.value.trim() || !id) return alert('Primero guarda la chica y luego añade fotos');
+    var fd = new FormData(); fd.append('id', id); fd.append('photo_url', url.value.trim());
+    fd.append('csrf_token', _csrf);
     fetch('api/girls.php?action=add_photo', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-        if (d.ok) { document.getElementById('girl-photo-url').value=''; loadGirls(); }
+        if (d.ok) { url.value=''; loadGirls(); }
         else alert('Error: '+(d.error||'Desconocido'));
     });
+}
+// New: file upload
+function uploadGirlPhoto() {
+    var id = document.getElementById('girl-edit-id').value;
+    var fileInput = document.getElementById('girl-photo-file');
+    if (!id) return alert('Primero guarda la chica (nombre + descripción) y luego sube fotos.');
+    if (!fileInput.files || !fileInput.files[0]) return alert('Selecciona una imagen.');
+    var file = fileInput.files[0];
+    if (file.size > 5*1024*1024) return alert('La imagen no puede superar 5 MB.');
+    var status = document.getElementById('upload-status');
+    status.textContent = '⏳ Subiendo...';
+    var fd = new FormData(); fd.append('id', id); fd.append('photo', file); fd.append('csrf_token', _csrf);
+    fetch('api/girls.php?action=upload_photo', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        if (d.ok) { fileInput.value=''; status.textContent='✅ Subida'; loadGirls(); }
+        else { status.textContent='❌ '+(d.error||'Error'); }
+    }).catch(function(){ status.textContent='❌ Error de conexión'; });
 }
 function toggleGirl(id) { var fd = new FormData(); fd.append('id', id); fd.append('csrf_token', _csrf); fetch('api/girls.php?action=toggle',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{ if(d.ok) loadGirls(); }); }
 function deleteGirl(id) { if(!confirm('¿Eliminar esta chica?')) return; var fd = new FormData(); fd.append('id', id); fd.append('csrf_token', _csrf); fetch('api/girls.php?action=delete',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{ if(d.ok) loadGirls(); }); }

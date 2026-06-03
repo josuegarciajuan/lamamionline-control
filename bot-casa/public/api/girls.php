@@ -180,6 +180,50 @@ try {
             echo json_encode(['ok' => true]);
             break;
 
+        case 'upload_photo':
+            if ($method !== 'POST') { echo json_encode(['ok'=>false,'error'=>'POST required']); break; }
+            $gid = trim((string)($_POST['id'] ?? ''));
+            if ($gid === '') { echo json_encode(['ok'=>false,'error'=>'ID requerido']); break; }
+            if (empty($_FILES['photo'])) { echo json_encode(['ok'=>false,'error'=>'No se recibió archivo']); break; }
+
+            $file = $_FILES['photo'];
+            $allowed = ['image/jpeg', 'image/png', 'image/webp'];
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime = finfo_file($finfo, $file['tmp_name']);
+            finfo_close($finfo);
+            if (!in_array($mime, $allowed, true)) { echo json_encode(['ok'=>false,'error'=>'Formato no permitido. Usa JPG, PNG o WebP.']); break; }
+            if ($file['size'] > 5 * 1024 * 1024) { echo json_encode(['ok'=>false,'error'=>'Imagen demasiado grande (máx 5MB).']); break; }
+
+            // Create random folder name (like girlsconf)
+            $chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            $folder = '';
+            for ($i = 0; $i < 5; $i++) { $folder .= $chars[random_int(0, strlen($chars)-1)]; }
+            $imgDir = WASAPBOT_ROOT . '/data/users/' . $userId . '/imgs/' . $folder;
+            if (!is_dir($imgDir)) @mkdir($imgDir, 0755, true);
+
+            $ext = $mime === 'image/png' ? 'png' : ($mime === 'image/webp' ? 'webp' : 'jpg');
+            $destPath = $imgDir . '/' . $folder . '.' . $ext;
+            if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+                echo json_encode(['ok'=>false,'error'=>'Error al guardar la imagen.']); break;
+            }
+
+            // The image is served from the same domain via a public symlink or direct path
+            // Store relative URL: /control/bot-casa/data/users/{userId}/imgs/{folder}/{folder}.{ext}
+            $photoUrl = '/control/bot-casa/data/users/' . $userId . '/imgs/' . $folder . '/' . $folder . '.' . $ext;
+
+            $data = loadGirls();
+            foreach ($data['girls'] as &$g) {
+                if (($g['id'] ?? '') === $gid) {
+                    if (!isset($g['fotos']) || !is_array($g['fotos'])) $g['fotos'] = [];
+                    $g['fotos'][] = $photoUrl;
+                    break;
+                }
+            }
+            unset($g);
+            saveGirls($data);
+            echo json_encode(['ok' => true, 'url' => $photoUrl]);
+            break;
+
         default:
             echo json_encode(['ok' => false, 'error' => 'Unknown action']);
     }
