@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-06-03 — BOT-CASA-MULTIUSER FASE 5 (clientes + mensajes + ajustes + estadísticas + logs)
+
+### Implementado
+- **Tab Clientes en client.php**: Lista de leads con marcado "llegó"/"no llegó", guía Telegram, configuración Chat IDs + alertas. API clientes.php con mark_arrived.
+- **Tab Mensajes en client.php**: Buscador por teléfono, historial de conversaciones en modal tipo chat, botón "Marcar como lead" desde conversación. API mensajes.php con threads y conversation.
+- **Tab Ajustes en client.php**: Agrupación de Humanización (delays), Variantes, Follow-up y Recordatorios ETA en acordeones. Advertencia sobre marcar leads antes de activar follow-up.
+- **Tab Estadísticas en client.php**: Métricas diferenciadas (leads notificados vs leads reales), tasa de llegada, gráfico de barras CSS últimos 7 días. API stats.php con datos agregados.
+- **Tab Registro en client.php**: Últimas 200 líneas de log sanitizadas (sin API keys, IPs, teléfonos, tokens). API logs.php con redacción de datos sensibles.
+- **IA oculta para clientes**: Ya implementado (client.php no tiene tab de IA, solo visible en panel admin).
+
+### Seguridad (hallazgos corregidos)
+- CSRF añadido en mark_lead (mensajes.php)
+- Sanitización de logs mejorada: más patrones de secrets, IPs RFC 1918, teléfonos contextuales
+- Código muerto eliminado en clientes.php
+
+### Archivos
+- **Nuevos (4):** `api/clientes.php`, `api/mensajes.php`, `api/stats.php`, `api/logs.php`
+- **Modificados (1):** `client.php` (+5 tabs con HTML/CSS/JS)
+- **Documentación:** `changelog.md`, `spec/tasks.md`
+
+### Verificación
+- `php -l`: 5/5 archivos OK
+- Clientes: list, mark_arrived funcional
+- Mensajes: search, chat modal, mark_lead funcional
+- Ajustes: guardado vía config form principal
+- Estadísticas: métricas + gráfico CSS funcional
+- Registro: logs sanitizados con redacción de datos sensibles
+
 ## 2026-06-03 — BOT-CASA-MULTIUSER FASE 4 (líneas + chicas + estados)
 
 ### Implementado

@@ -349,6 +349,11 @@ $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucci
     <button type="button" data-tab="tab-lineas">📱 Líneas</button>
     <button type="button" data-tab="tab-chicas">👩 Chicas</button>
     <button type="button" data-tab="tab-estados">📢 Estados</button>
+    <button type="button" data-tab="tab-clientes">👥 Clientes</button>
+    <button type="button" data-tab="tab-mensajes">💬 Mensajes</button>
+    <button type="button" data-tab="tab-ajustes">⚙️ Ajustes</button>
+    <button type="button" data-tab="tab-estadisticas">📈 Estadísticas</button>
+    <button type="button" data-tab="tab-registro">📋 Registro</button>
 </div>
 
 <form method="post" action="cliente?action=save_config" class="main-form">
@@ -763,6 +768,158 @@ $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucci
     </div>
 </div>
 
+<!-- ===== TAB: Clientes ===== -->
+<div class="tab-content" id="tab-clientes">
+    <div class="card">
+        <h2>👥 Clientes (Leads)
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span>
+                <span class="tooltip-box">Lista de clientes que han mostrado interés en venir. Marca los que llegaron de verdad para medir la efectividad del bot.</span>
+            </span>
+        </h2>
+
+        <div class="section-guide">
+            📱 <strong>¿Quieres recibir avisos cuando llegue un cliente?</strong><br>
+            <span style="font-size:.78rem">1. Abre Telegram, busca @BotFather, crea un bot con /newbot<br>
+            2. Busca @userinfobot para obtener tu Chat ID<br>
+            3. Configura el Chat ID abajo en los ajustes de Telegram</span>
+        </div>
+
+        <!-- Telegram config -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px">
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label>Chat IDs de Telegram (uno por línea)</label>
+                    <textarea name="telegram[chat_ids]" rows="3" class="code-area" spellcheck="false"><?php echo cv('telegram.chat_ids'); ?></textarea>
+                </div>
+                <div class="form-group" style="display:flex;align-items:flex-end">
+                    <label class="checkbox-label"><input type="hidden" name="telegram[alert_enabled]" value="0"><input type="checkbox" name="telegram[alert_enabled]" value="1" <?php echo checked((bool)$config->get('telegram.alert_enabled',false)); ?>> Alertas activadas</label>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">💾 Guardar Telegram</button>
+        </div>
+
+        <!-- Leads table -->
+        <div id="clientes-table-container">
+            <p style="color:var(--text-muted);text-align:center;padding:20px">Cargando leads...</p>
+        </div>
+    </div>
+</div>
+
+<!-- ===== TAB: Mensajes ===== -->
+<div class="tab-content" id="tab-mensajes">
+    <div class="card">
+        <h2>💬 Historial de Conversaciones
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span>
+                <span class="tooltip-box">Busca conversaciones por número de teléfono. Puedes ver el historial completo y marcar conversaciones como lead.</span>
+            </span>
+        </h2>
+
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+            <input type="text" id="msg-search" placeholder="Buscar por teléfono..." style="flex:1" oninput="searchThreads()">
+        </div>
+
+        <div id="mensajes-threads-container">
+            <p style="color:var(--text-muted);text-align:center;padding:20px">Cargando conversaciones...</p>
+        </div>
+
+        <!-- Chat modal -->
+        <div id="chat-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000" onclick="if(event.target===this)closeChat()">
+            <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px;max-width:600px;width:95%;margin:40px auto;max-height:85vh;overflow-y:auto">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                    <h3>💬 Conversación</h3>
+                    <button type="button" class="btn btn-sm btn-primary" id="chat-mark-lead-btn" onclick="markAsLeadFromChat()">⭐ Marcar como lead</button>
+                </div>
+                <div id="chat-messages" style="max-height:60vh;overflow-y:auto"></div>
+                <button type="button" class="btn btn-sm" style="margin-top:12px;background:var(--input-bg);color:var(--text-muted)" onclick="closeChat()">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== TAB: Ajustes ===== -->
+<div class="tab-content" id="tab-ajustes">
+    <div class="card">
+        <h2>⚙️ Ajustes del Bot</h2>
+        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">
+            Configuración avanzada. Si no estás seguro, deja los valores por defecto.
+        </p>
+
+        <details style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0;margin-bottom:8px" open>
+            <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:.9rem">⏱ Humanización (Delays)</summary>
+            <div style="padding:12px 16px;border-top:1px solid var(--border)">
+                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:10px">Tiempos que simulan comportamiento humano al responder.</p>
+                <div class="form-row">
+                    <div class="form-group"><label>Seen delay (seg)</label><input type="number" step="0.1" name="human_delays[seen][fallback_sec]" value="<?php echo cv('human_delays.seen.fallback_sec','1'); ?>"></div>
+                    <div class="form-group"><label>Typing fallback (seg)</label><input type="number" step="0.1" name="human_delays[typing][fallback_sec]" value="<?php echo cv('human_delays.typing.fallback_sec','4'); ?>"></div>
+                    <div class="form-group"><label>Read delay min (ms)</label><input type="number" name="human_delays[read][base_min_ms]" value="<?php echo cv('human_delays.read.base_min_ms','900'); ?>"></div>
+                    <div class="form-group"><label>Read delay max (ms)</label><input type="number" name="human_delays[read][base_max_ms]" value="<?php echo cv('human_delays.read.base_max_ms','2200'); ?>"></div>
+                </div>
+            </div>
+        </details>
+
+        <details style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0;margin-bottom:8px">
+            <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:.9rem">🎲 Variantes de mensajes</summary>
+            <div style="padding:12px 16px;border-top:1px solid var(--border)">
+                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:6px">Frases que el bot usa para responder a audios (una por línea).</p>
+                <textarea name="message_variants[audio_auto_reply]" rows="4" class="code-area" spellcheck="false"><?php echo cv('message_variants.audio_auto_reply'); ?></textarea>
+                <p style="color:var(--text-muted);font-size:.78rem;margin:10px 0 6px">Variantes para pedir ETA (una por línea).</p>
+                <textarea name="message_variants[eta_request_variants]" rows="3" class="code-area" spellcheck="false"><?php echo cv('message_variants.eta_request_variants'); ?></textarea>
+            </div>
+        </details>
+
+        <details style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0;margin-bottom:8px">
+            <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:.9rem">📨 Follow-up (recontactar leads)</summary>
+            <div style="padding:12px 16px;border-top:1px solid var(--border)">
+                <div class="alert-warning" style="margin-bottom:10px;font-size:.8rem;padding:8px 12px;border-radius:8px">
+                    ⚠️ <strong>Importante:</strong> El bot recontactará a los leads que NO hayan sido marcados como "llegó". Marca los leads en la pestaña Clientes para evitar mensajes incómodos.
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="checkbox-label"><input type="hidden" name="cron[followup][enabled]" value="0"><input type="checkbox" name="cron[followup][enabled]" value="1" <?php echo checked((bool)$config->get('cron.followup.enabled',false)); ?>> Activado</label></div>
+                    <div class="form-group"><label>Máx leads por ejecución</label><input type="number" name="cron[followup][max_leads_per_run]" value="<?php echo cv('cron.followup.max_leads_per_run','10'); ?>"></div>
+                    <div class="form-group"><label>Horario inicio</label><input type="text" name="cron[followup][send_window_start]" value="<?php echo cv('cron.followup.send_window_start','10:00'); ?>"></div>
+                    <div class="form-group"><label>Horario fin</label><input type="text" name="cron[followup][send_window_end]" value="<?php echo cv('cron.followup.send_window_end','22:00'); ?>"></div>
+                </div>
+            </div>
+        </details>
+
+        <details style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0;margin-bottom:8px">
+            <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:.9rem">⏰ Recordatorios ETA</summary>
+            <div style="padding:12px 16px;border-top:1px solid var(--border)">
+                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:8px">Si un cliente dice "llego en 20 min", el bot le enviará un recordatorio pasado ese tiempo.</p>
+                <div class="form-row">
+                    <div class="form-group"><label class="checkbox-label"><input type="hidden" name="cron[reminder][enabled]" value="0"><input type="checkbox" name="cron[reminder][enabled]" value="1" <?php echo checked((bool)$config->get('cron.reminder.enabled',false)); ?>> Activado</label></div>
+                    <div class="form-group"><label>Máx por ejecución</label><input type="number" name="cron[reminder][max_per_run]" value="<?php echo cv('cron.reminder.max_per_run','5'); ?>"></div>
+                </div>
+            </div>
+        </details>
+
+        <button type="submit" class="btn btn-primary" style="margin-top:12px">💾 Guardar Ajustes</button>
+    </div>
+</div>
+
+<!-- ===== TAB: Estadísticas ===== -->
+<div class="tab-content" id="tab-estadisticas">
+    <div class="card">
+        <h2>📈 Estadísticas</h2>
+        <div id="estadisticas-container">
+            <p style="color:var(--text-muted);text-align:center;padding:30px">Cargando estadísticas...</p>
+        </div>
+    </div>
+</div>
+
+<!-- ===== TAB: Registro (Logs) ===== -->
+<div class="tab-content" id="tab-registro">
+    <div class="card">
+        <h2>📋 Registro de actividad</h2>
+        <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:12px">
+            Últimas 200 líneas del registro del bot. Por curiosidad — no contiene datos sensibles.
+        </p>
+        <div id="registro-container">
+            <pre id="registro-pre" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;max-height:500px;overflow:auto;font-family:monospace;font-size:.72rem;white-space:pre-wrap;color:var(--text-muted)">Cargando...</pre>
+        </div>
+    </div>
+</div>
+
 </form>
 <script>
 var _csrf = <?php echo json_encode(generateCsrfToken()); ?>;
@@ -976,11 +1133,148 @@ function loadEstadosHistory() {
 // ── Helper ──
 function escHtml(s) { var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
+// ── Clientes ──
+function loadClientes() {
+    fetch('api/clientes.php?action=list').then(r=>r.json()).then(d=>{
+        if (!d.ok) return;
+        var html = '';
+        if (d.leads.length === 0) {
+            html = '<p style="color:var(--text-muted);text-align:center;padding:20px">No hay leads registrados todavía.</p>';
+        } else {
+            html = '<div style="display:flex;gap:8px;margin-bottom:12px"><span style="color:var(--text-muted);font-size:.8rem">'+d.total+' leads</span></div>';
+            html += '<table class="memory-table" style="font-size:.82rem"><thead><tr><th>Fecha</th><th>Teléfono</th><th>Línea</th><th>Confianza</th><th>¿Llegó?</th></tr></thead><tbody>';
+            d.leads.forEach(function(l){
+                var arrivedIcon = l.arrived ? '✅ Sí' : '❌ No';
+                var arrivedBtn = l.arrived
+                    ? '<button onclick="markLeadArrived(\''+escHtml(l.thread_id)+'\',false)" class="btn btn-sm" style="background:var(--ok-bg);color:var(--ok)">✅ Sí</button>'
+                    : '<button onclick="markLeadArrived(\''+escHtml(l.thread_id)+'\',true)" class="btn btn-sm btn-warning">Marcar llegó</button>';
+                var confColor = parseInt(l.confidence) > 80 ? 'color:var(--ok)' : (parseInt(l.confidence) > 50 ? 'color:var(--warn)' : 'color:var(--text-muted)');
+                html += '<tr><td class="mono">'+escHtml(l.ts)+'</td><td class="mono">'+escHtml(l.phone)+'</td><td>'+escHtml(l.line_label)+'</td><td style="'+confColor+'">'+l.confidence+'</td><td>'+arrivedBtn+'</td></tr>';
+            });
+            html += '</tbody></table>';
+        }
+        document.getElementById('clientes-table-container').innerHTML = html;
+    });
+}
+function markLeadArrived(threadId, arrived) {
+    var fd = new FormData(); fd.append('csrf_token', _csrf); fd.append('thread_id', threadId);
+    if (arrived) fd.append('arrived', '1'); else fd.append('arrived', '0');
+    fetch('api/clientes.php?action=mark_arrived', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        if (d.ok) loadClientes(); else alert('Error: '+(d.error||'Desconocido'));
+    });
+}
+
+// ── Mensajes ──
+var currentChatThreadId = '';
+function loadMensajes() { searchThreads(); }
+function searchThreads() {
+    var q = document.getElementById('msg-search').value.trim();
+    fetch('api/mensajes.php?action=threads&search='+encodeURIComponent(q)).then(r=>r.json()).then(d=>{
+        if (!d.ok) return;
+        var html = '';
+        if (d.threads.length === 0) {
+            html = '<p style="color:var(--text-muted);text-align:center;padding:20px">No se encontraron conversaciones.</p>';
+        } else {
+            html = '<table class="memory-table" style="font-size:.82rem"><thead><tr><th>Teléfono</th><th>Mensajes</th><th>Último</th><th>Acción</th></tr></thead><tbody>';
+            d.threads.forEach(function(t){
+                var phoneDisp = t.phone.length > 6 ? '...' + t.phone.substring(t.phone.length-6) : t.phone;
+                html += '<tr><td class="mono"><strong>'+escHtml(phoneDisp)+'</strong></td><td>'+t.count+'</td><td style="font-size:.75rem;color:var(--text-muted)">'+escHtml(t.last_msg)+'</td>';
+                html += '<td><button onclick="openChat(\''+escHtml(t.thread_id)+'\')" class="btn btn-sm btn-primary">Ver</button></td></tr>';
+            });
+            html += '</tbody></table>';
+        }
+        document.getElementById('mensajes-threads-container').innerHTML = html;
+    });
+}
+function openChat(threadId) {
+    currentChatThreadId = threadId;
+    document.getElementById('chat-modal').style.display = 'block';
+    document.getElementById('chat-messages').innerHTML = '<p style="color:var(--text-muted)">Cargando...</p>';
+    fetch('api/mensajes.php?action=conversation&thread_id='+encodeURIComponent(threadId)).then(r=>r.json()).then(d=>{
+        if (!d.ok) return;
+        var html = '';
+        d.conversation.forEach(function(m){
+            var dt = m.ts ? new Date(m.ts).toLocaleString('es-ES') : '';
+            html += '<div style="margin-bottom:10px;padding:8px 12px;background:var(--bg-surface);border-radius:var(--radius-sm);font-size:.82rem">';
+            if (m.user_msg) html += '<div style="color:var(--info);margin-bottom:2px"><strong>👤 Cliente:</strong> '+escHtml(m.user_msg)+'</div>';
+            if (m.bot_reply) html += '<div style="color:var(--ok)"><strong>🤖 Bot:</strong> '+escHtml(m.bot_reply)+'</div>';
+            html += '<div style="font-size:.7rem;color:var(--text-muted);margin-top:2px">'+dt+'</div></div>';
+        });
+        document.getElementById('chat-messages').innerHTML = html || '<p style="color:var(--text-muted)">Conversación vacía</p>';
+    });
+}
+function closeChat() { document.getElementById('chat-modal').style.display = 'none'; currentChatThreadId = ''; }
+function markAsLeadFromChat() {
+    if (!currentChatThreadId) return;
+    var fd = new FormData(); fd.append('thread_id', currentChatThreadId);
+    fetch('api/mensajes.php?action=mark_lead', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        alert(d.ok ? 'Conversación marcada como lead ✅' : 'Error: '+(d.error||'Desconocido'));
+        closeChat();
+    });
+}
+
+// ── Estadísticas ──
+function loadEstadisticas() {
+    fetch('api/stats.php').then(r=>r.json()).then(d=>{
+        if (!d.ok) return;
+        var s = d.stats;
+        var html = '';
+        html += '<div class="stats-grid">';
+        html += '<div class="stat-card"><div class="stat-num" style="color:var(--info)">'+s.conversations_total+'</div><div class="stat-label">Conversaciones totales</div></div>';
+        html += '<div class="stat-card"><div class="stat-num" style="color:var(--accent)">'+s.conversations_today+'</div><div class="stat-label">Conversaciones hoy</div></div>';
+        html += '<div class="stat-card"><div class="stat-num" style="color:var(--ok)">'+s.leads_total+'</div><div class="stat-label">Leads notificados</div></div>';
+        html += '<div class="stat-card"><div class="stat-num" style="color:var(--money)">'+s.leads_today+'</div><div class="stat-label">Leads hoy</div></div>';
+        html += '<div class="stat-card"><div class="stat-num" style="color:#a78bfa">'+s.leads_arrived+'</div><div class="stat-label">Leads reales (llegaron)</div></div>';
+        html += '<div class="stat-card"><div class="stat-num" style="color:var(--accent2)">'+s.leads_pending+'</div><div class="stat-label">Pendientes de confirmar</div></div>';
+        html += '</div>';
+
+        // Arrival rate
+        html += '<div style="margin-top:20px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center">';
+        html += '<div style="font-size:.82rem;color:var(--text-muted);margin-bottom:4px">Tasa de llegada</div>';
+        html += '<div style="font-size:2rem;font-weight:800;color:'+(s.arrival_rate>=50?'var(--ok)':(s.arrival_rate>=25?'var(--warn)':'var(--danger)'))+'">'+s.arrival_rate+'%</div>';
+        html += '<div style="font-size:.75rem;color:var(--text-muted)">'+s.leads_arrived+' de '+s.leads_total+' leads llegaron</div>';
+        html += '</div>';
+
+        // Simple graph (CSS bar chart)
+        var maxVal = Math.max.apply(null, d.stats.daily_graph.map(function(g){ return Math.max(g.conversations, g.leads); })) || 1;
+        html += '<div style="margin-top:20px"><h3 style="margin-bottom:10px">📊 Últimos 7 días</h3>';
+        html += '<div style="display:flex;gap:4px;align-items:flex-end;height:120px;padding:0 4px">';
+        d.stats.daily_graph.forEach(function(g){
+            var convH = (g.conversations/maxVal*100).toFixed(0);
+            var leadH = (g.leads/maxVal*100).toFixed(0);
+            html += '<div style="flex:1;text-align:center;font-size:.65rem;color:var(--text-muted)">';
+            html += '<div style="background:var(--info);width:100%;height:'+convH+'%;border-radius:2px 2px 0 0;margin-bottom:1px"></div>';
+            html += '<div style="background:var(--accent);width:100%;height:'+leadH+'%;border-radius:2px 2px 0 0"></div>';
+            html += g.date+'</div>';
+        });
+        html += '</div><div style="display:flex;gap:16px;margin-top:4px;font-size:.7rem;color:var(--text-muted)"><span>■ Conversaciones</span><span style="color:var(--accent)">■ Leads</span></div></div>';
+
+        document.getElementById('estadisticas-container').innerHTML = html;
+    });
+}
+
+// ── Registro (Logs) ──
+function loadRegistro() {
+    fetch('api/logs.php').then(r=>r.json()).then(d=>{
+        if (d.ok) {
+            document.getElementById('registro-pre').textContent = d.log || '(sin registros)';
+        } else {
+            document.getElementById('registro-pre').textContent = 'Error al cargar registros';
+        }
+        var pre = document.getElementById('registro-pre');
+        if (pre) pre.scrollTop = pre.scrollHeight;
+    });
+}
+
 // ── Load data when tabs become active ──
 var tabLoaders = {
     'tab-lineas': loadLines,
     'tab-chicas': loadGirls,
-    'tab-estados': function() { loadEstadosConfig(); loadEstadosHistory(); }
+    'tab-estados': function() { loadEstadosConfig(); loadEstadosHistory(); },
+    'tab-clientes': loadClientes,
+    'tab-mensajes': loadMensajes,
+    'tab-estadisticas': loadEstadisticas,
+    'tab-registro': loadRegistro,
 };
 var loadedTabs = {};
 document.querySelectorAll('#tabNav button[data-tab]').forEach(function(btn){

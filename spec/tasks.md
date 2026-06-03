@@ -605,12 +605,14 @@
 
 ### FASE 5 — Clientes + Mensajes + Ajustes + Stats + Logs
 
-- [ ] T5.1 — Sección Clientes: leads con arrived marking, guía Telegram.
-- [ ] T5.2 — Sección Mensajes: search por teléfono, vista chat, marcar lead.
-- [ ] T5.3 — Sección Ajustes: Delays, Variantes, Follow-up, Reminder agrupados.
-- [ ] T5.4 — Sección Estadísticas: métricas leads notificados vs reales.
-- [ ] T5.5 — Sección Registro: logs sanitizados.
-- [ ] T5.6 — Ocultar IA para clientes (solo admin).
+- [x] T5.1 — Sección Clientes: leads con arrived marking, guía Telegram.
+- [x] T5.2 — Sección Mensajes: search por teléfono, vista chat, marcar lead.
+- [x] T5.3 — Sección Ajustes: Delays, Variantes, Follow-up, Reminder agrupados.
+- [x] T5.4 — Sección Estadísticas: métricas leads notificados vs reales.
+- [x] T5.5 — Sección Registro: logs sanitizados.
+- [x] T5.6 — Ocultar IA para clientes (solo admin — client.php no tiene tab IA).
+
+**FASE 5 COMPLETADA.**
 
 ### FASE 6 — Onboarding + Cron Jobs + Pulido
 
