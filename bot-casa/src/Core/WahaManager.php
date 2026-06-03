@@ -5,170 +5,82 @@ declare(strict_types=1);
 namespace WasapBot\Core;
 
 /**
- * WahaManager — Gestión de instancias WAHA para líneas WhatsApp.
+ * WahaManager — Gestión de instancias WAHA vía HTTP API.
  *
- * Operaciones:
- *   - Crear/eliminar instancias WAHA vía SSH al servidor WAHA
- *   - Obtener QR de vinculación
- *   - Verificar estado de sesión
- *   - Enviar mensaje de prueba
- *
- * El servidor WAHA debe ser accesible vía SSH (preferiblemente Tailscale).
- * También expone la API HTTP de WAHA para consultas de estado.
+ * Dos fuentes:
+ *   1. WAHA Manager API (http://waha-server/wahaapi/) — CRUD de contenedores docker
+ *   2. WAHA HTTP API (http://waha-server:{port}/api/...) — gestión de sesiones
  */
 final class WahaManager
 {
     private string $wahaServer;
     private string $wahaApiKey;
-    private int $basePort;
+    private string $managerBaseUrl;
     private string $webhookUrl;
 
-    /** @var array<string, mixed> */
-    private array $config;
-
-    /**
-     * @param array<string, mixed> $config Config con claves:
-     *   waha_server: string — IP/hostname del servidor WAHA (ej: "100.117.92.74")
-     *   waha_api_key: string — API key global de WAHA
-     *   waha_base_port_start: int — Puerto inicial (default 3010, va incrementando)
-     *   webhook_url: string — URL del webhook (ej: "https://lamami.online/control/bot-casa/public/webhook.php")
-     */
     public function __construct(array $config = [])
     {
-        $this->wahaServer  = (string) ($config['waha_server'] ?? '100.117.92.74');
-        $this->wahaApiKey  = (string) ($config['waha_api_key'] ?? 'local321');
-        $this->basePort    = (int) ($config['waha_base_port_start'] ?? 3010);
-        $this->webhookUrl  = (string) ($config['webhook_url'] ?? '');
-        $this->config      = $config;
+        $this->wahaServer    = (string) ($config['waha_server'] ?? '100.117.92.74');
+        $this->wahaApiKey    = (string) ($config['waha_api_key'] ?? 'local321');
+        $this->managerBaseUrl = "http://{$this->wahaServer}/wahaapi";
+        $this->webhookUrl    = (string) ($config['webhook_url'] ?? 'https://lamami.online/control/bot-casa/public/webhook.php');
     }
 
     // ─────────────────────────────────────────────────────────
-    //  SSH Operations (stubs — require WAHA server access)
+    //  Manager API (container CRUD)
     // ─────────────────────────────────────────────────────────
 
-    /**
-     * Crear una nueva instancia WAHA para una línea.
-     * Asigna un puerto único, configura el webhook y arranca el contenedor.
-     *
-     * @param string $phoneNumber Número de teléfono (last9)
-     * @param int    $userId      ID del usuario propietario
-     * @return array{ok: bool, port?: int, error?: string}
-     */
-    public function createInstance(string $phoneNumber, int $userId): array
+    /** @return array */
+    public function getStatus(): array
     {
-        // Asignar puerto único basado en phoneNumber
-        $port = $this->basePort + (int) (crc32($phoneNumber) % 1000);
-
-        $instanceDir = "/srv/waha_{$port}";
-
-        // Construir docker-compose.yml
-        $compose = <<<YAML
-services:
-  waha{$port}:
-    image: devlikeapro/waha:latest
-    container_name: waha{$port}
-    restart: unless-stopped
-    ports:
-      - "{$port}:3000"
-    pids_limit: -1
-    ulimits:
-      nproc: 65535
-      nofile:
-        soft: 65535
-        hard: 65535
-    security_opt:
-      - seccomp=unconfined
-    environment:
-      - WAHA_API_KEY={$this->wahaApiKey}
-      - WHATSAPP_DEFAULT_ENGINE=GOWS
-      - TZ=Europe/Madrid
-      - WAHA_DASHBOARD_USERNAME=admin
-      - WAHA_DASHBOARD_PASSWORD=admin123
-      - WHATSAPP_SWAGGER_USERNAME=admin
-      - WHATSAPP_SWAGGER_PASSWORD=admin123
-      - WHATSAPP_HOOK_URL={$this->webhookUrl}
-      - WHATSAPP_HOOK_EVENTS=message
-    volumes:
-      - ./data:/app/data
-      - ./sessions:/app/.sessions
-      - ./media:/app/.media
-YAML;
-
-        $commands = [
-            "mkdir -p {$instanceDir}",
-            "echo " . escapeshellarg($compose) . " > {$instanceDir}/docker-compose.yml",
-            "cd {$instanceDir} && docker compose down 2>/dev/null; docker compose up -d",
-        ];
-
-        $cmd = 'ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ' . escapeshellarg($this->wahaServer)
-             . ' ' . escapeshellarg(implode(' && ', $commands));
-
-        exec($cmd . ' 2>&1', $output, $exitCode);
-
-        if ($exitCode !== 0) {
-            return ['ok' => false, 'error' => 'SSH failed: ' . implode("\n", $output)];
-        }
-
-        // Configurar sesión default con webhook
-        $this->configureSession($port, 'default', $this->webhookUrl);
-
-        return ['ok' => true, 'port' => $port];
+        return $this->managerGet('status');
     }
 
-    /**
-     * Configurar la sesión WAHA con el webhook.
-     */
-    private function configureSession(int $port, string $session, string $webhookUrl): void
+    /** @return array */
+    public function getNextPort(): int
     {
-        $baseUrl = "http://{$this->wahaServer}:{$port}";
-        $apiKey  = $this->wahaApiKey;
-
-        // PUT /api/sessions/{session}
-        $payload = json_encode([
-            'name'   => $session,
-            'config' => [
-                'webhooks' => [
-                    ['url' => $webhookUrl, 'events' => ['message']],
-                ],
-            ],
-        ]);
-
-        $ch = curl_init("{$baseUrl}/api/sessions/{$session}");
-        curl_setopt_array($ch, [
-            CURLOPT_CUSTOMREQUEST  => 'PUT',
-            CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_HTTPHEADER     => [
-                'Accept: application/json',
-                'Content-Type: application/json',
-                "X-Api-Key: {$apiKey}",
-            ],
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 10,
-        ]);
-        curl_exec($ch);
-        curl_close($ch);
+        $s = $this->getStatus();
+        return (int) ($s['next_port'] ?? 3020);
     }
 
-    /**
-     * Obtener QR de vinculación para una línea.
-     *
-     * @return array{ok: bool, qr_base64?: string, error?: string}
-     */
+    /** @return array */
+    public function createInstance(int $port = 0): array
+    {
+        return $this->managerPost('create', ['port' => $port > 0 ? $port : $this->getNextPort()]);
+    }
+
+    /** @return array */
+    public function deleteInstance(int $port): array
+    {
+        return $this->managerPost('delete', ['port' => $port]);
+    }
+
+    /** @return array */
+    public function resetInstance(int $port): array
+    {
+        return $this->managerPost('reset', ['port' => $port]);
+    }
+
+    /** @return array */
+    public function startSession(int $port): array
+    {
+        return $this->managerPost('start_session', ['port' => $port]);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    //  WAHA HTTP API (session management)
+    // ─────────────────────────────────────────────────────────
+
+    /** @return array{ok: bool, qr_base64?: string, error?: string} */
     public function getQrCode(int $port): array
     {
-        $baseUrl = "http://{$this->wahaServer}:{$port}";
-        $apiKey  = $this->wahaApiKey;
-
-        $ch = curl_init("{$baseUrl}/api/default/auth/qr?format=image");
+        $url = "http://{$this->wahaServer}:{$port}/api/default/auth/qr?format=image";
+        $ch = curl_init($url);
         curl_setopt_array($ch, [
-            CURLOPT_HTTPHEADER     => [
-                'Accept: application/json',
-                "X-Api-Key: {$apiKey}",
-            ],
+            CURLOPT_HTTPHEADER => ['Accept: application/json', "X-Api-Key: {$this->wahaApiKey}"],
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_TIMEOUT => 10,
         ]);
-
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
@@ -176,36 +88,23 @@ YAML;
         if ($httpCode !== 200 || $response === false) {
             return ['ok' => false, 'error' => "HTTP {$httpCode}: Failed to get QR"];
         }
-
         $data = json_decode($response, true);
         if (!is_array($data) || empty($data['data'])) {
             return ['ok' => false, 'error' => 'No QR data in response'];
         }
-
-        // Devolver el base64 directamente (el frontend lo convierte a imagen)
         return ['ok' => true, 'qr_base64' => (string) $data['data']];
     }
 
-    /**
-     * Verificar el estado de una sesión WAHA.
-     *
-     * @return array{ok: bool, status?: string, error?: string}
-     */
+    /** @return array{ok: bool, status?: string, phone?: string, error?: string} */
     public function checkStatus(int $port): array
     {
-        $baseUrl = "http://{$this->wahaServer}:{$port}";
-        $apiKey  = $this->wahaApiKey;
-
-        $ch = curl_init("{$baseUrl}/api/sessions/default");
+        $url = "http://{$this->wahaServer}:{$port}/api/sessions/default";
+        $ch = curl_init($url);
         curl_setopt_array($ch, [
-            CURLOPT_HTTPHEADER     => [
-                'Accept: application/json',
-                "X-Api-Key: {$apiKey}",
-            ],
+            CURLOPT_HTTPHEADER => ['Accept: application/json', "X-Api-Key: {$this->wahaApiKey}"],
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 5,
+            CURLOPT_TIMEOUT => 5,
         ]);
-
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
@@ -213,73 +112,107 @@ YAML;
         if ($httpCode !== 200 || $response === false) {
             return ['ok' => false, 'status' => 'down', 'error' => "HTTP {$httpCode}"];
         }
-
         $data = json_decode($response, true);
-        if (!is_array($data)) {
-            return ['ok' => true, 'status' => 'unknown'];
-        }
+        if (!is_array($data)) return ['ok' => true, 'status' => 'unknown'];
 
-        $status = (string) ($data['status'] ?? $data['me']['status'] ?? 'unknown');
-        return ['ok' => true, 'status' => $status];
+        $status = (string) ($data['status'] ?? 'unknown');
+        $phone  = isset($data['me']['id']) ? str_replace('@c.us', '', (string) $data['me']['id']) : '';
+        return ['ok' => true, 'status' => $status, 'phone' => $phone];
     }
 
-    /**
-     * Enviar un mensaje de prueba.
-     *
-     * @return array{ok: bool, error?: string}
-     */
-    public function sendTestMessage(int $port, string $chatId, string $text): array
+    /** @return array{ok: bool, error?: string} */
+    public function configureSession(int $port, string $webhookUrl): array
     {
-        $baseUrl = "http://{$this->wahaServer}:{$port}";
-        $apiKey  = $this->wahaApiKey;
-
+        $url = "http://{$this->wahaServer}:{$port}/api/sessions/default";
         $payload = json_encode([
-            'session' => 'default',
-            'chatId'  => $chatId,
-            'text'    => $text,
+            'name' => 'default',
+            'config' => ['webhooks' => [['url' => $webhookUrl, 'events' => ['message']]]],
         ]);
-
-        $ch = curl_init("{$baseUrl}/api/sendText");
+        $ch = curl_init($url);
         curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_HTTPHEADER     => [
-                'Accept: application/json',
-                'Content-Type: application/json',
-                "X-Api-Key: {$apiKey}",
-            ],
+            CURLOPT_CUSTOMREQUEST => 'PUT',
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => ['Accept: application/json', 'Content-Type: application/json', "X-Api-Key: {$this->wahaApiKey}"],
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_TIMEOUT => 10,
         ]);
-
-        $response = curl_exec($ch);
+        curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-
-        if ($httpCode < 200 || $httpCode >= 300) {
-            return ['ok' => false, 'error' => "HTTP {$httpCode}"];
-        }
-
-        return ['ok' => true];
+        return ['ok' => $httpCode >= 200 && $httpCode < 300];
     }
 
-    /**
-     * Eliminar una instancia WAHA.
-     *
-     * @return array{ok: bool, error?: string}
-     */
-    public function deleteInstance(int $port): array
+    /** @return array{ok: bool, error?: string} */
+    public function sendTestMessage(int $port, string $chatId, string $text): array
     {
-        $instanceDir = "/srv/waha_{$port}";
-        $cmd = 'ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ' . escapeshellarg($this->wahaServer)
-             . ' ' . escapeshellarg("cd {$instanceDir} && docker compose down && rm -rf {$instanceDir}");
+        $url = "http://{$this->wahaServer}:{$port}/api/sendText";
+        $payload = json_encode(['session' => 'default', 'chatId' => $chatId, 'text' => $text]);
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => ['Accept: application/json', 'Content-Type: application/json', "X-Api-Key: {$this->wahaApiKey}"],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 15,
+        ]);
+        curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        return ['ok' => $httpCode >= 200 && $httpCode < 300, 'http_code' => $httpCode];
+    }
 
-        exec($cmd . ' 2>&1', $output, $exitCode);
+    /** @return array List of available WAHA ports with status */
+    public function scanInstances(): array
+    {
+        $status = $this->getStatus();
+        $ports = [];
 
-        if ($exitCode !== 0) {
-            return ['ok' => false, 'error' => implode("\n", $output)];
+        if (!empty($status['api_ports'])) {
+            foreach ($status['api_ports'] as $ap) {
+                $ports[(int)$ap['port']] = [
+                    'port' => (int)$ap['port'],
+                    'sessions' => $ap['sessions'] ?? [],
+                    'working' => !empty($ap['sessions']),
+                    'phone' => $ap['sessions'][0]['phone'] ?? '',
+                ];
+            }
         }
+        return $ports;
+    }
 
-        return ['ok' => true];
+    // ─────────────────────────────────────────────────────────
+    //  Internal HTTP helpers
+    // ─────────────────────────────────────────────────────────
+
+    private function managerGet(string $action): array
+    {
+        $url = "{$this->managerBaseUrl}/?action={$action}";
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_HTTPHEADER => ['Accept: application/json', "X-Api-Key: {$this->wahaApiKey}"],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 10,
+        ]);
+        $resp = curl_exec($ch);
+        curl_close($ch);
+        $data = @json_decode($resp, true);
+        return is_array($data) ? $data : ['ok' => false, 'error' => 'Invalid response'];
+    }
+
+    private function managerPost(string $action, array $fields): array
+    {
+        $url = "{$this->managerBaseUrl}/?action={$action}";
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => http_build_query($fields),
+            CURLOPT_HTTPHEADER => ['Accept: application/json', "X-Api-Key: {$this->wahaApiKey}"],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 15,
+        ]);
+        $resp = curl_exec($ch);
+        curl_close($ch);
+        $data = @json_decode($resp, true);
+        return is_array($data) ? $data : ['ok' => false, 'error' => 'Invalid response: ' . substr((string)$resp, 0, 200)];
     }
 }

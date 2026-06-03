@@ -2,8 +2,8 @@
 /**
  * api/lines.php — CRUD de líneas WhatsApp para bot-casa multi-usuario.
  *
- * Llamado vía AJAX desde client.php.
- * Requiere sesión autenticada.
+ * Usa WahaManager (HTTP) para operaciones reales con WAHA.
+ * Puerto inicial para nuevas líneas: 3020 (las existentes 3000-3011 se respetan).
  */
 declare(strict_types=1);
 
@@ -22,39 +22,7 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $action = (string) ($_GET['action'] ?? 'list');
 $userId = (int) ($_SESSION['user_id'] ?? 0);
 $isAdmin = ($_SESSION['role'] ?? '') === 'admin';
-
-// Admin suplantar support
-if ($isAdmin && !empty($_SESSION['suplantar_user_id'])) {
-    $userId = (int) $_SESSION['suplantar_user_id'];
-}
-
-// ── CSRF protection for POST requests ──
-function requireValidCsrf(): void {
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') return;
-    $token = (string) ($_POST['csrf_token'] ?? '');
-    if ($token === '') { http_response_code(403); echo json_encode(['ok'=>false,'error'=>'CSRF token required']); exit; }
-    $secretFile = WASAPBOT_ROOT . '/data/.csrf_secret';
-    $secret = '';
-    if (file_exists($secretFile)) {
-        $secret = trim((string) @file_get_contents($secretFile));
-    }
-    if (strlen($secret) < 32) {
-        $secret = bin2hex(random_bytes(32));
-        $dir = dirname($secretFile);
-        if (!is_dir($dir)) @mkdir($dir, 0700, true);
-        @file_put_contents($secretFile, $secret, LOCK_EX);
-        @chmod($secretFile, 0600);
-    }
-    $realUserId = (int) ($_SESSION['user_id'] ?? 0);
-    $current = hash_hmac('sha256', $realUserId . '|' . date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
-    if (hash_equals($current, $token)) return;
-    $prevSlot = max(0, floor((int) date('i') / 10) - 1);
-    $previous = hash_hmac('sha256', $realUserId . '|' . date('Y-m-d-H') . $prevSlot, $secret);
-    if (hash_equals($previous, $token)) return;
-    http_response_code(403);
-    echo json_encode(['ok'=>false,'error'=>'CSRF token invalid']);
-    exit;
-}
+if ($isAdmin && !empty($_SESSION['suplantar_user_id'])) $userId = (int) $_SESSION['suplantar_user_id'];
 
 $linesFile = WASAPBOT_ROOT . '/data/users/' . $userId . '/lines.json';
 $linesMapFile = WASAPBOT_ROOT . '/data/lines_map.json';
@@ -90,26 +58,31 @@ function removeLineMap(string $last9): void {
     @file_put_contents($linesMapFile, json_encode($map, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE)."\n", LOCK_EX);
 }
 
-header('Content-Type: application/json; charset=utf-8');
+$wahaCfg = [
+    'waha_server' => '100.117.92.74',
+    'waha_api_key' => 'local321',
+    'webhook_url' => 'https://lamami.online/control/bot-casa/public/webhook.php',
+];
+$wm = new \WasapBot\Core\WahaManager($wahaCfg);
 
-// Validate CSRF for all POST requests
-if ($method === 'POST') requireValidCsrf();
+header('Content-Type: application/json; charset=utf-8');
 
 try {
     switch ($action) {
+
         case 'list':
             $lines = loadLines();
-            // Check status for each line
-            $wahaCfg = [
-                'waha_server' => $_ENV['WAHA_SERVER'] ?? '100.117.92.74',
-                'waha_api_key' => $_ENV['WAHA_API_KEY'] ?? 'local321',
-            ];
-            $wm = new \WasapBot\Core\WahaManager($wahaCfg);
+            // Cross-reference with real WAHA status
+            $realStatus = $wm->scanInstances();
             foreach ($lines as &$line) {
                 $port = (int) ($line['port'] ?? 0);
-                if ($port > 0) {
-                    $status = $wm->checkStatus($port);
-                    $line['health_status'] = $status['status'] ?? 'unknown';
+                if ($port > 0 && isset($realStatus[$port])) {
+                    $rs = $realStatus[$port];
+                    $sess = $rs['sessions'][0] ?? [];
+                    $line['health_status'] = $sess['status'] ?? 'unknown';
+                    $line['health_phone'] = $rs['phone'] ?? '';
+                } elseif ($port > 0) {
+                    $line['health_status'] = 'down';
                 } else {
                     $line['health_status'] = 'pending';
                 }
@@ -118,10 +91,18 @@ try {
             echo json_encode(['ok' => true, 'lines' => $lines]);
             break;
 
+        case 'available':
+            // Show available ports for new lines (3020+ and any free)
+            $status = $wm->getStatus();
+            $aval = ['next_port' => $status['next_port'] ?? 3020, 'api_ports' => $status['api_ports'] ?? []];
+            echo json_encode(['ok' => true, 'available' => $aval]);
+            break;
+
         case 'add':
             if ($method !== 'POST') { echo json_encode(['ok'=>false,'error'=>'POST required']); break; }
             $phone = trim((string)($_POST['phone'] ?? ''));
             $label = trim((string)($_POST['label'] ?? ''));
+            $port  = (int) ($_POST['port'] ?? 0);
             if ($phone === '') { echo json_encode(['ok'=>false,'error'=>'Número requerido']); break; }
 
             $last9 = preg_replace('/[^0-9]/', '', $phone);
@@ -129,37 +110,42 @@ try {
             $last9 = mb_substr($last9, -9);
 
             $lines = loadLines();
+            // Check if this phone is already assigned
+            foreach ($lines as $l) { if (((string)($l['last9']??'') === $last9)) { echo json_encode(['ok'=>false,'error'=>'Este número ya está configurado.']); exit; } }
+            // Check lines_map for global duplicates
+            $globalMap = [];
+            if (file_exists($linesMapFile)) {
+                $globalMap = @json_decode((string)@file_get_contents($linesMapFile), true);
+                if (!is_array($globalMap)) $globalMap = [];
+            }
+            if (isset($globalMap[$last9])) { echo json_encode(['ok'=>false,'error'=>'Este número ya está en uso por otro usuario.']); exit; }
+
+            // If no port specified, get next available
+            if ($port <= 0) {
+                $status = $wm->getStatus();
+                $port = (int) ($status['next_port'] ?? 3020);
+            }
+
+            // Create WAHA instance
+            $result = $wm->createInstance($port);
+
             $nextId = count($lines) > 0 ? max(array_column($lines, 'id')) + 1 : 1;
-
-            $wahaCfg = [
-                'waha_server' => $_ENV['WAHA_SERVER'] ?? '100.117.92.74',
-                'waha_api_key' => $_ENV['WAHA_API_KEY'] ?? 'local321',
-                'webhook_url' => 'https://lamami.online/control/bot-casa/public/webhook.php',
-            ];
-            $wm = new \WasapBot\Core\WahaManager($wahaCfg);
-            $result = $wm->createInstance($last9, $userId);
-
-            $port = $result['port'] ?? 0;
             $line = [
                 'id' => $nextId,
                 'last9' => $last9,
                 'phone' => $phone,
                 'label' => $label !== '' ? $label : ('Línea ' . $nextId),
-                'port' => $port,
+                'port' => $result['port'] ?? $port,
+                'container_port' => $port,
                 'created_at' => date('c'),
-                'health_status' => 'starting',
+                'health_status' => $result['ok'] ? 'starting' : 'error',
+                'error' => $result['ok'] ? '' : ($result['error'] ?? ''),
             ];
-
-            if (!$result['ok']) {
-                $line['port'] = 0;
-                $line['health_status'] = 'error';
-                $line['error'] = $result['error'] ?? 'Failed to create instance';
-            }
 
             $lines[] = $line;
             saveLines($lines);
-            if ($port > 0) updateLineMap($last9, $userId);
-            echo json_encode(['ok' => true, 'line' => $line]);
+            if ($result['ok']) updateLineMap($last9, $userId);
+            echo json_encode(['ok' => $result['ok'], 'line' => $line, 'result' => $result]);
             break;
 
         case 'qr':
@@ -167,11 +153,15 @@ try {
             $lines = loadLines();
             $found = null;
             foreach ($lines as $l) { if ((int)($l['id']??0) === $lineId) { $found = $l; break; } }
-            if (!$found || empty($found['port'])) { echo json_encode(['ok'=>false,'error'=>'Línea no encontrada']); break; }
+            if (!$found || empty($found['port'])) { echo json_encode(['ok'=>false,'error'=>'Línea no encontrada o sin puerto']); break; }
 
-            $wahaCfg = ['waha_server'=>$_ENV['WAHA_SERVER']??'100.117.92.74','waha_api_key'=>$_ENV['WAHA_API_KEY']??'local321'];
-            $wm = new \WasapBot\Core\WahaManager($wahaCfg);
-            $qr = $wm->getQrCode((int) $found['port']);
+            $port = (int) $found['port'];
+            $qr = $wm->getQrCode($port);
+
+            // Add warning about expiration
+            if ($qr['ok']) {
+                $qr['warning'] = '⚠️ El QR caduca en 30-60 segundos. Ten el móvil listo para escanear.';
+            }
             echo json_encode($qr);
             break;
 
@@ -188,22 +178,24 @@ try {
 
             $digits = preg_replace('/[^0-9]/', '', $testPhone);
             $chatId = $digits . '@c.us';
-
-            $wahaCfg = ['waha_server'=>$_ENV['WAHA_SERVER']??'100.117.92.74','waha_api_key'=>$_ENV['WAHA_API_KEY']??'local321'];
-            $wm = new \WasapBot\Core\WahaManager($wahaCfg);
             $result = $wm->sendTestMessage((int) $found['port'], $chatId, '✅ Mensaje de prueba desde bot-casa');
             echo json_encode($result);
             break;
 
         case 'status':
             $lines = loadLines();
-            $wahaCfg = ['waha_server'=>$_ENV['WAHA_SERVER']??'100.117.92.74','waha_api_key'=>$_ENV['WAHA_API_KEY']??'local321'];
-            $wm = new \WasapBot\Core\WahaManager($wahaCfg);
+            $realStatus = $wm->scanInstances();
             $statuses = [];
             foreach ($lines as $line) {
                 $port = (int) ($line['port'] ?? 0);
-                $s = $port > 0 ? $wm->checkStatus($port) : ['ok'=>false,'status'=>'pending'];
-                $statuses[(int)($line['id']??0)] = $s['status'] ?? 'unknown';
+                if ($port > 0 && isset($realStatus[$port])) {
+                    $s = $realStatus[$port]['sessions'][0] ?? [];
+                    $statuses[(int)($line['id']??0)] = $s['status'] ?? 'unknown';
+                } elseif ($port > 0) {
+                    $statuses[(int)($line['id']??0)] = 'down';
+                } else {
+                    $statuses[(int)($line['id']??0)] = 'pending';
+                }
             }
             echo json_encode(['ok' => true, 'statuses' => $statuses]);
             break;
@@ -218,37 +210,12 @@ try {
 
             $port = (int) ($found['port'] ?? 0);
             if ($port > 0) {
-                $wahaCfg = ['waha_server'=>$_ENV['WAHA_SERVER']??'100.117.92.74'];
-                $wm = new \WasapBot\Core\WahaManager($wahaCfg);
-                $wm->deleteInstance($port);
+                // Reset the instance (don't delete, just clean session)
+                $wm->resetInstance($port);
                 removeLineMap((string)($found['last9'] ?? ''));
             }
-
             array_splice($lines, $idx, 1);
             saveLines($lines);
-            echo json_encode(['ok' => true]);
-            break;
-
-        case 'start_session':
-            $lineId = (int) ($_GET['line_id'] ?? 0);
-            $lines = loadLines();
-            $found = null;
-            foreach ($lines as $l) { if ((int)($l['id']??0) === $lineId) { $found = $l; break; } }
-            if (!$found || empty($found['port'])) { echo json_encode(['ok'=>false,'error'=>'Línea no encontrada']); break; }
-
-            $port = (int) $found['port'];
-            $baseUrl = "http://" . ($_ENV['WAHA_SERVER']??'100.117.92.74') . ":{$port}";
-            $apiKey = $_ENV['WAHA_API_KEY'] ?? 'local321';
-
-            $ch = curl_init("{$baseUrl}/api/sessions/default/start");
-            curl_setopt_array($ch, [
-                CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => ['Accept: application/json', "X-Api-Key: {$apiKey}"],
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 10,
-            ]);
-            curl_exec($ch);
-            curl_close($ch);
             echo json_encode(['ok' => true]);
             break;
 
@@ -256,7 +223,7 @@ try {
             echo json_encode(['ok' => false, 'error' => 'Unknown action']);
     }
 } catch (\Throwable $e) {
-    error_log('lines.php error: ' . $e->getMessage());
+    error_log('[lines API] ' . $e->getMessage());
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Internal server error']);
 }

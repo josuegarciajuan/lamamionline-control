@@ -735,6 +735,7 @@ function dismissWizard() {
         <!-- Add form -->
         <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:20px">
             <h3 style="margin-bottom:10px">➕ Añadir línea</h3>
+            <p style="color:var(--text-muted);font-size:.75rem;margin-bottom:10px">Esto creará una nueva instancia WAHA en el servidor (puerto 3020+). Las líneas existentes (3000-3011) no se tocan.</p>
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
                 <div style="flex:2;min-width:160px">
                     <label style="font-size:.78rem;color:var(--text-muted)">Número de teléfono</label>
@@ -745,9 +746,10 @@ function dismissWizard() {
                     <input type="text" id="new-line-label" placeholder="Línea principal" style="width:100%">
                 </div>
                 <div>
-                    <button type="button" class="btn btn-primary" onclick="addLine()" style="white-space:nowrap">Añadir línea</button>
+                    <button type="button" class="btn btn-primary" onclick="addLine()" style="white-space:nowrap">Crear línea</button>
                 </div>
             </div>
+            <div id="add-line-status" style="margin-top:6px;font-size:.78rem;color:var(--text-muted)"></div>
         </div>
 
         <!-- Lines table -->
@@ -760,9 +762,11 @@ function dismissWizard() {
             <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);padding:24px;max-width:400px;text-align:center">
                 <h3>📱 Escanea el QR</h3>
                 <p style="color:var(--text-muted);font-size:.82rem;margin:8px 0">Abre WhatsApp → Ajustes → Vincular dispositivo</p>
+                <p style="color:var(--danger);font-size:.75rem;margin:4px 0">⚠️ El QR caduca en 30-60 segundos. Ten el móvil listo.</p>
                 <img id="qr-image" src="" style="max-width:280px;border-radius:8px;margin:12px auto" alt="QR Code">
                 <div id="qr-status" style="margin-top:8px;font-size:.85rem"></div>
-                <button type="button" class="btn btn-sm" style="margin-top:12px;background:var(--input-bg);color:var(--text-muted)" onclick="document.getElementById('qr-modal').style.display='none'">Cerrar</button>
+                <button type="button" class="btn btn-sm btn-primary" style="margin-top:4px" onclick="regenerateQR()">🔄 Regenerar QR</button>
+                <button type="button" class="btn btn-sm" style="margin-top:4px;background:var(--input-bg);color:var(--text-muted)" onclick="document.getElementById('qr-modal').style.display='none'">Cerrar</button>
             </div>
         </div>
 
@@ -1095,16 +1099,79 @@ function loadLines() {
         } else {
             html = '<table class="memory-table" style="font-size:.83rem"><thead><tr><th>Línea</th><th>Teléfono</th><th>Puerto</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
             d.lines.forEach(function(l) {
-                var statusIcon = {'up':'🟢 ONLINE','connecting':'🟡 CONECTANDO','starting':'🟡 ARRANCANDO','pending':'⚪ PENDIENTE','down':'🔴 CAÍDA'}[l.health_status] || '⚪ '+(l.health_status||'?');
-                html += '<tr><td><strong>'+escHtml(l.label)+'</strong></td><td class="mono">'+escHtml(l.last9||l.phone)+'</td><td>'+l.port+'</td><td>'+statusIcon+'</td>';
+                var st = l.health_status || '?';
+                var statusIcon = {'WORKING':'🟢 ONLINE','STARTING':'🟡 CONECTANDO','SCAN_QR':'📱 QR PENDIENTE','starting':'🟡 ARRANCANDO','down':'🔴 CAÍDA','pending':'⚪ PENDIENTE'}[st] || ('⚪ '+(st||'?'));
+                var phoneDisp = l.health_phone ? l.health_phone : (l.last9||l.phone);
+                html += '<tr><td><strong>'+escHtml(l.label)+'</strong></td><td class="mono">'+escHtml(phoneDisp)+'</td><td>'+l.port+'</td><td>'+statusIcon+'</td>';
                 html += '<td style="white-space:nowrap">';
                 html += '<button onclick="showQR('+l.id+')" class="btn btn-sm btn-primary" style="margin-right:3px">QR</button>';
                 html += '<button onclick="showTest('+l.id+')" class="btn btn-sm" style="background:var(--info);color:#fff;margin-right:3px">Test</button>';
+                if (st === 'WORKING') {
+                    html += '<button onclick="checkLineStatus('+l.id+')" class="btn btn-sm" style="background:var(--ok);color:#fff;margin-right:3px">✓</button>';
+                }
                 html += '<button onclick="deleteLine('+l.id+')" class="btn btn-sm btn-danger">🗑</button>';
                 html += '</td></tr>';
             });
             html += '</tbody></table>';
         }
+        document.getElementById('lines-container').innerHTML = html;
+    }).catch(function(){ document.getElementById('lines-container').innerHTML = '<p style="color:var(--danger)">Error al cargar líneas</p>'; });
+}
+function addLine() {
+    var phone = document.getElementById('new-line-phone').value.trim();
+    var label = document.getElementById('new-line-label').value.trim();
+    if (!phone) return alert('Introduce un número de teléfono');
+    var statusEl = document.getElementById('add-line-status');
+    statusEl.textContent = '⏳ Creando instancia WAHA... (puede tardar 10-15 segundos)';
+    var fd = new FormData(); fd.append('phone', phone); fd.append('label', label); fd.append('csrf_token', _csrf);
+    fetch('api/lines.php?action=add', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        if (d.ok) {
+            statusEl.textContent = '✅ Instancia creada en puerto '+(d.line?d.line.port:'?')+'. Usa el botón QR para vincular WhatsApp.';
+            document.getElementById('new-line-phone').value='';
+            document.getElementById('new-line-label').value='';
+            loadLines();
+        } else {
+            statusEl.textContent = '❌ '+(d.error||'Error al crear');
+        }
+    }).catch(function(){ statusEl.textContent = '❌ Error de conexión'; });
+}
+var currentQrLineId = 0;
+function showQR(lineId) {
+    currentQrLineId = lineId;
+    document.getElementById('qr-modal').style.display = 'flex';
+    document.getElementById('qr-image').src = '';
+    document.getElementById('qr-status').textContent = 'Cargando QR...';
+    fetchQR(lineId);
+}
+function fetchQR(lineId) {
+    fetch('api/lines.php?action=qr&line_id='+lineId).then(r=>r.json()).then(d=>{
+        if (d.ok && d.qr_base64) {
+            document.getElementById('qr-image').src = 'data:image/png;base64,'+d.qr_base64;
+            document.getElementById('qr-status').textContent = d.warning || 'Escanea con WhatsApp → Vincular dispositivo';
+        } else {
+            document.getElementById('qr-status').innerHTML = '<span style="color:var(--danger)">❌ '+(d.error||'No se pudo obtener QR')+'</span><br><small>Prueba a regenerar el QR o espera unos segundos.</small>';
+        }
+    }).catch(function(){
+        document.getElementById('qr-status').textContent = '❌ Error de conexión';
+    });
+}
+function regenerateQR() {
+    if (!currentQrLineId) return;
+    document.getElementById('qr-status').textContent = 'Generando nuevo QR...';
+    // First restart the session to get a fresh QR
+    fetch('api/lines.php?action=start_session&line_id='+currentQrLineId).then(r=>r.json()).then(function(){
+        // Small delay then fetch QR
+        setTimeout(function(){ fetchQR(currentQrLineId); }, 2000);
+    });
+}
+function checkLineStatus(lineId) {
+    fetch('api/lines.php?action=status').then(r=>r.json()).then(d=>{
+        if (d.ok && d.statuses) {
+            var st = d.statuses[lineId] || 'unknown';
+            alert('Estado de la línea: ' + st);
+        }
+    });
+}
         document.getElementById('lines-container').innerHTML = html;
     }).catch(function(){ document.getElementById('lines-container').innerHTML = '<p style="color:var(--danger)">Error al cargar líneas</p>'; });
 }
