@@ -595,11 +595,13 @@
 
 ### FASE 4 — Líneas + Chicas + Estados
 
-- [ ] T4.1 — Sección Líneas: UI para añadir/quitar, QR, estado, test.
-- [ ] T4.2 — API interna para SSH WAHA (crear/eliminar líneas).
-- [ ] T4.3 — Polling periódico de estado de líneas.
-- [ ] T4.4 — Sección Chicas: CRUD con upload de fotos.
-- [ ] T4.5 — Sección Estados: configuración + publicador + historial.
+- [x] T4.1 — Sección Líneas: UI para añadir/quitar, QR, estado, test.
+- [x] T4.2 — API interna para SSH WAHA (crear/eliminar líneas).
+- [x] T4.3 — Polling periódico de estado de líneas (cada 60s).
+- [x] T4.4 — Sección Chicas: CRUD con upload de fotos (por URL).
+- [x] T4.5 — Sección Estados: configuración + publicador + historial.
+
+**FASE 4 COMPLETADA.**
 
 ### FASE 5 — Clientes + Mensajes + Ajustes + Stats + Logs
 

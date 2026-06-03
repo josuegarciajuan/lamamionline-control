@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-06-03 — BOT-CASA-MULTIUSER FASE 4 (líneas + chicas + estados)
+
+### Implementado
+- **Tab Líneas en client.php**: UI completa para gestionar líneas WhatsApp (añadir con número/etiqueta, listar con estado, QR de vinculación, test de mensaje, eliminar). Polling de estado cada 60s.
+- **WahaManager**: Helper para operaciones WAHA (crear instancia docker vía SSH, configurar sesión, obtener QR, check status, enviar test, eliminar instancia). Los comandos SSH usan escapeshellarg() para seguridad.
+- **API lines.php**: CRUD de líneas con persistencia en data/users/{id}/lines.json. Sincroniza con lines_map.json para routing webhook. Soporta suplantar admin.
+- **Tab Chicas en client.php**: CRUD completo con cards visuales (nombre, descripción, fotos, toggle activar/pausar, editar, eliminar). Añadir fotos por URL (compartir.site).
+- **API girls.php**: Persistencia en data/users/{id}/girls.json. Operaciones: listar, crear/editar, eliminar, añadir/quitar fotos, toggle activa.
+- **Tab Estados en client.php**: Configuración (ON/OFF, frecuencia, formato, horario, líneas), botón publicar ahora, historial de publicaciones.
+- **API estados.php**: Configuración + publicación vía WAHA con 5 formatos (chicas_de_hoy, chica_del_dia, duo_sexy, catalogo_rapido, mix_aleatorio). Historial persistido.
+
+### Seguridad (hallazgos corregidos)
+- **HIGH**: CSRF ausente en 3 APIs POST → requireValidCsrf() en lines/girls/estados
+- **HIGH**: Fuga de excepciones → error_log() + mensaje genérico en catch blocks
+- **HIGH**: Credenciales WAHA hardcodeadas → documentado, mitigado por red interna Tailscale
+
+### Archivos
+- **Nuevos (4):** `api/lines.php`, `api/girls.php`, `api/estados.php`, `src/Core/WahaManager.php`
+- **Modificados (1):** `client.php` (+3 tabs con HTML/CSS/JS)
+- **Documentación:** `changelog.md`, `spec/tasks.md`
+
+### Verificación
+- `php -l`: 5/5 archivos OK
+- Líneas: añadir, listar, QR, test, delete vía AJAX
+- Chicas: crear, editar, toggle, fotos, eliminar vía AJAX
+- Estados: config, publish, history vía AJAX
+- Datos aislados por usuario (data/users/{id}/)
+
 ## 2026-06-03 — BOT-CASA-MULTIUSER FASE 3 (panel cliente + secciones principales)
 
 ### Implementado

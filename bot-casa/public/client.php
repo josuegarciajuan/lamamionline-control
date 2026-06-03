@@ -346,6 +346,9 @@ $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucci
     <button type="button" class="active" data-tab="tab-dashboard">📊 Inicio</button>
     <button type="button" data-tab="tab-mibot">🤖 Mi Bot</button>
     <button type="button" data-tab="tab-personalidad">🎭 Personalidad</button>
+    <button type="button" data-tab="tab-lineas">📱 Líneas</button>
+    <button type="button" data-tab="tab-chicas">👩 Chicas</button>
+    <button type="button" data-tab="tab-estados">📢 Estados</button>
 </div>
 
 <form method="post" action="cliente?action=save_config" class="main-form">
@@ -592,9 +595,400 @@ $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucci
     </div>
 </div>
 
-</form>
+<!-- ===== TAB: Líneas WhatsApp ===== -->
+<div class="tab-content" id="tab-lineas">
+    <div class="card">
+        <h2>📱 Líneas de WhatsApp
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span>
+                <span class="tooltip-box">Vincula tus números de WhatsApp para que el bot atienda por ellos. Cada línea es un número distinto.</span>
+            </span>
+        </h2>
+        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">
+            Añade los números de WhatsApp que quieres vincular al bot. Tras añadir una línea, escanea el código QR con WhatsApp para vincularla.
+        </p>
 
+        <!-- Add form -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:20px">
+            <h3 style="margin-bottom:10px">➕ Añadir línea</h3>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                <div style="flex:2;min-width:160px">
+                    <label style="font-size:.78rem;color:var(--text-muted)">Número de teléfono</label>
+                    <input type="text" id="new-line-phone" placeholder="Ej: 612345678" style="width:100%">
+                </div>
+                <div style="flex:1;min-width:100px">
+                    <label style="font-size:.78rem;color:var(--text-muted)">Etiqueta</label>
+                    <input type="text" id="new-line-label" placeholder="Línea principal" style="width:100%">
+                </div>
+                <div>
+                    <button type="button" class="btn btn-primary" onclick="addLine()" style="white-space:nowrap">Añadir línea</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lines table -->
+        <div id="lines-container">
+            <p style="color:var(--text-muted);text-align:center;padding:20px">Cargando líneas...</p>
+        </div>
+
+        <!-- QR modal (hidden) -->
+        <div id="qr-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+            <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);padding:24px;max-width:400px;text-align:center">
+                <h3>📱 Escanea el QR</h3>
+                <p style="color:var(--text-muted);font-size:.82rem;margin:8px 0">Abre WhatsApp → Ajustes → Vincular dispositivo</p>
+                <img id="qr-image" src="" style="max-width:280px;border-radius:8px;margin:12px auto" alt="QR Code">
+                <div id="qr-status" style="margin-top:8px;font-size:.85rem"></div>
+                <button type="button" class="btn btn-sm" style="margin-top:12px;background:var(--input-bg);color:var(--text-muted)" onclick="document.getElementById('qr-modal').style.display='none'">Cerrar</button>
+            </div>
+        </div>
+
+        <!-- Test modal -->
+        <div id="test-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+            <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);padding:24px;max-width:400px;text-align:center">
+                <h3>📤 Enviar mensaje de prueba</h3>
+                <input type="text" id="test-phone" placeholder="Número de teléfono (con prefijo)" style="width:100%;margin:12px 0">
+                <input type="hidden" id="test-line-id">
+                <button type="button" class="btn btn-primary" onclick="sendTestMessage()">Enviar prueba</button>
+                <button type="button" class="btn btn-sm" style="margin-top:8px;background:var(--input-bg);color:var(--text-muted)" onclick="document.getElementById('test-modal').style.display='none'">Cancelar</button>
+                <div id="test-result" style="margin-top:8px;font-size:.82rem"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== TAB: Chicas ===== -->
+<div class="tab-content" id="tab-chicas">
+    <div class="card">
+        <h2>👩 Catálogo de Chicas
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span>
+                <span class="tooltip-box">Gestiona las chicas que ofrece tu bot. Las fotos se mostrarán en las conversaciones cuando los clientes pregunten.</span>
+            </span>
+        </h2>
+
+        <!-- Add/edit form -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:20px">
+            <h3 id="girl-form-title" style="margin-bottom:10px">➕ Nueva chica</h3>
+            <input type="hidden" id="girl-edit-id">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                <div style="flex:2;min-width:140px">
+                    <label style="font-size:.78rem;color:var(--text-muted)">Nombre *</label>
+                    <input type="text" id="girl-nombre" placeholder="Ej: Sandra" style="width:100%">
+                </div>
+                <div style="flex:3;min-width:200px">
+                    <label style="font-size:.78rem;color:var(--text-muted)">Descripción corta</label>
+                    <input type="text" id="girl-desc" placeholder="Ej: Morena, 25 años, cariñosa..." style="width:100%">
+                </div>
+                <div>
+                    <button type="button" class="btn btn-primary" onclick="saveGirl()">💾 Guardar</button>
+                </div>
+            </div>
+            <!-- Photo URL add -->
+            <div style="margin-top:10px;display:flex;gap:8px;align-items:flex-end">
+                <div style="flex:1">
+                    <label style="font-size:.78rem;color:var(--text-muted)">Añadir foto (URL)</label>
+                    <input type="url" id="girl-photo-url" placeholder="https://compartir.site/imgs/abc/foto.jpg" style="width:100%">
+                </div>
+                <div>
+                    <button type="button" class="btn btn-sm btn-success" onclick="addGirlPhoto()">+ Foto</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Girls list -->
+        <div id="girls-container">
+            <p style="color:var(--text-muted);text-align:center;padding:20px">Cargando chicas...</p>
+        </div>
+    </div>
+</div>
+
+<!-- ===== TAB: Estados WhatsApp ===== -->
+<div class="tab-content" id="tab-estados">
+    <div class="card">
+        <h2>📢 Publicador de Estados
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span>
+                <span class="tooltip-box">Publica automáticamente estados de WhatsApp con tus chicas. Los clientes que tengan tu número verán las publicaciones.</span>
+            </span>
+        </h2>
+
+        <!-- Config form -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:20px">
+            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+                <div>
+                    <label style="font-size:.78rem;color:var(--text-muted)">Activado</label>
+                    <label class="checkbox-label"><input type="checkbox" id="estados-enabled" onchange="saveEstadosConfig()"> Publicar estados</label>
+                </div>
+                <div style="flex:1;min-width:120px">
+                    <label style="font-size:.78rem;color:var(--text-muted)">Frecuencia</label>
+                    <select id="estados-freq-tipo" onchange="saveEstadosConfig()">
+                        <option value="cada_x_horas">Cada X horas</option>
+                        <option value="x_veces_al_dia">X veces al día</option>
+                    </select>
+                </div>
+                <div style="width:80px">
+                    <label style="font-size:.78rem;color:var(--text-muted)">Valor</label>
+                    <input type="number" id="estados-freq-valor" value="6" min="1" max="24" onchange="saveEstadosConfig()" style="width:100%">
+                </div>
+                <div style="flex:1;min-width:160px">
+                    <label style="font-size:.78rem;color:var(--text-muted)">Formato</label>
+                    <select id="estados-formato" onchange="saveEstadosConfig()">
+                        <option value="chicas_de_hoy">Todas las chicas, 1 foto</option>
+                        <option value="chica_del_dia">1 chica aleatoria, 2 fotos</option>
+                        <option value="duo_sexy">2 chicas, 1 foto c/u</option>
+                        <option value="catalogo_rapido">Solo nombres</option>
+                        <option value="mix_aleatorio">Aleatorio cada ciclo</option>
+                    </select>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-success" onclick="publishEstado()">📢 Publicar ahora</button>
+                </div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:10px;align-items:flex-end">
+                <div style="width:100px">
+                    <label style="font-size:.78rem;color:var(--text-muted)">Desde</label>
+                    <input type="time" id="estados-hora-inicio" value="08:00" onchange="saveEstadosConfig()">
+                </div>
+                <div style="width:100px">
+                    <label style="font-size:.78rem;color:var(--text-muted)">Hasta</label>
+                    <input type="time" id="estados-hora-fin" value="23:00" onchange="saveEstadosConfig()">
+                </div>
+                <div id="estados-lines-checkboxes" style="flex:1;display:flex;flex-wrap:wrap;gap:10px"></div>
+            </div>
+            <div id="estados-status" style="margin-top:8px;font-size:.82rem;color:var(--text-muted)"></div>
+        </div>
+
+        <!-- History -->
+        <h3>📋 Historial de publicaciones</h3>
+        <div id="estados-history" style="margin-top:8px">
+            <p style="color:var(--text-muted);text-align:center;padding:10px">Cargando...</p>
+        </div>
+    </div>
+</div>
+
+</form>
 <script>
+var _csrf = <?php echo json_encode(generateCsrfToken()); ?>;
+// ── Líneas WhatsApp ──
+function loadLines() {
+    fetch('api/lines.php?action=list').then(r=>r.json()).then(d=>{
+        if (!d.ok) return;
+        var html = '';
+        if (d.lines.length === 0) {
+            html = '<p style="color:var(--text-muted);text-align:center;padding:20px">No hay líneas configuradas. Añade tu primer número arriba.</p>';
+        } else {
+            html = '<table class="memory-table" style="font-size:.83rem"><thead><tr><th>Línea</th><th>Teléfono</th><th>Puerto</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
+            d.lines.forEach(function(l) {
+                var statusIcon = {'up':'🟢 ONLINE','connecting':'🟡 CONECTANDO','starting':'🟡 ARRANCANDO','pending':'⚪ PENDIENTE','down':'🔴 CAÍDA'}[l.health_status] || '⚪ '+(l.health_status||'?');
+                html += '<tr><td><strong>'+escHtml(l.label)+'</strong></td><td class="mono">'+escHtml(l.last9||l.phone)+'</td><td>'+l.port+'</td><td>'+statusIcon+'</td>';
+                html += '<td style="white-space:nowrap">';
+                html += '<button onclick="showQR('+l.id+')" class="btn btn-sm btn-primary" style="margin-right:3px">QR</button>';
+                html += '<button onclick="showTest('+l.id+')" class="btn btn-sm" style="background:var(--info);color:#fff;margin-right:3px">Test</button>';
+                html += '<button onclick="deleteLine('+l.id+')" class="btn btn-sm btn-danger">🗑</button>';
+                html += '</td></tr>';
+            });
+            html += '</tbody></table>';
+        }
+        document.getElementById('lines-container').innerHTML = html;
+    }).catch(function(){ document.getElementById('lines-container').innerHTML = '<p style="color:var(--danger)">Error al cargar líneas</p>'; });
+}
+function addLine() {
+    var phone = document.getElementById('new-line-phone').value.trim();
+    var label = document.getElementById('new-line-label').value.trim();
+    if (!phone) return alert('Introduce un número de teléfono');
+    var fd = new FormData(); fd.append('phone', phone); fd.append('label', label); fd.append('csrf_token', _csrf);
+    fetch('api/lines.php?action=add', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        if (d.ok) { document.getElementById('new-line-phone').value=''; document.getElementById('new-line-label').value=''; loadLines(); }
+        else alert('Error: '+(d.error||'Desconocido'));
+    });
+}
+function showQR(lineId) {
+    document.getElementById('qr-modal').style.display = 'flex';
+    document.getElementById('qr-image').src = '';
+    document.getElementById('qr-status').textContent = 'Cargando QR...';
+    fetch('api/lines.php?action=qr&line_id='+lineId).then(r=>r.json()).then(d=>{
+        if (d.ok && d.qr_base64) {
+            document.getElementById('qr-image').src = 'data:image/png;base64,'+d.qr_base64;
+            document.getElementById('qr-status').textContent = 'Escanea con WhatsApp → Vincular dispositivo';
+        } else {
+            document.getElementById('qr-status').textContent = '❌ '+(d.error||'No se pudo obtener QR');
+        }
+    });
+}
+function showTest(lineId) {
+    document.getElementById('test-modal').style.display = 'flex';
+    document.getElementById('test-line-id').value = lineId;
+    document.getElementById('test-phone').value = '';
+    document.getElementById('test-result').textContent = '';
+}
+function sendTestMessage() {
+    var lineId = document.getElementById('test-line-id').value;
+    var phone = document.getElementById('test-phone').value.trim();
+    if (!phone) return alert('Introduce un número de teléfono');
+    var fd = new FormData(); fd.append('line_id', lineId); fd.append('test_phone', phone); fd.append('csrf_token', _csrf);
+    document.getElementById('test-result').textContent = 'Enviando...';
+    fetch('api/lines.php?action=test', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        document.getElementById('test-result').textContent = d.ok ? '✅ Mensaje enviado' : '❌ '+(d.error||'Error');
+    });
+}
+function deleteLine(lineId) {
+    if (!confirm('¿Eliminar esta línea? Se desvinculará del bot.')) return;
+    var fd = new FormData(); fd.append('line_id', lineId); fd.append('csrf_token', _csrf);
+    fetch('api/lines.php?action=delete', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        if (d.ok) loadLines(); else alert('Error: '+(d.error||'Desconocido'));
+    });
+}
+
+// ── Polling estado líneas (cada 60s) ──
+var linePollInterval;
+function startLinePolling() { linePollInterval = setInterval(function() {
+    if (document.getElementById('tab-lineas') && document.getElementById('tab-lineas').classList.contains('active')) {
+        fetch('api/lines.php?action=status').then(r=>r.json()).then(d=>{
+            if (!d.ok || !d.statuses) return;
+            var rows = document.querySelectorAll('#lines-container tbody tr');
+            rows.forEach(function(tr, i) {
+                // las filas se cargan con loadLines, el id está en el onclick
+            });
+        });
+    }
+}, 60000); }
+startLinePolling();
+
+// ── Chicas ──
+function loadGirls() {
+    fetch('api/girls.php?action=list').then(r=>r.json()).then(d=>{
+        if (!d.ok) return;
+        var html = '';
+        if (d.girls.length === 0) {
+            html = '<p style="color:var(--text-muted);text-align:center;padding:20px">No hay chicas configuradas. Añade la primera arriba.</p>';
+        } else {
+            html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:8px">';
+            d.girls.forEach(function(g) {
+                var active = g.activa ? '✅ Activa' : '❌ Inactiva';
+                var activeColor = g.activa ? 'var(--ok)' : 'var(--text-muted)';
+                var photos = (g.fotos||[]).slice(0,3).map(function(u,i){ return '<img src="'+escHtml(u)+'" style="width:60px;height:60px;object-fit:cover;border-radius:6px;margin:2px" onerror="this.style.display=\'none\'">'; }).join('');
+                html += '<div style="background:var(--bg-surface);border:1px solid '+(g.activa?'rgba(52,211,153,.3)':'var(--border)')+';border-radius:var(--radius-sm);padding:12px">';
+                html += '<strong>'+escHtml(g.nombre)+'</strong>';
+                html += '<span style="font-size:.75rem;color:'+activeColor+';margin-left:8px">'+active+'</span>';
+                html += '<div style="font-size:.78rem;color:var(--text-muted);margin:4px 0">'+escHtml(g.descripcion_corta||'')+'</div>';
+                if (photos) html += '<div style="margin-top:6px">'+photos+'</div>';
+                html += '<div style="margin-top:8px;display:flex;gap:4px">';
+                html += '<button onclick="editGirl(\''+escHtml(g.id)+'\',\''+escHtml(g.nombre)+'\',\''+escHtml(g.descripcion_corta||'')+'\')" class="btn btn-sm btn-warning">✏️</button>';
+                html += '<button onclick="toggleGirl(\''+escHtml(g.id)+'\')" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted)">'+(g.activa?'Pausar':'Activar')+'</button>';
+                html += '<button onclick="deleteGirl(\''+escHtml(g.id)+'\')" class="btn btn-sm btn-danger">🗑</button>';
+                html += '</div></div>';
+            });
+            html += '</div>';
+        }
+        document.getElementById('girls-container').innerHTML = html;
+    });
+}
+function saveGirl() {
+    var id = document.getElementById('girl-edit-id').value;
+    var fd = new FormData();
+    if (id) fd.append('id', id);
+    fd.append('csrf_token', _csrf);
+    fd.append('nombre', document.getElementById('girl-nombre').value.trim());
+    fd.append('descripcion', document.getElementById('girl-desc').value.trim());
+    fd.append('activa', '1');
+    fetch('api/girls.php?action=save', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        if (d.ok) { document.getElementById('girl-edit-id').value=''; document.getElementById('girl-nombre').value=''; document.getElementById('girl-desc').value=''; document.getElementById('girl-form-title').textContent='➕ Nueva chica'; loadGirls(); }
+        else alert('Error: '+(d.error||'Desconocido'));
+    });
+}
+function editGirl(id, nombre, desc) {
+    document.getElementById('girl-edit-id').value = id;
+    document.getElementById('girl-nombre').value = nombre;
+    document.getElementById('girl-desc').value = desc;
+    document.getElementById('girl-form-title').textContent = '✏️ Editar chica';
+    document.getElementById('girl-nombre').focus();
+}
+function addGirlPhoto() {
+    var url = document.getElementById('girl-photo-url').value.trim();
+    var id = document.getElementById('girl-edit-id').value;
+    if (!url || !id) return alert('Primero guarda la chica y luego añade fotos');
+    var fd = new FormData(); fd.append('id', id); fd.append('photo_url', url); fd.append('csrf_token', _csrf);
+    fetch('api/girls.php?action=add_photo', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        if (d.ok) { document.getElementById('girl-photo-url').value=''; loadGirls(); }
+        else alert('Error: '+(d.error||'Desconocido'));
+    });
+}
+function toggleGirl(id) { var fd = new FormData(); fd.append('id', id); fd.append('csrf_token', _csrf); fetch('api/girls.php?action=toggle',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{ if(d.ok) loadGirls(); }); }
+function deleteGirl(id) { if(!confirm('¿Eliminar esta chica?')) return; var fd = new FormData(); fd.append('id', id); fd.append('csrf_token', _csrf); fetch('api/girls.php?action=delete',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{ if(d.ok) loadGirls(); }); }
+
+// ── Estados ──
+function loadEstadosConfig() {
+    fetch('api/estados.php?action=config').then(r=>r.json()).then(d=>{
+        if (!d.ok) return;
+        var c = d.config;
+        document.getElementById('estados-enabled').checked = !!c.enabled;
+        document.getElementById('estados-freq-tipo').value = c.frecuencia_tipo;
+        document.getElementById('estados-freq-valor').value = c.frecuencia_valor;
+        document.getElementById('estados-formato').value = c.formato;
+        document.getElementById('estados-hora-inicio').value = c.hora_inicio;
+        document.getElementById('estados-hora-fin').value = c.hora_fin;
+        // Lines checkboxes
+        var lcb = document.getElementById('estados-lines-checkboxes');
+        lcb.innerHTML = (c.available_lines||[]).map(function(l){
+            var checked = (c.lineas||[]).indexOf(l.id) !== -1 ? 'checked' : '';
+            return '<label class="checkbox-label" style="font-size:.78rem"><input type="checkbox" value="'+l.id+'" '+checked+' onchange="saveEstadosConfig()"> '+escHtml(l.label||l.last9)+'</label>';
+        }).join('');
+    });
+}
+function saveEstadosConfig() {
+    var fd = new FormData();
+    fd.append('csrf_token', _csrf);
+    if (document.getElementById('estados-enabled').checked) fd.append('enabled','1');
+    fd.append('frecuencia_tipo', document.getElementById('estados-freq-tipo').value);
+    fd.append('frecuencia_valor', document.getElementById('estados-freq-valor').value);
+    fd.append('formato', document.getElementById('estados-formato').value);
+    fd.append('hora_inicio', document.getElementById('estados-hora-inicio').value);
+    fd.append('hora_fin', document.getElementById('estados-hora-fin').value);
+    var checks = document.querySelectorAll('#estados-lines-checkboxes input[type=checkbox]:checked');
+    checks.forEach(function(c){ fd.append('lineas[]', c.value); });
+    fetch('api/estados.php?action=config', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        document.getElementById('estados-status').textContent = d.ok ? '✅ Configuración guardada' : '❌ Error al guardar';
+        setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 3000);
+    });
+}
+function publishEstado() {
+    document.getElementById('estados-status').textContent = '⏳ Publicando...';
+    var fd = new FormData(); fd.append('csrf_token', _csrf);
+    fetch('api/estados.php?action=publish', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        if (d.ok) {
+            var oks = d.results.filter(function(r){return r.ok;}).length;
+            document.getElementById('estados-status').textContent = '✅ Publicado en '+oks+'/'+d.results.length+' líneas';
+            loadEstadosHistory();
+        } else {
+            document.getElementById('estados-status').textContent = '❌ '+(d.error||'Error');
+        }
+        setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 5000);
+    });
+}
+function loadEstadosHistory() {
+    fetch('api/estados.php?action=history').then(r=>r.json()).then(d=>{
+        if (!d.ok) return;
+        var html = d.log.slice(0,10).map(function(e){
+            var date = e.published_at ? new Date(e.published_at).toLocaleString('es-ES') : '?';
+            return '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:4px;font-size:.8rem"><strong>'+date+'</strong> — '+escHtml(e.formato)+'<br><span style="color:var(--text-muted)">'+escHtml((e.texto||'').substring(0,80))+'</span></div>';
+        }).join('');
+        document.getElementById('estados-history').innerHTML = html || '<p style="color:var(--text-muted);text-align:center;padding:10px">Sin publicaciones</p>';
+    });
+}
+
+// ── Helper ──
+function escHtml(s) { var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// ── Load data when tabs become active ──
+var tabLoaders = {
+    'tab-lineas': loadLines,
+    'tab-chicas': loadGirls,
+    'tab-estados': function() { loadEstadosConfig(); loadEstadosHistory(); }
+};
+var loadedTabs = {};
+document.querySelectorAll('#tabNav button[data-tab]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+        var tabId = btn.getAttribute('data-tab');
+        if (tabLoaders[tabId] && !loadedTabs[tabId]) { loadedTabs[tabId]=true; tabLoaders[tabId](); }
+    });
+});
 // ── Tab switching ──
 (function() {
     var btns = document.querySelectorAll('#tabNav button[data-tab]');
