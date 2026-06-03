@@ -22,16 +22,27 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 $isAdmin = !empty($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'admin';
+
+// Determine if accessed from CRM (lamami.online) or standalone (admin.casawasap.com)
+$host = (string) ($_SERVER['HTTP_HOST'] ?? '');
+$fromCRM = (strpos($host, 'lamami.online') !== false);
+
 if (!$isAdmin) {
-    // Check if legacy mode (users.json doesn't exist yet)
     $usersFile = WASAPBOT_ROOT . '/data/users.json';
-    if (file_exists($usersFile)) {
+    if (!file_exists($usersFile)) {
+        // No users.json → legacy mode, panel open
+    } elseif ($fromCRM) {
+        // Accessed from CRM iframe → trust CRM auth, panel open
+        // CRM already authenticated the user
+    } else {
+        // Standalone access (admin.casawasap.com) → require login
+        $loginUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http')
+                  . '://' . $host . '/login';
         http_response_code(403);
         header('Content-Type: text/html; charset=utf-8');
-        echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>403 Prohibido</title></head><body style="background:#080d17;color:#f0f3fa;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><div style="text-align:center"><h1 style="color:#f87171;font-size:3rem">403</h1><p>Acceso restringido.</p><p style="margin-top:16px"><a href="login" style="color:#f59e0b">Iniciar sesión</a></p></div></body></html>';
+        echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>403 Prohibido</title></head><body style="background:#080d17;color:#f0f3fa;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><div style="text-align:center"><h1 style="color:#f87171;font-size:3rem">403</h1><p>Acceso restringido.</p><p style="margin-top:16px"><a href="' . h($loginUrl) . '" style="color:#f59e0b">Iniciar sesión</a></p></div></body></html>';
         exit;
     }
-    // Legacy mode: no users.json, panel open
 }
 $adminUsername = $_SESSION['username'] ?? '';
 $adminRole = $_SESSION['role'] ?? '';

@@ -215,6 +215,22 @@ try {
 
         // ── GET /  or  GET /info → bot info ────────────────────
         case $method === 'GET' && ($uri === '/' || $uri === '/info'):
+            // If accessed standalone (not from CRM API call), redirect to login
+            if ($uri === '/') {
+                $host = (string) ($_SERVER['HTTP_HOST'] ?? '');
+                // Only redirect for browser-like access (not API calls)
+                $acceptHeader = (string) ($_SERVER['HTTP_ACCEPT'] ?? '');
+                if (strpos($acceptHeader, 'text/html') !== false) {
+                    botcasa_require_auth();
+                    // If authenticated, redirect to appropriate panel
+                    if (($_SESSION['role'] ?? '') === 'admin') {
+                        header('Location: panel');
+                    } else {
+                        header('Location: cliente');
+                    }
+                    exit;
+                }
+            }
             try {
                 $instances = \WasapBot\Bot::bootstrap(WASAPBOT_ROOT);
                 $bot       = $instances['bot'];
