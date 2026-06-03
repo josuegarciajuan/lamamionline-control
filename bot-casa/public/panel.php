@@ -33,7 +33,11 @@ if (!$isAdmin) {
         // No users.json → legacy mode, panel open
     } elseif ($fromCRM) {
         // Accessed from CRM iframe → trust CRM auth, panel open
-        // CRM already authenticated the user
+        // CRM user is always admin
+        $isAdmin = true;
+        $_SESSION['user_id'] = $_SESSION['user_id'] ?? 1;
+        $_SESSION['role'] = $_SESSION['role'] ?? 'admin';
+        $_SESSION['username'] = $_SESSION['username'] ?? 'admin';
     } else {
         // Standalone access (admin.casawasap.com) → require login
         $loginUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http')
@@ -3191,8 +3195,8 @@ document.getElementById('conversationModal').addEventListener('click', function(
                     <input type="text" name="name" id="user-form-name" placeholder="Nombre descriptivo">
                 </div>
                 <div class="form-group" style="flex:1">
-                    <label>Contraseña <span style="color:var(--text-muted);font-weight:400">(mín 8 chars)</span></label>
-                    <input type="password" name="password" id="user-form-password" placeholder="Dejar vacío para no cambiar" minlength="8">
+                    <label>Contraseña <span style="color:var(--text-muted);font-weight:400">(dejar vacío para no cambiar)</span></label>
+                    <input type="password" name="password" id="user-form-password" placeholder="Dejar vacío para no cambiar">
                 </div>
             </div>
 
@@ -3233,7 +3237,7 @@ function resetUserForm() {
     document.getElementById('user-form-role').value = 'user';
     document.getElementById('user-form-active').checked = true;
     document.getElementById('user-form-password').value = '';
-    document.getElementById('user-form-password').placeholder = 'Mínimo 8 caracteres';
+    document.getElementById('user-form-password').placeholder = 'Nueva contraseña (opcional)';
 }
 </script>
 <?php endif; ?>

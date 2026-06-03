@@ -73,8 +73,8 @@ final class UserManager
         if ($username === '') {
             return ['ok' => false, 'error' => 'El nombre de usuario es obligatorio.'];
         }
-        if (strlen($password) < 8) {
-            return ['ok' => false, 'error' => 'La contraseña debe tener al menos 8 caracteres.'];
+        if (strlen($password) < 1) {
+            return ['ok' => false, 'error' => 'La contraseña es obligatoria.'];
         }
 
         $allowedRoles = ['admin', 'user'];

@@ -133,8 +133,8 @@ try {
             require WASAPBOT_ROOT . '/public/webhook.php';
             break;
 
-        // ── GET /panel → admin panel (requires admin auth) ───────
-        case $method === 'GET' && $uri === '/panel':
+        // ── GET|POST /panel → admin panel (requires admin auth) ──
+        case ($method === 'GET' || $method === 'POST') && $uri === '/panel':
             botcasa_require_admin();
             $panelPath = WASAPBOT_ROOT . '/public/panel.php';
             if (file_exists($panelPath)) {
