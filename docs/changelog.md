@@ -1,5 +1,39 @@
 # Changelog
 
+## 2026-06-03 — BOT-CASA-MULTIUSER FASE 1 (fundación multi-tenant + auth)
+
+### Implementado
+- **UserManager.php**: CRUD de usuarios con bcrypt cost 12, flock(LOCK_EX) con timeout, auto-seed admin por defecto.
+- **login.php**: Formulario de login con CSRF, rate limiting (sleep 1s), session regeneration, security headers.
+- **logout.php**: Destrucción segura de sesión con limpieza de cookie.
+- **index.php**: Nuevas rutas /login, /logout, /cliente. Funciones `botcasa_require_auth()` y `botcasa_require_admin()`.
+- **webhook.php**: Routing por last9 → user_id vía data/lines_map.json. Fallback a user_id=1 (legacy).
+- **Bot.php**: `bootstrap()` acepta `$userId` opcional. `resolveUserDataPath()` y `resolveUserConfigDir()` para aislamiento de datos por usuario. Forward-compat: si no existe data/users/{id}/, usa data/ (legacy).
+- **data/lines_map.json**: Mapeo inicial de líneas existentes al admin (user_id=1).
+- **spec/**: requirements, design, contracts, tasks para el proyecto completo (6 fases).
+
+### Seguridad
+- bcrypt cost 12 con password_hash/verify
+- CSRF en login con hash_equals()
+- session_regenerate_id(true) tras login
+- session_set_cookie_params con httponly, secure, samesite=Lax
+- Security headers: X-Frame-Options, X-Content-Type-Options, Referrer-Policy
+- flock(LOCK_EX) con timeout 2s para evitar race conditions en users.json
+- Contraseña mínima 8 caracteres
+- Directorios de datos con permisos 0700
+- 0 hallazgos críticos/altos tras correcciones
+
+### Archivos
+- **Nuevos (6):** UserManager.php, login.php, logout.php, lines_map.json, spec/{requirements,design,contracts,tasks}.md
+- **Modificados (3):** index.php, webhook.php, Bot.php
+- **Documentación (2):** changelog.md, spec/tasks.md
+
+### Verificación
+- php -l: 6/6 archivos OK
+- Autenticación: bcrypt + CSRF + session security OK
+- Routing webhook: last9 → user_id con fallback legacy OK
+- Forward-compat: sin data/users/ → fallback a data/ OK
+
 ## 2026-06-01 — COM-LINEAS-UI-F2 (verificación y cierre)
 
 ### Verificado

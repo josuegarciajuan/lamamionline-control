@@ -121,3 +121,24 @@ Mejorar la UI de la sección `Comercial > Líneas` del CRM eliminando la duplica
 - Mantener el estilo visual actual (tema oscuro).
 - No modificar el comportamiento de otros módulos (publicista, avisos, procesos, etc.).
 - Las acciones POST existentes (`save_telefono`, `delete_telefono`, `save_comercial_line_state`, `comercial_check_lines_health`) deben seguir funcionando exactamente igual (contrato de no regresión).
+
+## BOT-CASA-MULTIUSER — Ampliación bot-casa Multi-Usuario v2.0
+
+### Objetivo
+Transformar bot-casa actual (single-tenant) en un servicio multi-usuario donde cada cliente tiene su panel aislado con sus datos, comparte el motor del bot, y el admin gestiona clientes.
+
+### Alcance por fases
+1. **FASE 1 — Fundación Multi-Tenant + Auth**: users.json, UserManager, login/logout, routing webhook por línea, aislamiento directorios, forward-compat, admin middleware.
+2. **FASE 2 — Panel Admin**: auth gate en panel.php, sección Usuarios, suplantar usuario, externalizar CSS/JS.
+3. **FASE 3 — Panel Cliente + Secciones Principales**: client.php, Dashboard, Mi Bot, Personalidad parametrizada.
+4. **FASE 4 — Líneas + Chicas + Estados**: gestión líneas WAHA vía SSH, QR, health check; CRUD chicas; publicador estados.
+5. **FASE 5 — Clientes + Mensajes + Ajustes + Stats + Logs**: leads con arrived marking, memoria con search, ajustes agrupados, estadísticas, logs sanitizados.
+6. **FASE 6 — Onboarding + Cron Jobs + Pulido**: wizard, crons multi-usuario, playbook por usuario.
+
+### Restricciones
+- Cambios mínimos y seguros. Sin dependencias nuevas.
+- No modificar lógica del pipeline (Bot.php, Pipeline/*).
+- Mantener compatibilidad con sistema actual (forward-compat: sin data/users/ → usar data/).
+- Auth: usuario/contraseña con bcrypt.
+- WAHA: gestión vía SSH automático. Imágenes: mantener compartir.site.
+- Aprendizaje: por usuario.

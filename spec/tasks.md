@@ -552,3 +552,65 @@
 - [x] T2.4 — Actualizar `docs/changelog.md` con entrada COM-LINEAS-UI.
 
 **CIERRE TOTAL DEL PROYECTO COM-LINEAS-UI — todas las fases completadas.**
+
+## BOT-CASA-MULTIUSER — Ampliación bot-casa Multi-Usuario
+
+### FASE 1 — Fundación Multi-Tenant + Auth
+
+- [x] T1.1 — Crear `src/Core/UserManager.php`: CRUD usuarios, bcrypt, seed admin por defecto.
+- [x] T1.2 — Crear `public/login.php`: formulario login, sesiones PHP, CSRF, rate limit.
+- [x] T1.3 — Crear `public/logout.php`: destruir sesión, redirigir.
+- [x] T1.4 — Modificar `public/index.php`: añadir rutas /login, /logout, /cliente.
+- [x] T1.5 — Modificar `Bot::bootstrap()`: aceptar user_id opcional, resolver paths por usuario.
+- [x] T1.6 — Modificar `public/webhook.php`: extraer last9, buscar user_id, pasar a bootstrap.
+- [x] T1.7 — Crear `data/lines_map.json` con mapeo de líneas existentes a user_id=1.
+- [x] T1.8 — Forward-compat: si no existe data/users/{id}/, usar data/ (legacy).
+- [x] T1.9 — Funciones `require_auth()` y `require_admin()` en helpers compartidos.
+- [x] T1.10 — Validación: php -l en todos los archivos nuevos/modificados.
+- [x] T1.11 — Revisión de seguridad: password hashing, CSRF, session fixation.
+- [x] T1.12 — Actualizar docs/changelog.md.
+
+**FASE 1 COMPLETADA.**
+
+### FASE 2 — Panel Admin (user #1)
+
+- [ ] T2.1 — Añadir auth gate en panel.php.
+- [ ] T2.2 — Nueva tab "Usuarios" con CRUD de clientes.
+- [ ] T2.3 — Botón "Suplantar" para ver panel del cliente.
+- [ ] T2.4 — Externalizar CSS/JS a assets/style.css y assets/app.js.
+- [ ] T2.5 — Actualizar cache busters en index.php.
+
+### FASE 3 — Panel Cliente + Secciones Principales
+
+- [ ] T3.1 — Crear public/client.php con nuevo layout y tabs.
+- [ ] T3.2 — Dashboard con stats visuales por usuario.
+- [ ] T3.3 — Sección "Mi Bot": ON/OFF simplificado, descripción.
+- [ ] T3.4 — Sección "Personalidad": prompt parametrizado con dropdowns.
+- [ ] T3.5 — Sistema de tooltips reutilizable.
+- [ ] T3.6 — CSS mobile-first responsive.
+
+### FASE 4 — Líneas + Chicas + Estados
+
+- [ ] T4.1 — Sección Líneas: UI para añadir/quitar, QR, estado, test.
+- [ ] T4.2 — API interna para SSH WAHA (crear/eliminar líneas).
+- [ ] T4.3 — Polling periódico de estado de líneas.
+- [ ] T4.4 — Sección Chicas: CRUD con upload de fotos.
+- [ ] T4.5 — Sección Estados: configuración + publicador + historial.
+
+### FASE 5 — Clientes + Mensajes + Ajustes + Stats + Logs
+
+- [ ] T5.1 — Sección Clientes: leads con arrived marking, guía Telegram.
+- [ ] T5.2 — Sección Mensajes: search por teléfono, vista chat, marcar lead.
+- [ ] T5.3 — Sección Ajustes: Delays, Variantes, Follow-up, Reminder agrupados.
+- [ ] T5.4 — Sección Estadísticas: métricas leads notificados vs reales.
+- [ ] T5.5 — Sección Registro: logs sanitizados.
+- [ ] T5.6 — Ocultar IA para clientes (solo admin).
+
+### FASE 6 — Onboarding + Cron Jobs + Pulido
+
+- [ ] T6.1 — Wizard de bienvenida al primer login.
+- [ ] T6.2 — Modificar crons para multi-usuario (learn, classify, followup, reminder).
+- [ ] T6.3 — Playbook por usuario (learn.php).
+- [ ] T6.4 — Follow-up respeta leads marcados como llegados.
+- [ ] T6.5 — Indicador de progreso de configuración.
+- [ ] T6.6 — Testing final end-to-end.

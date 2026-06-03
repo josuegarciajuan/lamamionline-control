@@ -63,8 +63,57 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // ─────────────────────────────────────────────────────────────────────
 
 try {
-    // Bootstrap
-    $instances = \WasapBot\Bot::bootstrap(WASAPBOT_ROOT);
+    // ── Resolve user_id from the incoming payload (last9 → user_id) ──
+    $rawBody = file_get_contents('php://input');
+    if ($rawBody === false || $rawBody === '') {
+        http_response_code(400);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['status' => 'error', 'message' => 'Empty request body'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    try {
+        $payload = json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
+    } catch (\JsonException) {
+        http_response_code(400);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['status' => 'error', 'message' => 'Invalid JSON payload'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if (!is_array($payload)) {
+        http_response_code(400);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['status' => 'error', 'message' => 'Payload must be a JSON object'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // ── Extract last9 from payload to determine user_id ──────────────
+    $userId = 1; // default: admin / legacy
+    $body   = $payload['payload'] ?? $payload;
+    $me     = $body['me'] ?? null;
+    $receiverId = '';
+    if (is_array($me) && isset($me['id'])) {
+        $receiverId = (string) $me['id'];
+    } elseif (isset($body['to'])) {
+        $receiverId = (string) $body['to'];
+    }
+    if ($receiverId !== '') {
+        $digits = preg_replace('/[^0-9]/', '', $receiverId) ?? '';
+        $last9  = $digits !== '' ? mb_substr($digits, -9) : '';
+        if ($last9 !== '') {
+            $linesMapPath = WASAPBOT_ROOT . '/data/lines_map.json';
+            if (file_exists($linesMapPath)) {
+                $linesMap = @json_decode((string) @file_get_contents($linesMapPath), true);
+                if (is_array($linesMap) && isset($linesMap[$last9])) {
+                    $userId = (int) $linesMap[$last9];
+                }
+            }
+        }
+    }
+
+    // Bootstrap with user-specific data
+    $instances = \WasapBot\Bot::bootstrap(WASAPBOT_ROOT, $userId);
     $bot       = $instances['bot'];
     $logger    = $instances['logger'];
 
@@ -86,41 +135,7 @@ try {
         }
     }
 
-    // Read raw input
-    $rawBody = file_get_contents('php://input');
-
-    if ($rawBody === false || $rawBody === '') {
-        http_response_code(400);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'status'  => 'error',
-            'message' => 'Empty request body',
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    // Decode JSON payload
-    try {
-        $payload = json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
-    } catch (\JsonException $jsonErr) {
-        http_response_code(400);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'status'  => 'error',
-            'message' => 'Invalid JSON payload',
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    if (!is_array($payload)) {
-        http_response_code(400);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'status'  => 'error',
-            'message' => 'Payload must be a JSON object',
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
+    // Raw body already read and parsed above for user routing
 
     // Save raw payload for debugging
     $rawPayloadPath = (string) $instances['config']->get('files.wa_raw_payload', '');

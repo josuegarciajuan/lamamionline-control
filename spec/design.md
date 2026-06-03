@@ -1173,3 +1173,51 @@ function setFormField(name, value) {
 | `assets/style.css` | Añadir estilos: `.modal-overlay`, `.modal-container`, `.modal-header`, `.modal-body`, `.modal-footer`, `.lineas-unified-table`, `.lineas-toolbar`, `body.modal-open`, column widths | ~80 líneas nuevas |
 | `assets/theme.css` | Añadir overrides tema oscuro: `.modal-overlay`, `.modal-container` (bg, border, text colors), `.lineas-unified-table` (borders, row hover) | ~40 líneas nuevas |
 | `index.php` | Bump versiones cache: `style.css`, `theme.css`, `app.js` | 3 líneas modificadas |
+
+## Diseño BOT-CASA-MULTIUSER — Arquitectura Multi-Tenant
+
+### Modelo de datos de usuarios (data/users.json)
+```json
+{"users":[{"id":1,"username":"admin","password_hash":"$2y$...","role":"admin","name":"Admin","created_at":"...","active":true}],"next_id":2}
+```
+Roles: `admin` (acceso total + gestión usuarios), `user` (solo su panel).
+
+### Mapeo líneas → usuarios (data/lines_map.json)
+```json
+{"624934900":1,"631349504":1}
+```
+Clave = last9 del número receptor. Valor = user_id. Se actualiza al añadir/quitar líneas.
+
+### Aislamiento de datos por usuario
+- `data/users/{id}/config.local.json` — Config del usuario
+- `data/users/{id}/.bot_mode` — ON/OFF
+- `data/users/{id}/session_memory.ndjson` — Memoria conversaciones
+- `data/users/{id}/leads.ndjson` — Leads
+- `data/users/{id}/girls.json` — Catálogo chicas
+- `data/users/{id}/bot.log` — Logs
+- `data/users/{id}/locks/` — Locks
+- Forward-compat: si no existe data/users/, se usa data/ (legacy)
+
+### Routing webhook
+1. Extraer last9 del número receptor del payload WAHA
+2. Buscar en lines_map.json → user_id
+3. Si no se encuentra → user_id = 1 (fallback legacy)
+4. Bot::bootstrap(WASAPBOT_ROOT, user_id) → carga config de ese usuario
+5. Ejecutar pipeline normalmente
+
+### Auth flow
+- Login: POST /login → valida credenciales → inicia sesión PHP → redirige según role
+- Panel admin: GET /panel → require_admin() → panel.php
+- Panel cliente: GET /cliente → require_auth() → client.php (futuro)
+- Logout: GET /logout → destruye sesión → redirige a /login
+
+### UserManager (src/Core/UserManager.php)
+- CRUD sobre data/users.json con flock()
+- Password hashing: password_hash(PASSWORD_BCRYPT)
+- Auth: password_verify()
+- Seed: crea admin por defecto si users.json no existe
+
+### Seguridad
+- CSRF tokens en formularios de login y panel
+- Sesiones PHP con regeneración de ID tras login
+- Rate limiting básico en login (sleep 1s en fallo)

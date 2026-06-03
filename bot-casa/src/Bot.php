@@ -361,10 +361,103 @@ final class Bot implements BotInterface
      * @param string $rootDir Absolute path to the project root (php-bot/).
      * @return array<string, object>  Associative array keyed by instance name.
      */
-    public static function bootstrap(string $rootDir): array
+    /**
+     * Resolve a data path for a specific user. If userId > 0 and that
+     * user has a data directory at data/users/{userId}/, return the
+     * user-specific path. Otherwise return the legacy root-level path.
+     *
+     * @param string $rootDir   Project root (WASAPBOT_ROOT)
+     * @param int    $userId    User ID (0 = legacy / default)
+     * @param string $relative  Relative path from data/ (e.g. "session_memory.ndjson")
+     * @return string Absolute path
+     */
+    public static function resolveUserDataPath(string $rootDir, int $userId, string $relative): string
     {
+        if ($userId > 0) {
+            $userDataDir = rtrim($rootDir, '/') . '/data/users/' . $userId;
+            $userFilePath = $userDataDir . '/' . ltrim($relative, '/');
+            if (is_dir($userDataDir) || file_exists($userFilePath)) {
+                // Ensure directory exists
+                if (!is_dir($userDataDir)) {
+                    @mkdir($userDataDir, 0755, true);
+                }
+                return $userFilePath;
+            }
+        }
+        // Legacy fallback
+        return rtrim($rootDir, '/') . '/data/' . ltrim($relative, '/');
+    }
+
+    /**
+     * Get the config directory for a specific user.
+     * If userId > 0 and data/users/{userId}/config.local.json exists,
+     * the user dir becomes the config dir (so Config loads from there).
+     * Otherwise returns the root config dir.
+     */
+    public static function resolveUserConfigDir(string $rootDir, int $userId): string
+    {
+        if ($userId > 0) {
+            $userDir = rtrim($rootDir, '/') . '/data/users/' . $userId;
+            if (is_dir($userDir) || file_exists($userDir . '/config.local.json')) {
+                if (!is_dir($userDir)) {
+                    @mkdir($userDir, 0755, true);
+                }
+                // If no config.local.json in user dir, copy from root (first time)
+                if (!file_exists($userDir . '/config.local.json')) {
+                    $rootLocal = $rootDir . '/config.local.json';
+                    $rootDist  = $rootDir . '/config.dist.json';
+                    if (file_exists($rootLocal)) {
+                        @copy($rootLocal, $userDir . '/config.local.json');
+                    } elseif (file_exists($rootDist)) {
+                        @copy($rootDist, $userDir . '/config.local.json');
+                    }
+                }
+                return $userDir;
+            }
+        }
+        return $rootDir;
+    }
+
+    public static function bootstrap(string $rootDir, int $userId = 0): array
+    {
+        // ── Resolve config directory for this user ───────────────────
+        $configDir = self::resolveUserConfigDir($rootDir, $userId);
+
         // ── Core ─────────────────────────────────────────────────────
-        $config = new \WasapBot\Core\Config($rootDir);
+        $config = new \WasapBot\Core\Config($configDir);
+
+        // ── Override relative data paths to be user-specific ─────────
+        if ($userId > 0) {
+            $fileKeys = [
+                'files.session_memory', 'files.leads', 'files.reminders',
+                'files.playbook', 'files.wa_raw_payload', 'files.bot_log',
+                'bot.mode_file',
+            ];
+            foreach ($fileKeys as $key) {
+                $val = $config->get($key, '');
+                if (is_string($val) && $val !== '') {
+                    $resolved = self::resolveUserDataPath($rootDir, $userId, $val);
+                    // Only override if the user data dir exists or we're explicitly in multi-user mode
+                    $userDataDir = rtrim($rootDir, '/') . '/data/users/' . $userId;
+                    if (is_dir($userDataDir)) {
+                        $config->set($key, $resolved);
+                    }
+                }
+            }
+            // Override lock dirs
+            $lockKeys = ['files.session_memory_lock', 'files.leads_lock', 'files.reminders_lock'];
+            foreach ($lockKeys as $key) {
+                $val = $config->get($key, '');
+                if (is_string($val) && $val !== '') {
+                    $resolved = self::resolveUserDataPath($rootDir, $userId, $val);
+                    $userDataDir = rtrim($rootDir, '/') . '/data/users/' . $userId;
+                    if (is_dir($userDataDir)) {
+                        $config->set($key, $resolved);
+                    }
+                }
+            }
+        }
+
         $logger = new \WasapBot\Core\FileLogger($config);
 
         // ── HTTP Client ──────────────────────────────────────────────

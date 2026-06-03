@@ -1018,3 +1018,41 @@ Las siguientes acciones POST DEBEN seguir funcionando **exactamente igual** que 
 - Los nombres de los campos del formulario (`name`) NO DEBEN cambiar.
 - Las URLs de redirección después de cada acción NO DEBEN cambiar.
 - La validación de CSRF existente para estas acciones NO DEBE romperse.
+
+## Contratos BOT-CASA-MULTIUSER
+
+### Contrato de UserManager
+- `UserManager::loadUsers()` — Lee data/users.json con flock(LOCK_SH), devuelve array
+- `UserManager::saveUsers(array)` — Escribe con flock(LOCK_EX)
+- `UserManager::createUser(username, password, role, name)` — Hash bcrypt, asigna next_id++
+- `UserManager::authenticate(username, password)` — password_verify(), devuelve array usuario o null
+- `UserManager::getUser(id)` — Busca por id
+- `UserManager::listUsers()` — Todos los usuarios activos
+- `UserManager::updateUser(id, data)` — Actualiza campos
+- Si users.json no existe → crea admin por defecto (admin/admin123)
+
+### Contrato de autenticación
+- POST /login: campos `username`, `password`, `csrf_token`
+- Sesión guarda: `user_id`, `username`, `role`
+- Regeneración de session_id tras login exitoso
+- GET /logout: destruye sesión, redirige a /login
+- Función `require_auth()`: comprueba $_SESSION['user_id'], si no → 401/redirect
+- Función `require_admin()`: comprueba role === 'admin', si no → 403
+
+### Contrato de routing webhook
+- Debe preservar 100% compatibilidad con el webhook actual
+- Si last9 no está en lines_map → user_id = 1 (legacy)
+- Si last9 está en lines_map → usar ese user_id
+- El parámetro user_id se propaga a Bot::bootstrap() y a todas las rutas de datos
+
+### Contrato de aislamiento de datos
+- Las funciones que resuelven paths (Config, Memory, Logger) deben aceptar user_id opcional
+- Si user_id > 0 y existe data/users/{user_id}/ → usar ese path
+- Si no → usar el path legacy en data/
+- El archivo .bot_mode es por usuario
+- session_memory.ndjson, leads.ndjson, bot.log son por usuario
+
+### Contrato de no regresión
+- Si no existe data/users/ → todo funciona como antes (legacy mode)
+- El pipeline (handleWebhook) no cambia su lógica
+- Las rutas existentes (/panel, /webhook, /health, /info) siguen funcionando
