@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-06-03 — BOT-CASA-MULTIUSER FASE 3 (panel cliente + secciones principales)
+
+### Implementado
+- **client.php**: Nuevo panel de cliente con 3 tabs (Dashboard, Mi Bot, Personalidad). Accesible por usuarios normales (ven su panel) y admin con suplantar.
+- **Dashboard**: Stats visuales en tarjetas (conversaciones totales/hoy, leads totales/hoy, líneas activas). Adaptado por usuario (datos de su data/).
+- **Mi Bot**: ON/OFF simplificado, checklist de configuración (WhatsApp vinculado, tarifas, personalidad), guía paso a paso.
+- **Personalidad**: Prompt parametrizado con dropdowns (tono de voz, modo hablante, emojis, longitud) + textareas guiadas (tarifas, ubicación, servicios, ofertas). Preview en tiempo real.
+- **Tooltips**: Sistema reutilizable con icono `?` y caja flotante explicativa.
+- **Responsive**: CSS mobile-first con stats grid adaptativo y prompt layout colapsable.
+- **Ruta /cliente**: Ahora acepta usuarios normales (require_auth) y admin con suplantar.
+
+### Seguridad (hallazgos corregidos)
+- **HIGH**: Config key injection en save_config → allowlist explícito de 18 claves permitidas
+- **MEDIUM**: CSRF token compartido entre usuarios → token ligado a user_id
+- **MEDIUM**: Path traversal en resolvePath() → validación realpath() dentro de WASAPBOT_ROOT
+
+### Archivos
+- **Nuevos (1):** `bot-casa/public/client.php`
+- **Modificados (1):** `bot-casa/public/index.php`
+- **Documentación:** `changelog.md`, `spec/tasks.md`
+
+### Verificación
+- `php -l client.php`: PASS
+- `php -l index.php`: PASS
+- Dashboard: stats por usuario funcionales
+- Personalidad: save_config con allowlist, preview en tiempo real
+- Tooltips: hover/focus para mostrar ayuda
+
 ## 2026-06-03 — BOT-CASA-MULTIUSER FASE 2 (panel admin + usuarios + suplantar)
 
 ### Implementado

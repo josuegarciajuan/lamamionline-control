@@ -584,12 +584,14 @@
 
 ### FASE 3 — Panel Cliente + Secciones Principales
 
-- [ ] T3.1 — Crear public/client.php con nuevo layout y tabs.
-- [ ] T3.2 — Dashboard con stats visuales por usuario.
-- [ ] T3.3 — Sección "Mi Bot": ON/OFF simplificado, descripción.
-- [ ] T3.4 — Sección "Personalidad": prompt parametrizado con dropdowns.
-- [ ] T3.5 — Sistema de tooltips reutilizable.
-- [ ] T3.6 — CSS mobile-first responsive.
+- [x] T3.1 — Crear public/client.php con nuevo layout y tabs (Dashboard, Mi Bot, Personalidad).
+- [x] T3.2 — Dashboard con stats visuales por usuario (conversaciones, leads, líneas activas).
+- [x] T3.3 — Sección "Mi Bot": ON/OFF simplificado, checklist de configuración, guía paso a paso.
+- [x] T3.4 — Sección "Personalidad": prompt parametrizado con dropdowns (tono, modo, emojis, longitud) + textareas guiadas + preview.
+- [x] T3.5 — Sistema de tooltips reutilizable con icono ? y caja flotante.
+- [x] T3.6 — CSS mobile-first responsive (stats grid, prompt layout colapsable).
+
+**FASE 3 COMPLETADA.**
 
 ### FASE 4 — Líneas + Chicas + Estados
 
