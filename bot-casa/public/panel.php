@@ -11,6 +11,11 @@ declare(strict_types=1);
  */
 
 // ─────────────────────────────────────────────────────────────────────
+//  Bootstrap — define root BEFORE any usage
+// ─────────────────────────────────────────────────────────────────────
+define('WASAPBOT_ROOT', dirname(__DIR__));
+
+// ─────────────────────────────────────────────────────────────────────
 //  Session/auth gate (defense in depth)
 // ─────────────────────────────────────────────────────────────────────
 if (session_status() === PHP_SESSION_NONE) {
@@ -34,8 +39,6 @@ $adminRole = $_SESSION['role'] ?? '';
 // ─────────────────────────────────────────────────────────────────────
 //  Bootstrap
 // ─────────────────────────────────────────────────────────────────────
-
-define('WASAPBOT_ROOT', dirname(__DIR__));
 
 // PSR-4-like autoloader (same as index.php)
 spl_autoload_register(function (string $class): void {
