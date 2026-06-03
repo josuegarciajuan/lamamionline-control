@@ -52,6 +52,17 @@ $clientName = h((string) ($clientUser['name'] ?? $clientUser['username'] ?? 'Usu
 $configDir = \WasapBot\Bot::resolveUserConfigDir(WASAPBOT_ROOT, $clientUserId);
 $config = new \WasapBot\Core\Config($configDir);
 
+// ── Override data paths for non-admin users (data isolation) ──
+if ($clientUserId > 1) {
+    $fileKeys = ['files.session_memory', 'files.leads', 'files.reminders', 'files.playbook', 'files.wa_raw_payload', 'files.bot_log', 'bot.mode_file'];
+    foreach ($fileKeys as $key) {
+        $val = $config->get($key, '');
+        if (is_string($val) && $val !== '') {
+            $config->set($key, \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $clientUserId, $val));
+        }
+    }
+}
+
 // ── Helpers ──
 function h(string $s): string { return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 function cv(string $key, mixed $default = ''): string {
@@ -575,7 +586,7 @@ function dismissWizard() {
                 <div class="form-row">
                     <div class="form-group">
                         <label>Tono de voz principal</label>
-                        <select name="prompt[sections][estilo_tipo]" onchange="updateTonoPreview()">
+                        <select name="prompt[sections][estilo_tipo]" onchange="buildPreview()">
                             <?php
                             $tonos = [
                                 'latina_barrio'  => '💃 Latina de barrio (directa, pícara, coloquial)',
@@ -1599,7 +1610,9 @@ document.querySelectorAll('#tabNav button[data-tab]').forEach(function(btn){
 
 // ── Prompt preview ──
 function buildPreview() {
+    try {
     var tono = document.querySelector('select[name="prompt[sections][estilo_tipo]"]');
+    if (!tono) return; // Only build if Personalidad tab elements exist
     var tonoLabel = tono ? tono.options[tono.selectedIndex].text.split(' ').slice(1).join(' ') : 'Latina de barrio';
     var speaker = document.querySelector('select[name="prompt[sections][speaker_mode]"]');
     var speakerLabel = speaker ? speaker.options[speaker.selectedIndex].text : 'Como la chica';
@@ -1656,6 +1669,7 @@ function buildPreview() {
 
     var stats = document.getElementById('prompt-stats');
     if (stats) stats.innerHTML = '';
+    } catch(e) { /* silently ignore if elements not found */ }
 }
 
 // Reset field to default value
