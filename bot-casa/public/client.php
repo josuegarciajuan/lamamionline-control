@@ -161,10 +161,11 @@ $botStatusLabel = $botMode === 'start' ? 'ENCENDIDO' : ($botMode === 'stop' ? 'A
 $leadsPath  = resolvePath('files.leads', 'data/leads.ndjson');
 $memoryPath = resolvePath('files.session_memory', 'data/session_memory.ndjson');
 $todayStr = (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Madrid')))->format('Y-m-d');
-$leadsTotal = 0; $leadsToday = 0;
+$leadsTotal = 0; $leadsToday = 0; $leadsArrived = 0;
 foreach (readNdjson($leadsPath) as $lead) {
     $leadsTotal++;
     if (str_starts_with((string) ($lead['ts'] ?? ''), $todayStr)) $leadsToday++;
+    if (!empty($lead['arrived'])) $leadsArrived++;
 }
 $allThreads = []; $todayThreads = [];
 foreach (readNdjson($memoryPath) as $rec) {
@@ -461,8 +462,31 @@ function dismissWizard() {
             </div>
             <div class="stat-card">
                 <div class="stat-num" style="color:var(--accent2)"><?php echo $linesForUser; ?></div>
-                <div class="stat-label">Líneas activas</div>
-                <div class="stat-sub">WhatsApp vinculados</div>
+                <div class="stat-label">Líneas WhatsApp</div>
+                <div class="stat-sub">Vinculadas al bot</div>
+            </div>
+            <?php
+            $girlsActiveCount = 0;
+            $gf = WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/girls.json';
+            if (file_exists($gf)) {
+                $gd = @json_decode((string)@file_get_contents($gf), true);
+                if (is_array($gd)) $girlsActiveCount = count(array_filter($gd['girls']??[], fn($g)=>!empty($g['activa'])));
+            }
+            ?>
+            <div class="stat-card">
+                <div class="stat-num" style="color:#a78bfa"><?php echo $girlsActiveCount; ?></div>
+                <div class="stat-label">Chicas activas</div>
+                <div class="stat-sub">En catálogo</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num" style="color:<?php echo $leadsTotal>0&&$leadsArrived>0?'var(--ok)':'var(--text-muted)'; ?>"><?php echo $leadsArrived??0; ?></div>
+                <div class="stat-label">Clientes recibidos</div>
+                <div class="stat-sub">Marcados como llegados</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num" style="color:#f97316"><?php echo count($allThreads)>0 ? round(count($allThreads)/max($leadsTotal,1),1) : 0; ?></div>
+                <div class="stat-label">Ratio conv/lead</div>
+                <div class="stat-sub">Conversaciones por lead</div>
             </div>
         </div>
     </div>
@@ -508,8 +532,8 @@ function dismissWizard() {
         <h2>🚀 Empezar</h2>
         <p style="color:var(--text-muted);font-size:.85rem">
             1. Configura tu <strong>Personalidad</strong> (tarifas, estilo, ubicación)<br>
-            2. Vincula tus <strong>líneas de WhatsApp</strong> (próximamente)<br>
-            3. Añade tu <strong>catálogo de chicas</strong> (próximamente)<br>
+            2. Vincula tus <strong>líneas de WhatsApp</strong> en la pestaña 📱 Líneas<br>
+            3. Añade tu <strong>catálogo de chicas</strong> en la pestaña 👩 Chicas<br>
             4. ¡Enciende el bot y empieza a recibir clientes!
         </p>
     </div>
@@ -518,7 +542,7 @@ function dismissWizard() {
 <!-- ===== TAB: Personalidad ===== -->
 <div class="tab-content" id="tab-personalidad">
     <div class="section-guide">
-        💡 <strong>Consejo:</strong> Cuanto más detallada sea la configuración, mejor responderá tu bot. Tómate tu tiempo para rellenar cada sección.
+        💡 <strong>Consejo:</strong> Cuanto más detallada sea la configuración, mejor responderá tu bot. Tómate tu tiempo para rellenar cada sección. Usa el botón 🔄 para restaurar valores de fábrica si te lías.
     </div>
 
     <div class="prompt-layout">
@@ -603,10 +627,11 @@ function dismissWizard() {
             <!-- Tarifas -->
             <div class="card">
                 <h2>💰 Tarifas y precios
-                    <span class="tooltip-wrap">
-                        <span class="tooltip-icon">?</span>
-                        <span class="tooltip-box">Define tus precios. El bot usará EXACTAMENTE estos valores. Si cambias los precios, cambia esto.</span>
+                    <span class="tooltip-wrap"><span class="tooltip-icon">?</span>
+                        <span class="tooltip-box">Define tus precios. El bot usará EXACTAMENTE estos valores.</span>
                     </span>
+                    <button type="button" class="btn btn-sm" style="float:right;background:var(--input-bg);color:var(--text-muted);font-size:.7rem"
+                        onclick="resetField('prompt\\[sections\\]\\[tarifas\\]','30€ = rapidito 10 min\n50€ = media hora completo\n100€ = 1 hora completo')">🔄 Restaurar</button>
                 </h2>
                 <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:12px">
                     Escribe tus tarifas en formato libre. Ejemplo:<br>
@@ -618,15 +643,16 @@ function dismissWizard() {
             <!-- Ubicación -->
             <div class="card">
                 <h2>📍 Ubicación
-                    <span class="tooltip-wrap">
-                        <span class="tooltip-icon">?</span>
-                        <span class="tooltip-box">Zona general donde estás. El bot dirá esto cuando le pregunten. No pongas la dirección exacta, solo zona/barrio.</span>
+                    <span class="tooltip-wrap"><span class="tooltip-icon">?</span>
+                        <span class="tooltip-box">Zona general. El bot dirá esto cuando le pregunten. No pongas dirección exacta.</span>
                     </span>
+                    <button type="button" class="btn btn-sm" style="float:right;background:var(--input-bg);color:var(--text-muted);font-size:.7rem"
+                        onclick="resetField('prompt\\[sections\\]\\[zona\\]','');resetField('prompt\\[sections\\]\\[ubicacion\\]','');resetField('urls\\[google_maps_location\\]','')">🔄 Restaurar</button>
                 </h2>
                 <div class="form-row">
                     <div class="form-group" style="flex:2">
                         <label>Zona / ciudad</label>
-                        <input type="text" name="prompt[sections][zona]" value="<?php echo cv('prompt.sections.zona'); ?>" placeholder="Ej: Burriana centro, piso discreto">
+                        <input type="text" name="prompt[sections][zona]" value="<?php echo cv('prompt.sections.zona'); ?>" placeholder="Ej: Zona centro, piso discreto">
                     </div>
                     <div class="form-group" style="flex:1">
                         <label>Enlace Google Maps</label>
@@ -638,7 +664,10 @@ function dismissWizard() {
 
             <!-- Servicios -->
             <div class="card">
-                <h2>🛏️ Servicios</h2>
+                <h2>🛏️ Servicios
+                    <button type="button" class="btn btn-sm" style="float:right;background:var(--input-bg);color:var(--text-muted);font-size:.7rem"
+                        onclick="resetField('prompt\\[sections\\]\\[servicios\\]','Servicio completo con preservativo.\nFrancés natural solo en tarifa de 1h si el cliente lo pide.\nGriego solo si el cliente pregunta expresamente.\nNo salidas a domicilio.')">🔄 Restaurar</button>
+                </h2>
                 <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:8px">
                     Describe los servicios disponibles. El bot usará esta información cuando le pregunten.
                 </p>
@@ -647,7 +676,10 @@ function dismissWizard() {
 
             <!-- Ofertas -->
             <div class="card">
-                <h2>🎁 Ofertas especiales (opcional)</h2>
+                <h2>🎁 Ofertas especiales (opcional)
+                    <button type="button" class="btn btn-sm" style="float:right;background:var(--input-bg);color:var(--text-muted);font-size:.7rem"
+                        onclick="resetField('prompt\\[sections\\]\\[ofertas\\]','')">🔄 Restaurar</button>
+                </h2>
                 <textarea name="prompt[sections][ofertas]" class="code-area" style="width:100%;min-height:60px" spellcheck="false"><?php echo cv('prompt.sections.ofertas'); ?></textarea>
             </div>
 
@@ -656,14 +688,16 @@ function dismissWizard() {
             </div>
         </div>
 
-        <!-- Preview column -->
+        <!-- Preview column (friendly summary) -->
         <div class="prompt-preview-col">
             <div class="card prompt-preview-card">
-                <h2>Vista previa del prompt</h2>
+                <h2>🧠 Configuración actual</h2>
                 <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:8px">
-                    Así ve el bot la configuración. Solo lectura.
+                    Resumen de cómo está configurado tu bot ahora mismo.
                 </p>
-                <pre id="prompt-preview" class="prompt-preview-box" style="font-size:.72rem">Cargando...</pre>
+                <div id="prompt-summary" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;font-size:.82rem;line-height:1.6;color:var(--text);max-height:60vh;overflow-y:auto">
+                    <p style="color:var(--text-muted)">Completa los campos de la izquierda para ver el resumen.</p>
+                </div>
                 <div id="prompt-stats" class="prompt-stats"></div>
             </div>
         </div>
@@ -1381,68 +1415,73 @@ document.querySelectorAll('#tabNav button[data-tab]').forEach(function(btn){
 // ── Prompt preview ──
 function buildPreview() {
     var tono = document.querySelector('select[name="prompt[sections][estilo_tipo]"]');
-    var tonoLabel = tono ? tono.options[tono.selectedIndex].text : '';
+    var tonoLabel = tono ? tono.options[tono.selectedIndex].text.split(' ').slice(1).join(' ') : 'Latina de barrio';
+    var speaker = document.querySelector('select[name="prompt[sections][speaker_mode]"]');
+    var speakerLabel = speaker ? speaker.options[speaker.selectedIndex].text : 'Como la chica';
+    var emoji = document.querySelector('select[name="prompt[sections][emoji_level]"]');
+    var emojiLabel = emoji ? emoji.options[emoji.selectedIndex].text : 'Moderado';
+    var len = document.querySelector('select[name="prompt[sections][reply_length]"]');
+    var lenLabel = len ? len.options[len.selectedIndex].text : 'Corta';
     var tarifas = document.querySelector('textarea[name="prompt[sections][tarifas]"]');
-    var ubicacion = document.querySelector('textarea[name="prompt[sections][ubicacion]"]');
     var zona = document.querySelector('input[name="prompt[sections][zona]"]');
     var servicios = document.querySelector('textarea[name="prompt[sections][servicios]"]');
-    var ofertas = document.querySelector('textarea[name="prompt[sections][ofertas]"]');
-    var mapsUrl = document.querySelector('input[name="urls[google_maps_location]"]');
 
-    var parts = [];
-    parts.push('=== BOT-CASA CONFIG ===');
-    parts.push('');
-    parts.push('TONO: ' + (tonoLabel || 'Latina de barrio'));
-    parts.push('');
-    if ((tarifas && tarifas.value.trim()) || (ubicacion && ubicacion.value.trim())) {
-        parts.push('--- TARIFAS ---');
-        parts.push((tarifas && tarifas.value.trim()) ? tarifas.value.trim() : '(sin configurar)');
-        parts.push('');
-        parts.push('--- UBICACIÓN ---');
-        if (zona && zona.value.trim()) parts.push('Zona: ' + zona.value.trim());
-        if (ubicacion && ubicacion.value.trim()) parts.push(ubicacion.value.trim());
-        if (!zona && !(ubicacion && ubicacion.value.trim())) parts.push('(sin configurar)');
-        parts.push('');
-    }
-    if (servicios && servicios.value.trim()) {
-        parts.push('--- SERVICIOS ---');
-        parts.push(servicios.value.trim());
-        parts.push('');
-    }
-    if (ofertas && ofertas.value.trim()) {
-        parts.push('--- OFERTAS ---');
-        parts.push(ofertas.value.trim());
-        parts.push('');
-    }
-    if (mapsUrl && mapsUrl.value.trim()) {
-        parts.push('Google Maps: ' + mapsUrl.value.trim());
-        parts.push('');
-    }
-    parts.push('---');
-    parts.push('(El prompt completo incluye reglas avanzadas gestionadas automáticamente por el sistema)');
+    // Count price lines (e.g. "30€...") in tarifas
+    var tarifasVal = tarifas ? tarifas.value.trim() : '';
+    var priceCount = (tarifasVal.match(/[\d]+[€$]/g) || []).length;
+    var hasTarifas = tarifasVal.length > 10;
+    var hasZona = zona && zona.value.trim().length > 0;
+    var hasServicios = servicios && servicios.value.trim().length > 10;
 
-    var preview = document.getElementById('prompt-preview');
-    if (preview) preview.textContent = parts.join('\n');
+    var html = '';
+    html += '<div style="margin-bottom:12px"><strong style="color:var(--accent)">🎨 Estilo:</strong> ' + escHtml(tonoLabel) + '</div>';
+    html += '<div style="margin-bottom:12px"><strong>🗣 Habla:</strong> ' + escHtml(speakerLabel) + ' · ' + escHtml(emojiLabel) + ' · ' + escHtml(lenLabel) + '</div>';
+
+    html += '<div style="margin-bottom:12px"><strong>💰 Tarifas:</strong> ';
+    if (hasTarifas) {
+        html += '<span style="color:var(--ok)">✅ ' + priceCount + ' precios configurados</span>';
+    } else {
+        html += '<span style="color:var(--warn)">⚠️ Sin configurar</span>';
+    }
+    html += '</div>';
+
+    html += '<div style="margin-bottom:12px"><strong>📍 Ubicación:</strong> ';
+    if (hasZona) {
+        html += '<span style="color:var(--ok)">✅ ' + escHtml(zona.value.trim().substring(0,40)) + '</span>';
+    } else {
+        html += '<span style="color:var(--warn)">⚠️ Sin configurar</span>';
+    }
+    html += '</div>';
+
+    html += '<div style="margin-bottom:12px"><strong>🛏️ Servicios:</strong> ';
+    if (hasServicios) {
+        html += '<span style="color:var(--ok)">✅ Configurados</span>';
+    } else {
+        html += '<span style="color:var(--warn)">⚠️ Sin configurar</span>';
+    }
+    html += '</div>';
+
+    var configured = (hasTarifas ? 1 : 0) + (hasZona ? 1 : 0) + (hasServicios ? 1 : 0);
+    html += '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);text-align:center;color:var(--text-muted);font-size:.78rem">';
+    html += configured + '/3 secciones configuradas';
+    html += '</div>';
+
+    var summary = document.getElementById('prompt-summary');
+    if (summary) summary.innerHTML = html;
 
     var stats = document.getElementById('prompt-stats');
-    if (stats) {
-        var totalChars = parts.join('\n').length;
-        var configured = (tarifas && tarifas.value.trim().length > 10) ? 1 : 0;
-        configured += (zona && zona.value.trim().length > 0) ? 1 : 0;
-        configured += (servicios && servicios.value.trim().length > 10) ? 1 : 0;
-        stats.innerHTML = '<span class="' + (totalChars > 100 ? 'stat-ok' : 'stat-warn') + '">' + totalChars + ' caracteres</span>'
-            + '<span>' + configured + '/3 secciones configuradas</span>';
-    }
+    if (stats) stats.innerHTML = '';
 }
 
-function updateTonoPreview() { buildPreview(); }
-
-// Bind all inputs
-document.addEventListener('DOMContentLoaded', function() {
-    buildPreview();
-    var inputs = document.querySelectorAll('textarea[name^="prompt"], input[name^="prompt"], input[name^="urls"], select[name^="prompt"]');
-    inputs.forEach(function(el) { el.addEventListener('input', buildPreview); });
-});
+// Reset field to default value
+function resetField(name, defaultValue) {
+    var el = document.querySelector('[name="' + name + '"]');
+    if (el) {
+        el.value = defaultValue;
+        el.dispatchEvent(new Event('input', {bubbles:true}));
+        buildPreview();
+    }
+}
 </script>
 </body>
 </html>
