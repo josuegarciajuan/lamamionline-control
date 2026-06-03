@@ -127,12 +127,12 @@ try {
             $instanceDir = "/srv/waha{$wahaNum}";
 
             if (is_dir($instanceDir)) {
-                echo json_encode(['ok' => false, 'error' => "Directory {$instanceDir} already exists"]);
-                break;
+                // Directory exists from a previous instance — stop it first, then reuse
+                execCmd("cd {$instanceDir} && docker compose down 2>/dev/null");
             }
 
             // Create directory
-            if (!@mkdir($instanceDir, 0755, true)) {
+            if (!@mkdir($instanceDir, 0755, true) && !is_dir($instanceDir)) {
                 echo json_encode(['ok' => false, 'error' => "Cannot create {$instanceDir}"]);
                 break;
             }
@@ -216,8 +216,9 @@ YAML;
                 break;
             }
 
-            $result = execCmd("cd {$instanceDir} && docker compose down 2>/dev/null; rm -rf {$instanceDir}");
-            echo json_encode(['ok' => $result['ok'], 'output' => $result['output']]);
+            // Stop container (don't delete dir — root-owned files can't be removed by www-data)
+            $r1 = execCmd("cd {$instanceDir} && docker compose down 2>/dev/null");
+            echo json_encode(['ok' => $r1['ok'], 'output' => $r1['output']]);
             break;
 
         case 'reset':
