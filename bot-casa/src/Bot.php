@@ -240,8 +240,22 @@ final class Bot implements BotInterface
             }
 
             // ── 12. Catalog formatter (CatalogFormatter) ─────────────
+            $textBeforeCatalog = $ctx['output_text'] ?? '';
             if (isset($this->processors[3]) && $this->processors[3]->name() === 'CatalogFormatter') {
                 $ctx = $this->processors[3]->process($ctx);
+            }
+            // Diagnostic: log if CatalogFormatter added photos via regex fallback
+            $textAfterCatalog = $ctx['output_text'] ?? '';
+            $photoAction = $ctx['photo_action'] ?? 'none';
+            if ($photoAction === 'none' && $textAfterCatalog !== $textBeforeCatalog) {
+                $hasNewPhotos = (bool) preg_match('/(?:https?:\/\/(?:compartir\.site|ibb\.co|i\.ibb\.co)\/)/i', $textAfterCatalog)
+                    && !preg_match('/(?:https?:\/\/(?:compartir\.site|ibb\.co|i\.ibb\.co)\/)/i', (string) $textBeforeCatalog);
+                if ($hasNewPhotos) {
+                    $this->logger->info('Bot::CatalogFormatter — injected photos via regex fallback (photo_action=none)', [
+                        'phone'     => $fromPhone,
+                        'thread_id' => $ctx['thread_id'] ?? '?',
+                    ]);
+                }
             }
 
             // ── 13. Dedupe reply (DedupeReply) ───────────────────────
@@ -413,13 +427,10 @@ final class Bot implements BotInterface
                 if (!is_dir($userDir)) {
                     @mkdir($userDir, 0755, true);
                 }
-                // If no config.local.json in user dir, copy from root (first time)
+                // If no config.local.json in user dir, create from dist template (not root's local)
                 if (!file_exists($userDir . '/config.local.json')) {
-                    $rootLocal = $rootDir . '/config.local.json';
-                    $rootDist  = $rootDir . '/config.dist.json';
-                    if (file_exists($rootLocal)) {
-                        @copy($rootLocal, $userDir . '/config.local.json');
-                    } elseif (file_exists($rootDist)) {
+                    $rootDist = $rootDir . '/config.dist.json';
+                    if (file_exists($rootDist)) {
                         @copy($rootDist, $userDir . '/config.local.json');
                     }
                 }
@@ -705,33 +716,51 @@ final class Bot implements BotInterface
         if ($lockDir !== '' && $fromPhone !== '') {
             $pending = \WasapBot\Pipeline\InflightGate::drainPending($lockDir, $fromPhone);
             if ($pending !== []) {
-                $this->logger->info('Bot::sendMessages — new messages arrived before send, re-processing', [
-                    'phone'      => $fromPhone,
-                    'num_pending' => count($pending),
-                    'send_depth'  => $sendDepth,
-                ]);
-                // Append pending messages to current message_text and re-process
-                $originalText = (string) ($ctx['message_text'] ?? '');
-                $parts = $originalText !== '' ? [$originalText] : [];
-                foreach ($pending as $p) {
-                    $t = (string) ($p['message_text'] ?? '');
-                    if ($t !== '' && $t !== $originalText) {
-                        $parts[] = $t;
+                // If already re-processed once, merge without full LLM re-run to avoid cascade
+                $alreadyReprocessed = ((int) ($ctx['__pending_drained_count'] ?? 0)) >= 1;
+                if ($alreadyReprocessed) {
+                    $this->logger->info('Bot::sendMessages — new messages arrived but already re-processed, merging without LLM', [
+                        'phone'       => $fromPhone,
+                        'num_pending' => count($pending),
+                        'send_depth'  => $sendDepth,
+                    ]);
+                    foreach ($pending as $p) {
+                        $t = (string) ($p['message_text'] ?? '');
+                        if ($t !== '') {
+                            $messages[] = ['text' => $t, '__is_first' => false, '__split_index' => count($messages)];
+                        }
                     }
+                    $ctx['splitted_messages'] = $messages;
+                    // Don't recurse — fall through to send current + appended messages
+                } else {
+                    $this->logger->info('Bot::sendMessages — new messages arrived before send, re-processing', [
+                        'phone'       => $fromPhone,
+                        'num_pending' => count($pending),
+                        'send_depth'  => $sendDepth,
+                    ]);
+                    // Append pending messages to current message_text and re-process
+                    $originalText = (string) ($ctx['message_text'] ?? '');
+                    $parts = $originalText !== '' ? [$originalText] : [];
+                    foreach ($pending as $p) {
+                        $t = (string) ($p['message_text'] ?? '');
+                        if ($t !== '' && $t !== $originalText) {
+                            $parts[] = $t;
+                        }
+                    }
+                    $ctx['message_text']     = implode(' | ', $parts);
+                    $ctx['__coalesced_text'] = $ctx['message_text'];
+                    $ctx['__reprocess_depth'] = ((int) ($ctx['__reprocess_depth'] ?? 0)) + 1;
+                    $ctx['__is_reprocess']   = true;
+
+                    // Re-run the full LLM pipeline with the coalesced input
+                    $ctx = $this->handleIncomingWhileProcessing($ctx, $lockDir, $fromPhone);
+
+                    // Reload messages after re-processing and recurse
+                    $newMessages = $ctx['splitted_messages'] ?? [$ctx['output_text'] ?? ''];
+                    $this->sendMessages($ctx, $newMessages, $lockDir, $fromPhone);
+                    $sendDepth--;
+                    return;
                 }
-                $ctx['message_text']     = implode(' | ', $parts);
-                $ctx['__coalesced_text'] = $ctx['message_text'];
-                $ctx['__reprocess_depth'] = ((int) ($ctx['__reprocess_depth'] ?? 0)) + 1;
-                $ctx['__is_reprocess']   = true;
-
-                // Re-run the full LLM pipeline with the coalesced input
-                $ctx = $this->handleIncomingWhileProcessing($ctx, $lockDir, $fromPhone);
-
-                // Reload messages after re-processing and recurse
-                $newMessages = $ctx['splitted_messages'] ?? [$ctx['output_text'] ?? ''];
-                $this->sendMessages($ctx, $newMessages, $lockDir, $fromPhone);
-                $sendDepth--;
-                return;
             }
         }
 
@@ -981,6 +1010,29 @@ final class Bot implements BotInterface
             return $ctx;
         }
 
+        // Skip if CatalogFormatter already injected photo URLs (avoid double injection)
+        $alreadyInjected = false;
+        $splittedMessages = $ctx['splitted_messages'] ?? [];
+        $photoUrlPattern = '/(?:https?:\/\/(?:compartir\.site|ibb\.co|i\.ibb\.co)\/)/i';
+        foreach ($splittedMessages as $msg) {
+            $text = is_array($msg) ? ((string) ($msg['text'] ?? '')) : (string) $msg;
+            if ($text !== '' && preg_match($photoUrlPattern, $text)) {
+                $alreadyInjected = true;
+                break;
+            }
+        }
+        // Also check the output_text itself
+        if (!$alreadyInjected && preg_match($photoUrlPattern, $outputText)) {
+            $alreadyInjected = true;
+        }
+        if ($alreadyInjected) {
+            $this->logger->debug('Bot::injectPhotoUrls — skipped (CatalogFormatter already injected photos)', [
+                'phone'     => $ctx['from_phone'] ?? '?',
+                'thread_id' => $ctx['thread_id'] ?? '?',
+            ]);
+            return $ctx;
+        }
+
         // Skip if photos were already sent in this conversation
         $yaEnviado = (array) ($ctx['ya_enviado'] ?? []);
         $photoInsistCount = (int) ($ctx['photo_insist_count'] ?? 0);
@@ -1140,6 +1192,9 @@ final class Bot implements BotInterface
         if ($pending === []) {
             return $ctx; // No new messages — proceed normally
         }
+
+        // Track re-process count to prevent cascading LLM re-runs in sendMessages
+        $ctx['__pending_drained_count'] = ((int) ($ctx['__pending_drained_count'] ?? 0)) + 1;
 
         $this->logger->info('Bot::handleIncomingWhileProcessing — re-processing with new messages', [
             'phone'      => $fromPhone,
