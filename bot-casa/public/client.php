@@ -61,6 +61,11 @@ if ($clientUserId > 1) {
             $config->set($key, \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $clientUserId, $val));
         }
     }
+    // Clear admin's personal data from dist template
+    $config->set('telegram.chat_ids', []);
+    $config->set('telegram.whatsapp_phones', '');
+    $config->set('telegram.alert_enabled', false);
+    $config->set('urls.google_maps_location', '');
 }
 
 // ── Helpers ──
@@ -224,16 +229,45 @@ if ($method === 'POST' && $action === 'save_config') {
         'prompt.sections.ubicacion',
         'prompt.sections.servicios',
         'prompt.sections.ofertas',
+        'prompt.sections.no_regateo',
+        'prompt.sections.regateo_1',
+        'prompt.sections.regateo_2',
+        'prompt.sections.regateo_3',
+        'prompt.sections.maps_solo_chica',
         // URL field
         'urls.google_maps_location',
-        // Textarea list keys (need special handling: string → array)
+        // Telegram
+        'telegram.chat_ids',
+        'telegram.whatsapp_phones',
+        'telegram.alert_enabled',
+        // Human delays (all subkeys)
+        'human_delays.seen.fallback_sec',
+        'human_delays.seen.random_min_sec',
+        'human_delays.seen.random_max_sec',
+        'human_delays.typing.fallback_sec',
+        'human_delays.typing.chars_per_sec_min',
+        'human_delays.typing.chars_per_sec_max',
+        'human_delays.read.base_min_ms',
+        'human_delays.read.base_max_ms',
+        'human_delays.presend_sleep_sec',
+        'human_delays.habituation.start_boost',
+        'human_delays.habituation.decay',
+        'human_delays.habituation.floor',
+        // Cron
+        'cron.followup.enabled',
+        'cron.followup.max_leads_per_run',
+        'cron.followup.send_window_start',
+        'cron.followup.send_window_end',
+        'cron.reminder.enabled',
+        // Textarea list keys
         'message_variants.audio_auto_reply',
+        'message_variants.eta_request_variants',
         'message_variants.dedup_start',
         'message_variants.dedup_end',
         'cron.followup.intro_variants',
         'cron.followup.closing_variants',
         'cron.reminder.message_variants',
-        // Tab tracking (not persisted to config, just used client-side)
+        // Tab tracking
     ];
     $allowedKeysMap = array_flip($allowedKeys);
 
@@ -253,7 +287,7 @@ if ($method === 'POST' && $action === 'save_config') {
     $walk($_POST);
 
     // Convert textarea array keys (newline-separated → array)
-    $textareaKeys = ['message_variants.audio_auto_reply', 'message_variants.dedup_start', 'message_variants.dedup_end',
+    $textareaKeys = ['telegram.chat_ids', 'telegram.whatsapp_phones', 'message_variants.audio_auto_reply', 'message_variants.eta_request_variants', 'message_variants.dedup_start', 'message_variants.dedup_end',
         'cron.followup.intro_variants', 'cron.followup.closing_variants', 'cron.reminder.message_variants'];
     foreach ($textareaKeys as $tk) {
         if (isset($flat[$tk]) && is_string($flat[$tk])) {
@@ -287,6 +321,15 @@ if ($method === 'POST' && $action === 'toggle_bot') {
             if (is_array($gd)) $activeGirls = count(array_filter($gd['girls']??[], fn($g)=>!empty($g['activa'])));
         }
         if ($activeGirls <= 0) $errors[] = 'No tienes chicas activas. Añade al menos una en 👩 Chicas.';
+        // Check notification config
+        $hasTelegram2 = false; $hasWhatsApp2 = false;
+        $tgVal2 = $config->get('telegram.chat_ids', '');
+        if (is_array($tgVal2)) $hasTelegram2 = count(array_filter($tgVal2, fn($v) => trim((string)$v) !== '')) > 0;
+        elseif (is_string($tgVal2) && trim($tgVal2) !== '') $hasTelegram2 = true;
+        $waVal2 = $config->get('telegram.whatsapp_phones', '');
+        if (is_array($waVal2)) $hasWhatsApp2 = count(array_filter($waVal2, fn($v) => trim((string)$v) !== '')) > 0;
+        elseif (is_string($waVal2) && trim($waVal2) !== '') $hasWhatsApp2 = true;
+        if (!$hasTelegram2 && !$hasWhatsApp2) $errors[] = 'No has configurado dónde recibir avisos. Ve a 👥 Clientes y añade tu Chat ID de Telegram o tu teléfono WhatsApp.';
         if (!empty($errors)) {
             $notification = '<div class="alert alert-warning"><strong>⚠️ No se puede encender el bot todavía:</strong><br>• ' . implode('<br>• ', $errors) . '</div>';
         } else {
@@ -409,7 +452,7 @@ $promptConfigured = strlen($tarifasVal) > 20 && mb_strpos($tarifasVal, $defaultT
 $progressTotal = 4;
 $progressDone = 0;
 if ($linesForUser > 0) $progressDone++;
-if (strlen((string)$config->get('prompt.sections.tarifas','')) > 20) $progressDone++;
+if ($promptConfigured) $progressDone++;
 if (file_exists(WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/girls.json')) {
     $gd = @json_decode((string)@file_get_contents(WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/girls.json'), true);
     if (is_array($gd) && count(array_filter($gd['girls']??[], fn($g)=>!empty($g['activa']))) > 0) $progressDone++;
@@ -560,12 +603,22 @@ function dismissWizard() {
         <div style="margin-top:16px">
             <h3>✅ Configuración necesaria</h3>
             <?php
-            $promptConfigured = $promptConfigured; // already computed above
+            $promptConfigured = $promptConfigured;
             $linesConfigured = $linesForUser > 0;
+            $hasNotifications = false;
+            $tgVal = $config->get('telegram.chat_ids', '');
+            $waVal = $config->get('telegram.whatsapp_phones', '');
+            if (is_array($tgVal)) $hasNotifications = count(array_filter($tgVal, fn($v) => trim((string)$v) !== '')) > 0;
+            elseif (is_string($tgVal) && trim($tgVal) !== '') $hasNotifications = true;
+            if (!$hasNotifications) {
+                if (is_array($waVal)) $hasNotifications = count(array_filter($waVal, fn($v) => trim((string)$v) !== '')) > 0;
+                elseif (is_string($waVal) && trim($waVal) !== '') $hasNotifications = true;
+            }
             $checkItems = [
                 ['✅ Vincular WhatsApp', $linesConfigured, 'Configura tus líneas en la pestaña 📱 Líneas.'],
                 ['✅ Configurar tarifas', $promptConfigured, 'Define tus precios en la pestaña 🎭 Personalidad.'],
                 ['⏳ Chicas configuradas', false, 'Añade tu catálogo en la pestaña 👩 Chicas.'],
+                ['✅ Avisos configurados', $hasNotifications, 'Pon tu Chat ID de Telegram o teléfono en 👥 Clientes.'],
             ];
             ?>
             <div class="config-checklist">
@@ -586,7 +639,7 @@ function dismissWizard() {
 
     <div class="card">
         <h2>🚀 Empezar</h2>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:8px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:8px">
             <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center">
                 <div style="font-size:2rem;margin-bottom:4px">🎭</div>
                 <strong>Personalidad</strong>
@@ -601,6 +654,11 @@ function dismissWizard() {
                 <div style="font-size:2rem;margin-bottom:4px">👩</div>
                 <strong>Catálogo de chicas</strong>
                 <p style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Añade tu equipo</p>
+            </div>
+            <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center">
+                <div style="font-size:2rem;margin-bottom:4px">👥</div>
+                <strong>Avisos</strong>
+                <p style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Configura Telegram o WhatsApp</p>
             </div>
             <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center">
                 <div style="font-size:2rem;margin-bottom:4px">🚀</div>
@@ -653,7 +711,7 @@ function dismissWizard() {
                                 <span class="tooltip-box">Si es la chica quien habla, usa "soy Ana, tengo X...". Si es una recepcionista, habla de las chicas en tercera persona.</span>
                             </span>
                         </label>
-                        <select name="prompt[sections][speaker_mode]">
+                        <select name="prompt[sections][speaker_mode]" onchange="buildPreview()">
                             <?php
                             $speakerModes = [
                                 'mixto'         => '🔄 Mixto — recomendado (detecta automáticamente)',
@@ -667,8 +725,9 @@ function dismissWizard() {
                             ?>
                         </select>
                         <small style="color:var(--text-muted);font-size:.72rem;margin-top:4px;display:block">
-                            <strong>Mixto:</strong> Si el cliente sabe qué chica es (ej: viene de un anuncio de Destacamos con nombre), 
-                            el bot habla como ella en 1ª persona. Si no lo sabe, habla como encargada en 3ª persona.
+                            <strong>Mixto:</strong> Si el cliente sabe qué chica es (ej: viene de un anuncio donde sí aparece el nombre, 
+                            o ya la conoce de antes), el bot habla como ella en 1ª persona. Si no lo sabe (ej: anuncio genérico sin nombre), 
+                            habla como encargada en 3ª persona.
                         </small>
                     </div>
                 </div>
@@ -676,7 +735,7 @@ function dismissWizard() {
                 <div class="form-row">
                     <div class="form-group">
                         <label>Uso de emojis</label>
-                        <select name="prompt[sections][emoji_level]">
+                        <select name="prompt[sections][emoji_level]" onchange="buildPreview()">
                             <?php
                             $emojiLevels = ['moderado' => '😊 Moderado (1 por mensaje)', 'normal' => '🙂 Normal (1 cada 2-3 mensajes, adaptable)', 'poco' => '😐 Poco (ocasional)', 'nada' => '🚫 Sin emojis'];
                             $currentEmoji = (string) $config->get('prompt.sections.emoji_level', 'moderado');
@@ -688,7 +747,7 @@ function dismissWizard() {
                     </div>
                     <div class="form-group">
                         <label>Longitud de respuestas</label>
-                        <select name="prompt[sections][reply_length]">
+                        <select name="prompt[sections][reply_length]" onchange="buildPreview()">
                             <?php
                             $lengths = ['ultra_corta' => 'Ultra corta (1 frase)', 'corta' => 'Corta (1-2 frases)', 'normal' => 'Normal (2-3 frases)'];
                             $currentLen = (string) $config->get('prompt.sections.reply_length', 'corta');
@@ -699,6 +758,7 @@ function dismissWizard() {
                         </select>
                     </div>
                 </div>
+                <button type="submit" class="btn btn-primary btn-sm" style="margin-top:8px">💾 Guardar estilo</button>
             </div>
 
             <!-- Tarifas (A11: accordion + bigger) -->
@@ -708,7 +768,7 @@ function dismissWizard() {
                 <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:8px">
                     Escribe tus tarifas en lenguaje natural. Ejemplo: "30€ rapidito 10 min, 50€ media hora, 100€ 1 hora completo"
                 </p>
-                <textarea name="prompt[sections][tarifas]" class="code-area" style="width:100%;min-height:180px" spellcheck="false"><?php echo cv('prompt.sections.tarifas'); ?></textarea>
+                <textarea name="prompt[sections][tarifas]" class="code-area" style="width:100%;min-height:180px" spellcheck="false" oninput="buildPreview()"><?php echo cv('prompt.sections.tarifas'); ?></textarea>
                 <div style="margin-top:8px;display:flex;gap:6px">
                     <button type="submit" class="btn btn-primary btn-sm">💾 Guardar tarifas</button>
                     <button type="button" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted)" 
@@ -724,13 +784,11 @@ function dismissWizard() {
                 <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:8px">Cómo reacciona el bot cuando un cliente intenta negociar el precio.</p>
                 <label class="checkbox-label" style="margin-bottom:8px">
                     <input type="hidden" name="prompt[sections][no_regateo]" value="0">
-                    <input type="checkbox" name="prompt[sections][no_regateo]" value="1" <?php echo checked((bool)$config->get('prompt.sections.no_regateo',false)); ?>> No aceptar regateo de ningún tipo
+                    <input type="checkbox" name="prompt[sections][no_regateo]" value="1" <?php echo checked((bool)$config->get('prompt.sections.no_regateo',false)); ?> onchange="buildPreview()"> No aceptar regateo de ningún tipo
                 </label>
-                <div class="form-row">
-                    <div class="form-group"><label>1er regateo</label><input type="text" name="prompt[sections][regateo_1]" value="<?php echo cv('prompt.sections.regateo_1','precio fijo cari, por eso la calidad es buena 😏'); ?>" placeholder="Respuesta al primer regateo"></div>
-                    <div class="form-group"><label>2º regateo</label><input type="text" name="prompt[sections][regateo_2]" value="<?php echo cv('prompt.sections.regateo_2','no puedo bajar mas amor, son los precios que tengo'); ?>" placeholder="Respuesta si insiste"></div>
-                    <div class="form-group"><label>3er regateo</label><input type="text" name="prompt[sections][regateo_3]" value="<?php echo cv('prompt.sections.regateo_3','si buscas mas barato no soy yo, suerte 😘'); ?>" placeholder="Respuesta final"></div>
-                </div>
+                <div class="form-group"><label>1er regateo <span style="color:var(--text-muted);font-weight:400">— primera vez que negocian</span></label><input type="text" name="prompt[sections][regateo_1]" value="<?php echo cv('prompt.sections.regateo_1','precio fijo cari, por eso la calidad es buena 😏'); ?>" placeholder="Respuesta al primer regateo"></div>
+                <div class="form-group"><label>2º regateo <span style="color:var(--text-muted);font-weight:400">— si insisten</span></label><input type="text" name="prompt[sections][regateo_2]" value="<?php echo cv('prompt.sections.regateo_2','no puedo bajar mas amor, son los precios que tengo'); ?>" placeholder="Respuesta si insiste"></div>
+                <div class="form-group"><label>3er regateo <span style="color:var(--text-muted);font-weight:400">— corte final</span></label><input type="text" name="prompt[sections][regateo_3]" value="<?php echo cv('prompt.sections.regateo_3','si buscas mas barato no soy yo, suerte 😘'); ?>" placeholder="Respuesta final"></div>
                 <button type="submit" class="btn btn-primary btn-sm" style="margin-top:6px">💾 Guardar anti-regateo</button>
                 </div>
             </details>
@@ -742,17 +800,22 @@ function dismissWizard() {
                 <div class="form-row">
                     <div class="form-group" style="flex:2">
                         <label>Zona / ciudad</label>
-                        <input type="text" name="prompt[sections][zona]" value="<?php echo cv('prompt.sections.zona'); ?>" placeholder="Ej: Madrid centro, zona tranquila">
+                        <input type="text" name="prompt[sections][zona]" value="<?php echo cv('prompt.sections.zona'); ?>" placeholder="Ej: Madrid centro, zona tranquila" oninput="buildPreview()">
                     </div>
                     <div class="form-group" style="flex:1">
                         <label>Enlace Google Maps</label>
-                        <input type="url" name="urls[google_maps_location]" value="<?php echo cv('urls.google_maps_location'); ?>" placeholder="https://maps.app.goo.gl/...">
+                        <input type="url" name="urls[google_maps_location]" value="<?php echo cv('urls.google_maps_location'); ?>" placeholder="https://maps.app.goo.gl/... (pega aquí tu enlace de Google Maps)">
                     </div>
                 </div>
                 <label class="checkbox-label" style="margin-top:8px">
                     <input type="hidden" name="prompt[sections][maps_solo_chica]" value="0">
                     <input type="checkbox" name="prompt[sections][maps_solo_chica]" value="1" <?php echo checked((bool)$config->get('prompt.sections.maps_solo_chica',true)); ?>> Enviar ubicación solo cuando el cliente haya elegido chica
                 </label>
+                <small style="color:var(--text-muted);font-size:.72rem;display:block;margin-top:4px">
+                    El bot no dará la dirección real hasta que el cliente elija a una chica concreta o insista mucho de verdad. 
+                    Mientras tanto solo dirá la zona (ej: "Madrid centro"). Así cuando llegue a la casa, ya sabes a qué chica viene. 
+                    Ideal si no trabajas con presentación de chicas en persona.
+                </small>
                 <button type="submit" class="btn btn-primary btn-sm" style="margin-top:8px">💾 Guardar ubicación</button>
                 </div>
             </details>
@@ -762,7 +825,7 @@ function dismissWizard() {
                 <summary class="prompt-summary">🛏️ Servicios</summary>
                 <div style="padding:12px;border-top:1px solid var(--border)">
                 <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:6px">Describe los servicios disponibles. El bot usará esta información cuando le pregunten.</p>
-                <textarea name="prompt[sections][servicios]" class="code-area" style="width:100%;min-height:150px" spellcheck="false"><?php echo cv('prompt.sections.servicios'); ?></textarea>
+                <textarea name="prompt[sections][servicios]" class="code-area" style="width:100%;min-height:150px" spellcheck="false" oninput="buildPreview()"><?php echo cv('prompt.sections.servicios'); ?></textarea>
                 <div style="margin-top:6px;display:flex;gap:6px">
                     <button type="submit" class="btn btn-primary btn-sm">💾 Guardar servicios</button>
                     <button type="button" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted)"
@@ -776,7 +839,7 @@ function dismissWizard() {
                 <summary class="prompt-summary">🎁 Ofertas especiales (opcional)</summary>
                 <div style="padding:12px;border-top:1px solid var(--border)">
                 <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:6px">Describe ofertas o promociones temporales. El bot las mencionará cuando sea relevante para la conversación.</p>
-                <textarea name="prompt[sections][ofertas]" class="code-area" style="width:100%;min-height:100px" spellcheck="false"><?php echo cv('prompt.sections.ofertas'); ?></textarea>
+                <textarea name="prompt[sections][ofertas]" class="code-area" style="width:100%;min-height:100px" spellcheck="false" oninput="buildPreview()"><?php echo cv('prompt.sections.ofertas'); ?></textarea>
                 <button type="submit" class="btn btn-primary btn-sm" style="margin-top:6px">💾 Guardar ofertas</button>
                 </div>
             </details>
@@ -789,8 +852,8 @@ function dismissWizard() {
                 <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:8px">
                     Resumen de cómo está configurado tu bot ahora mismo.
                 </p>
-                <div id="prompt-summary" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;font-size:.82rem;line-height:1.6;color:var(--text);max-height:60vh;overflow-y:auto">
-                    <span style="color:var(--text-muted)">Cargando resumen...</span>
+                <div id="prompt-summary" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 10px;font-size:.82rem;line-height:1.5;color:var(--text);max-height:60vh;overflow-y:auto">
+                    <div style="color:var(--text-muted);text-align:center;padding:12px 0;font-size:.8rem">⏳ Cargando resumen...</div>
                 </div>
                 <div id="prompt-stats" class="prompt-stats"></div>
             </div>
@@ -1178,10 +1241,90 @@ function dismissWizard() {
 
 </form>
 <script>
+// Global API token for all AJAX calls (works even without session cookie)
+var _apiToken = <?php echo json_encode(generateCsrfToken()); ?>;
+// Helper: append token to any API URL
+function apiUrl(url) {
+    return url + (url.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(_apiToken);
+}
+</script>
+<script>
 var _csrf = <?php echo json_encode(generateCsrfToken()); ?>;
+
+// ── Preview builder ──
+function buildPreview() {
+    var container = document.getElementById('prompt-summary');
+    if (!container) return;
+
+    var el = function(sel) { return document.querySelector(sel); };
+
+    var estiloEl  = el('select[name="prompt[sections][estilo_tipo]"]');
+    var speakerEl = el('select[name="prompt[sections][speaker_mode]"]');
+    var emojiEl   = el('select[name="prompt[sections][emoji_level]"]');
+    var lengthEl  = el('select[name="prompt[sections][reply_length]"]');
+    var tarifasEl = el('textarea[name="prompt[sections][tarifas]"]');
+    var zonaEl    = el('input[name="prompt[sections][zona]"]');
+    var serviciosEl = el('textarea[name="prompt[sections][servicios]"]');
+    var ofertasEl = el('textarea[name="prompt[sections][ofertas]"]');
+    var regateoEl = el('input[name="prompt[sections][no_regateo]"]');
+
+    var estilo  = estiloEl  ? estiloEl.options[estiloEl.selectedIndex].text   : '?';
+    var speaker = speakerEl ? speakerEl.options[speakerEl.selectedIndex].text : '?';
+    var emoji   = emojiEl   ? emojiEl.options[emojiEl.selectedIndex].text     : '?';
+    var length  = lengthEl  ? lengthEl.options[lengthEl.selectedIndex].text   : '?';
+
+    var tarifasVal   = tarifasEl   ? tarifasEl.value.trim()   : '';
+    var zonaVal      = zonaEl      ? zonaEl.value.trim()      : '';
+    var serviciosVal = serviciosEl ? serviciosEl.value.trim() : '';
+    var ofertasVal   = ofertasEl   ? ofertasEl.value.trim()   : '';
+    var noRegateo    = regateoEl   ? regateoEl.checked        : false;
+
+    var tarifasOk   = tarifasVal.length > 20 && tarifasVal.indexOf('TARIFAS ÚNICAS Y FIJAS:') !== 0;
+    var zonaOk      = zonaVal.length > 2;
+    var serviciosOk = serviciosVal.length > 10;
+    var ofertasOk   = ofertasVal.length > 5;
+
+    function row(icon, label, value, ok, extra) {
+        var color = ok ? 'var(--ok)' : 'var(--warn)';
+        var statusIcon = ok ? '✅' : '⚠️';
+        var bg = ok ? 'rgba(45,212,191,.04)' : 'rgba(251,191,36,.04)';
+        var extraHtml = extra ? '<span style="display:block;font-size:.7rem;color:var(--text-muted);margin-top:1px">' + escHtml(extra) + '</span>' : '';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:5px;background:'+bg+';border-radius:6px;border-left:3px solid '+color+'">' +
+            '<span style="font-size:1.1rem;flex-shrink:0;width:28px;text-align:center">' + icon + '</span>' +
+            '<div style="flex:1;min-width:0">' +
+                '<span style="font-weight:600;font-size:.81rem">' + escHtml(label) + '</span>' +
+                '<div style="font-size:.76rem;color:'+color+';margin-top:1px">' + value + '</div>' +
+                extraHtml +
+            '</div>' +
+            '<span style="font-size:.85rem;flex-shrink:0;color:'+color+'">' + statusIcon + '</span>' +
+        '</div>';
+    }
+
+    var rows = [];
+    rows.push(row('🎨', 'Estilo', estilo, true));
+    rows.push(row('🗣', 'Modo', speaker, true));
+    rows.push(row('😊', 'Emojis', emoji, true));
+    rows.push(row('📏', 'Longitud', length, true));
+    rows.push(row('💰', 'Tarifas', tarifasOk ? 'Configuradas' : 'Sin configurar', tarifasOk));
+
+    if (zonaOk) {
+        rows.push(row('📍', 'Ubicación', zonaVal, true));
+    } else {
+        rows.push(row('📍', 'Ubicación', 'Sin configurar', false));
+    }
+
+    rows.push(row('🛏️', 'Servicios', serviciosOk ? 'Configurados' : 'Sin configurar', serviciosOk));
+    rows.push(row('🎁', 'Ofertas', ofertasOk ? 'Configuradas' : 'Sin configurar', ofertasOk));
+
+    var regateoText = noRegateo ? 'No se acepta regateo' : 'Se permite negociar';
+    rows.push(row('🛡️', 'Regateo', regateoText, true));
+
+    container.innerHTML = rows.join('');
+}
+
 // ── Líneas WhatsApp ──
 function loadLines() {
-    fetch('api/lines.php?action=list').then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/lines.php?action=list')).then(r=>r.json()).then(d=>{
         if (!d.ok) return;
         var html = '';
         if (d.lines.length === 0) {
@@ -1234,7 +1377,7 @@ function showQR(lineId) {
     fetchQR(lineId);
 }
 function fetchQR(lineId) {
-    fetch('api/lines.php?action=qr&line_id='+lineId).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/lines.php?action=qr&line_id=')+'lineId).then(r=>r.json()).then(d=>{
         if (d.ok && d.qr_base64) {
             document.getElementById('qr-image').src = 'data:image/png;base64,'+d.qr_base64;
             document.getElementById('qr-status').textContent = d.warning || 'Escanea con WhatsApp → Vincular dispositivo';
@@ -1249,13 +1392,13 @@ function regenerateQR() {
     if (!currentQrLineId) return;
     document.getElementById('qr-status').textContent = 'Generando nuevo QR...';
     // First restart the session to get a fresh QR
-    fetch('api/lines.php?action=start_session&line_id='+currentQrLineId).then(r=>r.json()).then(function(){
+    fetch(apiUrl('api/lines.php?action=start_session&line_id=')+'currentQrLineId).then(r=>r.json()).then(function(){
         // Small delay then fetch QR
         setTimeout(function(){ fetchQR(currentQrLineId); }, 2000);
     });
 }
 function checkLineStatus(lineId) {
-    fetch('api/lines.php?action=status').then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/lines.php?action=status')).then(r=>r.json()).then(d=>{
         if (d.ok && d.statuses) {
             var st = d.statuses[lineId] || 'unknown';
             alert('Estado de la línea: ' + st);
@@ -1279,7 +1422,7 @@ function showQR(lineId) {
     document.getElementById('qr-modal').style.display = 'flex';
     document.getElementById('qr-image').src = '';
     document.getElementById('qr-status').textContent = 'Cargando QR...';
-    fetch('api/lines.php?action=qr&line_id='+lineId).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/lines.php?action=qr&line_id=')+'lineId).then(r=>r.json()).then(d=>{
         if (d.ok && d.qr_base64) {
             document.getElementById('qr-image').src = 'data:image/png;base64,'+d.qr_base64;
             document.getElementById('qr-status').textContent = 'Escanea con WhatsApp → Vincular dispositivo';
@@ -1316,7 +1459,7 @@ function deleteLine(lineId) {
 var linePollInterval;
 function startLinePolling() { linePollInterval = setInterval(function() {
     if (document.getElementById('tab-lineas') && document.getElementById('tab-lineas').classList.contains('active')) {
-        fetch('api/lines.php?action=status').then(r=>r.json()).then(d=>{
+        fetch(apiUrl('api/lines.php?action=status')).then(r=>r.json()).then(d=>{
             if (!d.ok || !d.statuses) return;
             var rows = document.querySelectorAll('#lines-container tbody tr');
             rows.forEach(function(tr, i) {
@@ -1329,7 +1472,7 @@ startLinePolling();
 
 // ── Chicas ──
 function loadGirls() {
-    fetch('api/girls.php?action=list').then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/girls.php?action=list')).then(r=>r.json()).then(d=>{
         if (!d.ok) return;
         var html = '';
         if (d.girls.length === 0) {
@@ -1396,7 +1539,7 @@ function deleteGirl(id) { if(!confirm('¿Eliminar esta chica?')) return; var fd 
 
 // ── Estados ──
 function loadEstadosConfig() {
-    fetch('api/estados.php?action=config').then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/estados.php?action=config')).then(r=>r.json()).then(d=>{
         if (!d.ok) return;
         var c = d.config;
         document.getElementById('estados-enabled').checked = !!c.enabled;
@@ -1444,7 +1587,7 @@ function publishEstado() {
     });
 }
 function loadEstadosHistory() {
-    fetch('api/estados.php?action=history').then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/estados.php?action=history')).then(r=>r.json()).then(d=>{
         if (!d.ok) return;
         var html = d.log.slice(0,10).map(function(e){
             var date = e.published_at ? new Date(e.published_at).toLocaleString('es-ES') : '?';
@@ -1459,7 +1602,7 @@ function escHtml(s) { var d=document.createElement('div'); d.textContent=s; retu
 
 // ── Clientes ──
 function loadClientes() {
-    fetch('api/clientes.php?action=list').then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/clientes.php?action=list')).then(r=>r.json()).then(d=>{
         if (!d.ok) return;
         var html = '';
         if (d.leads.length === 0) {
@@ -1493,7 +1636,7 @@ var currentChatThreadId = '';
 function loadMensajes() { searchThreads(); }
 function searchThreads() {
     var q = document.getElementById('msg-search').value.trim();
-    fetch('api/mensajes.php?action=threads&search='+encodeURIComponent(q)).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/mensajes.php?action=threads&search=')+'encodeURIComponent(q)).then(r=>r.json()).then(d=>{
         if (!d.ok) return;
         var html = '';
         if (d.threads.length === 0) {
@@ -1514,7 +1657,7 @@ function openChat(threadId) {
     currentChatThreadId = threadId;
     document.getElementById('chat-modal').style.display = 'block';
     document.getElementById('chat-messages').innerHTML = '<p style="color:var(--text-muted)">Cargando...</p>';
-    fetch('api/mensajes.php?action=conversation&thread_id='+encodeURIComponent(threadId)).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/mensajes.php?action=conversation&thread_id=')+'encodeURIComponent(threadId)).then(r=>r.json()).then(d=>{
         if (!d.ok) return;
         var html = '';
         d.conversation.forEach(function(m){
@@ -1539,7 +1682,7 @@ function markAsLeadFromChat() {
 
 // ── Estadísticas ──
 function loadEstadisticas() {
-    fetch('api/stats.php').then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/stats.php')).then(r=>r.json()).then(d=>{
         if (!d.ok) { document.getElementById('estadisticas-container').innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:30px">Error al cargar estadísticas.</p>'; return; }
         var s = d.stats;
 
@@ -1613,7 +1756,7 @@ function loadEstadisticas() {
 
 // ── Registro (Logs) ──
 function loadRegistro() {
-    fetch('api/logs.php').then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/logs.php')).then(r=>r.json()).then(d=>{
         if (d.ok) {
             document.getElementById('registro-pre').textContent = d.log || '(sin actividad todavía)';
         } else {
@@ -1668,6 +1811,182 @@ document.querySelectorAll('#tabNav button[data-tab]').forEach(function(btn){
         var btn = document.querySelector('#tabNav button[data-tab="' + stored + '"]');
         if (btn) btn.click();
     }
+})();
+</script>
+<script>
+// ── Preview card (isolated — runs regardless of main JS errors) ──
+(function() {
+    function escHtml(s) { var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+    function buildPreview() {
+        var container = document.getElementById('prompt-summary');
+        if (!container) return;
+
+        var el = function(sel) { return document.querySelector(sel); };
+
+        var estiloEl  = el('select[name="prompt[sections][estilo_tipo]"]');
+        var speakerEl = el('select[name="prompt[sections][speaker_mode]"]');
+        var emojiEl   = el('select[name="prompt[sections][emoji_level]"]');
+        var lengthEl  = el('select[name="prompt[sections][reply_length]"]');
+        var tarifasEl = el('textarea[name="prompt[sections][tarifas]"]');
+        var zonaEl    = el('input[name="prompt[sections][zona]"]');
+        var serviciosEl = el('textarea[name="prompt[sections][servicios]"]');
+        var ofertasEl = el('textarea[name="prompt[sections][ofertas]"]');
+        var regateoEl = el('input[name="prompt[sections][no_regateo]"]');
+
+        var estilo  = estiloEl  ? estiloEl.options[estiloEl.selectedIndex].text   : '?';
+        var speaker = speakerEl ? speakerEl.options[speakerEl.selectedIndex].text : '?';
+        var emoji   = emojiEl   ? emojiEl.options[emojiEl.selectedIndex].text     : '?';
+        var length  = lengthEl  ? lengthEl.options[lengthEl.selectedIndex].text   : '?';
+
+        var tarifasVal   = tarifasEl   ? tarifasEl.value.trim()   : '';
+        var zonaVal      = zonaEl      ? zonaEl.value.trim()      : '';
+        var serviciosVal = serviciosEl ? serviciosEl.value.trim() : '';
+        var ofertasVal   = ofertasEl   ? ofertasEl.value.trim()   : '';
+        var noRegateo    = regateoEl   ? regateoEl.checked        : false;
+
+        var tarifasOk   = tarifasVal.length > 20 && tarifasVal.indexOf('TARIFAS ÚNICAS Y FIJAS:') !== 0;
+        var zonaOk      = zonaVal.length > 2;
+        var serviciosOk = serviciosVal.length > 10;
+        var ofertasOk   = ofertasVal.length > 5;
+
+        function row(icon, label, value, ok, extra) {
+            var color = ok ? 'var(--ok)' : 'var(--warn)';
+            var icon2 = ok ? '✅' : '⚠️';
+            var bg = ok ? 'rgba(45,212,191,.04)' : 'rgba(251,191,36,.04)';
+            var extraHtml = extra ? '<span style="display:block;font-size:.7rem;color:var(--text-muted);margin-top:1px">'+escHtml(extra)+'</span>' : '';
+            return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:5px;background:'+bg+';border-radius:6px;border-left:3px solid '+color+'">'+
+                '<span style="font-size:1.1rem;flex-shrink:0;width:28px;text-align:center">'+icon+'</span>'+
+                '<div style="flex:1;min-width:0"><span style="font-weight:600;font-size:.81rem">'+escHtml(label)+'</span>'+
+                '<div style="font-size:.76rem;color:'+color+';margin-top:1px">'+value+'</div>'+extraHtml+'</div>'+
+                '<span style="font-size:.85rem;flex-shrink:0;color:'+color+'">'+icon2+'</span></div>';
+        }
+
+        var rows = [];
+        rows.push(row('🎨','Estilo', estilo, true));
+        rows.push(row('🗣','Modo', speaker, true));
+        rows.push(row('😊','Emojis', emoji.split(' ').slice(1).join(' '), true));
+        rows.push(row('📏','Longitud', length.split(' ').slice(1).join(' ').replace('(','').replace(')',''), true));
+        rows.push(row('💰','Tarifas', tarifasOk ? 'Configuradas' : 'Sin configurar', tarifasOk, tarifasOk ? '' : 'Define tus precios'));
+        rows.push(row('📍','Ubicación', zonaOk ? zonaVal.substring(0,40) : 'Sin configurar', zonaOk));
+        rows.push(row('🛏️','Servicios', serviciosOk ? 'Configurados' : 'Sin configurar', serviciosOk));
+        rows.push(row('🎁','Ofertas', ofertasOk ? 'Configuradas' : 'Sin configurar', ofertasOk));
+        rows.push(row('🛡️','Regateo', noRegateo ? 'No acepta' : 'Permite negociar', true));
+
+        container.innerHTML = rows.join('');
+    }
+
+    // Run on load
+    setTimeout(buildPreview, 400);
+    // Also re-run when any form element changes
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(buildPreview, 500);
+    });
+})();
+<script>
+// ── Chicas catalog (isolated — works regardless of main JS) ──
+(function() {
+    function escHtml(s) { var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+    var csrf = '';
+
+    function loadGirls() {
+        var container = document.getElementById('girls-container');
+        if (!container) return;
+        container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px">Cargando chicas...</p>';
+        fetch(apiUrl('api/girls.php?action=list')).then(function(r){return r.json()}).then(function(d){
+            if (!d.ok) { container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px">Error al cargar.</p>'; return; }
+            var html = '';
+            if (d.girls.length === 0) {
+                html = '<p style="color:var(--text-muted);text-align:center;padding:20px">No hay chicas configuradas. Añade la primera arriba.</p>';
+            } else {
+                html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:8px">';
+                d.girls.forEach(function(g){
+                    var active = g.activa ? '✅ Activa' : '❌ Inactiva';
+                    var activeColor = g.activa ? 'var(--ok)' : 'var(--text-muted)';
+                    var photos = (g.fotos||[]).slice(0,3).map(function(u){ return '<img src="'+escHtml(u)+'" style="width:60px;height:60px;object-fit:cover;border-radius:6px;margin:2px" onerror="this.style.display=\'none\'">'; }).join('');
+                    html += '<div style="background:var(--bg-surface);border:1px solid '+(g.activa?'rgba(45,212,191,.25)':'var(--border)')+';border-radius:var(--radius-sm);padding:12px">';
+                    html += '<strong>'+escHtml(g.nombre)+'</strong>';
+                    html += '<span style="font-size:.75rem;color:'+activeColor+';margin-left:8px">'+active+'</span>';
+                    html += '<div style="font-size:.78rem;color:var(--text-muted);margin:4px 0">'+escHtml(g.descripcion_corta||'')+'</div>';
+                    if (photos) html += '<div style="margin-top:6px">'+photos+'</div>';
+                    html += '<div style="margin-top:8px;display:flex;gap:4px">';
+                    html += '<button onclick="w_editGirl(\''+escHtml(g.id)+'\',\''+escHtml(g.nombre)+'\',\''+escHtml(g.descripcion_corta||'')+'\')" class="btn btn-sm btn-warning">✏️</button>';
+                    html += '<button onclick="w_toggleGirl(\''+escHtml(g.id)+'\')" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted)">'+(g.activa?'Pausar':'Activar')+'</button>';
+                    html += '<button onclick="w_deleteGirl(\''+escHtml(g.id)+'\')" class="btn btn-sm btn-danger">🗑</button>';
+                    html += '</div></div>';
+                });
+                html += '</div>';
+            }
+            container.innerHTML = html;
+        }).catch(function(e){ container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px">Error de conexión.</p>'; });
+    }
+
+    function saveGirl() {
+        var id = document.getElementById('girl-edit-id'); if (!id) return;
+        var idVal = id.value;
+        var nombre = document.getElementById('girl-nombre'); if (!nombre) return;
+        var desc = document.getElementById('girl-desc'); if (!desc) return;
+        var fd = new FormData();
+        if (idVal) fd.append('id', idVal);
+        fd.append('nombre', nombre.value.trim());
+        fd.append('descripcion', desc.value.trim());
+        fd.append('activa', '1');
+        fd.append('csrf_token', csrf);
+        fetch(apiUrl('api/girls.php?action=save'), {method:'POST',body:fd}).then(function(r){return r.json()}).then(function(d){
+            if (d.ok) { id.value=''; nombre.value=''; desc.value=''; document.getElementById('girl-form-title').textContent='➕ Nueva chica'; loadGirls(); }
+            else { alert('Error: '+(d.error||'Desconocido')); }
+        });
+    }
+
+    function w_editGirl(gid, nombre, descrip) {
+        var idEl = document.getElementById('girl-edit-id'); if (idEl) idEl.value = gid;
+        var nEl = document.getElementById('girl-nombre'); if (nEl) { nEl.value = nombre; nEl.focus(); }
+        var dEl = document.getElementById('girl-desc'); if (dEl) dEl.value = descrip;
+        var tEl = document.getElementById('girl-form-title'); if (tEl) tEl.textContent = '✏️ Editar chica';
+    }
+
+    function uploadGirlPhoto() {
+        var id = document.getElementById('girl-edit-id'); if (!id) return;
+        var idVal = id.value;
+        var fileInput = document.getElementById('girl-photo-file'); if (!fileInput) return;
+        if (!idVal) return alert('Primero guarda la chica (nombre + descripción) y luego sube fotos.');
+        if (!fileInput.files || !fileInput.files[0]) return alert('Selecciona una imagen.');
+        var file = fileInput.files[0];
+        if (file.size > 5*1024*1024) return alert('La imagen no puede superar 5 MB.');
+        var status = document.getElementById('upload-status'); if (status) status.textContent = '⏳ Subiendo...';
+        var fd = new FormData(); fd.append('id', idVal); fd.append('photo', file); fd.append('csrf_token', csrf);
+        fetch(apiUrl('api/girls.php?action=upload_photo'), {method:'POST',body:fd}).then(function(r){return r.json()}).then(function(d){
+            if (d.ok) { fileInput.value=''; if (status) status.textContent='✅ Subida'; loadGirls(); }
+            else { if (status) status.textContent='❌ '+(d.error||'Error'); }
+        }).catch(function(){ if (status) status.textContent='❌ Error de conexión'; });
+    }
+
+    function w_toggleGirl(gid) { 
+        var fd = new FormData(); fd.append('id', gid); fd.append('csrf_token', csrf);
+        fetch(apiUrl('api/girls.php?action=toggle'),{method:'POST',body:fd}).then(function(r){return r.json()}).then(function(d){ if(d.ok) loadGirls(); }); 
+    }
+    function w_deleteGirl(gid) { 
+        if(!confirm('¿Eliminar esta chica?')) return; 
+        var fd = new FormData(); fd.append('id', gid); fd.append('csrf_token', csrf);
+        fetch(apiUrl('api/girls.php?action=delete'),{method:'POST',body:fd}).then(function(r){return r.json()}).then(function(d){ if(d.ok) loadGirls(); }); 
+    }
+
+    window.loadGirls = loadGirls;
+    window.saveGirl = saveGirl;
+    window.uploadGirlPhoto = uploadGirlPhoto;
+    window.w_editGirl = w_editGirl;
+    window.w_toggleGirl = w_toggleGirl;
+    window.w_deleteGirl = w_deleteGirl;
+
+    // Load on any tab switch to chicas
+    setTimeout(function() {
+        try {
+            var container = document.getElementById('girls-container');
+            if (container && container.textContent.indexOf('Cargando') !== -1) {
+                loadGirls();
+            }
+        } catch(e) {}
+    }, 1000);
 })();
 </script>
 </body>
