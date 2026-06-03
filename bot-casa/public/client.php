@@ -888,10 +888,14 @@ function dismissWizard() {
         </h2>
 
         <div class="section-guide">
-            📱 <strong>¿Quieres recibir avisos cuando llegue un cliente?</strong><br>
-            <span style="font-size:.78rem">1. Abre Telegram, busca @BotFather, crea un bot con /newbot<br>
-            2. Busca @userinfobot para obtener tu Chat ID<br>
-            3. Configura el Chat ID abajo en los ajustes de Telegram</span>
+            📱 <strong>¿Quieres recibir avisos cuando llegue un cliente?</strong> Puedes recibir notificaciones por <strong>Telegram</strong> (recomendado) o por <strong>WhatsApp</strong>.<br><br>
+            <strong>Telegram (recomendado):</strong><br>
+            <span style="font-size:.78rem">1. Abre Telegram, busca @BotFather, crea un bot con /newbot y copia el token<br>
+            2. Busca @userinfobot para obtener tu Chat ID personal<br>
+            3. Pega tu Chat ID abajo (uno por línea si tienes varios)<br>
+            4. Activa las alertas con el checkbox</span><br><br>
+            <strong>WhatsApp:</strong><br>
+            <span style="font-size:.78rem">Puedes poner tu número personal para recibir avisos por WhatsApp. <strong>IMPORTANTE:</strong> El número que pongas aquí NO puede ser uno de los que tengas configurados como línea del bot en 📱 Líneas. Usa tu número personal.</span>
         </div>
 
         <!-- Telegram config -->
@@ -957,12 +961,27 @@ function dismissWizard() {
         <details style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0;margin-bottom:8px" open>
             <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:.9rem">⏱ Humanización (Delays)</summary>
             <div style="padding:12px 16px;border-top:1px solid var(--border)">
-                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:10px">Tiempos que simulan comportamiento humano al responder.</p>
+                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:10px">
+                    Estos tiempos hacen que el bot parezca humano al responder. Simula que "lee" el mensaje, "piensa" y "escribe". 
+                    Valores muy bajos hacen que el bot parezca artificial (responde al instante). Valores muy altos hacen esperar demasiado al cliente.
+                </p>
                 <div class="form-row">
-                    <div class="form-group"><label>Seen delay (seg)</label><input type="number" step="0.1" name="human_delays[seen][fallback_sec]" value="<?php echo cv('human_delays.seen.fallback_sec','1'); ?>"></div>
-                    <div class="form-group"><label>Typing fallback (seg)</label><input type="number" step="0.1" name="human_delays[typing][fallback_sec]" value="<?php echo cv('human_delays.typing.fallback_sec','4'); ?>"></div>
-                    <div class="form-group"><label>Read delay min (ms)</label><input type="number" name="human_delays[read][base_min_ms]" value="<?php echo cv('human_delays.read.base_min_ms','900'); ?>"></div>
-                    <div class="form-group"><label>Read delay max (ms)</label><input type="number" name="human_delays[read][base_max_ms]" value="<?php echo cv('human_delays.read.base_max_ms','2200'); ?>"></div>
+                    <div class="form-group">
+                        <label>Seen delay (seg) <span style="color:var(--text-muted)">— Tiempo que tarda en "ver" el mensaje. Recomendado: 1-3</span></label>
+                        <input type="number" step="0.1" name="human_delays[seen][fallback_sec]" value="<?php echo cv('human_delays.seen.fallback_sec','1'); ?>">
+                    </div>
+                    <div class="form-group">
+                        <label>Typing fallback (seg) <span style="color:var(--text-muted)">— Tiempo base de "escribir". Recomendado: 2-4</span></label>
+                        <input type="number" step="0.1" name="human_delays[typing][fallback_sec]" value="<?php echo cv('human_delays.typing.fallback_sec','4'); ?>">
+                    </div>
+                    <div class="form-group">
+                        <label>Read delay min (ms) <span style="color:var(--text-muted)">— Mínimo para "leer". Recomendado: 900</span></label>
+                        <input type="number" name="human_delays[read][base_min_ms]" value="<?php echo cv('human_delays.read.base_min_ms','900'); ?>">
+                    </div>
+                    <div class="form-group">
+                        <label>Read delay max (ms) <span style="color:var(--text-muted)">— Máximo para "leer". Recomendado: 2200</span></label>
+                        <input type="number" name="human_delays[read][base_max_ms]" value="<?php echo cv('human_delays.read.base_max_ms','2200'); ?>">
+                    </div>
                 </div>
             </div>
         </details>
@@ -970,9 +989,17 @@ function dismissWizard() {
         <details style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0;margin-bottom:8px">
             <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:.9rem">🎲 Variantes de mensajes</summary>
             <div style="padding:12px 16px;border-top:1px solid var(--border)">
-                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:6px">Frases que el bot usa para responder a audios (una por línea).</p>
+                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:6px">
+                    Frases que el bot elige al azar cuando recibe un audio (una por línea). Cuantas más pongas, más variado parecerá.
+                    <button type="button" class="btn btn-sm" style="margin-left:8px;background:var(--input-bg);color:var(--text-muted);font-size:.65rem"
+                        onclick="this.parentElement.nextElementSibling.value='no puedo escuchar audios amor, me lo escribes mejor?\namor por aqui no escucho audios, escribeme y te digo 😘\ncari no puedo oir audios ahora, me lo pones en texto?\nme va mejor si me lo escribes amor, los audios no puedo escucharlos'">🔄 Restaurar</button>
+                </p>
                 <textarea name="message_variants[audio_auto_reply]" rows="4" class="code-area" spellcheck="false"><?php echo cv('message_variants.audio_auto_reply'); ?></textarea>
-                <p style="color:var(--text-muted);font-size:.78rem;margin:10px 0 6px">Variantes para pedir ETA (una por línea).</p>
+                <p style="color:var(--text-muted);font-size:.78rem;margin:10px 0 6px">
+                    Variantes para pedir la hora de llegada (ETA) al cliente. El bot las rota.
+                    <button type="button" class="btn btn-sm" style="margin-left:8px;background:var(--input-bg);color:var(--text-muted);font-size:.65rem"
+                        onclick="this.parentElement.nextElementSibling.value='cuanto tardas amor?\navisame cuando salgas\nen cuantos min vienes?\ncuando llegas papi?\nme dices cuanto tardas?\nsal y avisame que te espero'">🔄 Restaurar</button>
+                </p>
                 <textarea name="message_variants[eta_request_variants]" rows="3" class="code-area" spellcheck="false"><?php echo cv('message_variants.eta_request_variants'); ?></textarea>
             </div>
         </details>
@@ -980,8 +1007,13 @@ function dismissWizard() {
         <details style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0;margin-bottom:8px">
             <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:.9rem">📨 Follow-up (recontactar leads)</summary>
             <div style="padding:12px 16px;border-top:1px solid var(--border)">
+                <p style="color:var(--text-muted);font-size:.8rem;margin-bottom:8px">
+                    <strong>¿Qué hace?</strong> El bot revisa periódicamente los leads antiguos y les envía un mensaje con fotos de las chicas disponibles para intentar que vuelvan. 
+                    Es como un "te echamos de menos" automático.<br><br>
+                    <strong>¿Cuándo se envía?</strong> Solo a clientes con los que se habló hace 48-72h y que NO hayan sido marcados como "llegó" en la pestaña 👥 Clientes.
+                </p>
                 <div class="alert-warning" style="margin-bottom:10px;font-size:.8rem;padding:8px 12px;border-radius:8px">
-                    ⚠️ <strong>Importante:</strong> El bot recontactará a los leads que NO hayan sido marcados como "llegó". Marca los leads en la pestaña Clientes para evitar mensajes incómodos.
+                    ⚠️ <strong>Importante:</strong> Marca los leads como "llegó" en la pestaña Clientes. Si no los marcas, el bot les reenviará mensajes y puede quedar raro.
                 </div>
                 <div class="form-row">
                     <div class="form-group"><label class="checkbox-label"><input type="hidden" name="cron[followup][enabled]" value="0"><input type="checkbox" name="cron[followup][enabled]" value="1" <?php echo checked((bool)$config->get('cron.followup.enabled',false)); ?>> Activado</label></div>
@@ -995,7 +1027,11 @@ function dismissWizard() {
         <details style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0;margin-bottom:8px">
             <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:.9rem">⏰ Recordatorios ETA</summary>
             <div style="padding:12px 16px;border-top:1px solid var(--border)">
-                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:8px">Si un cliente dice "llego en 20 min", el bot le enviará un recordatorio pasado ese tiempo.</p>
+                <p style="color:var(--text-muted);font-size:.8rem;margin-bottom:8px">
+                    <strong>¿Qué hace?</strong> Si un cliente dice "llego en 20 minutos", el bot programa un recordatorio y se lo envía pasado ese tiempo. 
+                    Así el cliente no se olvida de venir.<br><br>
+                    <strong>Importante:</strong> Este recordatorio se envía aunque no hayas marcado el lead como "llegó". Es automático y se basa en lo que el cliente dijo.
+                </p>
                 <div class="form-row">
                     <div class="form-group"><label class="checkbox-label"><input type="hidden" name="cron[reminder][enabled]" value="0"><input type="checkbox" name="cron[reminder][enabled]" value="1" <?php echo checked((bool)$config->get('cron.reminder.enabled',false)); ?>> Activado</label></div>
                     <div class="form-group"><label>Máx por ejecución</label><input type="number" name="cron[reminder][max_per_run]" value="<?php echo cv('cron.reminder.max_per_run','5'); ?>"></div>
