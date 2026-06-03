@@ -1516,7 +1516,7 @@ if (file_exists($logFilePath) && is_readable($logFilePath)) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>wasapBot — Admin Panel</title>
-<link rel="stylesheet" href="assets/style.css?v=20260603_2">
+<link rel="stylesheet" href="assets/style.css?v=20260603_4">
 </head>
 <body>
 

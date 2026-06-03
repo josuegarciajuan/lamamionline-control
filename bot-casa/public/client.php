@@ -285,7 +285,7 @@ $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucci
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>bot-casa — <?php echo $clientName; ?></title>
-<link rel="stylesheet" href="assets/style.css?v=20260603_3">
+<link rel="stylesheet" href="assets/style.css?v=20260603_4">
 <style>
 /* ── Client panel overrides / additions ── */
 .tooltip-icon {
@@ -305,18 +305,34 @@ $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucci
 .tooltip-wrap:hover .tooltip-box, .tooltip-wrap:focus-within .tooltip-box { display: block; }
 
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 4px; }
-.stat-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 18px; text-align: center; }
+.stat-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 18px 20px;
+    text-align: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
 .stat-card .stat-num { font-size: 2rem; font-weight: 800; }
 .stat-card .stat-label { font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
-.stat-card .stat-sub { font-size: .7rem; color: rgba(255,255,255,.3); margin-top: 2px; }
+.stat-card .stat-sub { font-size: .7rem; color: rgba(255,255,255,.25); margin-top: 2px; }
 
 .config-checklist { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
-.checklist-item { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: .8rem; }
+.checklist-item { display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: .8rem; }
 .checklist-item .check-icon { font-size: .9rem; }
-.check-ok { color: var(--ok); border-color: rgba(52,211,153,.3); }
-.check-warn { color: var(--warn); border-color: rgba(251,191,36,.3); }
+.check-ok { color: var(--ok); border-color: rgba(45,212,191,.25); }
+.check-warn { color: var(--warn); border-color: rgba(251,191,36,.25); }
 
-.section-guide { background: var(--info-bg); border: 1px solid var(--info); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 12px; font-size: .82rem; color: var(--info); }
+.section-guide {
+    background: var(--info-bg);
+    border: 1px solid rgba(124,92,255,0.2);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    font-size: .82rem;
+    color: var(--info);
+}
 
 @media (max-width: 768px) {
     .prompt-layout { flex-direction: column !important; }
@@ -1167,7 +1183,7 @@ function loadGirls() {
                 var active = g.activa ? '✅ Activa' : '❌ Inactiva';
                 var activeColor = g.activa ? 'var(--ok)' : 'var(--text-muted)';
                 var photos = (g.fotos||[]).slice(0,3).map(function(u,i){ return '<img src="'+escHtml(u)+'" style="width:60px;height:60px;object-fit:cover;border-radius:6px;margin:2px" onerror="this.style.display=\'none\'">'; }).join('');
-                html += '<div style="background:var(--bg-surface);border:1px solid '+(g.activa?'rgba(52,211,153,.3)':'var(--border)')+';border-radius:var(--radius-sm);padding:12px">';
+                html += '<div style="background:var(--bg-surface);border:1px solid '+(g.activa?'rgba(45,212,191,.25)':'var(--border)')+';border-radius:var(--radius-sm);padding:12px">';
                 html += '<strong>'+escHtml(g.nombre)+'</strong>';
                 html += '<span style="font-size:.75rem;color:'+activeColor+';margin-left:8px">'+active+'</span>';
                 html += '<div style="font-size:.78rem;color:var(--text-muted);margin:4px 0">'+escHtml(g.descripcion_corta||'')+'</div>';
