@@ -1061,7 +1061,7 @@ function dismissWizard() {
             Últimas 200 líneas del registro del bot. Por curiosidad — no contiene datos sensibles.
         </p>
         <div id="registro-container">
-            <pre id="registro-pre" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;max-height:500px;overflow:auto;font-family:monospace;font-size:.72rem;white-space:pre-wrap;color:var(--text-muted)">Cargando...</pre>
+            <pre id="registro-pre" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;max-height:500px;overflow:auto;font-family:monospace;font-size:.72rem;white-space:pre-wrap;color:var(--text-muted)">Haz clic en la pestaña para cargar el registro de actividad.</pre>
         </div>
     </div>
 </div>
@@ -1390,38 +1390,72 @@ function loadEstadisticas() {
     fetch('api/stats.php').then(r=>r.json()).then(d=>{
         if (!d.ok) { document.getElementById('estadisticas-container').innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:30px">Error al cargar estadísticas.</p>'; return; }
         var s = d.stats;
+
+        // Hero stat: arrival rate with progress ring
+        var rate = s.arrival_rate;
+        var rateColor = rate>=50 ? 'var(--ok)' : (rate>=25 ? 'var(--warn)' : 'var(--danger)');
+        var rateLabel = rate>=50 ? 'Excelente' : (rate>=25 ? 'Normal' : 'Bajo');
+
         var html = '';
+
+        // Hero section
+        html += '<div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px">';
+        html += '<div style="flex:1;min-width:200px;background:linear-gradient(135deg,var(--bg-surface),var(--panel));border:1px solid var(--border);border-radius:var(--radius-md);padding:24px;text-align:center">';
+        html += '<div style="position:relative;display:inline-block">';
+        html += '<svg width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="none" stroke="var(--border)" stroke-width="8"/><circle cx="50" cy="50" r="42" fill="none" stroke="'+rateColor+'" stroke-width="8" stroke-dasharray="'+(rate*2.64)+' 264" stroke-linecap="round" transform="rotate(-90 50 50)" style="transition:stroke-dasharray .8s"/></svg>';
+        html += '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:800;color:'+rateColor+'">'+rate+'%</div>';
+        html += '</div>';
+        html += '<div style="font-size:.85rem;color:var(--text-muted);margin-top:4px">Tasa de llegada</div>';
+        html += '<div style="font-size:.72rem;color:'+rateColor+'">'+rateLabel+'</div>';
+        html += '<div style="font-size:.7rem;color:var(--text-muted);margin-top:4px">'+s.leads_arrived+' llegaron de '+s.leads_total+' notificados</div>';
+        html += '</div>';
+
+        // Quick stats
+        html += '<div style="flex:2;min-width:300px">';
         html += '<div class="stats-grid">';
-        html += '<div class="stat-card"><div class="stat-num" style="color:var(--info)">'+s.conversations_total+'</div><div class="stat-label">Conversaciones totales</div></div>';
-        html += '<div class="stat-card"><div class="stat-num" style="color:var(--accent)">'+s.conversations_today+'</div><div class="stat-label">Conversaciones hoy</div></div>';
-        html += '<div class="stat-card"><div class="stat-num" style="color:var(--ok)">'+s.leads_total+'</div><div class="stat-label">Leads notificados</div></div>';
-        html += '<div class="stat-card"><div class="stat-num" style="color:var(--money)">'+s.leads_today+'</div><div class="stat-label">Leads hoy</div></div>';
-        html += '<div class="stat-card"><div class="stat-num" style="color:#a78bfa">'+s.leads_arrived+'</div><div class="stat-label">Leads reales (llegaron)</div></div>';
-        html += '<div class="stat-card"><div class="stat-num" style="color:var(--accent2)">'+s.leads_pending+'</div><div class="stat-label">Pendientes de confirmar</div></div>';
+        html += '<div class="stat-card"><div class="stat-num" style="color:var(--info)">'+s.conversations_total+'</div><div class="stat-label">💬 Conversaciones</div><div class="stat-sub">'+s.conversations_today+' hoy</div></div>';
+        html += '<div class="stat-card"><div class="stat-num" style="color:var(--ok)">'+s.leads_total+'</div><div class="stat-label">🎯 Leads</div><div class="stat-sub">'+s.leads_today+' hoy</div></div>';
+        html += '<div class="stat-card"><div class="stat-num" style="color:#a78bfa">'+s.leads_arrived+'</div><div class="stat-label">✅ Llegaron</div><div class="stat-sub">'+s.leads_pending+' pendientes</div></div>';
+        html += '<div class="stat-card"><div class="stat-num" style="color:var(--accent)">'+s.girls_active+'</div><div class="stat-label">👩 Chicas</div><div class="stat-sub">Activas</div></div>';
+        html += '<div class="stat-card"><div class="stat-num" style="color:var(--accent2)">'+s.lines_active+'</div><div class="stat-label">📱 Líneas</div><div class="stat-sub">Vinculadas</div></div>';
+        html += '<div class="stat-card"><div class="stat-num" style="color:var(--money)">'+s.conversations_week+'</div><div class="stat-label">📅 Esta semana</div><div class="stat-sub">Conversaciones</div></div>';
         html += '</div>';
+        html += '</div></div>';
 
-        // Arrival rate
-        html += '<div style="margin-top:20px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center">';
-        html += '<div style="font-size:.82rem;color:var(--text-muted);margin-bottom:4px">Tasa de llegada</div>';
-        html += '<div style="font-size:2rem;font-weight:800;color:'+(s.arrival_rate>=50?'var(--ok)':(s.arrival_rate>=25?'var(--warn)':'var(--danger)'))+'">'+s.arrival_rate+'%</div>';
-        html += '<div style="font-size:.75rem;color:var(--text-muted)">'+s.leads_arrived+' de '+s.leads_total+' leads llegaron</div>';
-        html += '</div>';
-
-        // Simple graph (CSS bar chart)
+        // 7-day chart
         var maxVal = Math.max.apply(null, d.stats.daily_graph.map(function(g){ return Math.max(g.conversations, g.leads); })) || 1;
-        html += '<div style="margin-top:20px"><h3 style="margin-bottom:10px">📊 Últimos 7 días</h3>';
-        html += '<div style="display:flex;gap:4px;align-items:flex-end;height:120px;padding:0 4px">';
-        d.stats.daily_graph.forEach(function(g){
-            var convH = (g.conversations/maxVal*100).toFixed(0);
-            var leadH = (g.leads/maxVal*100).toFixed(0);
-            html += '<div style="flex:1;text-align:center;font-size:.65rem;color:var(--text-muted)">';
-            html += '<div style="background:var(--info);width:100%;height:'+convH+'%;border-radius:2px 2px 0 0;margin-bottom:1px"></div>';
-            html += '<div style="background:var(--accent);width:100%;height:'+leadH+'%;border-radius:2px 2px 0 0"></div>';
-            html += g.date+'</div>';
+        var colors = ['var(--info)','var(--accent)','var(--ok)','var(--money)','var(--accent2)','#a78bfa','#f97316'];
+        html += '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px;margin-bottom:16px">';
+        html += '<h3 style="margin-bottom:14px">📊 Actividad últimos 7 días</h3>';
+        html += '<div style="display:flex;align-items:flex-end;height:130px;gap:4px;padding:0 2px">';
+        d.stats.daily_graph.forEach(function(g, i){
+            var convH = Math.max((g.conversations/maxVal*100).toFixed(0), 2);
+            var leadH = Math.max((g.leads/maxVal*100).toFixed(0), 2);
+            html += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">';
+            html += '<div style="font-size:.6rem;color:var(--text-muted);margin-bottom:2px">'+(g.conversations||'')+'</div>';
+            html += '<div style="background:'+colors[i%7]+';width:70%;height:'+convH+'%;border-radius:3px 3px 0 0;min-height:4px;position:relative" title="'+g.conversations+' conversaciones"></div>';
+            html += '<div style="font-size:.6rem;color:var(--accent);margin-top:1px">'+(g.leads||'')+'</div>';
+            html += '<div style="background:var(--accent);opacity:.7;width:40%;height:'+leadH+'%;border-radius:3px 3px 0 0;min-height:4px" title="'+g.leads+' leads"></div>';
+            html += '<div style="font-size:.55rem;color:var(--text-muted);margin-top:3px">'+g.date+'</div>';
+            html += '</div>';
         });
-        html += '</div><div style="display:flex;gap:16px;margin-top:4px;font-size:.7rem;color:var(--text-muted)"><span>■ Conversaciones</span><span style="color:var(--accent)">■ Leads</span></div></div>';
+        html += '</div>';
+        html += '<div style="display:flex;gap:16px;margin-top:8px;font-size:.7rem;color:var(--text-muted);justify-content:center"><span>█ Conversaciones</span><span style="color:var(--accent);opacity:.7">█ Leads</span></div>';
+        html += '</div>';
+
+        // Fun facts
+        html += '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;text-align:center">';
+        html += '<h3 style="margin-bottom:10px">✨ Datos curiosos</h3>';
+        var ratio = s.leads_total > 0 && s.conversations_total > 0 ? (s.leads_total/s.conversations_total*100).toFixed(1) : 0;
+        html += '<div style="display:flex;flex-wrap:wrap;gap:20px;justify-content:center;font-size:.82rem">';
+        html += '<div><span style="color:var(--text-muted)">Conversión:</span> <strong style="color:var(--accent)">'+ratio+'%</strong> de conversaciones generan lead</div>';
+        html += '<div><span style="color:var(--text-muted)">Efectividad:</span> <strong style="color:var(--ok)">'+(s.leads_arrived>0&&s.leads_total>0?(s.leads_arrived/s.leads_total*100).toFixed(0):0)+'%</strong> de leads llegaron</div>';
+        html += '<div><span style="color:var(--text-muted)">Promedio diario:</span> <strong style="color:var(--info)">'+(s.leads_week>0?(s.leads_week/7).toFixed(1):0)+'</strong> leads/día</div>';
+        html += '</div></div>';
 
         document.getElementById('estadisticas-container').innerHTML = html;
+    }).catch(function(){
+        document.getElementById('estadisticas-container').innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:30px">Sin datos todavía. ¡Empieza a usar el bot!</p>';
     });
 }
 
