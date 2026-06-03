@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-06-03 — BOT-CASA-MULTIUSER FASE 6 (onboarding + crons + pulido)
+
+### Implementado
+- **cron_runner.php**: Runner multi-usuario que itera sobre todos los usuarios activos y ejecuta crons (followup, reminder, learn, classify) con los datos y config de cada uno. Usa Bot::resolveUserDataPath para aislamiento.
+- **Crons multi-usuario**: lead_followup.php, reminder.php, learn.php y classify_outcomes.php ahora aceptan config override vía global `_cron_runner_config`. Sin el runner, funcionan igual que antes (modo legacy).
+- **Follow-up respeta "llegados"**: lead_followup.php ahora salta leads con flag `arrived=true`. Los clientes que fueron a la casa no reciben mensajes de seguimiento.
+- **Playbook por usuario**: learn.php ya soporta per-user via config override (playbook se escribe en data/users/{id}/playbook.md).
+- **Wizard de bienvenida**: Overlay modal al primer login (< 25% configuración) que guía en 3 pasos (Personalidad, Líneas, Chicas). Se oculta con cookie 24h.
+- **Indicador de progreso**: Barra de progreso en client.php que muestra % de configuración completada (líneas + tarifas + chicas + config).
+- **Testing final**: php -l en todos los archivos bot-casa (sin errores).
+
+### Archivos
+- **Nuevos (1):** `cron/cron_runner.php`
+- **Modificados (5):** `client.php` (+wizard +progress), `cron/lead_followup.php` (+arrived skip +multi-user), `cron/reminder.php` (+multi-user), `cron/learn.php` (+multi-user)
+- **Documentación:** `changelog.md`, `spec/tasks.md`
+
+### Verificación
+- `php -l` global bot-casa: todos los archivos OK
+- Wizard: overlay con 3 pasos, dismiss con cookie
+- Progress bar: calcula 4 indicadores (líneas, tarifas, chicas, config)
+- Follow-up: skip arrived leads verificado en getEligibleLeads()
+- Cron runner: itera usuarios y ejecuta crons per-user
+
 ## 2026-06-03 — BOT-CASA-MULTIUSER FASE 5 (clientes + mensajes + ajustes + estadísticas + logs)
 
 ### Implementado

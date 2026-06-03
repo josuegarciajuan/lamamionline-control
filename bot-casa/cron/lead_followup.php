@@ -18,12 +18,20 @@ declare(strict_types=1);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Bootstrap: load Config from php-bot (standalone — no Composer autoload)
+// Supports multi-user override via cron_runner.php global
 // ─────────────────────────────────────────────────────────────────────────────
 
 $phpBotRoot = dirname(__DIR__);                                 // php-bot root
 require_once $phpBotRoot . '/src/Core/ConfigInterface.php';
 require_once $phpBotRoot . '/src/Core/Config.php';
-$config = new \WasapBot\Core\Config($phpBotRoot);
+require_once $phpBotRoot . '/src/Bot.php';
+
+// Multi-user support: if cron_runner.php set a global config, use it
+if (isset($GLOBALS['_cron_runner_config']) && $GLOBALS['_cron_runner_config'] instanceof \WasapBot\Core\Config) {
+    $config = $GLOBALS['_cron_runner_config'];
+} else {
+    $config = new \WasapBot\Core\Config($phpBotRoot);
+}
 
 /**
  * Shorthand for $config->get() — accesses the global $config instance.
@@ -563,6 +571,11 @@ function getEligibleLeads(array $alreadySentToday, int $maxLeads): array
         $lineLabel   = (string) ($record['line_label'] ?? '');
 
         if ($phone === '' || $wahaBaseUrl === '' || $wahaPort === null) {
+            continue;
+        }
+
+        // ── Skip leads marked as "arrived" (cliente ya fue) ─────────
+        if (!empty($record['arrived'])) {
             continue;
         }
 

@@ -26,7 +26,14 @@ set_time_limit(300);
 $phpBotRoot = dirname(__DIR__);
 require_once $phpBotRoot . '/src/Core/ConfigInterface.php';
 require_once $phpBotRoot . '/src/Core/Config.php';
-$config = new \WasapBot\Core\Config($phpBotRoot);
+require_once $phpBotRoot . '/src/Bot.php';
+
+// Multi-user support
+if (isset($GLOBALS['_cron_runner_config']) && $GLOBALS['_cron_runner_config'] instanceof \WasapBot\Core\Config) {
+    $config = $GLOBALS['_cron_runner_config'];
+} else {
+    $config = new \WasapBot\Core\Config($phpBotRoot);
+}
 
 function _cfg(string $key, mixed $default = null): mixed
 {

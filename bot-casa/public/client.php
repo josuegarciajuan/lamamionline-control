@@ -342,6 +342,70 @@ $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucci
 
 <?php echo $notification; ?>
 
+<?php
+// ── Progress indicator ──
+$progressTotal = 4;
+$progressDone = 0;
+if ($linesForUser > 0) $progressDone++;
+if (strlen((string)$config->get('prompt.sections.tarifas','')) > 20) $progressDone++;
+if (file_exists(WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/girls.json')) {
+    $gd = @json_decode((string)@file_get_contents(WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/girls.json'), true);
+    if (is_array($gd) && count(array_filter($gd['girls']??[], fn($g)=>!empty($g['activa']))) > 0) $progressDone++;
+}
+$configPath = WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/config.local.json';
+if (file_exists($configPath)) $progressDone++;
+$progressPct = $progressDone > 0 ? round($progressDone / $progressTotal * 100) : 0;
+if ($progressPct < 100):
+?>
+<div style="padding:0 20px;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--text-muted)">
+        <span>⚙️ Configuración: <?php echo $progressDone; ?>/<?php echo $progressTotal; ?></span>
+        <div style="flex:1;background:var(--input-bg);border-radius:4px;height:6px;overflow:hidden">
+            <div style="background:linear-gradient(90deg,var(--accent),var(--ok));height:100%;width:<?php echo $progressPct; ?>%;border-radius:4px;transition:width .3s"></div>
+        </div>
+        <span><?php echo $progressPct; ?>%</span>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php
+// ── Onboarding wizard (shown if progress < 25%) ──
+$showWizard = $progressPct < 25 && !isset($_COOKIE['botcasa_wizard_done']);
+if ($showWizard):
+?>
+<div id="wizard-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">
+    <div style="background:var(--panel);border:1px solid var(--accent);border-radius:var(--radius-lg);padding:32px;max-width:500px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);text-align:center">
+        <div style="font-size:3rem;margin-bottom:8px">🚀</div>
+        <h2 style="color:var(--accent);margin-bottom:8px">¡Bienvenido a bot-casa!</h2>
+        <p style="color:var(--text-muted);margin-bottom:16px;font-size:.9rem">
+            Configura tu bot en 3 pasos sencillos para empezar a recibir clientes por WhatsApp automáticamente.
+        </p>
+        <div style="text-align:left;margin-bottom:20px">
+            <div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--bg-surface);border-radius:var(--radius-sm);margin-bottom:8px">
+                <span style="font-size:1.5rem">1️⃣</span>
+                <div><strong>Personalidad</strong><br><span style="font-size:.78rem;color:var(--text-muted)">Define tarifas, ubicación y estilo → pestaña 🎭 Personalidad</span></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--bg-surface);border-radius:var(--radius-sm);margin-bottom:8px">
+                <span style="font-size:1.5rem">2️⃣</span>
+                <div><strong>Líneas WhatsApp</strong><br><span style="font-size:.78rem;color:var(--text-muted)">Vincula tus números → pestaña 📱 Líneas</span></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--bg-surface);border-radius:var(--radius-sm)">
+                <span style="font-size:1.5rem">3️⃣</span>
+                <div><strong>Chicas</strong><br><span style="font-size:.78rem;color:var(--text-muted)">Añade tu catálogo → pestaña 👩 Chicas</span></div>
+            </div>
+        </div>
+        <button type="button" class="btn btn-primary btn-lg" onclick="dismissWizard()" style="width:100%">¡Empezar!</button>
+        <p style="font-size:.7rem;color:var(--text-muted);margin-top:10px">Este asistente solo aparece una vez. Puedes volver a verlo desde Ajustes.</p>
+    </div>
+</div>
+<script>
+function dismissWizard() {
+    document.getElementById('wizard-overlay').style.display = 'none';
+    document.cookie = 'botcasa_wizard_done=1;max-age=86400;path=/;samesite=lax';
+}
+</script>
+<?php endif; ?>
+
 <div class="tab-nav" id="tabNav">
     <button type="button" class="active" data-tab="tab-dashboard">📊 Inicio</button>
     <button type="button" data-tab="tab-mibot">🤖 Mi Bot</button>

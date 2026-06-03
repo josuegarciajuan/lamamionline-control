@@ -616,9 +616,11 @@
 
 ### FASE 6 — Onboarding + Cron Jobs + Pulido
 
-- [ ] T6.1 — Wizard de bienvenida al primer login.
-- [ ] T6.2 — Modificar crons para multi-usuario (learn, classify, followup, reminder).
-- [ ] T6.3 — Playbook por usuario (learn.php).
-- [ ] T6.4 — Follow-up respeta leads marcados como llegados.
-- [ ] T6.5 — Indicador de progreso de configuración.
-- [ ] T6.6 — Testing final end-to-end.
+- [x] T6.1 — Wizard de bienvenida al primer login (overlay modal, 3 pasos, cookie 24h).
+- [x] T6.2 — Modificar crons para multi-usuario (runner + config override en 4 crons).
+- [x] T6.3 — Playbook por usuario (learn.php per-user via config override).
+- [x] T6.4 — Follow-up respeta leads marcados como llegados (skip arrived=true).
+- [x] T6.5 — Indicador de progreso de configuración (barra 4 indicadores en client.php).
+- [x] T6.6 — Testing final end-to-end (php -l global OK).
+
+**FASE 6 COMPLETADA. 🎉 PROYECTO BOT-CASA-MULTIUSER FINALIZADO.**
