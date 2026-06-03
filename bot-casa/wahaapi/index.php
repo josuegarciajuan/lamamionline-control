@@ -76,7 +76,7 @@ try {
                     $containers[] = [
                         'name' => $name,
                         'port' => $port,
-                        'status' => str_contains(strtolower($status), 'up') ? 'running' : 'stopped',
+                        'status' => (strpos(strtolower($status), 'up') !== false) ? 'running' : 'stopped',
                         'ports_raw' => $ports,
                     ];
                 }
