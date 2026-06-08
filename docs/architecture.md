@@ -1,5 +1,11 @@
 # Arquitectura (resumen operativo)
 
+## MOBILE-REDESIGN — Fase 1 (completada)
+
+- **Bottom tab bar pulido**: Active state con indicador `::before` (gradiente dorado 20×3px con glow). Touch feedback `scale(0.92)`. Iconos 21px con scale 1.08× en activo. Label bold (700) en activo. Border-top `rgba(245,158,11,0.12)` + sombra.
+- **Toolbar simplificada**: `#mobileMenuToggle` oculto. Solo Avisos + Voz visibles, centrados.
+- **Zero overflow**: `overflow-x: hidden !important` en body/.main/.layout + 7 contenedores más. `* { word-wrap: break-word }`. Imágenes/media `max-width: 100% !important`.
+
 ## MOBILE-REDESIGN — Fase 0 (completada)
 
 - **Bottom Tab Bar**: Navegación fija inferior con 5 tabs (Dashboard, Comercial, LaMami, Jostal, Más). Visible solo ≤767px. Sidebar oculto en mobile.

@@ -640,9 +640,9 @@
 
 ### MOBILE-REDESIGN-F1 — Bottom Tab Bar + Navegación reestructurada
 
-- [ ] T1.1 — Pulir bottom tab bar: active states, transiciones, color accent.
-- [ ] T1.2 — Simplificar toolbar superior: ocultar botón Menú (redundante con bottom bar).
-- [ ] T1.3 — Ajustar `body` y `.main` para zero overflow horizontal.
+- [x] T1.1 — Pulir bottom tab bar: active states con `::before` indicator dorado + glow, animación scale al tocar (`:active`), transiciones color/background, icon sizing (21px), border-top dorado sutil.
+- [x] T1.2 — Simplificar toolbar superior: ocultar `#mobileMenuToggle` (redundante con bottom bar), centrar Avisos + Voz con `justify-content: center`.
+- [x] T1.3 — Zero overflow horizontal: `overflow-x: hidden !important` + `max-width: 100vw` en body/.main/.layout/.panel/.cards/.table-wrap/.subtab-content/.page-head/.section-head/.form-grid. Imágenes/media `max-width: 100% !important`. `* { word-wrap: break-word }`.
 
 ### MOBILE-REDESIGN-F2 — Conversor universal Tablas → Tarjetas (Card Stack)
 

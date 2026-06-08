@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-08 — MOBILE-REDESIGN FASE 1 (Bottom Tab Bar pulido + Toolbar simplificada + Zero overflow)
+
+### Implementado
+- **Bottom tab bar pulido**: Active state con indicador `::before` dorado + glow, animación `scale(0.92)` al tocar (`:active`), transiciones suaves, iconos 21px, label bold en activo. Border-top dorado sutil con sombra `0 -4px 24px`.
+- **Toolbar superior simplificada**: Botón `#mobileMenuToggle` oculto (redundante con bottom bar). Botones Avisos + Voz centrados con `justify-content: center`.
+- **Zero overflow horizontal definitivo**: `overflow-x: hidden !important` + `max-width: 100vw` en body, .main, .layout, .panel, .cards, .table-wrap, .subtab-content, .page-head, .section-head, .form-grid. Imágenes/media con `max-width: 100% !important`. Selector universal `* { word-wrap: break-word; overflow-wrap: break-word }`.
+
+### Archivos
+- **Modificado (1):** `assets/theme.css` (+85 líneas netas en bloque `@media (max-width: 767px)`)
+- **Documentación:** `changelog.md`, `docs/architecture.md`, `spec/tasks.md`
+
+### Verificación
+- `php -l index.php`: OK
+- CSS: 6 reglas de overflow encontradas en theme.css (todas presentes)
+- Seguridad: 0 hallazgos (CSS-only, sin superficie de ataque)
+
 ## 2026-06-08 — MOBILE-REDESIGN FASE 0 (Fundación Shell Mobile)
 
 ### Implementado
