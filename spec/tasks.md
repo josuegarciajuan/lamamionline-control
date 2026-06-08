@@ -659,8 +659,8 @@
 
 ### MOBILE-REDESIGN-F4 — Subpestañas → Chips + Overflow
 
-- [ ] T4.1 — CSS: subpestañas como chips compactos (border-radius 20px, padding reducido, wrap).
-- [ ] T4.2 — JS (opcional): dropdown "···" para más de 6 chips.
+- [x] T4.1 — CSS: chips compactos (`border-radius: 20px`, `padding: 5px 10px`, `font-size: 11px`, `flex-wrap: wrap`). Sin scroll horizontal. Activo: fill dorado sólido. Inactivo: outline sutil transparente.
+- [x] T4.2 — JS: `setupSubtabOverflow()` — si hay más de 6 chips, oculta los que exceden 5 y muestra botón "···" con toggle expand/colapsar. `aria-expanded` + `aria-label`.
 
 ### MOBILE-REDESIGN-F5 — Conversor Agente Table → Cards
 

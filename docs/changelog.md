@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-08 — MOBILE-REDESIGN FASE 4 (Subpestañas → Chips compactos + Overflow)
+
+### Implementado
+- **CSS chips**: Subpestañas reescritas como píldoras compactas (`border-radius: 20px`, `padding: 5px 10px`, `font-size: 11px`, `flex-wrap: wrap`). Sin scroll horizontal. Activo: fill dorado sólido. Inactivo: outline sutil con transparencia. Hover/tap con highlight.
+- **JS overflow dropdown**: `setupSubtabOverflow()` detecta si hay más de 6 subpestañas en un contenedor `.subtabs`. Si es así, oculta las que exceden 5 y muestra un botón "···" que las expande/colapsa. Con `aria-expanded` y `aria-label`.
+- **Comercial (9 tabs)**: Ahora muestra 5 chips + "···" → expande a 9. Josué (10): misma mejora. El resto (3-6 tabs): wrap natural en 1-2 filas.
+
+### Archivos
+- **Modificados (2):** `assets/theme.css` (+45 líneas chips + overflow button), `assets/app.js` (+45 líneas setupSubtabOverflow)
+- **Documentación:** `changelog.md`, `spec/tasks.md`, `docs/architecture.md`
+
+### Verificación
+- `php -l index.php`: OK
+- JS: `textContent` y `style` solamente (sin `innerHTML` — seguro por construcción)
+- CSS: `flex-wrap: wrap` (sin scroll), chips con 20px border-radius
+- Seguridad: 0 hallazgos. A11y: `aria-expanded` + `aria-label` en botón overflow.
+
 ## 2026-06-08 — MOBILE-REDESIGN FASE 3 (Bottom Sheets para Formularios + FAB)
 
 ### Implementado

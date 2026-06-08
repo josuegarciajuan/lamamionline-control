@@ -138,6 +138,56 @@
         });
     }
 
+    // =========================================================================
+    // MOBILE-REDESIGN F4: Subtab overflow dropdown (···)
+    // If a .subtabs container has more than 6 visible chips, hide extras and
+    // show a "···" toggle that expands them.
+    // =========================================================================
+    function setupSubtabOverflow() {
+        if (!window.matchMedia('(max-width: 767px)').matches) return;
+
+        document.querySelectorAll('.subtabs').forEach(function (container) {
+            var items = container.querySelectorAll('.subtab, a.subtab, .subtab-split');
+            if (items.length <= 6) return;
+
+            // Hide items beyond 5
+            var hiddenItems = [];
+            for (var i = 5; i < items.length; i++) {
+                items[i].style.display = 'none';
+                hiddenItems.push(items[i]);
+            }
+
+            // Create "···" toggle button
+            var moreBtn = document.createElement('button');
+            moreBtn.type = 'button';
+            moreBtn.className = 'subtab subtab-more';
+            moreBtn.textContent = '···';
+            moreBtn.style.cssText = items[0].getAttribute('style') || '';
+            moreBtn.style.display = '';
+            moreBtn.style.minWidth = 'auto';
+            moreBtn.style.padding = '5px 10px';
+            moreBtn.style.fontSize = '11px';
+            moreBtn.style.borderRadius = '20px';
+            moreBtn.style.fontWeight = '700';
+            moreBtn.style.cursor = 'pointer';
+            moreBtn.setAttribute('aria-expanded', 'false');
+            moreBtn.setAttribute('aria-label', 'Mostrar más pestañas');
+
+            container.appendChild(moreBtn);
+
+            // Toggle hidden items
+            var expanded = false;
+            moreBtn.addEventListener('click', function () {
+                expanded = !expanded;
+                hiddenItems.forEach(function (item) {
+                    item.style.display = expanded ? '' : 'none';
+                });
+                moreBtn.textContent = expanded ? '▲' : '···';
+                moreBtn.setAttribute('aria-expanded', String(expanded));
+            });
+        });
+    }
+
     function showToast(message, type) {
         var el = document.getElementById('floatingToast');
         if (!el || !message) return;
@@ -2326,6 +2376,7 @@
         AgentTable.init();
         scrollActiveSubtabIntoView();
         convertTablesToCards();
+        setupSubtabOverflow();
 
         // ── "Más" bottom sheet toggle (MOBILE-REDESIGN F0) ──
         var moreBtn = document.getElementById('mobileMoreBtn');

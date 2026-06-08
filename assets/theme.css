@@ -2393,28 +2393,79 @@ a.subtab.active {
     margin: 0 !important;
   }
 
-  /* Subtabs: horizontal scrollable strip instead of multi-row wrap */
+  /* ── T4.1: Subtabs as compact chip pills (wrap naturally, no scroll) ── */
   .subtabs {
-    flex-wrap: nowrap !important;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    scroll-behavior: smooth;
-    gap: 6px !important;
-    padding-bottom: 4px;
+    flex-wrap: wrap !important;
+    overflow-x: visible !important;
+    gap: 5px !important;
+    padding-bottom: 2px;
   }
-  .subtabs::-webkit-scrollbar { display: none; }
 
   .subtabs .subtab,
-  a.subtab,
-  .subtab-split {
+  a.subtab {
     flex: 0 0 auto !important;
     min-width: auto !important;
-    padding: 8px 14px !important;
+    padding: 5px 10px !important;
+    font-size: 11px !important;
+    font-weight: 600;
+    border-radius: 20px !important;
     white-space: nowrap;
+    line-height: 1.35;
+    box-shadow: none !important;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
   }
+
   .subtab-split {
-    min-width: 185px !important;
+    min-width: 0 !important;
+    flex: 0 0 auto;
+    font-size: 11px !important;
+    border-radius: 20px !important;
+    padding: 5px 10px !important;
+  }
+
+  .subtab-split-main,
+  .subtab-split-side {
+    padding: 5px 10px !important;
+    font-size: 11px !important;
+  }
+
+  /* Active chip: solid gold fill */
+  .subtabs .subtab.active,
+  a.subtab.active {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(249, 115, 22, 0.18)) !important;
+    border-color: rgba(245, 158, 11, 0.45) !important;
+    color: #f59e0b !important;
+    font-weight: 700;
+  }
+
+  /* Inactive chip: subtle outline */
+  .subtabs .subtab:not(.active),
+  a.subtab:not(.active) {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    color: var(--muted, #7a8ba5) !important;
+  }
+
+  /* Hover/tap on inactive */
+  .subtabs .subtab:not(.active):hover,
+  a.subtab:not(.active):hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(255, 255, 255, 0.14) !important;
+  }
+
+  /* "···" overflow toggle button */
+  .subtab-more {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: var(--muted, #7a8ba5) !important;
+    cursor: pointer;
+    font-size: 14px;
+    letter-spacing: 2px;
+    line-height: 1;
+  }
+
+  .subtab-more:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
   }
 
   /* ── Mobile tables: compact & scrollable with scroll-shadow ── */
