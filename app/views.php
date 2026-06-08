@@ -94,7 +94,6 @@ function render_global_ui($page = '') {
     echo '<div class="field full">';
     echo '<label for="voiceCommandInput">Texto de la orden</label>';
     echo '<textarea id="voiceCommandInput" class="voice-command-input" placeholder="Ejemplo: muéstrame estadísticas de esta clienta"></textarea>';
-    echo '<div class="field-help">Se enviará automáticamente al terminar de hablar. Si quieres, puedes corregir el texto y reenviarlo manualmente.</div>';
     echo '</div>';
 
     echo '<div class="voice-command-meta">';

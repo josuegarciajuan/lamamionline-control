@@ -682,8 +682,8 @@
 
         if (mobileAvisosToggle) {
             mobileAvisosToggle.addEventListener('click', function () {
-                if (!avisosPanel) {
-                    // No panel rendered: redirect to full avisos page as fallback
+                // Empty or hidden panel: redirect to full avisos page
+                if (!avisosPanel || !avisosPanel.children.length || avisosPanel.textContent.trim() === '') {
                     window.location.href = 'index.php?page=avisos';
                     return;
                 }
