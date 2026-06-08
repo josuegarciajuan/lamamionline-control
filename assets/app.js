@@ -1513,7 +1513,7 @@
                 return;
             }
 
-            if (support) support.textContent = 'Puedes hablar en español y el sistema esperará una pausa más larga antes de cortar. Además enviará alternativas a la IA para interpretar mejor el comando del CRM.';
+            if (support) support.textContent = '';
 
             recognition = new RecognitionCtor();
             recognition.lang = 'es-ES';
