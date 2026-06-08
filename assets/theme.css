@@ -3186,4 +3186,123 @@ a.subtab.active {
     font-weight: 700;
     border-radius: 12px;
   }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     T5: AGENT TABLE CARD-STACK POLISH
+     El agente (tabla más ancha del CRM, 900px) ya tiene modo card a
+     ≤640px en style.css. Aquí lo pulimos con el tema oscuro Luxe Sapphire.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  /* Force card mode at 767px (not just 640px) — no horizontal scroll */
+  .agent-table thead {
+    display: none !important;
+  }
+
+  .agent-table,
+  .agent-table tbody,
+  .agent-table tr,
+  .agent-table td {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .agent-table {
+    min-width: 0 !important;
+    table-layout: auto !important;
+  }
+
+  /* Card-style rows: panels with gap, rounded, shadow */
+  .agent-table tr.agent-data-row {
+    display: block !important;
+    background: var(--panel, rgba(17, 28, 45, 0.96));
+    border: 1px solid var(--line, #26384f);
+    border-radius: 14px;
+    padding: 14px !important;
+    margin-bottom: 10px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Hide empty/header-only rows in card mode */
+  .agent-table thead,
+  .agent-table tr:not(.agent-data-row) {
+    display: none !important;
+  }
+
+  /* Cell styling: key-value pairs with labels */
+  .agent-table td {
+    padding: 4px 0 !important;
+    border-bottom: none !important;
+    font-size: 13px;
+    color: var(--text, #edf2f7);
+  }
+
+  .agent-table td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted, #7a8ba5);
+    margin-bottom: 3px;
+  }
+
+  /* Actions column: no label, full-width, top border */
+  .agent-table td.col-actions {
+    padding-top: 10px !important;
+    margin-top: 6px;
+    border-top: 1px solid var(--line, #26384f);
+  }
+
+  .agent-table td.col-actions::before {
+    display: none;
+  }
+
+  /* Action buttons: wrap naturally, compact */
+  .agent-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .agent-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    border-radius: 10px;
+  }
+
+  /* Agent phone number: make it prominent */
+  .agent-phone {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text, #edf2f7);
+    padding: 4px 0;
+  }
+
+  /* Agent counter badges: keep them readable */
+  .agent-counter-badge {
+    font-size: 18px;
+  }
+
+  .agent-counter-badge .count {
+    font-size: 26px;
+  }
+
+  /* Inline chat: same card style when expanded */
+  .agent-inline-chat.is-open td {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 0 0 14px 14px;
+    padding: 12px 14px !important;
+    border-top: 1px solid var(--line, #26384f);
+  }
+
+  /* Filter chips: compact */
+  .agent-filter-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 12px;
+    border-radius: 12px;
+  }
 }

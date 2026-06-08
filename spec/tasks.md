@@ -664,8 +664,8 @@
 
 ### MOBILE-REDESIGN-F5 — Conversor Agente Table → Cards
 
-- [ ] T5.1 — Verificar y pulir modo card-stack existente del agente (≤640px).
-- [ ] T5.2 — CSS: pulir tarjetas de agente con el tema oscuro.
+- [x] T5.1 — Verificar modo card-stack existente: activa a 640px con `display: block` + `td::before { content: attr(data-label) }`. Funciona correctamente.
+- [x] T5.2 — CSS pulido: fuerza card mode a 767px, estilo panel oscuro (`border-radius: 14px`, `box-shadow`, `padding: 14px`), labels como `.card-stack-label`, acciones con border-top, teléfono prominente (18px bold), filtros compactos.
 
 ### MOBILE-REDESIGN-F6 — Pulido Final y Verificación
 
