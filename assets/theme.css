@@ -3305,4 +3305,60 @@ a.subtab.active {
     font-size: 12px;
     border-radius: 12px;
   }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     T6.1: KILL ALL REMAINING MIN-WIDTHS
+     Última línea de defensa: elementos que aún puedan causar overflow.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  /* Buttons and interactive elements: auto-width on mobile */
+  .btn-wa,
+  .btn-primary,
+  .btn-secondary-mini,
+  .btn-danger-mini,
+  .btn-panel-link,
+  .runtime-toggle-btn,
+  .josue-save-btn,
+  .lamamibot-linkbtn,
+  .lamamibot-toggle {
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: 100% !important;
+  }
+
+  /* Thread actions and previews */
+  .commercial-thread-actions-cell {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .commercial-row-preview {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Publicista elements */
+  .publicista-ads-firing-label {
+    min-width: 0 !important;
+  }
+
+  /* Any element that might have a min-width from style.css */
+  .panel .table-wrap,
+  .subtab-content .table-wrap {
+    min-width: 0 !important;
+  }
+
+  /* Eliminate fixed widths on table cells that cause overflow */
+  td[style*="width"],
+  th[style*="width"] {
+    width: auto !important;
+    min-width: 0 !important;
+  }
+
+  /* CRUD mobile toggle (obsolete, replaced by FAB in F3) */
+  .crud-mobile-toggle {
+    min-width: 0 !important;
+    width: auto !important;
+  }
 }

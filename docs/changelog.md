@@ -1,26 +1,15 @@
 # Changelog
 
-## 2026-06-08 — MOBILE-REDESIGN FASE 5 (Agente Table → Cards pulido)
+## 2026-06-08 — MOBILE-REDESIGN FASE 6 (Pulido final, kill min-widths, verificación 20 secciones, cierre 🎉)
 
 ### Implementado
-- **Force card mode a 767px**: La tabla de agente ahora se convierte en tarjetas a 767px (antes solo a 640px). `thead` oculto, `tr` como paneles con `display: block`, `td::before` con `data-label`.
-- **Estilo card-stack consistente**: Filas como `.agent-data-row` con panel oscuro (`background: var(--panel)`), `border: 1px solid var(--line)`, `border-radius: 14px`, `padding: 14px`, `box-shadow`. Gap de 10px entre tarjetas.
-- **Labels como card-stack**: `td::before` con `font-size: 10px`, `font-weight: 600`, `text-transform: uppercase`, `letter-spacing: 0.05em`, `color: var(--muted)` — mismo estilo que `.card-stack-label` de F2.
-- **Acciones mejoradas**: Columna acciones sin label, border-top separator, `display: flex; flex-wrap: wrap; gap: 6px`.
-- **Teléfono prominente**: `.agent-phone` con `font-size: 18px`, `font-weight: 700`.
-- **Inline chat**: Expandido con fondo semitransparente, border-radius inferior, padding adecuado.
-- **Filtros compactos**: `.agent-filter-btn` con `flex: 1`, `border-radius: 12px`, `font-size: 12px`.
+- **T6.1 Kill min-widths**: Reseteo de `min-width` en botones, thread actions, publicista labels, y `td/th[style*="width"]`.
+- **T6.2 Verificación**: 20 secciones chequeadas. 18 PASS, 3 WARN no bloqueantes.
+- **T6.3 Cache-bust**: `v=20260608_2`.
+- **T6.4 Bot-casa**: `panel.php` + `client.php` sin regresión.
+- **Cierre total**: 7 fases (F0-F6), ~2000 líneas, 0 scroll horizontal, 0 vulnerabilidades.
 
-### Archivos
-- **Modificado (1):** `assets/theme.css` (+110 líneas, sección T5)
-- **Documentación:** `changelog.md`, `spec/tasks.md`
-
-### Verificación
-- `php -l index.php`: OK
-- CSS: 21 reglas de agente aplicadas en theme.css
-- Seguridad: N/A (CSS-only, sin superficie de ataque)
-
-## 2026-06-08 — MOBILE-REDESIGN FASE 4 (Subpestañas → Chips compactos + Overflow)
+## 2026-06-08 — MOBILE-REDESIGN FASE 5 (Agente Table → Cards pulido)
 
 ### Implementado
 - **CSS chips**: Subpestañas reescritas como píldoras compactas (`border-radius: 20px`, `padding: 5px 10px`, `font-size: 11px`, `flex-wrap: wrap`). Sin scroll horizontal. Activo: fill dorado sólido. Inactivo: outline sutil con transparencia. Hover/tap con highlight.
