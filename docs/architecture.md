@@ -1,5 +1,12 @@
 # Arquitectura (resumen operativo)
 
+## MOBILE-REDESIGN — Fase 3 (completada)
+
+- **Bottom sheets para formularios**: `setupFormSheets()` reemplaza el antiguo sistema CRUD móvil. Detecta `.cards.two` con forms, crea FAB flotante + sheet deslizable. Auto-open en edición.
+- **FAB**: 52px círculo con gradiente `#e83e8c → #8a5cf6`, glow shadow, animación `scale(0.9)` al tocar. Posición `bottom: 80px; right: 16px`.
+- **Form sheet**: Overlay `z-index: 1480`, panel con `slideUp` + `fadeIn`, handle sticky, inputs 16px font. Escape key cierra.
+- **Seguridad**: IDs clonados eliminados, form original deshabilitado, WAI-ARIA completo, Escape key handler.
+
 ## MOBILE-REDESIGN — Fase 2 (completada)
 
 - **Conversor universal tablas→tarjetas**: JS `convertTablesToCards()` (130 líneas). Auto-detecta `<thead>`, mapea columnas→labels, convierte `<tr>`→`.card-stack-item`. Preserva forms inline, botones, acciones. Edge cases: colspan rows, triage headers, hidden rows, empty states, columna "Acciones"→barra inferior.

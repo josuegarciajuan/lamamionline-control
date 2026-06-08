@@ -3009,4 +3009,130 @@ a.subtab.active {
     text-decoration: none;
     margin-top: 2px;
   }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     T3.2: FAB + FORM BOTTOM SHEET
+     FAB flotante abre formularios en bottom sheet deslizable.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  /* FAB — Floating Action Button */
+  .mobile-fab {
+    display: flex;
+    position: fixed;
+    bottom: calc(80px + env(safe-area-inset-bottom, 0px) + 8px);
+    right: 16px;
+    z-index: 1420;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #e83e8c, #8a5cf6);
+    color: #fff;
+    font-size: 26px;
+    font-weight: 700;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 20px rgba(232, 62, 140, 0.35);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.18s, box-shadow 0.18s;
+    line-height: 1;
+    padding: 0;
+  }
+
+  .mobile-fab:active {
+    transform: scale(0.9);
+    box-shadow: 0 4px 14px rgba(232, 62, 140, 0.25);
+  }
+
+  /* Form Bottom Sheet — slides up from bottom */
+  .mobile-form-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 1480;
+    display: block;
+  }
+
+  .mobile-form-sheet[hidden] {
+    display: none;
+  }
+
+  .mobile-form-sheet-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    animation: formSheetFadeIn 0.25s ease;
+  }
+
+  @keyframes formSheetFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .mobile-form-sheet-panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 85vh;
+    background: var(--panel, #111c2d);
+    border-radius: 20px 20px 0 0;
+    padding: 0 18px max(16px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+    box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.5);
+    animation: formSheetSlideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  @keyframes formSheetSlideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .mobile-form-sheet-handle {
+    width: 36px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 2px;
+    margin: 10px auto 8px;
+    position: sticky;
+    top: 10px;
+  }
+
+  /* Reset panel styles inside form sheet */
+  .mobile-form-sheet-panel .panel {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  /* Make form elements full-width and tap-friendly in sheet */
+  .mobile-form-sheet-panel input,
+  .mobile-form-sheet-panel select,
+  .mobile-form-sheet-panel textarea {
+    font-size: 16px !important;
+    padding: 12px 14px !important;
+  }
+
+  /* Sticky bottom bar for save/cancel in sheet */
+  .mobile-form-sheet-footer {
+    position: sticky;
+    bottom: 0;
+    background: var(--panel, #111c2d);
+    padding: 12px 18px max(12px, env(safe-area-inset-bottom));
+    margin: 0 -18px;
+    border-top: 1px solid var(--line, #26384f);
+    display: flex;
+    gap: 10px;
+  }
+
+  .mobile-form-sheet-footer button,
+  .mobile-form-sheet-footer .btn-primary {
+    flex: 1;
+    padding: 14px 16px;
+    font-size: 15px;
+    font-weight: 700;
+    border-radius: 12px;
+  }
 }

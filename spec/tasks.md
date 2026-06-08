@@ -653,8 +653,9 @@
 
 ### MOBILE-REDESIGN-F3 — Bottom Sheets para Formularios + FAB
 
-- [ ] T3.1 — JS: `setupFormSheets()` convierte form+table `.cards.two` en bottom sheet + FAB.
-- [ ] T3.2 — CSS: `.mobile-fab` (FAB 52px circle), `.mobile-form-sheet` con backdrop y panel.
+- [x] T3.1 — JS: `setupFormSheets()` reemplaza `setupMobileCrudPanels()`. Detecta `.cards.two`, crea FAB + bottom sheet, clona form con `cloneNode(true)`, auto-open si `?edit/?convert/?new`.
+- [x] T3.2 — CSS: `.mobile-fab` (52px circle, gradiente rosa-violeta, glow shadow, scale animation). `.mobile-form-sheet` (overlay, backdrop, slideUp panel, sticky handle + footer).
+- [x] T3.3 — Seguridad: IDs del clon eliminados (removeAttribute), form original deshabilitado (preventDefault), Escape key cierra, WAI-ARIA (role dialog, aria-modal).
 
 ### MOBILE-REDESIGN-F4 — Subpestañas → Chips + Overflow
 

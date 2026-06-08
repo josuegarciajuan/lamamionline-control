@@ -650,77 +650,179 @@
             });
         });
 
-        function setupMobileCrudPanels() {
+        // =========================================================================
+        // MOBILE-REDESIGN F3: Form bottom sheets + FAB
+        // Converts form+table .cards.two layouts into bottom sheets on mobile.
+        // Each form gets a FAB (floating button) that opens it as a sliding panel.
+        // =========================================================================
+        function setupFormSheets() {
             if (!isMobile) return;
 
-            document.querySelectorAll('.cards.two > .panel:first-child').forEach(function (panel) {
-                if (panel.classList.contains('crud-mobile-ready')) return;
-                var form = panel.querySelector('form.form-grid, form.inline-form + form.form-grid, form');
+            var sheetsCreated = 0;
+            document.querySelectorAll('.cards.two').forEach(function (cardsContainer) {
+                var panels = cardsContainer.querySelectorAll(':scope > .panel');
+                if (panels.length < 2) return;
+
+                var formPanel = panels[0];
+                var tablePanel = panels[1];
+
+                // Detect if first panel has a form
+                var form = formPanel.querySelector('form');
                 if (!form) return;
-                var parentCards = panel.parentElement;
-                if (!parentCards || !parentCards.classList.contains('cards')) return;
-                var sibling = panel.nextElementSibling;
-                if (!sibling || !sibling.classList.contains('panel')) return;
 
-                var firstHeading = panel.querySelector('h2');
-                var secondHeading = sibling.querySelector('h2');
-                if (!firstHeading || !secondHeading) return;
+                // Detect if second panel has a listing/resumen table
+                var secondHeading = tablePanel.querySelector('h2');
+                if (!secondHeading) return;
                 var secondText = (secondHeading.textContent || '').toLowerCase();
-                if (secondText.indexOf('listado') === -1 && secondText.indexOf('resumen') === -1) return;
+                if (secondText.indexOf('listado') === -1 && secondText.indexOf('resumen') === -1 && secondText.indexOf('registro') === -1) return;
 
-                panel.classList.add('crud-mobile-ready');
+                // Get form title
+                var firstHeading = formPanel.querySelector('h2');
+                var formTitle = firstHeading ? (firstHeading.textContent || 'Formulario').trim() : 'Formulario';
 
-                var bodyNodes = Array.prototype.slice.call(panel.childNodes);
-                var wrapper = document.createElement('div');
-                wrapper.className = 'crud-mobile-body';
+                // Create FAB
+                var fab = document.createElement('button');
+                fab.className = 'mobile-fab';
+                fab.setAttribute('aria-label', formTitle);
+                fab.textContent = '＋';
+                document.body.appendChild(fab);
 
-                bodyNodes.forEach(function (node, index) {
-                    if (index === 0 && node === firstHeading.parentElement && node.classList && node.classList.contains('section-head')) {
-                        return;
-                    }
-                    if (node === firstHeading) return;
-                    wrapper.appendChild(node);
+                // Create form sheet
+                var sheet = document.createElement('div');
+                sheet.className = 'mobile-form-sheet';
+                sheet.hidden = true;
+
+                var backdrop = document.createElement('div');
+                backdrop.className = 'mobile-form-sheet-backdrop';
+
+                var panel = document.createElement('div');
+                panel.className = 'mobile-form-sheet-panel';
+
+                var handle = document.createElement('div');
+                handle.className = 'mobile-form-sheet-handle';
+
+                var content = document.createElement('div');
+
+                panel.appendChild(handle);
+                panel.appendChild(content);
+                sheet.appendChild(backdrop);
+                sheet.appendChild(panel);
+                document.body.appendChild(sheet);
+
+                // Move form panel content into sheet
+                var formCloned = formPanel.cloneNode(true);
+                formCloned.style.display = '';
+                // Strip IDs to avoid collisions with hidden original (security: duplicate DOM IDs)
+                formCloned.querySelectorAll('[id]').forEach(function (el) {
+                    el.removeAttribute('id');
                 });
+                content.appendChild(formCloned);
 
-                panel.innerHTML = '';
-
-                var header = document.createElement('div');
-                header.className = 'crud-mobile-head';
-
-                var title = document.createElement('div');
-                title.className = 'crud-mobile-title';
-                title.textContent = firstHeading.textContent || 'Formulario';
-
-                var button = document.createElement('button');
-                button.type = 'button';
-                button.className = 'crud-mobile-toggle';
-                button.textContent = 'Nuevo';
-
-                var forceOpen = params.has('edit') || params.has('convert') || params.has('new');
-                if ((firstHeading.textContent || '').toLowerCase().indexOf('editar') !== -1 || (firstHeading.textContent || '').toLowerCase().indexOf('ficha') !== -1) {
-                    forceOpen = true;
-                    button.textContent = 'Editar';
+                // Hide and disable original form panel
+                formPanel.style.display = 'none';
+                var originalForm = formPanel.querySelector('form');
+                if (originalForm) {
+                    originalForm.addEventListener('submit', function (e) { e.preventDefault(); });
                 }
 
-                if (forceOpen) {
-                    panel.classList.add('is-open');
-                    button.textContent = 'Ocultar';
-                }
-
-                button.addEventListener('click', function () {
-                    var open = panel.classList.toggle('is-open');
-                    button.textContent = open ? 'Ocultar' : ((firstHeading.textContent || '').toLowerCase().indexOf('editar') !== -1 || (firstHeading.textContent || '').toLowerCase().indexOf('ficha') !== -1 ? 'Editar' : 'Nuevo');
-                    if (open) {
-                        var firstInput = panel.querySelector('input, select, textarea');
+                // Toggle: FAB opens sheet
+                fab.addEventListener('click', function () {
+                    sheet.hidden = false;
+                    document.body.style.overflow = 'hidden';
+                    // Focus first input for convenience
+                    setTimeout(function () {
+                        var firstInput = sheet.querySelector('input, select, textarea');
                         if (firstInput) firstInput.focus();
-                    }
+                    }, 350);
                 });
 
-                header.appendChild(title);
-                header.appendChild(button);
-                panel.appendChild(header);
-                panel.appendChild(wrapper);
+                // Backdrop click closes
+                backdrop.addEventListener('click', function () {
+                    sheet.hidden = true;
+                    document.body.style.overflow = '';
+                });
+
+                // Escape key closes sheet (a11y + security: prevent focus escape)
+                sheet.addEventListener('keydown', function (e) {
+                    if (e.key === 'Escape' || e.keyCode === 27) {
+                        sheet.hidden = true;
+                        document.body.style.overflow = '';
+                        fab.focus();
+                    }
+                });
+                sheet.setAttribute('role', 'dialog');
+                sheet.setAttribute('aria-modal', 'true');
+                sheet.setAttribute('aria-label', formTitle);
+
+                // Auto-open if URL has edit/new/convert params or form title indicates editing
+                var forceOpen = params.has('edit') || params.has('convert') || params.has('new');
+                var titleLower = formTitle.toLowerCase();
+                if (titleLower.indexOf('editar') !== -1 || titleLower.indexOf('ficha') !== -1 || titleLower.indexOf('edición') !== -1) {
+                    forceOpen = true;
+                }
+                if (forceOpen) {
+                    sheet.hidden = false;
+                    document.body.style.overflow = 'hidden';
+                }
+
+                sheetsCreated++;
             });
+
+            // If no forms detected, also handle standalone form panels
+            if (sheetsCreated === 0) {
+                document.querySelectorAll('.cards.two > .panel:first-child form').forEach(function (form) {
+                    var formPanel = form.closest('.panel');
+                    if (!formPanel) return;
+                    var formTitle = 'Formulario';
+                    var heading = formPanel.querySelector('h2');
+                    if (heading) formTitle = heading.textContent.trim();
+
+                    var fab = document.createElement('button');
+                    fab.className = 'mobile-fab';
+                    fab.setAttribute('aria-label', formTitle);
+                    fab.textContent = '＋';
+                    document.body.appendChild(fab);
+
+                    var sheet = document.createElement('div');
+                    sheet.className = 'mobile-form-sheet';
+                    sheet.hidden = true;
+                    sheet.innerHTML = '<div class="mobile-form-sheet-backdrop"></div><div class="mobile-form-sheet-panel"><div class="mobile-form-sheet-handle"></div></div>';
+                    var content = sheet.querySelector('.mobile-form-sheet-panel');
+                    var clonedPanel = formPanel.cloneNode(true);
+                    // Strip IDs to avoid collisions with hidden original
+                    clonedPanel.querySelectorAll('[id]').forEach(function (el) {
+                        el.removeAttribute('id');
+                    });
+                    content.appendChild(clonedPanel);
+                    document.body.appendChild(sheet);
+
+                    formPanel.style.display = 'none';
+                    var origForm = formPanel.querySelector('form');
+                    if (origForm) {
+                        origForm.addEventListener('submit', function (e) { e.preventDefault(); });
+                    }
+
+                    var bg = sheet.querySelector('.mobile-form-sheet-backdrop');
+                    fab.addEventListener('click', function () {
+                        sheet.hidden = false;
+                        document.body.style.overflow = 'hidden';
+                    });
+                    bg.addEventListener('click', function () {
+                        sheet.hidden = true;
+                        document.body.style.overflow = '';
+                    });
+                    // Escape key closes
+                    sheet.addEventListener('keydown', function (e) {
+                        if (e.key === 'Escape' || e.keyCode === 27) {
+                            sheet.hidden = true;
+                            document.body.style.overflow = '';
+                            fab.focus();
+                        }
+                    });
+                    sheet.setAttribute('role', 'dialog');
+                    sheet.setAttribute('aria-modal', 'true');
+                });
+            }
         }
 
         function setupVoiceCommandPanel() {
@@ -1477,7 +1579,7 @@
             }
         }
 
-        setupMobileCrudPanels();
+        setupFormSheets();
         setupVoiceCommandPanel();
 
         window.addEventListener('resize', function () {

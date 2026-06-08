@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-08 — MOBILE-REDESIGN FASE 3 (Bottom Sheets para Formularios + FAB)
+
+### Implementado
+- **JS `setupFormSheets()`**: Reemplaza `setupMobileCrudPanels()`. Detecta `.cards.two` con formularios, crea un FAB (botón flotante) en cada uno, oculta el panel del formulario, y lo mueve a un bottom sheet deslizable. Auto-open si URL tiene `?edit`, `?convert`, `?new` o el título del form indica edición.
+- **CSS FAB + Form Sheet**: `.mobile-fab` (círculo 52px, gradiente rosa-violeta, sombra glow, animación scale al tocar). `.mobile-form-sheet` (overlay full-screen, backdrop negro 60%, panel con slideUp + fadeIn, handle sticky, footer sticky para botones). Form inputs con 16px font y 12-14px padding en sheet.
+- **Seguridad aplicada (auditoría F3)**:
+  - IDs del clon eliminados (`removeAttribute('id')`) para evitar colisiones DOM
+  - Formulario original deshabilitado (`preventDefault()` en submit) para evitar doble envío
+  - Escape key cierra sheet (`keyCode 27`) + retorno de foco al FAB
+  - Atributos WAI-ARIA: `role="dialog"`, `aria-modal="true"`, `aria-label`
+
+### Archivos
+- **Modificados (2):** `assets/app.js` (+145 líneas, reemplazo de función), `assets/theme.css` (+110 líneas FAB + sheet)
+- **Documentación:** `changelog.md`, `spec/tasks.md`, `docs/architecture.md`
+
+### Verificación
+- `php -l index.php`: OK
+- JS: 17 referencias a fixes de seguridad en app.js (removeAttribute, keyCode, aria-modal, preventDefault, role dialog)
+- CSS: 14 referencias a mobile-fab/mobile-form-sheet en theme.css
+- Seguridad: 2 LOW corregidos (duplicate IDs, hidden form), 3 INFO mitigados (lost listeners, keyboard, FAB position)
+
 ## 2026-06-08 — MOBILE-REDESIGN FASE 2 (Conversor universal Tablas → Tarjetas)
 
 ### Implementado
