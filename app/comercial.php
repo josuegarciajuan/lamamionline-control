@@ -646,6 +646,7 @@ function comercial_page_tabs() {
         'lineas' => 'Líneas',
         'conversaciones' => 'Conversaciones',
         'leads' => 'Leads',
+        'agente' => 'Agente',
         'blacklist' => 'Blacklist',
         'ajustes' => 'Ajustes',
         'logs' => 'Logs',
@@ -4064,6 +4065,435 @@ function comercial_thread_recent_history_text($thread, $limit = 5) {
 }
 
 /**
+ * ── AI Lead Qualification System ──
+ * Analiza conversaciones con LLM para la tabla del agente comercial.
+ * Solo pasan leads genuinos, filtrando ruido para no saturar al comercial.
+ */
+
+/**
+ * Construye el prompt para que el LLM analice si una conversación es un lead real.
+ */
+function comercial_build_qualify_lead_prompt($thread, $process, $history) {
+    $processSlug = trim((string)($thread['process_slug'] ?? $process['slug'] ?? ''));
+    $processName = trim((string)($process['nombre'] ?? $processSlug));
+    $iaContext = trim((string)($process['ia_context_prompt'] ?? ''));
+    $repliesCount = (int)($thread['replies_count'] ?? 0);
+    $stage = trim((string)($thread['stage'] ?? ''));
+    $lastInbound = trim((string)($thread['last_inbound_text'] ?? ''));
+
+    $contextShort = '';
+    if ($iaContext !== '') {
+        $lines = explode("\n", $iaContext);
+        $contextShort = implode("\n", array_slice($lines, 0, 2));
+    }
+
+    return trim("
+Eres un filtro ANTI-RUIDO para un negocio. Tu trabajo es leer conversaciones de WhatsApp y decidir si la persona está REALMENTE interesada en comprar/contratar. Sé MUY ESTRICTO: la mayoría de conversaciones son ruido. Solo deben pasar leads donde el cliente muestre intención clara de compra.
+
+PROCESO COMERCIAL: {$processName} ({$processSlug})
+" . ($contextShort !== '' ? "CONTEXTO DEL NEGOCIO:\n{$contextShort}\n" : "") . "
+
+CONVERSACIÓN COMPLETA:
+---
+{$history}
+---
+
+ÚLTIMO MENSAJE DEL CLIENTE: «{$lastInbound}»
+DATOS: {$repliesCount} respuestas del cliente, etapa: {$stage}
+
+═══════════════════════════════════
+FILTRO ESTRICTO — SOLO PASAN SI:
+═══════════════════════════════════
+
+SEÑALES DE INTERÉS REAL (necesitas AL MENOS 2 para aprobar):
+✓ Pregunta precio, cuota, coste, cuánto vale, tarifas
+✓ Pregunta ubicación, dirección, dónde estáis, cómo llegar
+✓ Pregunta horarios, cuándo puede ir/empezar/reservar
+✓ Pregunta requisitos, qué necesita para contratar
+✓ Dice \"me interesa\", \"quiero contratar\", \"me gustaría\", \"apúntame\", \"¿cómo lo hago?\"
+✓ Pide información MUY concreta: no solo \"info\" o \"más info\"
+✓ Da su nombre completo, email, o datos de contacto voluntariamente
+✓ Pregunta cómo funciona exactamente el servicio
+✓ Muestra urgencia real: \"para ya\", \"cuánto antes\", \"este finde\", \"mañana\"
+✓ Responde con frases de más de 15-20 palabras con contenido sustancial
+✓ Hace preguntas de seguimiento (segunda o tercera pregunta)
+
+SEÑALES DE RUIDO — DESCARTA AUTOMÁTICAMENTE SI:
+✗ Solo dijo \"hola\", \"buenas\", \"ok\", \"gracias\", \"bien\", \"vale\", \"perfecto\" y nada más
+✗ Respuestas de 1-5 palabras sin preguntas ni interés
+✗ \"No me interesa\", \"no gracias\", \"ya te aviso\", \"otro día\", \"de acuerdo\"
+✗ \"Quién eres\", \"cómo tienes mi número\", \"de dónde me hablas\", \"quítame de la lista\"
+✗ Solo emojis o stickers sin texto
+✗ Auto-responder: \"Estoy ocupado\", \"No puedo hablar ahora\", \"Te escribo luego\" (y no vuelve)
+✗ Tono agresivo, grosero, quejas, amenazas de denuncia
+✗ Solo preguntó \"precio?\" o \"info?\" con 1 palabra y no siguió la conversación
+✗ La conversación tiene más de 3 días sin actividad
+✗ Pregunta algo genérico tipo \"qué tal\" o \"cómo estás\" sin interés comercial
+
+═══════════════════════════════════
+REGLAS DE DECISIÓN (OBLIGATORIAS):
+═══════════════════════════════════
+1. Necesitas AL MENOS 2 buying signals CLAROS → is_genuine_lead = true
+2. Con 1 sola buying signal → is_genuine_lead = FALSE (demasiado débil)
+3. Si hay CUALQUIER risk signal → is_genuine_lead = false
+4. Si solo saludó sin preguntar nada → is_genuine_lead = false
+5. Si las respuestas son vagas/genéricas → is_genuine_lead = false
+6. Si el cliente dejó de responder hace más de 48h → is_genuine_lead = false
+7. EXCEPCIÓN: si pregunta precio Y ubicación juntos → is_genuine_lead = true (1 sola señal doble basta)
+8. Si stage es \"very_hot\" → is_genuine_lead = true (ya validado por el sistema)
+
+IMPORTANTE: PREFIERE EL SILENCIO AL RUIDO. De cada 10 conversaciones, solo 1-3 deberían pasar. Si tienes la más mínima duda, RECHAZA.
+
+═══════════════════════════════════
+RESUMEN Y CONSEJO:
+═══════════════════════════════════
+summary: Explica en ESPAÑOL LLANO (máx 15 palabras) qué quiere esta persona. Lenguaje de calle. Ej: \"Pregunta precio del alquiler y cuándo puede verlo\"
+
+action_advice: Dale al comercial un CONSEJO CLARO de qué hacer con este lead. Máximo 20 palabras. Debe ser una ACCIÓN CONCRETA. Ejemplos:
+- \"Llamar ya, quiere contratar hoy. Pregunta por el alta\"  
+- \"Escribirle con precio exacto y fotos de la habitación\"
+- \"Está interesado pero indeciso. Ofrecerle prueba gratis\"
+- \"Preguntar qué presupuesto tiene y enviarle opciones\"
+- \"Contactar urgente, preguntó por disponibilidad inmediata\"
+Si is_genuine_lead = false, action_advice debe ser \"Descartar, no hay interés real\"
+
+RESPONDE ÚNICAMENTE con un objeto JSON. Sin markdown ni explicaciones.
+
+{
+  \"is_genuine_lead\": true,
+  \"interest_score\": 85,
+  \"summary\": \"Pregunta precio del alquiler y cuándo puede verlo\",
+  \"action_advice\": \"Llamar ya y darle precio. Quiere agendar visita esta semana\",
+  \"reason\": \"Preguntó precio + disponibilidad. Señal de compra clara.\",
+  \"buying_signals\": [\"pregunta_precio\", \"pregunta_disponibilidad\"],
+  \"risk_signals\": [],
+  \"suggested_priority\": \"hot\"
+}");
+}
+
+/**
+ * Fallback basado en reglas si la IA no está disponible o falla al devolver JSON.
+ */
+function comercial_ai_qualify_lead_fallback($thread, $rawOutput = '') {
+    $stage = trim((string)($thread['stage'] ?? ''));
+    $replies = (int)($thread['replies_count'] ?? 0);
+    $lastInbound = trim((string)($thread['last_inbound_text'] ?? ''));
+    $textLen = comercial_safe_len($lastInbound);
+    $score = 0;
+    $isGenuine = false;
+    $signals = array();
+    $risks = array();
+
+    // already qualified by existing system
+    if ($stage === 'very_hot') {
+        $score = 90;
+        $isGenuine = true;
+        $signals[] = 'stage_very_hot';
+    } elseif ($stage === 'qualified') {
+        $score = 70;
+        $isGenuine = true;
+        $signals[] = 'stage_qualified';
+    }
+
+    // Rule-based signals
+    if (preg_match('/[?¿]/u', $lastInbound) || preg_match('/\b(que|qué|cual|cu[aá]l|como|c[oó]mo|cu[aá]ndo|donde|d[oó]nde|cu[aá]nto|por qu[eé]|precio|info|informaci[oó]n)\b/ui', $lastInbound)) {
+        $score += 15;
+        $signals[] = 'hizo_pregunta';
+    }
+    if ($textLen >= 50) {
+        $score += 10;
+        $signals[] = 'respuesta_larga';
+    }
+    if (preg_match('/\b(interesa|quiero|gustar[íi]a|ap[uú]ntame|dime|contactar|llamad?me|escribid?me)\b/ui', $lastInbound)) {
+        $score += 15;
+        $signals[] = 'mostro_interes';
+    }
+    if ($replies >= 2) {
+        $score += 10;
+        $signals[] = 'multiples_respuestas';
+    }
+
+    // Risks
+    if ($textLen <= 15 && !$isGenuine) {
+        $risks[] = 'respuesta_muy_corta';
+        if ($score < 30) $isGenuine = false;
+    }
+    if (preg_match('/\b(no gracias|no me interesa|otro d[ií]a|para nada)\b/ui', $lastInbound)) {
+        $risks[] = 'rechazo_explicito';
+        $isGenuine = false;
+        $score = 0;
+    }
+
+    if ($score >= 60 && count($signals) >= 2 && empty($risks)) {
+        $isGenuine = true;
+    }
+    if ($score >= 75) {
+        $isGenuine = true;
+    }
+    if (count($risks) > 0) {
+        $isGenuine = false;
+        $score = max(0, $score - 40);
+    }
+
+    // Generate simple summary inline (max 15 words)
+    $summary = '';
+    if ($lastInbound !== '') {
+        $clean = preg_replace('/\s+/u', ' ', $lastInbound);
+        $words = explode(' ', $clean);
+        if (count($words) <= 15) {
+            $summary = $clean;
+        } else {
+            $summary = implode(' ', array_slice($words, 0, 15)) . '…';
+        }
+    }
+
+    return array(
+        'ok' => true,
+        'is_genuine_lead' => $isGenuine,
+        'interest_score' => $score,
+        'summary' => $summary,
+        'action_advice' => $isGenuine ? 'Llamar y preguntar qué necesita' : 'Descartar, no hay interés real',
+        'reason' => 'fallback_rules',
+        'buying_signals' => $signals,
+        'risk_signals' => $risks,
+        'suggested_priority' => $isGenuine ? ($score >= 70 ? 'hot' : 'warm') : 'cold',
+    );
+}
+
+/**
+ * Analiza una conversación completa con LLM para decidir si es un lead REAL.
+ * Devuelve array con: is_genuine_lead, interest_score (0-100), summary, etc.
+ */
+function comercial_ai_qualify_lead($thread, $process = array()) {
+    // Validar dependencias
+    if (!function_exists('publicista_openai_json_request') || !function_exists('publicista_ai_config')) {
+        return array('ok' => false, 'error' => 'ai_utilities_unavailable');
+    }
+    $cfg = publicista_ai_config();
+    if (empty($cfg['configured'])) {
+        return array('ok' => false, 'error' => 'ia_no_configurada');
+    }
+
+    $thread = comercial_normalize_thread($thread);
+    $processSlug = trim((string)($thread['process_slug'] ?? ''));
+    $repliesCount = (int)($thread['replies_count'] ?? 0);
+    $stage = trim((string)($thread['stage'] ?? ''));
+
+    // ── FAST-PATH: Descartar sin llamar a IA ──
+    if ($stage === 'discarded') {
+        return array(
+            'ok' => true, 'is_genuine_lead' => false, 'interest_score' => 0,
+            'summary' => '', 'action_advice' => 'Conversación ya descartada',
+            'reason' => 'thread_already_discarded',
+            'buying_signals' => array(), 'risk_signals' => array('stage_discarded'),
+            'suggested_priority' => 'cold',
+        );
+    }
+
+    // Si nunca respondió y no está marcado como very_hot, no puede ser lead
+    if ($repliesCount === 0 && $stage !== 'very_hot') {
+        return array(
+            'ok' => true, 'is_genuine_lead' => false, 'interest_score' => 0,
+            'summary' => '', 'action_advice' => 'Esperar a que responda',
+            'reason' => 'no_replies_yet',
+            'buying_signals' => array(), 'risk_signals' => array('sin_respuesta'),
+            'suggested_priority' => 'cold',
+        );
+    }
+
+    // Si es very_hot y ya tiene ai_summary, no re-analizar (24h cache)
+    $lastAnalysis = trim((string)($thread['ai_qualified_at'] ?? ''));
+    if ($stage === 'very_hot' && $lastAnalysis !== '' && strtotime($lastAnalysis) > time() - 86400) {
+        return array(
+            'ok' => true, 'is_genuine_lead' => !empty($thread['ai_is_genuine']),
+            'interest_score' => (int)($thread['ai_interest_score'] ?? 85),
+            'summary' => trim((string)($thread['ai_summary'] ?? '')),
+            'action_advice' => trim((string)($thread['ai_action_advice'] ?? '')),
+            'reason' => 'cached_very_hot',
+            'buying_signals' => (array)($thread['ai_buying_signals'] ?? array()),
+            'risk_signals' => (array)($thread['ai_risk_signals'] ?? array()),
+            'suggested_priority' => trim((string)($thread['ai_suggested_priority'] ?? 'hot')),
+        );
+    }
+
+    // ── Construir historial y prompt ──
+    $history = comercial_thread_recent_history_text($thread, 20);
+    $prompt = comercial_build_qualify_lead_prompt($thread, $process, $history);
+
+    // ── Llamar a IA ──
+    $model = trim((string)($cfg['descriptor_model'] ?? 'gpt-5.4-mini'));
+    $payload = array(
+        'model' => $model,
+        'input' => $prompt,
+        'max_output_tokens' => 400,
+        'text' => array('format' => array('type' => 'json_object')),
+    );
+
+    $resp = publicista_openai_json_request('/v1/responses', $payload, 60);
+    if (empty($resp['ok'])) {
+        return comercial_ai_qualify_lead_fallback($thread);
+    }
+
+    $decoded = $resp['decoded'] ?? array();
+    $outputText = trim((string)publicista_response_output_text($decoded));
+    $parsed = json_decode($outputText, true);
+
+    if (!is_array($parsed)) {
+        if (preg_match('/\{[\s\S]*\}/', $outputText, $m)) {
+            $parsed = json_decode($m[0], true);
+        }
+    }
+
+    if (!is_array($parsed)) {
+        return comercial_ai_qualify_lead_fallback($thread, $outputText);
+    }
+
+    // ── Validar y normalizar respuesta ──
+    $isGenuine = !empty($parsed['is_genuine_lead']);
+    $score = max(0, min(100, (int)($parsed['interest_score'] ?? 50)));
+    $summary = trim((string)($parsed['summary'] ?? ''));
+
+    // Limitar summary a 15 palabras (seguridad)
+    $words = explode(' ', $summary);
+    if (count($words) > 15) {
+        $summary = implode(' ', array_slice($words, 0, 15));
+    }
+
+    return array(
+        'ok' => true,
+        'is_genuine_lead' => $isGenuine,
+        'interest_score' => $score,
+        'summary' => $summary,
+        'action_advice' => trim((string)($parsed['action_advice'] ?? '')),
+        'reason' => trim((string)($parsed['reason'] ?? '')),
+        'buying_signals' => (array)($parsed['buying_signals'] ?? array()),
+        'risk_signals' => (array)($parsed['risk_signals'] ?? array()),
+        'suggested_priority' => trim((string)($parsed['suggested_priority'] ?? ($isGenuine ? 'warm' : 'cold'))),
+    );
+}
+
+/**
+ * ── Auto-qualification: analiza threads recientes sin intervención manual ──
+ * Se ejecuta vía cron (comercial_run_tick). Dos fases:
+ *   1. Seeding retroactivo (4 días): analiza threads sin clasificar (una sola vez).
+ *   2. Ongoing: analiza threads con actividad en la última hora.
+ * Límite máximo por ejecución para no saturar la IA.
+ */
+function comercial_auto_qualify_recent_threads() {
+    if (!function_exists('publicista_openai_json_request') || !function_exists('publicista_ai_config')) {
+        return array('ok' => false, 'error' => 'ai_utilities_unavailable');
+    }
+    $cfg = publicista_ai_config();
+    if (empty($cfg['configured'])) {
+        return array('ok' => false, 'error' => 'ia_no_configurada');
+    }
+
+    $settings = comercial_get_settings();
+    $threads = comercial_get_threads();
+    $processes = comercial_get_processes();
+    $processesBySlug = array();
+    foreach ($processes as $p) {
+        $processesBySlug[trim((string)($p['slug'] ?? ''))] = $p;
+    }
+
+    $now = time();
+    $analyzed = 0;
+    $passed = 0;
+    $maxPerRun = 10; // máximo de análisis IA por ejecución
+
+    // ── Fase 1: seeding retroactivo de 4 días (una sola vez) ──
+    $seeded = !empty($settings['ai_qualification_seeded']);
+    $foundPending = false;
+
+    if (!$seeded) {
+        $retroactiveCutoff = $now - (4 * 86400);
+        foreach ($threads as $thread) {
+            if ($analyzed >= $maxPerRun) break;
+
+            $stage = trim((string)($thread['stage'] ?? ''));
+            if ($stage === 'discarded' || $stage === 'autoresponder') continue;
+
+            $updatedTs = strtotime((string)($thread['updated_at'] ?? ''));
+            if ($updatedTs < $retroactiveCutoff) continue;
+
+            // Solo threads que aún no han sido analizados por IA
+            $lastAnalysis = trim((string)($thread['ai_qualified_at'] ?? ''));
+            if ($lastAnalysis !== '') continue;
+
+            $foundPending = true;
+            $processSlug = trim((string)($thread['process_slug'] ?? ''));
+            $process = isset($processesBySlug[$processSlug]) ? $processesBySlug[$processSlug] : array();
+
+            $result = comercial_ai_qualify_lead($thread, $process);
+            $analyzed++;
+
+            if (!empty($result['ok'])) {
+                $thread['ai_qualified_at'] = now_datetime();
+                $thread['ai_interest_score'] = (int)($result['interest_score'] ?? 0);
+                $thread['ai_summary'] = trim((string)($result['summary'] ?? ''));
+                $thread['ai_action_advice'] = trim((string)($result['action_advice'] ?? ''));
+                $thread['ai_is_genuine'] = !empty($result['is_genuine_lead']);
+                $thread['ai_buying_signals'] = (array)($result['buying_signals'] ?? array());
+                $thread['ai_risk_signals'] = (array)($result['risk_signals'] ?? array());
+                $thread['ai_suggested_priority'] = trim((string)($result['suggested_priority'] ?? ''));
+                $thread['ai_reason'] = trim((string)($result['reason'] ?? ''));
+                comercial_upsert_thread($thread);
+                if (!empty($result['is_genuine_lead'])) $passed++;
+            }
+        }
+
+        if (!$foundPending) {
+            $settings['ai_qualification_seeded'] = true;
+            $settings['ai_qualification_seeded_at'] = now_datetime();
+            comercial_save_settings($settings);
+        }
+
+        if ($analyzed > 0) {
+            return array('ok' => true, 'phase' => 'seeding', 'analyzed' => $analyzed, 'passed' => $passed);
+        }
+    }
+
+    // ── Fase 2: ongoing — actividad en la última hora ──
+    $ongoingCutoff = $now - 3600;
+    foreach ($threads as $thread) {
+        if ($analyzed >= $maxPerRun) break;
+
+        $stage = trim((string)($thread['stage'] ?? ''));
+        if ($stage === 'discarded' || $stage === 'autoresponder') continue;
+
+        // ¿Actividad reciente?
+        $updatedAt = trim((string)($thread['updated_at'] ?? ''));
+        if ($updatedAt === '' || strtotime($updatedAt) < $ongoingCutoff) continue;
+
+        // No re-analizar si ya se analizó en la última hora
+        $lastAnalysis = trim((string)($thread['ai_qualified_at'] ?? ''));
+        if ($lastAnalysis !== '' && strtotime($lastAnalysis) > $now - 3600) continue;
+
+        $processSlug = trim((string)($thread['process_slug'] ?? ''));
+        $process = isset($processesBySlug[$processSlug]) ? $processesBySlug[$processSlug] : array();
+
+        $result = comercial_ai_qualify_lead($thread, $process);
+        $analyzed++;
+
+        if (!empty($result['ok'])) {
+            $thread['ai_qualified_at'] = now_datetime();
+            $thread['ai_interest_score'] = (int)($result['interest_score'] ?? 0);
+            $thread['ai_summary'] = trim((string)($result['summary'] ?? ''));
+            $thread['ai_action_advice'] = trim((string)($result['action_advice'] ?? ''));
+            $thread['ai_is_genuine'] = !empty($result['is_genuine_lead']);
+            $thread['ai_buying_signals'] = (array)($result['buying_signals'] ?? array());
+            $thread['ai_risk_signals'] = (array)($result['risk_signals'] ?? array());
+            $thread['ai_suggested_priority'] = trim((string)($result['suggested_priority'] ?? ''));
+            $thread['ai_reason'] = trim((string)($result['reason'] ?? ''));
+            comercial_upsert_thread($thread);
+            if (!empty($result['is_genuine_lead'])) $passed++;
+        }
+    }
+
+    return array('ok' => true, 'phase' => 'ongoing', 'analyzed' => $analyzed, 'passed' => $passed);
+}
+
+/**
  * ── Psychology-driven followup system ──
  * Calcula puntuación de engagement (0-100) basada en señales de la respuesta entrante.
  */
@@ -5245,6 +5675,12 @@ function comercial_run_tick($forceProcessId = '') {
         }
     }
 
+    // ── Auto-qualification IA: analiza conversaciones recientes ──
+    $aiResult = comercial_auto_qualify_recent_threads();
+    if (!empty($aiResult['analyzed']) && (int)$aiResult['analyzed'] > 0) {
+        comercial_event_append('ai_auto_qualify', $aiResult);
+    }
+
     return $results;
 }
 
@@ -6092,7 +6528,7 @@ function comercial_render_thread_timeline_html($history) {
 function comercial_render_thread_webhook_log_html($webhookLog) {
     ob_start();
     if (!empty($webhookLog)) {
-        echo '<div class="table-wrap" style="margin-top:8px;"><table><thead><tr><th>Fecha</th><th>Paso</th><th>Detalle</th></tr></thead><tbody>';
+        echo '<div class="table-wrap" style="margin-top:8px;"><table data-no-card-view><thead><tr><th>Fecha</th><th>Paso</th><th>Detalle</th></tr></thead><tbody>';
         foreach ((array)$webhookLog as $logRow) {
             $logPayload = isset($logRow['payload']) && is_array($logRow['payload']) ? $logRow['payload'] : array();
             echo '<tr>';
@@ -6259,7 +6695,7 @@ function render_comercial_page() {
         comercial_field_number('global_daily_target', 'Objetivo global / día', $settings['global_daily_target'], '1');
         echo '<div class="field"><label>Total porcentajes</label><input type="text" id="comercial_distribution_total" value="0%" readonly></div>';
         echo '</div>';
-        echo '<div class="table-wrap" style="margin-top:12px;"><table><thead><tr><th>Proceso</th><th>Activo</th><th>% diario</th><th>Objetivo/día</th><th>Intervalo calculado</th><th>Ventana</th></tr></thead><tbody>';
+        echo '<div class="table-wrap" style="margin-top:12px;"><table data-no-card-view><thead><tr><th>Proceso</th><th>Activo</th><th>% diario</th><th>Objetivo/día</th><th>Intervalo calculado</th><th>Ventana</th></tr></thead><tbody>';
         foreach ($processes as $row) {
             $plan = isset($previewById[(string)$row['id']]) ? $previewById[(string)$row['id']] : array('daily_target' => 0, 'interval_min' => 0, 'interval_max' => 0);
             echo '<tr>';
@@ -7080,6 +7516,51 @@ HTML;
         return;
     }
 
+    if ($tab === 'agente') {
+        require_once __DIR__ . '/comercial_agent_table.php';
+
+        // ── Filtrar solo threads de los últimos 4 días ──
+        $cutoffTs = time() - (4 * 86400);
+        $agentThreads = array();
+        foreach ($threads as $thread) {
+            $stage = trim((string)($thread['stage'] ?? ''));
+            $updatedTs = strtotime((string)($thread['updated_at'] ?? ''));
+
+            // Solo últimos 4 días
+            if ($updatedTs < $cutoffTs) continue;
+
+            // Ya analizado por IA y pasó el filtro
+            if (!empty($thread['ai_is_genuine'])) {
+                $agentThreads[] = $thread;
+                continue;
+            }
+
+            // very_hot o qualified: pasan directamente
+            if ($stage === 'very_hot' || $stage === 'qualified') {
+                $agentThreads[] = $thread;
+                continue;
+            }
+
+            // Con 2+ respuestas y no descartado ni auto-responder
+            $replies = (int)($thread['replies_count'] ?? 0);
+            if ($replies >= 2 && $stage !== 'discarded' && $stage !== 'autoresponder') {
+                $agentThreads[] = $thread;
+                continue;
+            }
+        }
+
+        echo '<section class="panel">';
+        echo '<h2>📋 Bandeja del Comercial</h2>';
+        echo '<p class="muted" style="margin-top:0;">Conversaciones de los últimos 4 días filtradas automáticamente por IA. Solo aparecen las que muestran interés real.</p>';
+
+        // La IA analiza automáticamente las conversaciones cuando hay actividad.
+        // El análisis se ejecuta vía cron (comercial_run_tick) sin intervención manual.
+
+        render_comercial_agent_table($agentThreads, $linesIndexed);
+        echo '</section>';
+        return;
+    }
+
     if ($tab === 'ajustes') {
         echo '<section class="panel">';
         echo '<h2>Ajustes globales</h2>';
@@ -7121,7 +7602,7 @@ HTML;
         $events = comercial_events_recent(200);
         echo '<section class="panel">';
         echo '<h2>Logs recientes</h2>';
-        echo '<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th></tr></thead><tbody>';
+        echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th></tr></thead><tbody>';
         foreach ($events as $event) {
             echo '<tr>';
             echo '<td>' . e((string)($event['ts'] ?? '')) . '</td>';

@@ -10,6 +10,134 @@
         }
     }
 
+    // =========================================================================
+    // MOBILE-REDESIGN F2: Universal table → card stack converter
+    // Converts every <table> into a vertical .card-stack on mobile (≤767px).
+    // Preserves inline forms, buttons, and interactive elements inside cells.
+    // Skips tables with data-no-card-view, agent tables, or no <thead>.
+    // =========================================================================
+    function convertTablesToCards() {
+        if (!window.matchMedia('(max-width: 767px)').matches) return;
+
+        var wrappers = document.querySelectorAll('.table-wrap');
+        wrappers.forEach(function (wrapper) {
+            var table = wrapper.querySelector('table');
+            if (!table) return;
+
+            // Skip: tables explicitly excluded
+            if (table.hasAttribute('data-no-card-view')) return;
+            // Skip: agent table (has its own card mode at 640px)
+            if (table.closest('.agent-table-wrap')) return;
+            // Skip: already converted
+            if (wrapper.parentNode && wrapper.parentNode.querySelector('.card-stack')) return;
+
+            var thead = table.querySelector('thead');
+            if (!thead) {
+                // Tables without thead: just add scroll indicator and continue
+                wrapper.style.webkitOverflowScrolling = 'touch';
+                return;
+            }
+
+            // Get column labels from <thead>
+            var labels = [];
+            thead.querySelectorAll('th').forEach(function (th) {
+                labels.push(th.textContent.trim());
+            });
+            if (labels.length === 0) return;
+
+            // Build card stack
+            var cardStack = document.createElement('div');
+            cardStack.className = 'card-stack';
+
+            var rows = table.querySelectorAll('tbody > tr');
+            var cardCount = 0;
+
+            rows.forEach(function (row) {
+                // Skip hidden detail rows (expand/collapse rows)
+                if (row.style.display === 'none') return;
+                // Skip rows hidden by inline style
+                if (row.classList.contains('run-log-detail')) return;
+
+                var cells = row.querySelectorAll('td, th');
+                if (cells.length === 0) return;
+
+                // Check for colspan empty-state row
+                var firstCell = cells[0];
+                if (firstCell.hasAttribute('colspan') && cells.length === 1) {
+                    var card = document.createElement('div');
+                    card.className = 'card-stack-item card-stack-empty';
+                    card.textContent = firstCell.textContent;
+                    cardStack.appendChild(card);
+                    return;
+                }
+
+                // Check for triage/section header rows
+                if (row.classList.contains('commercial-triage-group-row')) {
+                    var headerCard = document.createElement('div');
+                    headerCard.className = 'card-stack-item card-stack-section-header';
+                    headerCard.textContent = firstCell.textContent.trim();
+                    cardStack.appendChild(headerCard);
+                    return;
+                }
+
+                // Normal data row: create a card
+                var card = document.createElement('div');
+                card.className = 'card-stack-item';
+
+                var hasActions = false;
+                var actionsHtml = '';
+
+                cells.forEach(function (td, i) {
+                    var content = td.innerHTML.trim();
+                    if (!content || content === '&nbsp;' || content === '&mdash;' || content === '—' || content === '-') return;
+
+                    var label = labels[i] ? labels[i] : '';
+                    // Skip "Acciones" column — render its content as bottom action bar
+                    if (label.toLowerCase() === 'acciones' || label.toLowerCase() === 'acción' || label.toLowerCase() === 'action' || label === '' || label === '—') {
+                        if (content) {
+                            hasActions = true;
+                            actionsHtml += content;
+                        }
+                        return;
+                    }
+
+                    var rowDiv = document.createElement('div');
+                    rowDiv.className = 'card-stack-row';
+
+                    var labelSpan = document.createElement('span');
+                    labelSpan.className = 'card-stack-label';
+                    labelSpan.textContent = label;
+
+                    var valueDiv = document.createElement('div');
+                    valueDiv.className = 'card-stack-value';
+                    valueDiv.innerHTML = content;
+
+                    rowDiv.appendChild(labelSpan);
+                    rowDiv.appendChild(valueDiv);
+                    card.appendChild(rowDiv);
+                });
+
+                // Append action buttons at the bottom of the card
+                if (hasActions) {
+                    var actionBar = document.createElement('div');
+                    actionBar.className = 'card-stack-actions';
+                    actionBar.innerHTML = actionsHtml;
+                    card.appendChild(actionBar);
+                }
+
+                if (card.children.length > 0) {
+                    cardStack.appendChild(card);
+                    cardCount++;
+                }
+            });
+
+            // Replace the table wrapper with the card stack
+            if (cardCount > 0) {
+                wrapper.parentNode.replaceChild(cardStack, wrapper);
+            }
+        });
+    }
+
     function showToast(message, type) {
         var el = document.getElementById('floatingToast');
         if (!el || !message) return;
@@ -2095,6 +2223,7 @@
         initPlatformPhotoLabels();
         AgentTable.init();
         scrollActiveSubtabIntoView();
+        convertTablesToCards();
 
         // ── "Más" bottom sheet toggle (MOBILE-REDESIGN F0) ──
         var moreBtn = document.getElementById('mobileMoreBtn');

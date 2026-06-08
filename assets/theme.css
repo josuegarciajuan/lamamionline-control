@@ -2889,4 +2889,124 @@ a.subtab.active {
     word-wrap: break-word;
     overflow-wrap: break-word;
   }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     T2.2: CARD STACK — Conversor universal tablas → tarjetas verticales
+     Cada fila de tabla se convierte en una tarjeta apilada, 100% ancho.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  .card-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .card-stack-item {
+    background: var(--panel, rgba(17, 28, 45, 0.96));
+    border: 1px solid var(--line, #26384f);
+    border-radius: 14px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .card-stack-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .card-stack-row:empty {
+    display: none;
+  }
+
+  .card-stack-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted, #7a8ba5);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .card-stack-value {
+    font-size: 13px;
+    color: var(--text, #edf2f7);
+    word-break: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.45;
+  }
+
+  /* Preserve inline forms and action buttons inside cards */
+  .card-stack-value form.inline-form {
+    display: inline-block;
+    margin-top: 4px;
+  }
+
+  .card-stack-value .btn-wa,
+  .card-stack-value .btn-primary,
+  .card-stack-value .btn-danger-mini,
+  .card-stack-value .btn-secondary-mini,
+  .card-stack-value a.btn-wa,
+  .card-stack-value button {
+    width: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 4px;
+    margin-right: 4px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  /* Section divider cards (triage group headers converted to cards) */
+  .card-stack-item.card-stack-section-header {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(249, 115, 22, 0.06));
+    border-color: rgba(245, 158, 11, 0.25);
+    padding: 10px 14px;
+    font-weight: 700;
+    font-size: 13px;
+    color: #f59e0b;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Empty state card */
+  .card-stack-item.card-stack-empty {
+    text-align: center;
+    padding: 20px 14px;
+    color: var(--muted, #7a8ba5);
+    font-style: italic;
+  }
+
+  /* Highlight cards with important actions */
+  .card-stack-item .card-stack-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line, #26384f);
+  }
+
+  /* Phone numbers: keep them readable and tap-friendly */
+  .card-stack-value a[href^="tel:"],
+  .card-stack-value a[href^="https://wa.me"] {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    border-radius: 8px;
+    color: #22c55e;
+    font-weight: 600;
+    text-decoration: none;
+    margin-top: 2px;
+  }
 }

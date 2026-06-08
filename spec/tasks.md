@@ -646,9 +646,10 @@
 
 ### MOBILE-REDESIGN-F2 — Conversor universal Tablas → Tarjetas (Card Stack)
 
-- [ ] T2.1 — JS: función `convertTablesToCards()` que detecta thead, mapea columnas como labels.
-- [ ] T2.2 — CSS: `.card-stack`, `.card-stack-item`, `.card-stack-row`, `.card-stack-label`, `.card-stack-value`.
-- [ ] T2.3 — PHP: marcar tablas especiales con `data-no-card-view` donde necesario.
+- [x] T2.1 — JS: función `convertTablesToCards()` que detecta `<thead>`, mapea columnas como labels, preserva forms/buttons inline, maneja edge cases (colspan rows, triage headers, hidden rows, empty states, acción column → action bar).
+- [x] T2.2 — CSS: `.card-stack`, `.card-stack-item`, `.card-stack-row`, `.card-stack-label`, `.card-stack-value` con tema oscuro. Barra de acciones, section headers, empty states, enlaces teléfono tap-friendly.
+- [x] T2.3 — PHP: 17 tablas marcadas con `data-no-card-view` (14 en views.php, 3 en comercial.php) — rankings 2 cols, summaries, form matrices, logs técnicos.
+- [x] T2.4 — Seguridad: 0 CRITICAL/HIGH. Defense-in-depth aplicado (textContent en empty-state en vez de innerHTML).
 
 ### MOBILE-REDESIGN-F3 — Bottom Sheets para Formularios + FAB
 

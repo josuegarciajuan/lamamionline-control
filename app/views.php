@@ -992,7 +992,7 @@ function render_publicista_calculo_publicidad_page() {
 
     echo '<section class="panel">';
     echo '<div class="branch-panel-head"><h2>Precios configurados</h2><span class="summary-badge">Base</span></div>';
-    echo '<div class="table-wrap" style="margin-top:12px;"><table><tbody>';
+    echo '<div class="table-wrap" style="margin-top:12px;"><table data-no-card-view><tbody>';
     echo '<tr><td>TOP (10 días)</td><td style="text-align:right;"><strong>' . e(publicista_ads_euros((float) $prices['top'])) . '</strong></td></tr>';
     echo '<tr><td>Autorenueva 10 sub/día</td><td style="text-align:right;"><strong>' . e(publicista_ads_euros((float) $prices['auto7'])) . '</strong></td></tr>';
     echo '<tr><td>Autorenueva 4 sub/día</td><td style="text-align:right;"><strong>' . e(publicista_ads_euros((float) $prices['auto4'])) . '</strong></td></tr>';
@@ -1764,7 +1764,7 @@ function render_publicista_campanas_page() {
             }
 
             if (!empty($previewByAccount)) {
-                echo '<div class="table-wrap" style="margin-top:12px;"><table><thead><tr><th>Cuenta</th><th>Anuncios</th><th>Coste subtotal</th></tr></thead><tbody>';
+                echo '<div class="table-wrap" style="margin-top:12px;"><table data-no-card-view><thead><tr><th>Cuenta</th><th>Anuncios</th><th>Coste subtotal</th></tr></thead><tbody>';
                 foreach ($previewByAccount as $rowAccount) {
                     echo '<tr>';
                     echo '<td><strong>' . e((string)($rowAccount['account_name'] ?? ($rowAccount['account_id'] ?? ''))) . '</strong></td>';
@@ -1776,7 +1776,7 @@ function render_publicista_campanas_page() {
             }
 
             if (!empty($previewByProduct)) {
-                echo '<div class="table-wrap" style="margin-top:12px;"><table><thead><tr><th>Producto</th><th>Anuncios</th><th>Coste subtotal</th></tr></thead><tbody>';
+                echo '<div class="table-wrap" style="margin-top:12px;"><table data-no-card-view><thead><tr><th>Producto</th><th>Anuncios</th><th>Coste subtotal</th></tr></thead><tbody>';
                 foreach ($previewByProduct as $rowProduct) {
                     echo '<tr>';
                     echo '<td><strong>' . e((string)($rowProduct['product_name'] ?? ($rowProduct['product_id'] ?? ''))) . '</strong></td>';
@@ -1816,7 +1816,7 @@ function render_publicista_campanas_page() {
                 }
 
                 echo '<p class="muted" style="margin-top:0;">Define cuántos anuncios tendrá cada producto en cada cuenta y aplica. El total por producto debe mantenerse.</p>';
-                echo '<div class="table-wrap"><table><thead><tr><th>Producto</th>';
+                echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Producto</th>';
                 foreach ($matrixAccounts as $accountMeta) {
                     $aid = trim((string)($accountMeta['account_id'] ?? ''));
                     $capacityTxt = (string)(int)($matrixAccountCapacity[$aid] ?? 0);
@@ -6778,7 +6778,7 @@ function render_informes_page() {
 
     echo '<section class="panel panel-space">';
     echo '<div class="branch-panel-head"><h2>Consolidado por rama</h2><span class="summary-badge">' . e($from) . ' → ' . e($to) . '</span></div>';
-    echo '<div class="table-wrap"><table><thead><tr>';
+    echo '<div class="table-wrap"><table data-no-card-view><thead><tr>';
     echo '<th>Rama</th><th>Ingresos</th><th>Movimientos</th><th>% ingresos</th>';
     echo '</tr></thead><tbody>';
     $incomeBase = $filteredIncome > 0 ? $filteredIncome : 1;
@@ -6826,7 +6826,7 @@ function render_informes_page() {
         if (empty($lamamiRank)) {
             echo '<div class="empty">Sin datos para este filtro.</div>';
         } else {
-            echo '<div class="table-wrap"><table><thead><tr><th>Clienta</th><th>Ingresos</th></tr></thead><tbody>';
+            echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Clienta</th><th>Ingresos</th></tr></thead><tbody>';
             $shown = 0;
             foreach ($lamamiRank as $label => $money) {
                 echo '<tr><td>' . e($label) . '</td><td><span class="money-chip">' . e(euro($money)) . '</span></td></tr>';
@@ -6842,7 +6842,7 @@ function render_informes_page() {
         if (empty($lamamiAltasFiltered)) {
             echo '<div class="empty">Sin altas en este período.</div>';
         } else {
-            echo '<div class="table-wrap"><table><thead><tr><th>Clienta</th><th>Fecha</th><th>Importe</th></tr></thead><tbody>';
+            echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Clienta</th><th>Fecha</th><th>Importe</th></tr></thead><tbody>';
             $tmp = $lamamiAltasFiltered;
             usort($tmp, function ($a, $b) use ($parseTs) { return $parseTs($b['fecha_alta'] ?? '') <=> $parseTs($a['fecha_alta'] ?? ''); });
             foreach (array_slice($tmp, 0, 10) as $cliente) {
@@ -6875,7 +6875,7 @@ function render_informes_page() {
         if (empty($casaRank)) {
             echo '<div class="empty">Sin pagos para este filtro.</div>';
         } else {
-            echo '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Ingresos</th></tr></thead><tbody>';
+            echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Cliente</th><th>Ingresos</th></tr></thead><tbody>';
             $shown = 0;
             foreach ($casaRank as $label => $money) {
                 echo '<tr><td>' . e($label) . '</td><td><span class="money-chip">' . e(euro($money)) . '</span></td></tr>';
@@ -6891,7 +6891,7 @@ function render_informes_page() {
         if (empty($casaPagosFiltered)) {
             echo '<div class="empty">Sin pagos para este período.</div>';
         } else {
-            echo '<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Importe</th></tr></thead><tbody>';
+            echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Fecha</th><th>Cliente</th><th>Importe</th></tr></thead><tbody>';
             $tmp = $casaPagosFiltered;
             usort($tmp, function ($a, $b) use ($parseTs) { return $parseTs($b['fecha_hora'] ?? '') <=> $parseTs($a['fecha_hora'] ?? ''); });
             foreach (array_slice($tmp, 0, 10) as $pago) {
@@ -6930,7 +6930,7 @@ function render_informes_page() {
         if (empty($jostalLeadRank)) {
             echo '<div class="empty">Sin leads para este filtro.</div>';
         } else {
-            echo '<div class="table-wrap"><table><thead><tr><th>Clienta</th><th>Ingresos</th></tr></thead><tbody>';
+            echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Clienta</th><th>Ingresos</th></tr></thead><tbody>';
             $shown = 0;
             foreach ($jostalLeadRank as $label => $money) {
                 echo '<tr><td>' . e($label) . '</td><td><span class="money-chip">' . e(euro($money)) . '</span></td></tr>';
@@ -6946,7 +6946,7 @@ function render_informes_page() {
         if (empty($jostalVentasFiltered)) {
             echo '<div class="empty">Sin ventas para este período.</div>';
         } else {
-            echo '<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Descripción</th><th>Importe</th></tr></thead><tbody>';
+            echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Fecha</th><th>Descripción</th><th>Importe</th></tr></thead><tbody>';
             $tmp = $jostalVentasFiltered;
             usort($tmp, function ($a, $b) use ($parseTs) { return $parseTs($b['created_at'] ?? '') <=> $parseTs($a['created_at'] ?? ''); });
             foreach (array_slice($tmp, 0, 10) as $venta) {
@@ -7351,7 +7351,7 @@ function render_configm_section() {
             echo '<div class="full">';
             echo '<label>' . e($label) . '</label>';
             echo '<div class="field-help" style="margin-bottom:10px;">Vincula cada tipo de aviso a una línea de Josue > Teléfonos. Si dejas "Automático", se usará el routing determinista por tipo.</div>';
-            echo '<div class="table-wrap"><table><thead><tr><th>Tipo de aviso</th><th>Línea origen</th></tr></thead><tbody>';
+            echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Tipo de aviso</th><th>Línea origen</th></tr></thead><tbody>';
             foreach ($overrideTypes as $typeKey => $typeLabel) {
                 $selected = trim((string)($overrideMap[strtolower($typeKey)] ?? ''));
                 echo '<tr>';
@@ -8460,7 +8460,7 @@ if ($tab === 'clientas') {
                 echo '<div class="empty">Todavía no hay periodos registrados.</div>';
             } else {
                 render_live_filter('#jostalPeriodosRows tr[data-filter-text]', 'Buscar periodo...');
-                echo '<div class="table-wrap"><table><thead><tr><th>Entrada</th><th>Salida</th><th>Estado</th></tr></thead><tbody id="jostalPeriodosRows">';
+                echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Entrada</th><th>Salida</th><th>Estado</th></tr></thead><tbody id="jostalPeriodosRows">';
                 foreach (array_reverse($periodos) as $p) {
                     $periodoEstado = (($p['salida'] ?? '') === '' ? 'En casa' : 'Finalizado');
                     $searchText = strtolower(trim(($p['entrada'] ?? '') . ' ' . ($p['salida'] ?? '') . ' ' . $periodoEstado));
@@ -8692,7 +8692,7 @@ if ($tab === 'clientas') {
         } else {
             $ventas = sort_desc_by_key($ventas, 'created_at');
             render_live_filter('#jostalVentasRows tr[data-filter-text]', 'Buscar venta Jostal...');
-            echo '<div class="table-wrap"><table><thead><tr>';
+            echo '<div class="table-wrap"><table data-no-card-view><thead><tr>';
             echo '<th>Descripción</th><th>Precio</th><th>Created at</th>';
             echo '</tr></thead><tbody id="jostalVentasRows">';
             foreach ($ventas as $venta) {

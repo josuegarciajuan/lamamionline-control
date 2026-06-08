@@ -1,5 +1,12 @@
 # Arquitectura (resumen operativo)
 
+## MOBILE-REDESIGN — Fase 2 (completada)
+
+- **Conversor universal tablas→tarjetas**: JS `convertTablesToCards()` (130 líneas). Auto-detecta `<thead>`, mapea columnas→labels, convierte `<tr>`→`.card-stack-item`. Preserva forms inline, botones, acciones. Edge cases: colspan rows, triage headers, hidden rows, empty states, columna "Acciones"→barra inferior.
+- **CSS card stack**: `.card-stack` (flex column, gap 10px), `.card-stack-item` (panel theme, 14px padding, sombra), `.card-stack-label` (uppercase 10px muted), `.card-stack-value` (13px text). Action bars, section headers (gold gradient), empty states, phone links (green chip).
+- **PHP**: 17 tablas con `data-no-card-view` — rankings (2 cols), summaries (3-4 cols), form matrices, logs técnicos. 14 en views.php + 3 en comercial.php.
+- **Defensa**: empty-state usa `textContent` en vez de `innerHTML`. 0 vulnerabilidades.
+
 ## MOBILE-REDESIGN — Fase 1 (completada)
 
 - **Bottom tab bar pulido**: Active state con indicador `::before` (gradiente dorado 20×3px con glow). Touch feedback `scale(0.92)`. Iconos 21px con scale 1.08× en activo. Label bold (700) en activo. Border-top `rgba(245,158,11,0.12)` + sombra.

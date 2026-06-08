@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-08 — MOBILE-REDESIGN FASE 2 (Conversor universal Tablas → Tarjetas)
+
+### Implementado
+- **JS `convertTablesToCards()`**: Función universal que detecta automáticamente el `<thead>` de cada tabla, mapea las columnas como labels, y convierte cada `<tr>` en una tarjeta vertical `.card-stack-item`. Preserva formularios inline, botones de acción, y elementos interactivos.
+  - Edge cases manejados: rows ocultas (`display:none`), colspan empty-states, triage group headers (comercial), columna "Acciones" → barra de acciones inferior, tablas sin `<thead>` (scroll fallback).
+  - Excluye automáticamente: tablas con `data-no-card-view`, `.agent-table-wrap` (ya tiene su modo card), y tablas ya convertidas.
+- **CSS card stack**: `.card-stack`, `.card-stack-item`, `.card-stack-row`, `.card-stack-label`, `.card-stack-value` con tema oscuro Luxe Sapphire + Warm Gold. Barra de acciones (`.card-stack-actions`), section headers (`.card-stack-section-header`), empty states (`.card-stack-empty`), y enlaces telefónicos con estilo tap-friendly.
+- **PHP `data-no-card-view`**: 17 tablas marcadas como no convertibles (2-3 columnas, rankings, summaries, form matrices, logs técnicos). 14 en `app/views.php` + 3 en `app/comercial.php`.
+
+### Archivos
+- **Modificados (4):** `assets/app.js` (+130 líneas JS), `assets/theme.css` (+110 líneas CSS), `app/views.php` (14 × `data-no-card-view`), `app/comercial.php` (3 × `data-no-card-view`)
+- **Documentación:** `changelog.md`, `spec/tasks.md`, `docs/architecture.md`
+
+### Verificación
+- `php -l` en `index.php`, `app/views.php`, `app/comercial.php`: OK
+- `data-no-card-view`: 14 + 3 = 17 ocurrencias confirmadas
+- JS `convertTablesToCards` + `card-stack`: 12 referencias en app.js
+- Seguridad: 0 CRITICAL, 0 HIGH, 2 LOW (defense-in-depth aplicado: empty-state usa textContent)
+
 ## 2026-06-08 — MOBILE-REDESIGN FASE 1 (Bottom Tab Bar pulido + Toolbar simplificada + Zero overflow)
 
 ### Implementado
