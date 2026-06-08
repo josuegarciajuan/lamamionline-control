@@ -18,55 +18,60 @@ function render_global_ui($page = '') {
     echo '<button type="button" id="voiceCommandToggleMobile" class="app-shell-btn app-shell-btn-mobile app-shell-btn-mic" data-voice-command-toggle aria-expanded="false" aria-controls="voiceCommandPanel" aria-label="Abrir voz CRM" title="Abrir voz CRM">🎙</button>';
     echo '</div>';
 
-    // ── Bottom Navigation Bar (mobile only) ──
-    $primaryTabs = [
-        ['page' => 'dashboard', 'icon' => '📊', 'label' => 'Dashb', 'activeCond' => in_array($page, ['dashboard'])],
-        ['page' => 'comercial', 'icon' => '💬', 'label' => 'Comerc', 'activeCond' => in_array($page, ['comercial'])],
-        ['page' => 'lamami',    'icon' => '👩', 'label' => 'LaMami', 'activeCond' => in_array($page, ['lamami','interesadas','clientas','lamamibot'])],
-        ['page' => 'jostal',   'icon' => '🏠', 'label' => 'Jostal', 'activeCond' => in_array($page, ['jostal'])],
+    // ── Bottom Navigation Bar (mobile only) — 8 items ──
+    $tabs = [
+        ['type' => 'link',  'page' => 'dashboard', 'icon' => '📊', 'label' => 'Dash',  'active' => in_array($page, ['dashboard'])],
+        ['type' => 'link',  'page' => 'bot-casa',   'icon' => '🏚', 'label' => 'Bot',   'active' => in_array($page, ['bot-casa'])],
+        ['type' => 'link',  'page' => 'jostal',     'icon' => '🏠', 'label' => 'Jost',  'active' => in_array($page, ['jostal'])],
+        ['type' => 'drop',  'id'   => 'dropCtrl',   'icon' => '📈', 'label' => 'Ctrl',  'active' => in_array($page, ['informes','gastos']),
+            'links' => [
+                ['page' => 'dashboard', 'label' => 'Dashboard'],
+                ['page' => 'informes', 'label' => 'Informes'],
+                ['page' => 'gastos', 'label' => 'Gastos'],
+            ]],
+        ['type' => 'drop',  'id'   => 'dropNeg',    'icon' => '💰', 'label' => 'Neg',   'active' => in_array($page, ['lamami','interesadas','clientas','lamamibot','casawasap']),
+            'links' => [
+                ['page' => 'lamami', 'label' => 'LaMami'],
+                ['page' => 'jostal', 'label' => 'Jostal'],
+                ['page' => 'casawasap', 'label' => 'Casawasap'],
+            ]],
+        ['type' => 'drop',  'id'   => 'dropCom',    'icon' => '💬', 'label' => 'Com',   'active' => in_array($page, ['comercial','publicista','avisos','bots']),
+            'links' => [
+                ['page' => 'comercial', 'label' => 'Comercial'],
+                ['page' => 'publicista', 'label' => 'Publicista'],
+                ['page' => 'avisos', 'label' => 'Avisos'],
+                ['page' => 'bots', 'label' => 'Bots'],
+            ]],
+        ['type' => 'drop',  'id'   => 'dropSis',    'icon' => '⚙️', 'label' => 'Sis',   'active' => in_array($page, ['josue']),
+            'links' => [
+                ['page' => 'bot-casa', 'label' => 'Bot Casa'],
+                ['page' => 'josue', 'label' => 'Josué'],
+            ]],
+        ['type' => 'link',  'page' => 'logout',     'icon' => '🚪', 'label' => 'Salir', 'active' => false],
     ];
     echo '<nav class="mobile-bottom-nav" id="mobileBottomNav">';
-    foreach ($primaryTabs as $tab) {
-        $cls = $tab['activeCond'] ? ' is-active' : '';
-        echo '<a href="index.php?page=' . e($tab['page']) . '" class="mobile-nav-item' . $cls . '">';
-        echo '<span class="mobile-nav-icon">' . $tab['icon'] . '</span>';
-        echo '<span class="mobile-nav-label">' . $tab['label'] . '</span>';
-        echo '</a>';
+    foreach ($tabs as $tab) {
+        $cls = $tab['active'] ? ' is-active' : '';
+        if ($tab['type'] === 'link') {
+            echo '<a href="index.php?page=' . e($tab['page']) . '" class="mobile-nav-item' . $cls . '">';
+            echo '<span class="mobile-nav-icon">' . $tab['icon'] . '</span>';
+            echo '<span class="mobile-nav-label">' . $tab['label'] . '</span>';
+            echo '</a>';
+        } else {
+            $dropId = $tab['id'];
+            echo '<button type="button" class="mobile-nav-item mobile-nav-drop' . $cls . '" id="' . $dropId . '" aria-expanded="false" aria-haspopup="true">';
+            echo '<span class="mobile-nav-icon">' . $tab['icon'] . '</span>';
+            echo '<span class="mobile-nav-label">' . $tab['label'] . '</span>';
+            echo '</button>';
+            // Dropdown popover
+            echo '<div class="mobile-nav-popover" id="' . $dropId . 'Pop" hidden>';
+            foreach ($tab['links'] as $link) {
+                echo '<a href="index.php?page=' . e($link['page']) . '" class="mobile-nav-popover-link">' . e($link['label']) . '</a>';
+            }
+            echo '</div>';
+        }
     }
-    echo '<button type="button" class="mobile-nav-item" id="mobileMoreBtn" aria-expanded="false" aria-controls="mobileMoreSheet">';
-    echo '<span class="mobile-nav-icon">⋯</span>';
-    echo '<span class="mobile-nav-label">Más</span>';
-    echo '</button>';
     echo '</nav>';
-
-    // ── "Más" Bottom Sheet ──
-    echo '<div class="mobile-more-sheet" id="mobileMoreSheet" hidden>';
-    echo '<div class="mobile-more-sheet-backdrop" id="mobileMoreBackdrop"></div>';
-    echo '<div class="mobile-more-sheet-panel">';
-    echo '<div class="mobile-more-sheet-handle"></div>';
-    echo '<h2 class="mobile-more-sheet-title">Todas las secciones</h2>';
-    echo '<div class="mobile-more-group"><h3 class="mobile-more-group-title">📊 Control</h3>';
-    echo '<a href="index.php?page=dashboard" class="mobile-more-link">Dashboard</a>';
-    echo '<a href="index.php?page=informes" class="mobile-more-link">Informes</a>';
-    echo '<a href="index.php?page=gastos" class="mobile-more-link">Gastos</a>';
-    echo '</div>';
-    echo '<div class="mobile-more-group"><h3 class="mobile-more-group-title">🏠 Negocios</h3>';
-    echo '<a href="index.php?page=lamami" class="mobile-more-link">LaMami</a>';
-    echo '<a href="index.php?page=jostal" class="mobile-more-link">Jostal</a>';
-    echo '<a href="index.php?page=casawasap" class="mobile-more-link">Casawasap</a>';
-    echo '</div>';
-    echo '<div class="mobile-more-group"><h3 class="mobile-more-group-title">💬 Comunicación</h3>';
-    echo '<a href="index.php?page=comercial" class="mobile-more-link">Comercial</a>';
-    echo '<a href="index.php?page=publicista" class="mobile-more-link">Publicista</a>';
-    echo '<a href="index.php?page=avisos" class="mobile-more-link">AvisosWasap</a>';
-    echo '<a href="index.php?page=bots" class="mobile-more-link">Bots</a>';
-    echo '</div>';
-    echo '<div class="mobile-more-group"><h3 class="mobile-more-group-title">⚙️ Sistema</h3>';
-    echo '<a href="index.php?page=bot-casa" class="mobile-more-link">Bot Casa</a>';
-    echo '<a href="index.php?page=josue" class="mobile-more-link">Josué</a>';
-    echo '<a href="index.php?page=logout" class="mobile-more-link">🚪 Salir</a>';
-    echo '</div>';
-    echo '</div></div>';
 
     echo '<section id="voiceCommandPanel" class="voice-command-panel" hidden aria-hidden="true">';
     echo '<div class="voice-command-head">';

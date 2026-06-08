@@ -38,8 +38,8 @@ header('X-Frame-Options: DENY');
     <title>LaMami CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="assets/style.css?v=20260608_2">
-    <link rel="stylesheet" href="assets/theme.css?v=20260608_2">
+    <link rel="stylesheet" href="assets/style.css?v=20260608_3">
+    <link rel="stylesheet" href="assets/theme.css?v=20260608_3">
 </head>
 <body class="page-<?= e($page) ?>" data-page="<?= e($page) ?>">
 <?php if ($page === 'login'): ?>

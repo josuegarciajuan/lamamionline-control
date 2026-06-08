@@ -2378,32 +2378,48 @@
         convertTablesToCards();
         setupSubtabOverflow();
 
-        // ── "Más" bottom sheet toggle (MOBILE-REDESIGN F0) ──
-        var moreBtn = document.getElementById('mobileMoreBtn');
-        var moreSheet = document.getElementById('mobileMoreSheet');
-        var moreBackdrop = document.getElementById('mobileMoreBackdrop');
-        if (moreBtn && moreSheet) {
-            moreBtn.addEventListener('click', function () {
-                var isOpen = !moreSheet.hidden;
-                moreSheet.hidden = isOpen;
-                moreBtn.setAttribute('aria-expanded', String(!isOpen));
-                document.body.style.overflow = isOpen ? '' : 'hidden';
+        // ── Dropdown popover toggles (MOBILE-REDESIGN: replaces Más sheet) ──
+        var dropIds = ['dropCtrl', 'dropNeg', 'dropCom', 'dropSis'];
+        var activePop = null;
+
+        function closeAllPops() {
+            dropIds.forEach(function (id) {
+                var pop = document.getElementById(id + 'Pop');
+                var btn = document.getElementById(id);
+                if (pop) pop.hidden = true;
+                if (btn) btn.setAttribute('aria-expanded', 'false');
             });
-            if (moreBackdrop) {
-                moreBackdrop.addEventListener('click', function () {
-                    moreSheet.hidden = true;
-                    moreBtn.setAttribute('aria-expanded', 'false');
-                    document.body.style.overflow = '';
-                });
-            }
-            // Cerrar sheet al hacer click en un enlace interno
-            moreSheet.querySelectorAll('.mobile-more-link').forEach(function (link) {
-                link.addEventListener('click', function () {
-                    moreSheet.hidden = true;
-                    moreBtn.setAttribute('aria-expanded', 'false');
-                    document.body.style.overflow = '';
-                });
-            });
+            activePop = null;
         }
+
+        dropIds.forEach(function (id) {
+            var btn = document.getElementById(id);
+            var pop = document.getElementById(id + 'Pop');
+            if (!btn || !pop) return;
+
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (activePop === id) {
+                    closeAllPops();
+                } else {
+                    closeAllPops();
+                    pop.hidden = false;
+                    btn.setAttribute('aria-expanded', 'true');
+                    activePop = id;
+                }
+            });
+
+            // Close when clicking a link inside the popover
+            pop.querySelectorAll('.mobile-nav-popover-link').forEach(function (link) {
+                link.addEventListener('click', function () {
+                    closeAllPops();
+                });
+            });
+        });
+
+        // Click outside closes any open popover
+        document.addEventListener('click', function () {
+            if (activePop) closeAllPops();
+        });
     });
 })();

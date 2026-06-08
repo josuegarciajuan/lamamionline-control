@@ -2693,8 +2693,7 @@ a.subtab.active {
    Active at ≤767px. Hidden on desktop. Fase 0 — Fundación.
    ========================================================================== */
 
-.mobile-bottom-nav,
-.mobile-more-sheet { display: none; }
+.mobile-bottom-nav { display: none; }
 
 @media (max-width: 767px) {
   /* ── Hide sidebar on mobile (replaced by bottom tab bar) ── */
@@ -2724,9 +2723,11 @@ a.subtab.active {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    padding: 6px 4px;
-    min-width: 44px;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 48px;
+    gap: 1px;
+    padding: 5px 1px;
     border: none;
     background: transparent;
     color: var(--muted, #7a8ba5);
@@ -2764,7 +2765,7 @@ a.subtab.active {
   }
 
   .mobile-nav-icon {
-    font-size: 21px;
+    font-size: 17px;
     line-height: 1;
     transition: transform 0.15s;
   }
@@ -2774,7 +2775,7 @@ a.subtab.active {
   }
 
   .mobile-nav-label {
-    font-size: 9px;
+    font-size: 7px;
     line-height: 1.2;
     font-weight: 500;
     margin-top: 1px;
@@ -2784,95 +2785,60 @@ a.subtab.active {
     font-weight: 700;
   }
 
-  /* ── "Más" bottom sheet ── */
-  .mobile-more-sheet {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 1450;
-    pointer-events: none;
-  }
-
-  .mobile-more-sheet:not([hidden]) {
-    pointer-events: auto;
-  }
-
-  .mobile-more-sheet-backdrop {
+  /* ── Dropdown popovers (replaces "Más" sheet) ── */
+  .mobile-nav-popover {
+    display: none;
     position: absolute;
-    inset: 0;
-    background: rgba(0,0,0,0.5);
-    opacity: 0;
-    transition: opacity 0.25s;
-  }
-
-  .mobile-more-sheet:not([hidden]) .mobile-more-sheet-backdrop {
-    opacity: 1;
-  }
-
-  .mobile-more-sheet-panel {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    max-height: 70vh;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 8px;
     background: var(--panel, #111c2d);
-    border-radius: 20px 20px 0 0;
-    padding: 16px 18px max(16px, env(safe-area-inset-bottom));
-    transform: translateY(100%);
-    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
-    overflow-y: auto;
-    box-shadow: 0 -8px 40px rgba(0,0,0,0.4);
+    border: 1px solid var(--line, #26384f);
+    border-radius: 12px;
+    padding: 6px;
+    min-width: 130px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    z-index: 1410;
+    animation: popoverFadeIn 0.18s ease;
   }
 
-  .mobile-more-sheet:not([hidden]) .mobile-more-sheet-panel {
-    transform: translateY(0);
-  }
-
-  .mobile-more-sheet-handle {
-    width: 36px;
-    height: 4px;
-    background: rgba(255,255,255,0.2);
-    border-radius: 2px;
-    margin: 0 auto 14px;
-  }
-
-  .mobile-more-sheet-title {
-    margin: 0 0 14px;
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text, #edf2f7);
-  }
-
-  .mobile-more-group {
-    margin-bottom: 12px;
-  }
-
-  .mobile-more-group-title {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--muted, #9fb0c7);
-    margin: 0 0 6px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid var(--line, #26384f);
-  }
-
-  .mobile-more-link {
+  .mobile-nav-popover:not([hidden]) {
     display: block;
-    padding: 10px 12px;
-    border-radius: 10px;
+  }
+
+  @keyframes popoverFadeIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  .mobile-nav-popover-link {
+    display: block;
+    padding: 8px 12px;
+    border-radius: 8px;
     color: var(--text, #edf2f7);
     text-decoration: none;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
-    margin-bottom: 1px;
+    white-space: nowrap;
     -webkit-tap-highlight-color: transparent;
   }
 
-  .mobile-more-link:hover,
-  .mobile-more-link:active {
-    background: rgba(255,255,255,0.05);
+  .mobile-nav-popover-link:hover,
+  .mobile-nav-popover-link:active {
+    background: rgba(255, 255, 255, 0.06);
+    color: #f59e0b;
   }
+
+  /* ── Remove old "Más" sheet styles (no longer used) ── */
+  .mobile-more-sheet,
+  .mobile-more-sheet-backdrop,
+  .mobile-more-sheet-panel,
+  .mobile-more-sheet-handle,
+  .mobile-more-sheet-title,
+  .mobile-more-group,
+  .mobile-more-group-title,
+  .mobile-more-link { display: none !important; }
 
   /* ── Push main content up for bottom nav ── */
   .main {
