@@ -2851,13 +2851,21 @@ a.subtab.active {
   }
 
   .app-shell-tools {
-    justify-content: center;
+    justify-content: flex-end;
     gap: 8px;
   }
 
   .app-shell-btn-mobile {
     display: inline-flex;
     align-items: center;
+  }
+
+  /* Avisos button: gold/orange when there are active avisos */
+  .app-shell-btn-avisos-active {
+    border-color: rgba(245, 158, 11, 0.45) !important;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(249, 115, 22, 0.10)) !important;
+    color: #f59e0b !important;
+    font-weight: 700;
   }
 
   .app-shell-btn {
@@ -2896,9 +2904,14 @@ a.subtab.active {
   }
 
   /* Ensure all images and media stay within bounds */
-  img, video, iframe, svg, canvas {
+  img, video, svg, canvas {
     max-width: 100% !important;
     height: auto !important;
+  }
+
+  iframe {
+    max-width: 100% !important;
+    /* height set via inline style + JS — do NOT override */
   }
 
   /* Kill any element that tries to be wider than the viewport */

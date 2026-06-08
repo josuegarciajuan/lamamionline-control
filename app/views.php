@@ -14,7 +14,9 @@ function render_global_ui($page = '') {
     echo '</div>';
     echo '<div class="app-shell-tools">';
     echo '<button type="button" id="mobileMenuToggle" class="app-shell-btn app-shell-btn-mobile" aria-expanded="false" aria-controls="appSidebar">☰ Menú</button>';
-    echo '<button type="button" id="mobileAvisosToggle" class="app-shell-btn app-shell-btn-mobile" aria-expanded="false" aria-controls="avisosPanel">⚠ Avisos</button>';
+    $avisosCount = count(avisos_get_active());
+    $avisosBtnClass = $avisosCount > 0 ? ' app-shell-btn-avisos-active' : '';
+    echo '<button type="button" id="mobileAvisosToggle" class="app-shell-btn app-shell-btn-mobile' . $avisosBtnClass . '" aria-expanded="false" aria-controls="avisosPanel">⚠ Avisos' . ($avisosCount > 0 ? ' (' . $avisosCount . ')' : '') . '</button>';
     echo '<button type="button" id="voiceCommandToggleMobile" class="app-shell-btn app-shell-btn-mobile app-shell-btn-mic" data-voice-command-toggle aria-expanded="false" aria-controls="voiceCommandPanel" aria-label="Abrir voz CRM" title="Abrir voz CRM">🎙</button>';
     echo '</div>';
 
@@ -77,7 +79,6 @@ function render_global_ui($page = '') {
     echo '<div class="voice-command-head">';
     echo '<div>';
     echo '<h2>Órdenes por voz</h2>';
-    echo '<p>Pulsa el micro y habla. Cuando termines, la orden se envía sola.</p>';
     echo '</div>';
     echo '<button type="button" id="voiceCommandClose" class="voice-command-close" aria-label="Cerrar panel de voz">✕</button>';
     echo '</div>';
@@ -271,7 +272,11 @@ function render_publicista_strategy_option_detail($option, $isDefault = false) {
 
 function render_avisos_panel() {
     $avisos = avisos_get_active();
-    if (empty($avisos)) return;
+    if (empty($avisos)) {
+        // Always render panel so JS toggle works even with zero avisos
+        echo '<section id="avisosPanel" class="panel panel-space avisos-panel" hidden></section>';
+        return;
+    }
 
     $newCount = 0;
 
@@ -4549,7 +4554,7 @@ function dashboard_card($title, $value, $money = false) {
 
 function render_bot_casa_page() {
     page_header('Bot Casa', 'Panel de control del bot de WhatsApp');
-    $panelUrl = 'bot-casa/public/panel.php?v=20260608_1';
+    $panelUrl = 'bot-casa/public/panel.php?v=20260608_2';
     echo '<div class="panel panel-space" style="padding:0;overflow:visible;border-radius:var(--radius-md)">';
     echo '<iframe id="bot-casa-iframe" src="' . e($panelUrl) . '" style="width:100%;min-height:calc(100vh - 200px);height:auto;border:none;display:block" title="Panel Bot Casa"></iframe>';
     echo '</div>';
@@ -5108,7 +5113,6 @@ function render_dashboard_page() {
 
     echo '<div class="brand" style="margin-bottom:4px;font-size:28px;">LaMami <span>CRM</span></div>';
     page_header('Dashboard', 'Vista de pájaro del negocio completo');
-    render_dashboard_external_bot_panel();
 
     echo '<section class="panel panel-space">';
     echo '<form method="get" class="toolbar">';

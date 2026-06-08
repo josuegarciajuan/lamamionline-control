@@ -680,8 +680,13 @@
             });
         }
 
-        if (mobileAvisosToggle && avisosPanel) {
+        if (mobileAvisosToggle) {
             mobileAvisosToggle.addEventListener('click', function () {
+                if (!avisosPanel) {
+                    // No panel rendered: redirect to full avisos page as fallback
+                    window.location.href = 'index.php?page=avisos';
+                    return;
+                }
                 var open = document.body.classList.toggle('mobile-avisos-open');
                 document.body.classList.remove('mobile-nav-open');
                 mobileAvisosToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
