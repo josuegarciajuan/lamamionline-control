@@ -29,6 +29,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action'])) {
     handle_get_actions();
 }
+// Prevent clickjacking on mobile (MOBILE-REDESIGN F0)
+header('X-Frame-Options: DENY');
 ?><!doctype html>
 <html lang="es">
 <head>
@@ -36,14 +38,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action'])) {
     <title>LaMami CRM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="assets/style.css?v=20260602_8">
-    <link rel="stylesheet" href="assets/theme.css?v=20260601_2">
+    <link rel="stylesheet" href="assets/style.css?v=20260608_1">
+    <link rel="stylesheet" href="assets/theme.css?v=20260608_1">
 </head>
 <body class="page-<?= e($page) ?>" data-page="<?= e($page) ?>">
 <?php if ($page === 'login'): ?>
     <?php render_login_page(); ?>
 <?php else: ?>
-    <?php render_global_ui(); ?>
+    <?php render_global_ui($page); ?>
     <div class="layout" id="appLayout">
         <?php render_sidebar($page); ?>
         <main class="main" id="appMain">
@@ -129,6 +131,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action'])) {
         </main>
     </div>
 <?php endif; ?>
-<script src="assets/app.js?v=20260602_7"></script>
+<script src="assets/app.js?v=20260608_1"></script>
 </body>
 </html>

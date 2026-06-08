@@ -1052,6 +1052,26 @@ Las siguientes acciones POST DEBEN seguir funcionando **exactamente igual** que 
 - El archivo .bot_mode es por usuario
 - session_memory.ndjson, leads.ndjson, bot.log son por usuario
 
+### Contrato de dual-panel sincronizado
+
+Toda modificación en la sección bot-casa DEBE aplicarse simultáneamente a los dos paneles existentes:
+
+| Panel | Archivo | URL de acceso |
+|-------|---------|--------------|
+| **Admin** | `bot-casa/public/panel.php` | `https://lamami.online/control/index.php?page=bot-casa` (iframe en CRM) |
+| **Cliente** | `bot-casa/public/client.php` | `http://admin.casawasap.com/cliente` |
+
+Reglas obligatorias:
+1. Si se añade una sección/tab nueva a `panel.php`, DEBE añadirse su equivalente en `client.php` (o viceversa).
+2. Si se modifica la lógica de UI en uno, DEBE modificarse en el otro.
+3. Si se cambian estilos en `bot-casa/public/assets/style.css`, aplican a ambos automáticamente.
+4. Si se añade o modifica un endpoint en `bot-casa/public/api/`, ambos paneles deben poder consumirlo.
+5. **Prohibido** desarrollar una feature solo para el panel admin o solo para el panel cliente. Son la misma herramienta con 2 UIs.
+
+Excepciones legítimas (features que SÍ son exclusivas de un panel):
+- **Admin-only**: Gestión de usuarios (tab-users), suplantación de identidad (`?suplantar=`), API keys de IA, Telegram alerts.
+- **Cliente-only**: Wizard de onboarding (3 pasos), barra de progreso (4 indicadores), guía paso a paso.
+
 ### Contrato de no regresión
 - Si no existe data/users/ → todo funciona como antes (legacy mode)
 - El pipeline (handleWebhook) no cambia su lógica

@@ -1,4 +1,15 @@
 (function () {
+    function scrollActiveSubtabIntoView() {
+        const active = document.querySelector('.subtabs .subtab.active, .subtabs a.subtab.active, .subtabs .subtab-split.is-active');
+        if (active) {
+            try {
+                active.scrollIntoView({ inline: 'center', behavior: 'smooth', block: 'nearest' });
+            } catch(e) {
+                active.scrollIntoView(false);
+            }
+        }
+    }
+
     function showToast(message, type) {
         var el = document.getElementById('floatingToast');
         if (!el || !message) return;
@@ -1483,9 +1494,634 @@
         });
     }
 
+    // ====================================================================
+    // COMERCIAL AGENT TABLE — Simplified interaction logic
+    // ====================================================================
+
+    var AgentTable = {
+        // Which filter is active: 'all', 'pending', 'done'
+        activeFilter: 'pending',
+
+        // Toast timer
+        toastTimer: null,
+
+        init: function () {
+            var self = this;
+            var table = document.querySelector('.agent-table-wrap');
+            if (!table) return;
+
+            this.bindFilters();
+            this.bindAttendButtons();
+            this.bindDiscardButtons();
+            this.bindViewButtons();
+            this.bindCopyButtons();
+            this.bindFullscreenButton();
+            this.updateCounters();
+        },
+
+        bindFilters: function () {
+            var self = this;
+            var btns = document.querySelectorAll('.agent-filter-btn');
+            btns.forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var filter = this.getAttribute('data-filter');
+                    btns.forEach(function (b) { b.classList.remove('is-active'); });
+                    this.classList.add('is-active');
+                    self.activeFilter = filter;
+                    self.applyFilter();
+                    self.updateCounters();
+                });
+            });
+        },
+
+        applyFilter: function () {
+            var rows = document.querySelectorAll('.agent-table tbody tr.agent-data-row');
+            rows.forEach(function (row) {
+                var status = row.getAttribute('data-agent-status');
+                if (AgentTable.activeFilter === 'all') {
+                    row.style.display = '';
+                } else if (AgentTable.activeFilter === 'pending' && status === 'pending') {
+                    row.style.display = '';
+                } else if (AgentTable.activeFilter === 'done' && status === 'done') {
+                    row.style.display = '';
+                } else if (AgentTable.activeFilter === 'discarded' && status === 'discarded') {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            // Hide inline chat rows that belong to hidden rows
+            document.querySelectorAll('.agent-inline-chat').forEach(function (chatRow) {
+                var prevRow = chatRow.previousElementSibling;
+                if (prevRow && prevRow.style.display === 'none') {
+                    chatRow.style.display = 'none';
+                    chatRow.classList.remove('is-open');
+                }
+            });
+        },
+
+        updateCounters: function () {
+            var allRows = document.querySelectorAll('.agent-table tbody tr.agent-data-row');
+            var visibleCount = 0;
+            var pendingCount = 0;
+            var doneCount = 0;
+            var discardedCount = 0;
+
+            allRows.forEach(function (row) {
+                var status = row.getAttribute('data-agent-status');
+                if (status === 'pending') pendingCount++;
+                if (status === 'done') doneCount++;
+                if (status === 'discarded') discardedCount++;
+            });
+
+            // Update counter badge
+            var counterEl = document.getElementById('agentPendingCount');
+            if (counterEl) {
+                var prevCount = parseInt(counterEl.textContent, 10);
+                // Animate number change
+                if (!isNaN(prevCount) && prevCount !== pendingCount) {
+                    counterEl.style.transition = 'none';
+                    counterEl.style.transform = 'scale(1.25)';
+                    counterEl.style.color = pendingCount > 0 ? '#22c55e' : '#94a3b8';
+                    setTimeout(function () {
+                        counterEl.style.transition = 'transform .3s cubic-bezier(.16,1,.3,1)';
+                        counterEl.style.transform = 'scale(1)';
+                    }, 50);
+                }
+                counterEl.textContent = pendingCount;
+            }
+
+            // Update filter badges
+            var badgeAll = document.querySelector('.agent-filter-btn[data-filter="all"] .badge');
+            var badgePending = document.querySelector('.agent-filter-btn[data-filter="pending"] .badge');
+            var badgeDone = document.querySelector('.agent-filter-btn[data-filter="done"] .badge');
+            var badgeDiscarded = document.querySelector('.agent-filter-btn[data-filter="discarded"] .badge');
+
+            if (badgeAll) badgeAll.textContent = allRows.length;
+            if (badgePending) badgePending.textContent = pendingCount;
+            if (badgeDone) badgeDone.textContent = doneCount;
+            if (badgeDiscarded) badgeDiscarded.textContent = discardedCount;
+
+            // Re-apply current filter to refresh visibility
+            this.applyFilter();
+        },
+
+        bindAttendButtons: function () {
+            var self = this;
+            document.querySelectorAll('.agent-btn-attend').forEach(function (btn) {
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    if (this.classList.contains('is-sent')) return;
+
+                    var threadId = this.getAttribute('data-thread-id');
+                    if (!threadId) return;
+
+                    self.markAttended(this, threadId);
+                });
+            });
+        },
+
+        markAttended: function (btn, threadId) {
+            var self = this;
+
+            // Instant visual feedback
+            btn.classList.add('is-sent');
+            btn.innerHTML = '&#10003; Hecho';
+            btn.disabled = true;
+
+            // Update the row
+            var row = btn.closest('tr.agent-data-row');
+            if (row) {
+                row.setAttribute('data-agent-status', 'done');
+                row.classList.remove('agent-row-pending', 'agent-row-hot', 'agent-row-warm');
+                row.classList.add('agent-row-done');
+
+                // Update status pill
+                var statusEl = row.querySelector('.agent-status');
+                if (statusEl) {
+                    statusEl.innerHTML = '<span class="status-dot dot-done"></span> Atendido';
+                    statusEl.className = 'agent-status is-done';
+                }
+
+                // Disable discard button
+                var discardBtn = row.querySelector('.agent-btn-discard');
+                if (discardBtn) {
+                    discardBtn.style.display = 'none';
+                }
+            }
+
+            // Send to backend
+            var csrfToken = document.querySelector('input[name="csrf_token"]');
+            var csrfValue = csrfToken ? csrfToken.value : '';
+
+            var formData = new FormData();
+            formData.append('action', 'comercial_set_thread_stage');
+            formData.append('thread_id', threadId);
+            formData.append('stage', 'qualified');
+            formData.append('csrf_token', csrfValue);
+
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            }).then(function (resp) {
+                return resp.text();
+            }).then(function () {
+                self.showToast('Marcado como atendido', 'ok');
+                self.updateCounters();
+            }).catch(function () {
+                self.showToast('Error al marcar. Reintenta.', 'error');
+                // Revert on error
+                btn.classList.remove('is-sent');
+                btn.innerHTML = '&#128222; Atendido';
+                btn.disabled = false;
+                if (row) {
+                    row.setAttribute('data-agent-status', 'pending');
+                    row.classList.add('agent-row-pending');
+                    row.classList.remove('agent-row-done');
+                    var statusEl = row.querySelector('.agent-status');
+                    if (statusEl) {
+                        statusEl.innerHTML = '<span class="status-dot dot-pending"></span> Pendiente';
+                        statusEl.className = 'agent-status is-pending';
+                    }
+                }
+            });
+        },
+
+        bindDiscardButtons: function () {
+            var self = this;
+            document.querySelectorAll('.agent-btn-discard').forEach(function (btn) {
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    var threadId = this.getAttribute('data-thread-id');
+                    if (!threadId) return;
+
+                    // Two-step confirmation with inline button state change
+                    if (!this.classList.contains('is-confirming')) {
+                        // First click: ask for confirmation
+                        this.classList.add('is-confirming');
+                        this.innerHTML = '&#9888; &#191;Seguro?';
+                        // Auto-reset after 3 seconds
+                        var btnRef = this;
+                        clearTimeout(this._confirmTimer);
+                        this._confirmTimer = setTimeout(function () {
+                            btnRef.classList.remove('is-confirming');
+                            btnRef.innerHTML = '&#128465; Descartar';
+                        }, 4000);
+                        return;
+                    }
+
+                    // Second click: execute
+                    self.discardThread(this, threadId);
+                });
+            });
+        },
+
+        discardThread: function (btn, threadId) {
+            var self = this;
+            clearTimeout(btn._confirmTimer);
+            btn.classList.remove('is-confirming');
+            btn.innerHTML = '&#8987; ...';
+            btn.disabled = true;
+
+            var row = btn.closest('tr.agent-data-row');
+            var csrfToken = document.querySelector('input[name="csrf_token"]');
+            var csrfValue = csrfToken ? csrfToken.value : '';
+
+            var formData = new FormData();
+            formData.append('action', 'comercial_set_thread_stage');
+            formData.append('thread_id', threadId);
+            formData.append('stage', 'discarded');
+            formData.append('csrf_token', csrfValue);
+
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            }).then(function (resp) {
+                return resp.text();
+            }).then(function () {
+                if (row) {
+                    row.setAttribute('data-agent-status', 'discarded');
+                    row.classList.remove('agent-row-pending', 'agent-row-hot', 'agent-row-warm');
+                    row.classList.add('agent-row-discarded');
+
+                    var statusEl = row.querySelector('.agent-status');
+                    if (statusEl) {
+                        statusEl.innerHTML = '<span class="status-dot dot-discarded"></span> Descartado';
+                        statusEl.className = 'agent-status is-discarded';
+                    }
+
+                    // Hide attend button
+                    var attendBtn = row.querySelector('.agent-btn-attend');
+                    if (attendBtn) attendBtn.style.display = 'none';
+
+                    btn.innerHTML = '&#128465; Descartado';
+                    btn.style.opacity = '0.5';
+                    btn.style.pointerEvents = 'none';
+                }
+                self.showToast('Descartado correctamente', 'ok');
+                self.updateCounters();
+            }).catch(function () {
+                self.showToast('Error al descartar. Reintenta.', 'error');
+                btn.innerHTML = '&#128465; Descartar';
+                btn.disabled = false;
+            });
+        },
+
+        bindViewButtons: function () {
+            var self = this;
+            document.querySelectorAll('.agent-btn-view').forEach(function (btn) {
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    var threadId = this.getAttribute('data-thread-id');
+                    if (!threadId) return;
+
+                    var row = this.closest('tr.agent-data-row');
+                    if (!row) return;
+
+                    // Toggle: close if already open
+                    var chatRow = row.nextElementSibling;
+                    if (chatRow && chatRow.classList.contains('agent-inline-chat')) {
+                        if (chatRow.classList.contains('is-open')) {
+                            chatRow.classList.remove('is-open');
+                            chatRow.style.display = 'none';
+                            btn.innerHTML = '&#128065; Ver';
+                            return;
+                        }
+                        // Re-open and refresh
+                        self.loadChatContent(chatRow, threadId);
+                        chatRow.classList.add('is-open');
+                        chatRow.style.display = '';
+                        btn.innerHTML = '&#128065; Ocultar';
+                        return;
+                    }
+
+                    // Create new chat row
+                    self.createChatRow(row, threadId, btn);
+                });
+            });
+        },
+
+        createChatRow: function (row, threadId, btn) {
+            var self = this;
+            var chatRow = document.createElement('tr');
+            chatRow.className = 'agent-inline-chat is-open';
+            chatRow.innerHTML = '<td colspan="6"><div class="agent-chat-shell">'
+                + '<div class="agent-chat-head">'
+                + '<strong>Ultimos mensajes</strong>'
+                + '<button type="button" class="agent-chat-close">Cerrar</button>'
+                + '</div>'
+                + '<div class="agent-chat-bubbles">'
+                + '<div class="agent-chat-loading">Cargando conversacion...</div>'
+                + '</div>'
+                + '</div></td>';
+
+            row.parentNode.insertBefore(chatRow, row.nextSibling);
+
+            // Close button
+            var closeBtn = chatRow.querySelector('.agent-chat-close');
+            closeBtn.addEventListener('click', function () {
+                chatRow.classList.remove('is-open');
+                chatRow.style.display = 'none';
+                btn.innerHTML = '&#128065; Ver';
+            });
+
+            btn.innerHTML = '&#128065; Ocultar';
+
+            // Load content
+            this.loadChatContent(chatRow, threadId);
+        },
+
+        loadChatContent: function (chatRow, threadId) {
+            var bubblesEl = chatRow.querySelector('.agent-chat-bubbles');
+            if (!bubblesEl) return;
+
+            bubblesEl.innerHTML = '<div class="agent-chat-loading">Cargando conversacion...</div>';
+
+            // Obtener URL base del feed desde el data attribute del contenedor
+            var tableWrap = document.querySelector('.agent-table-wrap');
+            var feedBase = tableWrap ? (tableWrap.getAttribute('data-feed-url') || '') : '';
+            if (!feedBase) {
+                feedBase = (window.location.origin || '') + '/comercial_thread_feed.php';
+            }
+            var feedUrl = feedBase + '?thread_id=' + encodeURIComponent(threadId) + '&_=' + Date.now();
+
+            fetch(feedUrl, { credentials: 'same-origin' })
+                .then(function (resp) { return resp.json(); })
+                .then(function (data) {
+                    if (!data.ok || !data.thread) {
+                        bubblesEl.innerHTML = '<div class="agent-chat-loading">No se pudo cargar la conversacion.</div>';
+                        return;
+                    }
+
+                    var timelineHtml = data.thread.timeline_html || '';
+                    if (!timelineHtml || timelineHtml.trim() === '') {
+                        bubblesEl.innerHTML = '<div class="agent-chat-loading">Sin mensajes todavia.</div>';
+                        return;
+                    }
+
+                    // Parse the server-rendered HTML into chat bubbles
+                    bubblesEl.innerHTML = '';
+
+                    // The timeline HTML from the server contains .commercial-thread-entry elements.
+                    // We parse them into our simpler chat format.
+                    var tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = timelineHtml;
+
+                    var entries = tempDiv.querySelectorAll('.commercial-thread-entry');
+                    if (entries.length === 0) {
+                        bubblesEl.innerHTML = '<div class="agent-chat-loading">Sin mensajes todavia.</div>';
+                        return;
+                    }
+
+                    entries.forEach(function (entry) {
+                        var isInbound = entry.classList.contains('in');
+                        var isOutbound = entry.classList.contains('out');
+                        var isMeta = entry.classList.contains('meta');
+
+                        if (isMeta) {
+                            var metaText = (entry.querySelector('.commercial-thread-entry-meta') || {}).textContent || entry.textContent || '';
+                            var metaDiv = document.createElement('div');
+                            metaDiv.className = 'agent-chat-msg';
+                            metaDiv.style.alignSelf = 'center';
+                            metaDiv.style.background = 'rgba(255,255,255,.03)';
+                            metaDiv.style.maxWidth = '100%';
+                            metaDiv.style.fontSize = '12px';
+                            metaDiv.style.color = 'var(--muted)';
+                            metaDiv.style.textAlign = 'center';
+                            metaDiv.textContent = metaText.trim();
+                            bubblesEl.appendChild(metaDiv);
+                            return;
+                        }
+
+                        if (isInbound || isOutbound) {
+                            var bubble = entry.querySelector('.commercial-bubble');
+                            var text = bubble ? bubble.textContent.trim() : entry.textContent.trim();
+                            var timeEl = entry.querySelector('.commercial-thread-entry-meta') || entry.querySelector('[style*="font-size:11px"]');
+                            var time = timeEl ? timeEl.textContent.trim() : '';
+
+                            var msgDiv = document.createElement('div');
+                            msgDiv.className = 'agent-chat-msg ' + (isInbound ? 'is-inbound' : 'is-outbound');
+                            msgDiv.textContent = text;
+                            if (time) {
+                                var timeSpan = document.createElement('span');
+                                timeSpan.className = 'msg-time';
+                                timeSpan.textContent = time;
+                                msgDiv.appendChild(timeSpan);
+                            }
+                            bubblesEl.appendChild(msgDiv);
+                        }
+                    });
+
+                    if (bubblesEl.children.length === 0) {
+                        bubblesEl.innerHTML = '<div class="agent-chat-loading">Sin mensajes todavia.</div>';
+                    }
+                })
+                .catch(function () {
+                    bubblesEl.innerHTML = '<div class="agent-chat-loading">Error al cargar. Intentalo de nuevo.</div>';
+                });
+        },
+
+        bindCopyButtons: function () {
+            var self = this;
+            document.querySelectorAll('.agent-copy-btn').forEach(function (btn) {
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var phone = this.getAttribute('data-phone') || '';
+                    if (!phone) return;
+
+                    // Copiar al portapapeles
+                    var cleaned = phone.replace(/[^0-9+]/g, '');
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(cleaned).then(function () {
+                            self._flashCopyBtn(btn);
+                        }).catch(function () {
+                            self._fallbackCopy(cleaned, btn);
+                        });
+                    } else {
+                        self._fallbackCopy(cleaned, btn);
+                    }
+                });
+            });
+        },
+
+        _flashCopyBtn: function (btn) {
+            var original = btn.innerHTML;
+            btn.classList.add('is-copied');
+            btn.innerHTML = '✓';
+            setTimeout(function () {
+                btn.classList.remove('is-copied');
+                btn.innerHTML = original;
+            }, 1200);
+        },
+
+        _fallbackCopy: function (text, btn) {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch (e) {}
+            document.body.removeChild(ta);
+            this._flashCopyBtn(btn);
+        },
+
+        bindFullscreenButton: function () {
+            var self = this;
+            var btn = document.getElementById('agentFullscreenBtn');
+            if (!btn) return;
+
+            btn.addEventListener('click', function () {
+                self.openFullscreen();
+            });
+        },
+
+        openFullscreen: function () {
+            var panel = document.getElementById('agentTablePanel');
+            if (!panel) return;
+
+            // Recoger todo el CSS de la página
+            var styles = '';
+            var sheets = document.styleSheets;
+            for (var i = 0; i < sheets.length; i++) {
+                try {
+                    var rules = sheets[i].cssRules || sheets[i].rules;
+                    if (rules) {
+                        for (var j = 0; j < rules.length; j++) {
+                            styles += rules[j].cssText + '\n';
+                        }
+                    }
+                } catch (e) {
+                    // Cross-origin stylesheets won't be readable — skip
+                }
+            }
+
+            // También incluir <style> inline
+            var inlineStyles = document.querySelectorAll('style');
+            inlineStyles.forEach(function (s) {
+                styles += s.textContent + '\n';
+            });
+
+            // Clonar el panel y quitar el botón fullscreen del clon
+            var clone = panel.cloneNode(true);
+            var fsBtn = clone.querySelector('#agentFullscreenBtn');
+            if (fsBtn) fsBtn.remove();
+
+            // HTML completo para la ventana emergente
+            var html = '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
+                + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+                + '<title>Bandeja del Comercial</title>'
+                + '<style>' + styles + '</style>'
+                + '</head><body style="margin:0;padding:0;background:#0a0f1a;overflow:hidden;">'
+                + '<div style="position:fixed;top:10px;right:10px;z-index:99999;">'
+                + '<button onclick="window.close()" style="padding:10px 20px;border:1px solid rgba(248,113,113,.30);border-radius:8px;background:rgba(15,23,42,.95);color:#fca5a5;cursor:pointer;font-size:14px;font-weight:700;">✕ Cerrar</button>'
+                + '</div>'
+                + clone.outerHTML
+                + '</body></html>';
+
+            // Abrir ventana emergente a pantalla completa
+            var w = window.open('', '_blank', 'width=' + screen.width + ',height=' + screen.height + ',left=0,top=0');
+            if (w) {
+                w.document.write(html);
+                w.document.close();
+
+                // Intentar maximizar
+                try { w.moveTo(0, 0); w.resizeTo(screen.width, screen.height); } catch (e) {}
+
+                // Copiar los event listeners básicos al nuevo window
+                var self = this;
+                setTimeout(function () {
+                    self._bindFsWindow(w);
+                }, 200);
+            }
+        },
+
+        _bindFsWindow: function (w) {
+            var doc = w.document;
+            // Filtros
+            var filterBtns = doc.querySelectorAll('.agent-filter-btn');
+            filterBtns.forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var filter = this.getAttribute('data-filter');
+                    filterBtns.forEach(function (b) { b.classList.remove('is-active'); });
+                    this.classList.add('is-active');
+                    var rows = doc.querySelectorAll('.agent-table tbody tr.agent-data-row');
+                    rows.forEach(function (row) {
+                        var s = row.getAttribute('data-agent-status');
+                        if (filter === 'all' || s === filter) row.style.display = '';
+                        else row.style.display = 'none';
+                    });
+                });
+            });
+            // Copiar teléfonos
+            doc.querySelectorAll('.agent-copy-btn').forEach(function (b) {
+                b.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    var phone = (this.getAttribute('data-phone') || '').replace(/[^0-9+]/g, '');
+                    if (phone && navigator.clipboard) {
+                        navigator.clipboard.writeText(phone).then(function () {
+                            b.classList.add('is-copied');
+                            b.innerHTML = '✓';
+                            setTimeout(function () { b.classList.remove('is-copied'); b.innerHTML = '📋'; }, 1200);
+                        });
+                    }
+                });
+            });
+        },
+
+        showToast: function (message, type) {
+            var el = document.getElementById('agentToast');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'agentToast';
+                el.className = 'agent-toast';
+                document.body.appendChild(el);
+            }
+
+            el.textContent = message;
+            el.className = 'agent-toast ' + (type || 'ok') + ' is-visible';
+
+            clearTimeout(this.toastTimer);
+            this.toastTimer = setTimeout(function () {
+                el.classList.remove('is-visible');
+            }, 2500);
+        }
+    };
+
     document.addEventListener('DOMContentLoaded', function () {
         initLineasUnifiedSearch();
         initLineasModal();
         initPlatformPhotoLabels();
+        AgentTable.init();
+        scrollActiveSubtabIntoView();
+
+        // ── "Más" bottom sheet toggle (MOBILE-REDESIGN F0) ──
+        var moreBtn = document.getElementById('mobileMoreBtn');
+        var moreSheet = document.getElementById('mobileMoreSheet');
+        var moreBackdrop = document.getElementById('mobileMoreBackdrop');
+        if (moreBtn && moreSheet) {
+            moreBtn.addEventListener('click', function () {
+                var isOpen = !moreSheet.hidden;
+                moreSheet.hidden = isOpen;
+                moreBtn.setAttribute('aria-expanded', String(!isOpen));
+                document.body.style.overflow = isOpen ? '' : 'hidden';
+            });
+            if (moreBackdrop) {
+                moreBackdrop.addEventListener('click', function () {
+                    moreSheet.hidden = true;
+                    moreBtn.setAttribute('aria-expanded', 'false');
+                    document.body.style.overflow = '';
+                });
+            }
+            // Cerrar sheet al hacer click en un enlace interno
+            moreSheet.querySelectorAll('.mobile-more-link').forEach(function (link) {
+                link.addEventListener('click', function () {
+                    moreSheet.hidden = true;
+                    moreBtn.setAttribute('aria-expanded', 'false');
+                    document.body.style.overflow = '';
+                });
+            });
+        }
     });
 })();

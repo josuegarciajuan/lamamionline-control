@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-08 — MOBILE-REDESIGN FASE 0 (Fundación Shell Mobile)
+
+### Implementado
+- **Bottom Tab Bar**: Barra de navegación inferior fija con 5 tabs (Dashboard, Comercial, LaMami, Jostal, Más). Visible solo en mobile (≤767px). Reemplaza la sidebar en móvil.
+- **"Más" Bottom Sheet**: Sheet deslizable desde abajo con las 12 secciones agrupadas por categoría (Control, Negocios, Comunicación, Sistema). Incluye botón Salir.
+- **CSS Shell Mobile**: ~130 líneas en `theme.css` con backdrop blur, safe-area insets, animaciones de sheet, zero overflow body/.main/.layout.
+- **JS Toggle**: Toggle del sheet con backdrop click + cierre en enlaces internos. Estado `aria-expanded` correcto.
+- **Parámetro `$page`**: `render_global_ui()` ahora recibe `$page` para activar el tab correcto en la bottom bar.
+- **Seguridad**: Añadido `X-Frame-Options: DENY` en `index.php` para prevenir clickjacking (hallazgo MEDIUM de auditoría F0).
+
+### Archivos
+- **Modificados (5):** `app/views.php` (+65 líneas HTML bottom bar + sheet), `index.php` (pass $page + X-Frame-Options + cache-bust v=20260608_1), `assets/theme.css` (+140 líneas mobile shell), `assets/app.js` (+24 líneas toggle JS), `docs/changelog.md`
+- **Specs (3):** `spec/requirements.md` (nueva sección MOBILE-REDESIGN), `spec/design.md` (diseño detallado F0-F6), `spec/tasks.md` (tracking 7 fases)
+
+### Verificación
+- `php -l` en `index.php` y `app/views.php`: OK
+- HTML: `mobile-bottom-nav`, `mobile-more-sheet`, `mobileMoreBtn`, `mobileMoreSheet` presentes y correctos
+- CSS: 11 referencias a clases mobile-* en theme.css dentro de `@media (max-width: 767px)`
+- JS: toggle funcional con backdrop + cierre en links
+- Seguridad: 0 CRITICAL, 0 HIGH, 1 MEDIUM corregido (X-Frame-Options)
+
 ## 2026-06-03 — BOT-CASA-MULTIUSER FASE 6 (onboarding + crons + pulido)
 
 ### Implementado

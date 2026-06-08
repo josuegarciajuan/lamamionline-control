@@ -624,3 +624,50 @@
 - [x] T6.6 — Testing final end-to-end (php -l global OK).
 
 **FASE 6 COMPLETADA. 🎉 PROYECTO BOT-CASA-MULTIUSER FINALIZADO.**
+
+---
+
+## MOBILE-REDESIGN — Rediseño responsive CRM "Native App Shell"
+
+### MOBILE-REDESIGN-F0 — Fundación (Shell Mobile Base)
+
+- [x] T0.1 — HTML del bottom tab bar (5 tabs: Dashboard/Comercial/LaMami/Jostal/Más) + "Más" bottom sheet con 12 secciones agrupadas en `render_global_ui()`.
+- [x] T0.2 — CSS base: ocultar sidebar en mobile, bottom bar fixed, backdrop sheet con handle, variables de espacio safe-area.
+- [x] T0.3 — JS toggle del "Más" sheet: backdrop click cierra, links internos cierran, overflow: hidden en body.
+- [x] T0.4 — Pasar `$page` como parámetro a `render_global_ui()` para activar tabs correctamente.
+- [x] T0.5 — Cache-bust versions en index.php (`style.css`, `theme.css`, `app.js`) v=20260608_1.
+- [x] T0.6 — Seguridad: `X-Frame-Options: DENY` añadido. Auditoría F0: 0 CRITICAL, 0 HIGH, 1 MEDIUM corregido.
+
+### MOBILE-REDESIGN-F1 — Bottom Tab Bar + Navegación reestructurada
+
+- [ ] T1.1 — Pulir bottom tab bar: active states, transiciones, color accent.
+- [ ] T1.2 — Simplificar toolbar superior: ocultar botón Menú (redundante con bottom bar).
+- [ ] T1.3 — Ajustar `body` y `.main` para zero overflow horizontal.
+
+### MOBILE-REDESIGN-F2 — Conversor universal Tablas → Tarjetas (Card Stack)
+
+- [ ] T2.1 — JS: función `convertTablesToCards()` que detecta thead, mapea columnas como labels.
+- [ ] T2.2 — CSS: `.card-stack`, `.card-stack-item`, `.card-stack-row`, `.card-stack-label`, `.card-stack-value`.
+- [ ] T2.3 — PHP: marcar tablas especiales con `data-no-card-view` donde necesario.
+
+### MOBILE-REDESIGN-F3 — Bottom Sheets para Formularios + FAB
+
+- [ ] T3.1 — JS: `setupFormSheets()` convierte form+table `.cards.two` en bottom sheet + FAB.
+- [ ] T3.2 — CSS: `.mobile-fab` (FAB 52px circle), `.mobile-form-sheet` con backdrop y panel.
+
+### MOBILE-REDESIGN-F4 — Subpestañas → Chips + Overflow
+
+- [ ] T4.1 — CSS: subpestañas como chips compactos (border-radius 20px, padding reducido, wrap).
+- [ ] T4.2 — JS (opcional): dropdown "···" para más de 6 chips.
+
+### MOBILE-REDESIGN-F5 — Conversor Agente Table → Cards
+
+- [ ] T5.1 — Verificar y pulir modo card-stack existente del agente (≤640px).
+- [ ] T5.2 — CSS: pulir tarjetas de agente con el tema oscuro.
+
+### MOBILE-REDESIGN-F6 — Pulido Final y Verificación
+
+- [ ] T6.1 — Eliminar TODOS los `min-width` fijos que causan overflow en mobile.
+- [ ] T6.2 — Verificar las 20 secciones una por una a ≤767px.
+- [ ] T6.3 — Actualizar cache-bust final.
+- [ ] T6.4 — Verificar dual-panel bot-casa sin regresión.

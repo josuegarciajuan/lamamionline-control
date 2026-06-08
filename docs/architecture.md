@@ -1,5 +1,13 @@
 # Arquitectura (resumen operativo)
 
+## MOBILE-REDESIGN — Fase 0 (completada)
+
+- **Bottom Tab Bar**: Navegación fija inferior con 5 tabs (Dashboard, Comercial, LaMami, Jostal, Más). Visible solo ≤767px. Sidebar oculto en mobile.
+- **"Más" Bottom Sheet**: Sheet overlay (z-index 1450) con 12 secciones agrupadas en 4 categorías. Animación `cubic-bezier(0.32, 0.72, 0, 1)`.
+- **CSS Shell**: Todo en `@media (max-width: 767px)` dentro de `theme.css`. Cero impacto en desktop. Safe-area insets en bottom bar y sheet.
+- **JS**: Toggle minimalista (25 líneas). Backdrop cierra, links cierran, `body.style.overflow` protegido.
+- **Seguridad**: `X-Frame-Options: DENY` añadido en `index.php`. Todos los valores dinámicos escapados con `e()`.
+
 ## Estado actual por fases
 
 ### Fase 1 (completada)

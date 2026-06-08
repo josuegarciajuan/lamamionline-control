@@ -1311,6 +1311,26 @@ tr:hover td {
 .db-kpi-gold { box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.20); }
 .db-kpi-purple { box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.20); }
 
+/* Daily income card — theme variant */
+.db-daily-income-card {
+  border: 1px solid var(--line-soft, #2b3b55);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.2));
+}
+.db-daily-income-inner {
+  border-radius: 12px 12px 0 0;
+}
+.db-daily-income-label { color: var(--text-heading, #e2e8f0); }
+.db-daily-income-meta { color: var(--text-muted, #94a3b8); }
+.db-daily-income-sub {
+  color: var(--text-muted, #64748b);
+  border-top: 1px solid var(--line-subtle, rgba(148,163,184,0.08));
+}
+.db-daily-income-sub strong { color: var(--text, #e2e8f0); }
+
+/* Margin KPI — theme variant */
+.db-margin-avg { color: #a78bfa; }
+.db-margin-label { color: var(--text-muted, #94a3b8); }
+
 .db-main-chart-panel {
   border: 1px solid var(--line-soft);
   box-shadow: var(--shadow-md), 0 0 0 1px rgba(245, 158, 11, 0.08);
@@ -1366,14 +1386,16 @@ tr:hover td {
 
 .db-dashboard .db-glow-panel,
 .db-dashboard .db-kpi-card,
-.db-dashboard .db-main-chart-panel {
+.db-dashboard .db-main-chart-panel,
+.db-dashboard .db-daily-income-card {
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.03), 0 8px 30px rgba(245, 158, 11, 0.04);
   transition: box-shadow 0.28s ease, border-color 0.28s ease, transform 0.28s ease;
 }
 
 .db-dashboard .db-glow-panel:hover,
 .db-dashboard .db-kpi-card:hover,
-.db-dashboard .db-main-chart-panel:hover {
+.db-dashboard .db-main-chart-panel:hover,
+.db-dashboard .db-daily-income-card:hover {
   border-color: rgba(245, 158, 11, 0.22);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 14px 38px rgba(245, 158, 11, 0.10);
   transform: translateY(-1px);
@@ -2370,6 +2392,123 @@ a.subtab.active {
     padding: 12px !important;
     margin: 0 !important;
   }
+
+  /* Subtabs: horizontal scrollable strip instead of multi-row wrap */
+  .subtabs {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    scroll-behavior: smooth;
+    gap: 6px !important;
+    padding-bottom: 4px;
+  }
+  .subtabs::-webkit-scrollbar { display: none; }
+
+  .subtabs .subtab,
+  a.subtab,
+  .subtab-split {
+    flex: 0 0 auto !important;
+    min-width: auto !important;
+    padding: 8px 14px !important;
+    white-space: nowrap;
+  }
+  .subtab-split {
+    min-width: 185px !important;
+  }
+
+  /* ── Mobile tables: compact & scrollable with scroll-shadow ── */
+  table th,
+  table td {
+    padding: 6px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .table-wrap {
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    /* Right-edge scroll shadow: shadow visible when content overflows horizontally */
+    background:
+      linear-gradient(to left, var(--bg, #08111f) 30%, transparent) right center / 40px 100% no-repeat,
+      radial-gradient(farthest-side at right center, rgba(0,0,0,0.20), transparent) right center / 14px 100% no-repeat;
+    background-attachment: local, scroll;
+  }
+
+  .agent-table-wrap {
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 10px;
+    max-width: 100%;
+  }
+
+  /* ── Prevent long strings from breaking layout ── */
+  .panel,
+  .subtab-content,
+  td,
+  th,
+  p,
+  .stat-label,
+  .field label,
+  .big-msg {
+    overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
+    max-width: 100%;
+  }
+
+  /* ── Commercial thread: compact on mobile ── */
+  .commercial-thread-actions-cell {
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  .commercial-row-preview {
+    min-width: 0 !important;
+    max-width: 100%;
+  }
+
+  /* ── Form grids: single column ── */
+  .form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px;
+  }
+
+  /* ── Section heads: ensure actions wrap properly ── */
+  .section-head,
+  .section-head-actions {
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .section-head-actions .btn-primary,
+  .section-head-actions a,
+  .section-head-actions button {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* ── Images & media: prevent breakout ── */
+  img,
+  video,
+  iframe,
+  svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* ── Code/pre blocks: wrap ── */
+  pre,
+  code {
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+  }
 }
 
 @media (max-width: 680px) {
@@ -2496,4 +2635,173 @@ a.subtab.active {
 #lineas-unified-search:focus {
   border-color: var(--accent, #5dd39e) !important;
   box-shadow: 0 0 0 2px rgba(93, 211, 158, 0.10) !important;
+}
+
+/* ==========================================================================
+   MOBILE SHELL — Bottom Tab Bar + Card Stack + More Sheet (MOBILE-REDESIGN)
+   Active at ≤767px. Hidden on desktop. Fase 0 — Fundación.
+   ========================================================================== */
+
+.mobile-bottom-nav,
+.mobile-more-sheet { display: none; }
+
+@media (max-width: 767px) {
+  /* ── Hide sidebar on mobile (replaced by bottom tab bar) ── */
+  .sidebar { display: none !important; }
+  body.mobile-nav-open .sidebar { display: none !important; }
+
+  /* ── Bottom tab bar ── */
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1400;
+    background: rgba(6, 12, 22, 0.97);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--line, #26384f);
+    padding: 5px 3px max(5px, env(safe-area-inset-bottom));
+    justify-content: space-around;
+    align-items: flex-start;
+  }
+
+  .mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 5px 3px;
+    min-width: 48px;
+    border: none;
+    background: transparent;
+    color: var(--muted, #9fb0c7);
+    text-decoration: none;
+    font-size: 10px;
+    font-weight: 500;
+    border-radius: 10px;
+    transition: color 0.15s, background 0.15s;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-nav-item.is-active {
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.08);
+  }
+
+  .mobile-nav-icon {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .mobile-nav-label {
+    font-size: 9px;
+    line-height: 1.2;
+  }
+
+  /* ── "Más" bottom sheet ── */
+  .mobile-more-sheet {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1450;
+    pointer-events: none;
+  }
+
+  .mobile-more-sheet:not([hidden]) {
+    pointer-events: auto;
+  }
+
+  .mobile-more-sheet-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+
+  .mobile-more-sheet:not([hidden]) .mobile-more-sheet-backdrop {
+    opacity: 1;
+  }
+
+  .mobile-more-sheet-panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 70vh;
+    background: var(--panel, #111c2d);
+    border-radius: 20px 20px 0 0;
+    padding: 16px 18px max(16px, env(safe-area-inset-bottom));
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    overflow-y: auto;
+    box-shadow: 0 -8px 40px rgba(0,0,0,0.4);
+  }
+
+  .mobile-more-sheet:not([hidden]) .mobile-more-sheet-panel {
+    transform: translateY(0);
+  }
+
+  .mobile-more-sheet-handle {
+    width: 36px;
+    height: 4px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 2px;
+    margin: 0 auto 14px;
+  }
+
+  .mobile-more-sheet-title {
+    margin: 0 0 14px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text, #edf2f7);
+  }
+
+  .mobile-more-group {
+    margin-bottom: 12px;
+  }
+
+  .mobile-more-group-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted, #9fb0c7);
+    margin: 0 0 6px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--line, #26384f);
+  }
+
+  .mobile-more-link {
+    display: block;
+    padding: 10px 12px;
+    border-radius: 10px;
+    color: var(--text, #edf2f7);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 1px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-more-link:hover,
+  .mobile-more-link:active {
+    background: rgba(255,255,255,0.05);
+  }
+
+  /* ── Push main content up for bottom nav ── */
+  .main {
+    padding-bottom: 80px !important;
+  }
+
+  /* ── Ensure body never overflows horizontally ── */
+  body {
+    overflow-x: hidden !important;
+    max-width: 100vw;
+  }
+  .main { max-width: 100vw; overflow-x: hidden; }
+  .layout { max-width: 100vw; overflow-x: hidden; }
 }

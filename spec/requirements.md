@@ -75,6 +75,27 @@ Habilitar un modelo operativo y trazable de **interés real** para el bot comerc
    - Definir métricas de aceptación (precisión operativa y tiempos de respuesta).
    - Cerrar documentación y checklist de salida.
 
+## MOBILE-REDESIGN — Rediseño responsive CRM "Native App Shell"
+
+### Objetivo
+Rediseñar la UI del CRM para móvil desde cero, no como parches CSS sino como una app nativa móvil. Eliminar el scroll horizontal que afecta a casi todas las secciones, reestructurar la navegación con bottom tab bar (estilo app), convertir tablas en tarjetas (card stack), formularios en bottom sheets, y subpestañas en chips compactos.
+
+### Alcance por fases
+1. **MOBILE-REDESIGN-F0 — Fundación**: Marcado HTML del bottom tab bar + "Más" sheet, CSS base, JS toggle, paso de `$page`.
+2. **MOBILE-REDESIGN-F1 — Bottom Tab Bar**: Pulido, toolbar superior simplificada, zero overflow.
+3. **MOBILE-REDESIGN-F2 — Card Stack**: Conversor universal tablas→tarjetas (JS + CSS), sin scroll horizontal.
+4. **MOBILE-REDESIGN-F3 — Form Sheets + FAB**: Formularios en bottom sheets, FAB flotante.
+5. **MOBILE-REDESIGN-F4 — Subtab Chips**: Pestañas como chips compactos con overflow.
+6. **MOBILE-REDESIGN-F5 — Agent Cards**: Pulir modo card del agente table.
+7. **MOBILE-REDESIGN-F6 — Pulido**: Kill all min-widths, verificación 20 secciones, cache-bust final.
+
+### Restricciones
+- Cambios mínimos y seguros. Sin dependencias nuevas. Sin frameworks.
+- Cero pérdida de funcionalidad. Todo se reestructura, nada se elimina.
+- Solo modificar: `app/views.php`, `index.php`, `assets/theme.css`, `assets/app.js`, `assets/style.css`.
+- Dual-panel bot-casa: sin cambios (tiene su propio CSS responsive).
+- Desktop: sin cambios (todo dentro de `@media (max-width: 767px)`).
+
 ## COM-BALANCE — Balanceo equitativo de envíos entre líneas comerciales
 
 ### Objetivo
@@ -142,3 +163,8 @@ Transformar bot-casa actual (single-tenant) en un servicio multi-usuario donde c
 - Auth: usuario/contraseña con bcrypt.
 - WAHA: gestión vía SSH automático. Imágenes: mantener compartir.site.
 - Aprendizaje: por usuario.
+- **⛔ DUAL-PANEL SYNC: Cualquier cambio en bot-casa (UI, lógica, config, features, estilos) DEBE aplicarse por igual a los DOS paneles:**
+  - **Panel Admin** (`bot-casa/public/panel.php`) → accedido via `https://lamami.online/control/index.php?page=bot-casa` (iframe en CRM)
+  - **Panel Cliente** (`bot-casa/public/client.php`) → accedido via `http://admin.casawasap.com/cliente`
+  - Ambos comparten backend (`bot-casa/public/api/`) y CSS (`bot-casa/public/assets/style.css`).
+  - Son la misma herramienta con 2 UIs diferentes. No se permite desarrollar para uno solo.

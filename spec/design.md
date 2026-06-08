@@ -804,6 +804,55 @@ Mejorar la calidad de las respuestas generadas por IA dotándola de mayor contex
 
 ---
 
+---
+
+## Diseño MOBILE-REDESIGN — Shell Mobile "Native App Shell"
+
+### Arquitectura Mobile (≤767px)
+
+```
+┌─── TOOLBAR TOP ───────────────────────────┐
+│  [⚠ Avisos]          [🎙 Voz]             │
+├─── SUBPESTAÑAS (chips) ───────────────────┤
+│  [Resumen] [Procesos] [Líneas] ···        │
+├─── CONTENT ───────────────────────────────┤
+│ ┌─────────────────────────────────┐       │
+│ │ ┌─── CARD ──────────────────┐   │       │
+│ │ │ 📞 +34 612...              │   │       │
+│ │ │ 📍 Origen: Instagram       │   │       │
+│ │ │ 📅 2026-06-08             │   │       │
+│ │ │ [Ver] [Editar]            │   │       │
+│ │ └────────────────────────────┘   │       │
+│ └─────────────────────────────────┘       │
+│                                     [⊕]   │ ← FAB
+├─── BOTTOM TAB BAR ────────────────────────┤
+│  📊      💬      👩      🏠      ⋯       │
+│ Dashb  Comerc  LaMami  Jostal   Más       │
+└───────────────────────────────────────────┘
+```
+
+### Decisiones Fase 0
+
+1. **Bottom tab bar fixed**: 5 tabs (Dashboard, Comercial, LaMami, Jostal, Más), oculta sidebar en mobile.
+2. **"Más" sheet**: Bottom sheet con las 12 secciones agrupadas por categoría (Control, Negocios, Comunicación, Sistema).
+3. **Toolbar superior simplificada**: Solo Avisos + Voz (el botón Menú es redundante con bottom bar).
+4. **Sidebar oculto en mobile**: `display: none !important` a ≤767px.
+5. **Safe-area**: `env(safe-area-inset-bottom)` en bottom bar y bottom sheets.
+
+### CSS variables y estructura
+
+- `.mobile-bottom-nav` — fixed, bottom: 0, z-index: 1400
+- `.mobile-nav-item` — flex column, icon + label, 48px min-width
+- `.mobile-more-sheet` — fixed overlay, z-index: 1450
+- `.mobile-more-sheet-panel` — bottom sheet, border-radius: 20px 20px 0 0
+- `.mobile-more-sheet-backdrop` — semi-transparent overlay
+- `.main` — padding-bottom: 80px para dar espacio a la bottom bar
+
+### Seguridad
+- Sin cambios en autenticación/sesión. Solo cambios de UI.
+- Los enlaces del bottom bar y "Más" sheet son `<a href="index.php?page=...">` estándar (sin JS para navegación).
+- El backdrop del "Más" sheet usa `pointer-events: none` cuando está hidden (previene click-through accidental).
+
 ## Diseño COM-BALANCE — Balanceo ponderado de envíos entre líneas
 
 ### Objetivo de diseño
