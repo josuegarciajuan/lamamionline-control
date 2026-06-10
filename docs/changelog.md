@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-06-10 — MOBILE-REDESIGN-V2 BLOQUE C (Rediseño página por página)
+
+### Implementado
+- **C1 Dashboard**: KPIs compactos (26px values, 12px padding), daily income card full-width con iconos reducidos, chart boxes 240-320px, hero bg reducido
+- **C2 LaMami**: Contact cards con layout vertical, acciones full-width, phone 18px, lead quick-inline 1-col, money input compacto
+- **C3 Comercial**: Agent table → card mode a 767px con priority banners (4px left border coloreada: verde=pendiente, naranja=hot, amarillo=warm, rojo=descartado), celdas block con word-break, acciones full-width. Thread viewer full-height overlay, reply form 1-col, bubble 90% width. Filter chips 2 por fila
+- **C4 Publicista**: Steps grid → 1 col, visual flow 1 col, restrictions grid 1 col, check items compactos, guide actions stack vertical, clienta picker 140px min-height
+- **C5 Jostal**: Day grid → 1 col vertical con items compactos, month total simplificado, quick-add inline con botones reducidos
+- **C6 Resto**: Bots (topbar vertical, toggle full-width, runtime compacto), Josué (iframe 60vh, textarea 360px), Avisos (items verticales con acciones flex), Informes (legend compacto), Gastos (totals bar vertical, money callout reducido), Branch KPIs 1-col, Split tabs stacked
+
+### Archivos
+- **Modificados (3):** `index.php`, `assets/theme.css`, `docs/changelog.md`
+- **CSS añadido:** ~280 líneas en `@media (max-width: 767px)` cubriendo 11 páginas
+
 ## 2026-06-10 — MOBILE-REDESIGN-V2 BLOQUE B (!important cleanup + Form Sheets DOM Move)
 
 ### Implementado

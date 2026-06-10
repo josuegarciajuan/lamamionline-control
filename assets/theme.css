@@ -2504,64 +2504,517 @@ a.subtab.active {
   .stat-label,
   .field label,
   .big-msg {
-    overflow-wrap: break-word;
-    word-break: break-word;
-    hyphens: auto;
-    max-width: 100%;
-  }
-
-  /* ── Commercial thread: compact on mobile ── */
-  .commercial-thread-actions-cell {
-    min-width: 0 !important;
-    width: 100%;
-  }
-
-  .commercial-row-preview {
-    min-width: 0 !important;
-    max-width: 100%;
-  }
-
-  /* ── Form grids: single column ── */
-  .form-grid {
-    grid-template-columns: 1fr !important;
-    gap: 8px;
-  }
-
-  /* ── Section heads: ensure actions wrap properly ── */
-  .section-head,
-  .section-head-actions {
-    width: 100%;
-    max-width: 100%;
-    flex-wrap: wrap;
-  }
-
-  .section-head-actions .btn-primary,
-  .section-head-actions a,
-  .section-head-actions button {
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
-  /* ── Images & media: prevent breakout ── */
-  img,
-  video,
-  iframe,
-  svg {
-    max-width: 100%;
-    height: auto;
-  }
-
-  /* ── Code/pre blocks: wrap ── */
-  pre,
-  code {
-    white-space: pre-wrap;
-    word-break: break-all;
     overflow-wrap: anywhere;
     max-width: 100%;
   }
-}
 
+  /* ══════════════════════════════════════════════════════════════════════
+     C1: DASHBOARD — KPIs compactos, daily income card full-width
+     ══════════════════════════════════════════════════════════════════════ */
+
+  .db-hero {
+    padding: 14px 12px;
+    border-radius: var(--radius-md, 14px);
+  }
+
+  .db-hero-bg {
+    right: -40px;
+    top: -60px;
+    width: 180px;
+    height: 180px;
+    opacity: 0.6;
+  }
+
+  .db-hero-top {
+    gap: 10px;
+  }
+
+  .db-kpi-card {
+    padding: 12px 14px;
+    min-height: auto;
+  }
+
+  .db-kpi-value {
+    font-size: 26px;
+  }
+
+  .db-kpi-head {
+    font-size: 12px;
+  }
+
+  .db-daily-income-card {
+    border-radius: var(--radius-md, 14px);
+    margin-top: 8px;
+  }
+
+  .db-daily-income-inner {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  .db-daily-income-icon {
+    font-size: 26px;
+  }
+
+  .db-daily-income-label {
+    font-size: 13px;
+  }
+
+  .db-daily-income-value {
+    font-size: 24px;
+  }
+
+  .db-daily-income-sub {
+    padding: 8px 14px;
+    font-size: 11px;
+  }
+
+  .db-chart-notes > div {
+    padding: 8px;
+    font-size: 12px;
+  }
+
+  .db-chip-row {
+    gap: 4px;
+  }
+
+  .db-chip {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  .chart-box {
+    height: 240px;
+  }
+
+  .chart-box-xl {
+    height: 320px;
+  }
+
+  canvas {
+    height: 220px !important;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     C2: LAMAMI — Contact cards mejoradas, acciones inline
+     ══════════════════════════════════════════════════════════════════════ */
+
+  .contact-card-main {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .contact-card-body {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .contact-card-phone {
+    font-size: 18px;
+  }
+
+  .contact-card-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .contact-card-actions .btn-wa,
+  .contact-card-actions .btn-primary,
+  .contact-card-actions .btn-secondary-mini,
+  .contact-card-actions button {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .lead-quick-inline {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .money-input {
+    font-size: 22px;
+    padding: 14px;
+  }
+
+  .btn-money,
+  .btn-expense {
+    font-size: 16px;
+    padding: 14px 16px;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     C3: COMERCIAL — Agent table card mode + Thread full-screen
+     ══════════════════════════════════════════════════════════════════════ */
+
+  /* Agent table: card mode at 767px with priority banners */
+  .agent-table {
+    min-width: 0 !important;
+    table-layout: auto !important;
+  }
+
+  .agent-table thead {
+    display: none !important;
+  }
+
+  .agent-table tbody tr.agent-data-row {
+    display: block !important;
+    background: var(--panel, rgba(17, 28, 45, 0.96));
+    border: 1px solid var(--line, #26384f);
+    border-radius: 14px;
+    padding: 14px !important;
+    margin-bottom: 10px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  .agent-table tbody tr:not(.agent-data-row) {
+    display: none !important;
+  }
+
+  .agent-table td {
+    display: block !important;
+    width: 100% !important;
+    padding: 4px 0 !important;
+    border-bottom: none !important;
+    font-size: 13px;
+    color: var(--text, #edf2f7);
+    word-break: break-word;
+  }
+
+  /* Hide empty cells and separator rows */
+  .agent-table td:empty {
+    display: none !important;
+  }
+
+  /* Priority banner via left border + label */
+  .agent-row-hot td:first-child {
+    border-left: 4px solid #fb923c;
+    padding-left: 12px !important;
+  }
+
+  .agent-row-warm td:first-child {
+    border-left: 4px solid #fbbf24;
+    padding-left: 12px !important;
+  }
+
+  .agent-row-pending td:first-child {
+    border-left: 4px solid #34d399;
+    padding-left: 12px !important;
+  }
+
+  .agent-row-discarded td:first-child {
+    border-left: 4px solid #f87171;
+    padding-left: 12px !important;
+  }
+
+  .agent-table td.col-actions {
+    padding-top: 10px !important;
+    margin-top: 6px;
+    border-top: 1px solid var(--line, #26384f);
+  }
+
+  .agent-table td.col-actions::before {
+    display: none;
+  }
+
+  .agent-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .agent-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: center;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .agent-phone {
+    font-size: 18px;
+    font-weight: 700;
+    padding: 4px 0;
+  }
+
+  .agent-filter-btn {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  /* Thread viewer: full-screen overlay on mobile */
+  .commercial-thread-view {
+    border-radius: 0;
+    margin: -14px -10px 0;
+    border: none;
+    min-height: calc(100vh - 120px);
+  }
+
+  .commercial-thread-view-head {
+    padding: 12px 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .commercial-thread-view-reply-form {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .commercial-thread-view-reply-form textarea {
+    min-height: 60px;
+  }
+
+  .commercial-thread-timeline {
+    max-height: calc(100vh - 320px);
+  }
+
+  .commercial-bubble {
+    max-width: 90%;
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+
+  .commercial-filter-bar {
+    gap: 4px;
+  }
+
+  .commercial-filter-chip {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     C4: PUBLICISTA — Stepper vertical + Profile grid 2-col
+     ══════════════════════════════════════════════════════════════════════ */
+
+  .publicista-steps-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .publicista-step-card {
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .publicista-step-card h4 {
+    font-size: 14px;
+  }
+
+  .publicista-visual-flow {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .publicista-visual-step {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .publicista-visual-step strong {
+    font-size: 13px;
+  }
+
+  .publicista-restrictions-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .publicista-check-item {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .publicista-guide-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .publicista-guide-actions .btn-primary,
+  .publicista-guide-actions .btn-secondary-mini {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .publicista-clienta-picker select {
+    min-height: 140px;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     C5: JOSTAL — Day carousel horizontal con snap-scroll
+     ══════════════════════════════════════════════════════════════════════ */
+
+  .jostal-days-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .jostal-day-col {
+    min-height: auto;
+    border-radius: 14px;
+  }
+
+  .jostal-day-head {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+
+  .jostal-day-body {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .jostal-item {
+    padding: 8px 10px;
+  }
+
+  .jostal-month-total {
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+
+  .lead-quick-inline-jostal .btn-money {
+    font-size: 15px;
+    padding: 12px;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     C6: BOTS, GASTOS, CASAWASAP, JOSUÉ, AVISOS, INFORMES
+     ══════════════════════════════════════════════════════════════════════ */
+
+  /* Bots: runtime cards más compactos */
+  .lamamibot-topbar {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .lamamibot-runtime {
+    flex: 1 1 auto;
+  }
+
+  .lamamibot-toggle {
+    min-width: 0;
+    width: 100%;
+    padding: 12px;
+    font-size: 14px;
+  }
+
+  .runtime-toggle-btn {
+    width: 100% !important;
+    min-width: 0 !important;
+    justify-content: center;
+  }
+
+  .bot-runtime-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Casawasap: lineas table → card stack */
+  .lineas-unified-table thead th {
+    font-size: 10px;
+    padding: 8px 6px;
+  }
+
+  .lineas-unified-table tbody td {
+    font-size: 12px;
+    padding: 8px 6px;
+  }
+
+  /* Josué: iframe y textarea full-width */
+  .iframe-wrap {
+    height: 60vh;
+    min-height: 400px;
+    border-radius: 12px;
+  }
+
+  .josue-iframe {
+    min-height: 400px;
+  }
+
+  .josue-textarea {
+    min-height: 360px;
+    font-size: 13px;
+  }
+
+  .josue-text-view {
+    min-height: 360px;
+    font-size: 13px;
+  }
+
+  /* Avisos: items más compactos */
+  .aviso-item {
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .aviso-actions {
+    width: 100%;
+    display: flex;
+    gap: 6px;
+  }
+
+  .aviso-actions form,
+  .aviso-actions button {
+    flex: 1;
+  }
+
+  /* Informes: grid mensual full-width */
+  .monthly-grid-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .grid-legend {
+    gap: 6px;
+  }
+
+  .grid-legend-chip {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  /* Gastos: money callout compacto */
+  .money-callout {
+    padding: 14px;
+  }
+
+  .money-title {
+    font-size: 16px;
+    margin-bottom: 10px;
+  }
+
+  /* Total bars: stack vertically */
+  .totals-bar {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  /* Branch KPIs: 1 col */
+  .branch-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  /* Split tabs: stack vertically */
+  .subtab-split {
+    grid-template-columns: 1fr;
+    min-width: 0;
+  }
+
+  .subtab-split-side {
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+}
 @media (max-width: 680px) {
   .db-kpi-visual-grid {
     grid-template-columns: 1fr;

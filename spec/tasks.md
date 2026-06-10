@@ -717,7 +717,12 @@
 
 ### Pendiente para Bloque C
 
-- [ ] C1 — Rediseño página por página (Dashboard, LaMami, Comercial, Publicista, Jostal, resto).
+- [x] C1 — Dashboard: KPIs compactos, daily income full-width, charts altura reducida.
+- [x] C2 — LaMami: Contact cards verticales, acciones inline, quick-add compacto.
+- [x] C3 — Comercial: Agent table cards con priority banners, thread full-height, filters 2-col.
+- [x] C4 — Publicista: Steps 1 col, visual flow 1 col, guide actions vertical.
+- [x] C5 — Jostal: Day grid 1 col vertical, items compactos, quick-add inline.
+- [x] C6 — Resto: Bots, Gastos, Casawasap, Josué, Avisos, Informes — compact mobile layouts.
 
 ### Pendiente para Bloque D
 
