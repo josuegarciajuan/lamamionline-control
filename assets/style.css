@@ -2795,9 +2795,9 @@ body.voice-processing-open{
 
 /* ===== Comercial ===== */
 .commercial-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
-.commercial-kpi{background:#fff;border:1px solid #ececf4;border-radius:14px;padding:14px 16px}
-.commercial-kpi-title{font-size:12px;color:#667085;text-transform:uppercase;letter-spacing:.04em}
-.commercial-kpi-value{margin-top:8px;font-size:28px;font-weight:800;color:#111827}
+.commercial-kpi{background:linear-gradient(180deg,var(--panel-hover,#152036),var(--panel,#111b2e));border:1px solid var(--line,#1c2d4a);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow-sm,0 4px 12px rgba(0,0,0,0.25))}
+.commercial-kpi-title{font-size:12px;color:var(--muted,#8b9ec0);text-transform:uppercase;letter-spacing:.04em}
+.commercial-kpi-value{margin-top:8px;font-size:28px;font-weight:800;color:var(--text-bright,#ffffff)}
 .commercial-filter-bar{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
 .commercial-filter-chip{display:inline-flex;align-items:center;justify-content:center;padding:8px 12px;border-radius:999px;background:#18283d;border:1px solid #314862;color:#e8eef8;text-decoration:none;font-size:12px;font-weight:700}
 .commercial-filter-chip.active{background:#5dd39e;border-color:#5dd39e;color:#0f1a2b}
@@ -2851,7 +2851,7 @@ linear-gradient(180deg,#0b141a 0%,#0f1d22 100%)}
 .status-pill.hot{background:rgba(251,146,60,.16);border-color:rgba(251,146,60,.34);color:#ffedd5}
 .status-pill.muted{background:rgba(148,163,184,.12);border-color:rgba(148,163,184,.22);color:#dbe4f0}
 .status-pill.danger{background:rgba(248,113,113,.16);border-color:rgba(248,113,113,.34);color:#fee2e2}
-.status-pill.warn{background:#fff7ed;color:#b45309}
+.status-pill.warn{background:var(--warn-bg,rgba(251,191,36,0.10));color:#fde68a}
 .btn-danger-soft{background:rgba(248,113,113,.14);border:1px solid rgba(248,113,113,.28);color:#fee2e2}
 .btn-danger-soft:hover{background:rgba(248,113,113,.20)}
 .commercial-filter-btn{width:auto;cursor:pointer}
@@ -2881,11 +2881,11 @@ linear-gradient(180deg,#0b141a 0%,#0f1d22 100%)}
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--line,#1c2d4a);
   border-radius: 12px;
-  background: #fff;
+  background: linear-gradient(180deg,var(--panel-hover,#152036),var(--panel,#111b2e));
   text-decoration: none;
-  color: inherit;
+  color: var(--text,#f0f3fa);
 }
 .publicista-visual-step .step-num {
   width: 28px;
@@ -2911,9 +2911,9 @@ linear-gradient(180deg,#0b141a 0%,#0f1d22 100%)}
 }
 .publicista-config-panel {
   margin-top: 16px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--line,#1c2d4a);
   border-radius: 14px;
-  background: #fff;
+  background: var(--panel,#111b2e);
   padding: 0 16px 16px;
 }
 .publicista-config-panel > summary {
@@ -2921,7 +2921,7 @@ linear-gradient(180deg,#0b141a 0%,#0f1d22 100%)}
   cursor: pointer;
   padding: 16px 0;
   font-weight: 700;
-  color: #111827;
+  color: var(--text-bright,#fff);
 }
 .publicista-config-panel > summary::-webkit-details-marker {
   display: none;

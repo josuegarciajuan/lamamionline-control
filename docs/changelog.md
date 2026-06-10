@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-06-10 — MOBILE-REDESIGN-V2 BLOQUE B (!important cleanup + Form Sheets DOM Move)
+
+### Implementado
+- **B1 White-background fixes**: Reglas con `background:#fff` en `style.css` reescritas con tokens del tema oscuro:
+  - `.commercial-kpi`, `.commercial-kpi-title`, `.commercial-kpi-value`: de blanco/gris a tokens `--panel`, `--text-bright`, `--muted`
+  - `.status-pill.warn`: de `#fff7ed/#b45309` a `--warn-bg/#fde68a`
+  - `.publicista-visual-step`: de `#fff/#e5e7eb` a `--panel-hover/--line`
+  - `.publicista-config-panel`: de `#fff/#e5e7eb/#111827` a tokens `--panel/--line/--text-bright`
+- **B2 Form sheets DOM Move**: Reescribo completo de `setupFormSheets()` en `app.js`:
+  - **Antes**: `cloneNode(true)` + strip IDs → CSRF tokens rotos, IDs duplicados, form original deshabilitado
+  - **Ahora**: `appendChild()` mueve el nodo DOM real del form al sheet; al cerrar se devuelve a su posición original
+  - Preserva: CSRF tokens, event listeners, IDs, labels `for`, valores de formulario
+  - Dirty check con `confirm()` antes de cerrar si el form tiene datos
+  - Scroll lock con contador `activeSheetCount` para evitar desbloqueo prematuro con múltiples sheets
+  - Limpieza de sheets al hacer resize a desktop
+- **Seguridad**: Auditoría — 0 CRITICAL, 0 HIGH, 1 MEDIUM corregido (scroll lock race), 2 LOW corregidos
+
+### Archivos
+- **Modificados (4):** `index.php`, `assets/style.css`, `assets/app.js`, `docs/changelog.md`
+- **No tocados:** `app/views.php`, `assets/theme.css`, `assets/tokens.css` (sin cambios en este bloque)
+
+### Verificación
+- `php -l index.php`: OK
+- `node -c assets/app.js`: OK
+- Seguridad: 0 hallazgos críticos/altos
+
 ## 2026-06-10 — MOBILE-REDESIGN-V2 BLOQUE A (Spec + Tokens + Navegación 4-Tabs + Card Stack Fixes)
 
 ### Implementado

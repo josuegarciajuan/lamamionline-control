@@ -660,6 +660,11 @@
             document.body.classList.remove('mobile-avisos-open');
             if (mobileAvisosToggle) mobileAvisosToggle.setAttribute('aria-expanded', 'false');
             if (appBackdrop) appBackdrop.hidden = true;
+            // Close any open form sheets and "Más" sheet on desktop resize
+            document.querySelectorAll('.mobile-form-sheet').forEach(function(s) {
+                if (!s.hidden) { s.hidden = true; }
+            });
+            document.body.style.overflow = '';
         }
 
         function syncBackdrop() {
@@ -693,14 +698,15 @@
         });
 
         // =========================================================================
-        // MOBILE-REDESIGN F3: Form bottom sheets + FAB
-        // Converts form+table .cards.two layouts into bottom sheets on mobile.
-        // Each form gets a FAB (floating button) that opens it as a sliding panel.
+        // MOBILE-REDESIGN-V2 F5: Form bottom sheets + FAB (DOM Move)
+        // Moves the REAL form DOM node into the sheet (no cloneNode).
+        // Preserves: CSRF tokens, event listeners, form values, IDs, labels.
         // =========================================================================
         function setupFormSheets() {
             if (!isMobile) return;
 
-            var sheetsCreated = 0;
+            var activeSheetCount = 0;
+
             document.querySelectorAll('.cards.two').forEach(function (cardsContainer) {
                 var panels = cardsContainer.querySelectorAll(':scope > .panel');
                 if (panels.length < 2) return;
@@ -729,72 +735,96 @@
                 fab.textContent = '＋';
                 document.body.appendChild(fab);
 
-                // Create form sheet
+                // Create form sheet (DOM structure)
                 var sheet = document.createElement('div');
                 sheet.className = 'mobile-form-sheet';
                 sheet.hidden = true;
+                sheet.setAttribute('role', 'dialog');
+                sheet.setAttribute('aria-modal', 'true');
+                sheet.setAttribute('aria-label', formTitle);
 
                 var backdrop = document.createElement('div');
                 backdrop.className = 'mobile-form-sheet-backdrop';
 
-                var panel = document.createElement('div');
-                panel.className = 'mobile-form-sheet-panel';
+                var sheetPanel = document.createElement('div');
+                sheetPanel.className = 'mobile-form-sheet-panel';
 
                 var handle = document.createElement('div');
                 handle.className = 'mobile-form-sheet-handle';
 
-                var content = document.createElement('div');
-
-                panel.appendChild(handle);
-                panel.appendChild(content);
+                sheetPanel.appendChild(handle);
                 sheet.appendChild(backdrop);
-                sheet.appendChild(panel);
+                sheet.appendChild(sheetPanel);
                 document.body.appendChild(sheet);
 
-                // Move form panel content into sheet
-                var formCloned = formPanel.cloneNode(true);
-                formCloned.style.display = '';
-                // Strip IDs to avoid collisions with hidden original (security: duplicate DOM IDs)
-                formCloned.querySelectorAll('[id]').forEach(function (el) {
-                    el.removeAttribute('id');
-                });
-                content.appendChild(formCloned);
+                // ── DOM MOVE approach: move real formPanel into sheet, back on close ──
+                var formPanelParent = formPanel.parentNode;
+                var formPanelPlaceholder = document.createElement('div');
+                formPanelPlaceholder.style.display = 'none';
+                formPanelPlaceholder.setAttribute('data-form-sheet-ph', '1');
+                // Insert placeholder right after formPanel
+                formPanelParent.insertBefore(formPanelPlaceholder, formPanel.nextSibling);
+                formPanelParent = null; // Free reference (we use placeholder's parent)
 
-                // Hide and disable original form panel
-                formPanel.style.display = 'none';
-                var originalForm = formPanel.querySelector('form');
-                if (originalForm) {
-                    originalForm.addEventListener('submit', function (e) { e.preventDefault(); });
-                }
-
-                // Toggle: FAB opens sheet
-                fab.addEventListener('click', function () {
+                function openSheet() {
+                    // Move the real form panel into the sheet
+                    sheetPanel.appendChild(formPanel);
+                    formPanel.style.display = '';
+                    formPanel.style.visibility = '';
                     sheet.hidden = false;
+                    activeSheetCount++;
                     document.body.style.overflow = 'hidden';
                     // Focus first input for convenience
                     setTimeout(function () {
-                        var firstInput = sheet.querySelector('input, select, textarea');
+                        var firstInput = sheet.querySelector('input:not([type=hidden]), select, textarea');
                         if (firstInput) firstInput.focus();
                     }, 350);
-                });
+                }
 
-                // Backdrop click closes
-                backdrop.addEventListener('click', function () {
+                function closeSheet(force) {
+                    // Dirty check: if form has values, warn before closing
+                    if (!force) {
+                        var inputs = formPanel.querySelectorAll('input:not([type=hidden]), select, textarea');
+                        var hasValue = false;
+                        for (var i = 0; i < inputs.length; i++) {
+                            if (inputs[i].value && String(inputs[i].value).length > 0) {
+                                hasValue = true;
+                                break;
+                            }
+                        }
+                        if (hasValue && !confirm('¿Descartar los cambios? Los datos no se guardarán.')) {
+                            return;
+                        }
+                    }
+
                     sheet.hidden = true;
-                    document.body.style.overflow = '';
-                });
+                    activeSheetCount = Math.max(0, activeSheetCount - 1);
+                    if (activeSheetCount === 0) {
+                        document.body.style.overflow = '';
+                    }
+                    // Move formPanel back to its original position
+                    if (formPanelPlaceholder.parentNode) {
+                        formPanelPlaceholder.parentNode.insertBefore(formPanel, formPanelPlaceholder);
+                    }
+                    formPanel.style.display = 'none';
+                }
 
-                // Escape key closes sheet (a11y + security: prevent focus escape)
+                // FAB opens sheet
+                fab.addEventListener('click', openSheet);
+
+                // Backdrop click closes (with dirty check)
+                backdrop.addEventListener('click', function () { closeSheet(false); });
+
+                // Escape key closes (with dirty check)
                 sheet.addEventListener('keydown', function (e) {
                     if (e.key === 'Escape' || e.keyCode === 27) {
-                        sheet.hidden = true;
-                        document.body.style.overflow = '';
+                        closeSheet(false);
                         fab.focus();
                     }
                 });
-                sheet.setAttribute('role', 'dialog');
-                sheet.setAttribute('aria-modal', 'true');
-                sheet.setAttribute('aria-label', formTitle);
+
+                // When the form submits successfully, page reloads → sheet is destroyed naturally
+                // No need to move formPanel back on submit (page navigation handles it)
 
                 // Auto-open if URL has edit/new/convert params or form title indicates editing
                 var forceOpen = params.has('edit') || params.has('convert') || params.has('new');
@@ -803,68 +833,9 @@
                     forceOpen = true;
                 }
                 if (forceOpen) {
-                    sheet.hidden = false;
-                    document.body.style.overflow = 'hidden';
+                    openSheet();
                 }
-
-                sheetsCreated++;
             });
-
-            // If no forms detected, also handle standalone form panels
-            if (sheetsCreated === 0) {
-                document.querySelectorAll('.cards.two > .panel:first-child form').forEach(function (form) {
-                    var formPanel = form.closest('.panel');
-                    if (!formPanel) return;
-                    var formTitle = 'Formulario';
-                    var heading = formPanel.querySelector('h2');
-                    if (heading) formTitle = heading.textContent.trim();
-
-                    var fab = document.createElement('button');
-                    fab.className = 'mobile-fab';
-                    fab.setAttribute('aria-label', formTitle);
-                    fab.textContent = '＋';
-                    document.body.appendChild(fab);
-
-                    var sheet = document.createElement('div');
-                    sheet.className = 'mobile-form-sheet';
-                    sheet.hidden = true;
-                    sheet.innerHTML = '<div class="mobile-form-sheet-backdrop"></div><div class="mobile-form-sheet-panel"><div class="mobile-form-sheet-handle"></div></div>';
-                    var content = sheet.querySelector('.mobile-form-sheet-panel');
-                    var clonedPanel = formPanel.cloneNode(true);
-                    // Strip IDs to avoid collisions with hidden original
-                    clonedPanel.querySelectorAll('[id]').forEach(function (el) {
-                        el.removeAttribute('id');
-                    });
-                    content.appendChild(clonedPanel);
-                    document.body.appendChild(sheet);
-
-                    formPanel.style.display = 'none';
-                    var origForm = formPanel.querySelector('form');
-                    if (origForm) {
-                        origForm.addEventListener('submit', function (e) { e.preventDefault(); });
-                    }
-
-                    var bg = sheet.querySelector('.mobile-form-sheet-backdrop');
-                    fab.addEventListener('click', function () {
-                        sheet.hidden = false;
-                        document.body.style.overflow = 'hidden';
-                    });
-                    bg.addEventListener('click', function () {
-                        sheet.hidden = true;
-                        document.body.style.overflow = '';
-                    });
-                    // Escape key closes
-                    sheet.addEventListener('keydown', function (e) {
-                        if (e.key === 'Escape' || e.keyCode === 27) {
-                            sheet.hidden = true;
-                            document.body.style.overflow = '';
-                            fab.focus();
-                        }
-                    });
-                    sheet.setAttribute('role', 'dialog');
-                    sheet.setAttribute('aria-modal', 'true');
-                });
-            }
         }
 
         function setupVoiceCommandPanel() {

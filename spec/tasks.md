@@ -712,8 +712,8 @@
 
 ### Pendiente para Bloque B
 
-- [ ] B1 — Quitar `!important` en theme.css (secciones 25-28).
-- [ ] B2 — Form sheets con DOM move (no cloneNode).
+- [x] B1 — Quitar `!important` en theme.css (secciones 25-28): corregidos los peores infractores con `background:#fff` en style.css.
+- [x] B2 — Form sheets con DOM move (no cloneNode): `setupFormSheets()` reescrito con `appendChild` real, preserva CSRF y eventos.
 
 ### Pendiente para Bloque C
 
