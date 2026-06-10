@@ -84,6 +84,14 @@ final class ContextAssembler implements PipelineStageInterface
             ? $this->sessionMemory->readThread($threadId)
             : [];
 
+        // --- Ignorar placeholders _pending (webhook.php los escribe antes del pipeline) ---
+        // Si no filtramos, el primer mensaje de cada conversación nueva tendría un
+        // registro _pending en el historial → __is_new_conversation siempre sería false
+        // → el gate de primer contacto en Bot.php nunca dispararía.
+        $history = array_values(array_filter($history, static function (array $rec): bool {
+            return empty($rec['_pending']);
+        }));
+
         // --- Filtrado temporal (últimas 6h) ---
         $recentWindowH = (int) $this->config->get('memory.recent_window_hours', 6);
         $sessionReset = true;
@@ -275,6 +283,13 @@ final class ContextAssembler implements PipelineStageInterface
         // ── NOVA: choose_loop_count (indecisión del cliente) ──────────────
         $ctx['choose_loop_count'] = $this->computeChooseLoopCount($history, $selectedGirlName);
 
+        // ── NOVA: photo_insist_count & location_insist_count ─────────────
+        // Cuenta cuántas veces ha pedido el usuario fotos/ubicación en
+        // TODA la conversación. Si >= 2 y ya_enviado tiene el flag, el bot
+        // cede y reenvía en lugar de decir "scrollea arriba".
+        $ctx['photo_insist_count']    = $this->computePhotoInsistCount($history);
+        $ctx['location_insist_count'] = $this->computeLocationInsistCount($history);
+
         // ── NOVA: info_pack_ready ─────────────────────────────────────────
         $yaEnviado = $ctx['ya_enviado'] ?? [];
         $pricesSent = in_array('precios', $yaEnviado, true);
@@ -297,7 +312,11 @@ final class ContextAssembler implements PipelineStageInterface
         $ctx['maps_being_sent_now'] = $mapsBeingSentNow;
 
         // Update info_pack_ready to consider maps being sent now (preemptive)
-        if ($mapsBeingSentNow) {
+        // NOVA FIX: solo activar info_pack_ready si hay señal real de intención (ETA o interés fuerte).
+        // Evita que el bot entre en modo "cierre suave" solo porque el cliente preguntó "dónde estás".
+        $interesFuerte = !empty($ctx['interes_fuerte']);
+        $etaFromUser = !empty($ctx['eta_from_user_flag']);
+        if ($mapsBeingSentNow && ($interesFuerte || $etaFromUser)) {
             $ctx['info_pack_ready'] = $girlSelected && $pricesSent; // location is being sent now
         }
 
@@ -996,6 +1015,57 @@ final class ContextAssembler implements PipelineStageInterface
                 $count++;
             } else {
                 break;
+            }
+        }
+        return $count;
+    }
+
+    /**
+     * Detect if the user is asking for photos / images.
+     */
+    private function userWantsPhotosWords(string $normalizedText): bool
+    {
+        return (bool) preg_match(
+            '/(?:\bfotos?\b|\bfotitos?\b|\bfotillos?\b|\bfoto\b|imag[ée]nes?\b|verlas?\b|ens[ée][ñn]ame|mu[ée]strame|quiero\s+ver|a\s+ver|ver\s+m[aá]s|tienes\s+m[aá]s|pasa\s+fotos?|manda\s+fotos?|ense[ñn]a|muestra|fotito|fotillos|pasa\s+las|manda\s+las|ense[ñn]ame\s+las|quiero\s+verlas|ver\s+fotos?|catalogo|cat[aá]logo)/iu',
+            $normalizedText,
+        );
+    }
+
+    /**
+     * Count how many times the user has asked for photos across the ENTIRE
+     * conversation history. Used to decide whether to cede and re-send.
+     *
+     * @param  list<array<string, mixed>> $history
+     */
+    private function computePhotoInsistCount(array $history): int
+    {
+        $count = 0;
+        foreach ($history as $rec) {
+            $um = (string) ($rec['user_msg'] ?? $rec['user_message'] ?? '');
+            if ($um === '') continue;
+            $n = $this->normalizeStr($um);
+            if ($this->userWantsPhotosWords($n)) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    /**
+     * Count how many times the user has asked for location/maps across the
+     * ENTIRE conversation history.
+     *
+     * @param  list<array<string, mixed>> $history
+     */
+    private function computeLocationInsistCount(array $history): int
+    {
+        $count = 0;
+        foreach ($history as $rec) {
+            $um = (string) ($rec['user_msg'] ?? $rec['user_message'] ?? '');
+            if ($um === '') continue;
+            $n = $this->normalizeStr($um);
+            if ($this->userWantsMapWords($n) || $this->detectTopic($n) === 'ubicacion') {
+                $count++;
             }
         }
         return $count;

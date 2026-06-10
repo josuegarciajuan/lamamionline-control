@@ -18,7 +18,7 @@ final class LeadDetector implements LeadDetectorInterface
     /**
      * Confidence threshold above which a lead is considered "high confidence".
      */
-    private const float HIGH_CONFIDENCE_THRESHOLD = 0.5;
+    private const float HIGH_CONFIDENCE_THRESHOLD = 0.7;
 
     /**
      * @param Config|null $config  Bot configuration (optional, for future use).
@@ -33,26 +33,30 @@ final class LeadDetector implements LeadDetectorInterface
      * Determine whether the OpenAI response indicates a lead.
      *
      * A lead is detected when:
-     *  - lead_detected is truthy, OR
-     *  - There is an ETA (eta_minutes > 0) AND confidence is high.
+     *  - lead_detected is explicitly true in the LLM response (PRIMARY), OR
+     *  - lead_confidence >= 0.95 AND eta_from_user_flag is set (user explicitly stated ETA)
+     *
+     * ⚠️ The old fallback (eta_minutes > 0 && confidence >= 0.7) was removed because
+     * it caused massive false positives: the LLM infers eta_minutes from the bot's
+     * own questions ("cuanto tardas?") instead of from genuine user statements.
      *
      * @param array<string, mixed> $openAiResponse  Parsed OpenAI JSON response.
      * @return bool
      */
     public function isLead(array $openAiResponse): bool
     {
-        // Primary flag: explicit lead_detected boolean
+        // Primary flag: explicit lead_detected boolean from LLM
         $leadDetected = !empty($openAiResponse['lead_detected']);
 
         if ($leadDetected) {
             return true;
         }
 
-        // Secondary: ETA > 0 combined with high confidence
-        $eta = $this->etaMinutes($openAiResponse);
+        // Secondary (strict): only if user explicitly gave ETA AND confidence >= 0.95
+        $etaFromUser = !empty($openAiResponse['eta_from_user_flag']);
         $conf = $this->confidence($openAiResponse);
 
-        if ($eta > 0 && $conf >= self::HIGH_CONFIDENCE_THRESHOLD) {
+        if ($etaFromUser && $conf >= 0.95) {
             return true;
         }
 

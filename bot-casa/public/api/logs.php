@@ -5,6 +5,12 @@
 declare(strict_types=1);
 
 define('WASAPBOT_ROOT', dirname(__DIR__, 2));
+spl_autoload_register(function (string $class): void {
+    $prefix = 'WasapBot\\'; $prefixLen = strlen($prefix);
+    if (strncmp($prefix, $class, $prefixLen) !== 0) return;
+    $file = WASAPBOT_ROOT . '/src/' . str_replace('\\', '/', substr($class, $prefixLen)) . '.php';
+    if (file_exists($file)) require_once $file;
+});
 $isHttps = (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off");
 session_set_cookie_params(["lifetime"=>0,"path"=>"/","secure"=>$isHttps,"httponly"=>true,"samesite"=>"Lax"]);
 $isHttps = (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off");
@@ -17,11 +23,10 @@ if (($_SESSION['role']??'') === 'admin' && !empty($_SESSION['suplantar_user_id']
     $userId = (int) $_SESSION['suplantar_user_id'];
 }
 
-$logFile = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'bot.log');
-
 header('Content-Type: application/json; charset=utf-8');
 
 try {
+    $logFile = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'bot.log');
     if (!file_exists($logFile) || !is_readable($logFile)) {
         echo json_encode(['ok' => true, 'log' => '(sin registros)']);
         exit;

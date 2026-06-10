@@ -122,6 +122,9 @@ final readonly class RoutingGate implements PipelineStageInterface
                 $fromPhone = $this->onlyDigits($rawFrom);
             }
 
+            // Store sender LID for sendSeen in manual chat replies
+            $ctx['sender_lid'] = (string) $rawFrom;
+
             $ctx['waha_line']    = $entry;
             $ctx['waha_enabled'] = $lineEnabled;
             $ctx['line_label']   = $entry !== null ? ((string) ($entry['label'] ?? '')) : '';

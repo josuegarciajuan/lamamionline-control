@@ -75,24 +75,41 @@ final class WahaManager
     public function getQrCode(int $port): array
     {
         $url = "http://{$this->wahaServer}:{$port}/api/default/auth/qr?format=image";
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_HTTPHEADER => ['Accept: application/json', "X-Api-Key: {$this->wahaApiKey}"],
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 10,
-        ]);
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        $lastError = '';
 
-        if ($httpCode !== 200 || $response === false) {
-            return ['ok' => false, 'error' => "HTTP {$httpCode}: Failed to get QR"];
+        // Retry up to 5 times — the Docker container may still be booting
+        for ($attempt = 1; $attempt <= 5; $attempt++) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_HTTPHEADER => ['Accept: application/json', "X-Api-Key: {$this->wahaApiKey}"],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 5,
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+
+            if ($httpCode === 200 && $response !== false) {
+                $data = json_decode($response, true);
+                if (is_array($data) && !empty($data['data'])) {
+                    return ['ok' => true, 'qr_base64' => (string) $data['data']];
+                }
+                $lastError = 'No QR data in response';
+            } elseif ($response === false) {
+                $lastError = "WAHA no responde en puerto {$port} (intento {$attempt}/5)";
+                if ($curlError !== '') {
+                    $lastError .= ': ' . $curlError;
+                }
+            } else {
+                $lastError = "HTTP {$httpCode}: Failed to get QR";
+            }
+
+            if ($attempt < 5) {
+                sleep(1);
+            }
         }
-        $data = json_decode($response, true);
-        if (!is_array($data) || empty($data['data'])) {
-            return ['ok' => false, 'error' => 'No QR data in response'];
-        }
-        return ['ok' => true, 'qr_base64' => (string) $data['data']];
+        return ['ok' => false, 'error' => $lastError];
     }
 
     /** @return array{ok: bool, status?: string, phone?: string, error?: string} */
@@ -142,7 +159,7 @@ final class WahaManager
         return ['ok' => $httpCode >= 200 && $httpCode < 300];
     }
 
-    /** @return array{ok: bool, error?: string} */
+    /** @return array{ok: bool, http_code: int, error?: string} */
     public function sendTestMessage(int $port, string $chatId, string $text): array
     {
         $url = "http://{$this->wahaServer}:{$port}/api/sendText";
@@ -155,10 +172,22 @@ final class WahaManager
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 15,
         ]);
-        curl_exec($ch);
+        $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr = curl_error($ch);
         curl_close($ch);
-        return ['ok' => $httpCode >= 200 && $httpCode < 300, 'http_code' => $httpCode];
+
+        $result = ['ok' => $httpCode >= 200 && $httpCode < 300, 'http_code' => $httpCode];
+        if ($response !== false && $response !== '') {
+            $body = @json_decode($response, true);
+            if (is_array($body) && isset($body['error'])) {
+                $result['error'] = (string) $body['error'];
+            }
+        }
+        if ($curlErr !== '') {
+            $result['error'] = ($result['error'] ?? '') ? $result['error'] . ' | curl: ' . $curlErr : 'curl: ' . $curlErr;
+        }
+        return $result;
     }
 
     /** @return array List of available WAHA ports with status */

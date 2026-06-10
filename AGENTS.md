@@ -12,6 +12,11 @@ Aplicación de gestión.
 - siempre que modifiques un js o un css, ve al index.php y adapta la fecha de modificación, esto se hace para que el navegador refresque estos archivos que tienen almacnados en caché y podamos ver a la primera los cambios efectuados:
 <link rel="stylesheet" href="assets/style.css?v=20260331_1">
 <script src="assets/app.js?v=20260402"></script>
+- **⛔ DUAL-PANEL BOT-CASA: Cualquier cambio en la sección bot-casa (UI, lógica, features, estilos) DEBE aplicarse por igual a los DOS paneles:**
+  - `bot-casa/public/panel.php` (Admin, accedido via CRM en `?page=bot-casa`)
+  - `bot-casa/public/client.php` (Cliente, accedido via `http://admin.casawasap.com/cliente`)
+  - Son la misma herramienta con 2 UIs. Prohibido desarrollar para uno solo.
+  - Excepciones: gestión de usuarios y API keys (solo admin), wizard onboarding (solo cliente).
 
 ## Validación
 - Ejecuta lint si existe.

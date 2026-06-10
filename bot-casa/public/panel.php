@@ -21,30 +21,25 @@ define('WASAPBOT_ROOT', dirname(__DIR__));
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+// Auth gate — acceso solo autenticados
 $isAdmin = !empty($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'admin';
 
-// Determine if accessed from CRM (lamami.online) or standalone (admin.casawasap.com)
+// Si se accede desde el CRM (iframe), confiar en la auth del CRM
 $host = (string) ($_SERVER['HTTP_HOST'] ?? '');
 $fromCRM = (strpos($host, 'lamami.online') !== false);
 
 if (!$isAdmin) {
-    $usersFile = WASAPBOT_ROOT . '/data/users.json';
-    if (!file_exists($usersFile)) {
-        // No users.json → legacy mode, panel open
-    } elseif ($fromCRM) {
-        // Accessed from CRM iframe → trust CRM auth, panel open
-        // CRM user is always admin
+    if ($fromCRM) {
+        // Acceso desde CRM iframe → el usuario del CRM es admin
         $isAdmin = true;
         $_SESSION['user_id'] = $_SESSION['user_id'] ?? 1;
         $_SESSION['role'] = $_SESSION['role'] ?? 'admin';
         $_SESSION['username'] = $_SESSION['username'] ?? 'admin';
     } else {
-        // Standalone access (admin.casawasap.com) → require login
+        // Acceso directo → redirigir al login
         $loginUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http')
                   . '://' . $host . '/login';
-        http_response_code(403);
-        header('Content-Type: text/html; charset=utf-8');
-        echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>403 Prohibido</title></head><body style="background:#080d17;color:#f0f3fa;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><div style="text-align:center"><h1 style="color:#f87171;font-size:3rem">403</h1><p>Acceso restringido.</p><p style="margin-top:16px"><a href="' . h($loginUrl) . '" style="color:#f59e0b">Iniciar sesión</a></p></div></body></html>';
+        header('Location: ' . $loginUrl);
         exit;
     }
 }
@@ -251,17 +246,20 @@ function getCsrfSecret(): string
 
 function generateCsrfToken(): string
 {
-    // Rotates every 10 minutes; uses persistent random secret
-    $secret = getCsrfSecret();
-    return hash_hmac('sha256', date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
+    // Rotates every 10 minutes; uses persistent random secret.
+    // User-bound: tokens are tied to the authenticated user to prevent reuse across sessions.
+    $secret  = getCsrfSecret();
+    $userId  = (int) ($_SESSION['user_id'] ?? 0);
+    return hash_hmac('sha256', $userId . '|' . date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
 }
 
 function validateCsrfToken(string $token): bool
 {
     $secret = getCsrfSecret();
+    $userId = (int) ($_SESSION['user_id'] ?? 0);
 
     // Accept current time window
-    $current = hash_hmac('sha256', date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
+    $current = hash_hmac('sha256', $userId . '|' . date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
     if (hash_equals($current, $token)) {
         return true;
     }
@@ -270,7 +268,7 @@ function validateCsrfToken(string $token): bool
     // the page was loaded just before a 10-minute boundary and submitted
     // shortly after.
     $prevSlot = max(0, floor((int) date('i') / 10) - 1);
-    $previous = hash_hmac('sha256', date('Y-m-d-H') . $prevSlot, $secret);
+    $previous = hash_hmac('sha256', $userId . '|' . date('Y-m-d-H') . $prevSlot, $secret);
     return hash_equals($previous, $token);
 }
 
@@ -305,6 +303,7 @@ function buildRedirectUrl(string $baseUrl, string $extraParam, string $overrideT
         'tab-waha', 'tab-ia', 'tab-routing', 'tab-delays',
         'tab-variants', 'tab-followup', 'tab-reminder', 'tab-urls',
         'tab-memory', 'tab-logs', 'tab-learning', 'tab-users',
+        'tab-chat',
     ];
     $tab = $overrideTab !== '' ? $overrideTab : (string) ($_POST['active_tab'] ?? $_GET['tab'] ?? '');
     if (!in_array($tab, $allowedTabs, true)) {
@@ -1514,9 +1513,10 @@ if (file_exists($logFilePath) && is_readable($logFilePath)) {
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>wasapBot — Admin Panel</title>
-<link rel="stylesheet" href="assets/style.css?v=20260603_4">
+<link rel="stylesheet" href="assets/style.css?v=20260610_1">
+<link rel="stylesheet" href="assets/chat.css?v=20260610_1">
 </head>
 <body>
 
@@ -1533,6 +1533,8 @@ if (file_exists($logFilePath) && is_readable($logFilePath)) {
         <?php if ($adminUsername !== ''): ?>
         <a href="logout" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted);text-decoration:none;display:inline-flex;align-items:center;font-size:.8rem">Cerrar sesión</a>
         <?php endif; ?>
+        <a href="https://casawasap.com/girlsconf/" target="_blank" rel="noopener noreferrer" class="btn btn-sm" style="background:var(--accent);color:#fff;text-decoration:none;display:inline-flex;align-items:center;font-size:.8rem;border-radius:6px;padding:6px 12px;font-weight:600" title="Abrir panel de chicas">👩 Panel chicas</a>
+        <button onclick="window.location.reload()" class="btn btn-sm" title="Recargar panel" style="background:var(--input-bg);color:var(--text-muted);border:1px solid var(--border);cursor:pointer;font-size:.8rem;border-radius:6px;padding:6px 10px">↻ Recargar</button>
         <form method="post" action="<?php echo h($baseUrl); ?>?action=toggle_bot" style="display:inline">
             <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
             <input type="hidden" name="active_tab" class="js-active-tab-input" value="tab-status">
@@ -1558,6 +1560,7 @@ if (file_exists($logFilePath) && is_readable($logFilePath)) {
     <button type="button" data-tab="tab-variants">Variantes</button>
     <button type="button" data-tab="tab-followup">Cron Follow-up</button>
     <button type="button" data-tab="tab-reminder">Cron Reminder</button>
+    <button type="button" data-tab="tab-estados">📢 Estados</button>
     <button type="button" data-tab="tab-urls">URLs</button>
     <button type="button" data-tab="tab-memory">Memoria</button>
     <button type="button" data-tab="tab-logs">Logs</button>
@@ -1565,6 +1568,7 @@ if (file_exists($logFilePath) && is_readable($logFilePath)) {
     <?php if ($isAdmin): ?>
     <button type="button" data-tab="tab-users" style="color:var(--accent)">👥 Usuarios</button>
     <?php endif; ?>
+    <button type="button" data-tab="tab-chat" style="color:var(--ok)">💬 Chat</button>
 </div>
 
 <!-- ── Main config form ── -->
@@ -2733,7 +2737,69 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </div>
 
-<!-- ===== TAB 11: URLs externas ===== -->
+<!-- ===== TAB: Estados WhatsApp ===== -->
+<div class="tab-content" id="tab-estados">
+    <div class="card">
+        <h2>📢 Publicador de Estados
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span>
+                <span class="tooltip-box">El bot publica estados de WhatsApp automáticamente. Los genera basándose en las chicas activas del catálogo, combinando nombres, fotos y textos atractivos.</span>
+            </span>
+        </h2>
+        <div class="section-guide">
+            📢 <strong>¿Cómo funciona?</strong> El bot crea y publica estados de WhatsApp automáticamente según la frecuencia que configures. 
+            Los estados se generan con las chicas que tengas activas. Si no hay chicas activas, no se publicará nada.
+        </div>
+
+        <!-- Config form -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:20px">
+            <!-- ON/OFF + Save -->
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+                <label class="checkbox-label" style="font-size:.9rem"><input type="checkbox" id="estados-enabled" onchange="saveEstadosConfig()"> Activar publicador de estados</label>
+                <span style="flex:1"></span>
+                <button type="button" class="btn btn-primary btn-sm" onclick="saveEstadosConfig()">💾 Guardar configuración</button>
+                <button type="button" class="btn btn-success btn-sm" onclick="publishEstado()">📢 Publicar ahora</button>
+            </div>
+            <!-- Settings row -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Frecuencia</label>
+                    <select id="estados-freq-tipo" onchange="saveEstadosConfig()">
+                        <option value="cada_x_horas">Cada X horas</option>
+                        <option value="x_veces_al_dia">X veces al día</option>
+                    </select>
+                </div>
+                <div class="form-group" style="max-width:70px">
+                    <label>Cada</label>
+                    <input type="number" id="estados-freq-valor" value="6" min="1" max="24" onchange="saveEstadosConfig()">
+                </div>
+                <div class="form-group">
+                    <label>Formato</label>
+                    <select id="estados-formato" onchange="saveEstadosConfig()">
+                        <option value="mix_aleatorio">🎲 Aleatorio (recomendado)</option>
+                        <option value="chicas_de_hoy">Todas las chicas, 1 foto</option>
+                        <option value="chica_del_dia">1 chica aleatoria, 2 fotos</option>
+                        <option value="duo_sexy">2 chicas, 1 foto c/u</option>
+                        <option value="catalogo_rapido">Solo nombres</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Horario inicio</label><input type="time" id="estados-hora-inicio" value="08:00" onchange="saveEstadosConfig()"></div>
+                <div class="form-group"><label>Horario fin</label><input type="time" id="estados-hora-fin" value="23:00" onchange="saveEstadosConfig()"></div>
+            </div>
+            <div id="estados-lines-checkboxes" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px"></div>
+            <div id="estados-status" style="margin-top:8px;font-size:.82rem;color:var(--text-muted)"></div>
+        </div>
+
+        <!-- History -->
+        <h3>📋 Historial de publicaciones</h3>
+        <div id="estados-history" style="margin-top:8px">
+            <p style="color:var(--text-muted);text-align:center;padding:10px">No hay publicaciones todavía.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ===== TAB: URLs externas ===== -->
 <div class="tab-content" id="tab-urls">
     <div class="card">
         <h2>URLs Externas</h2>
@@ -3242,6 +3308,9 @@ function resetUserForm() {
 </script>
 <?php endif; ?>
 
+<!-- ===== TAB: Chat (WhatsApp-style) ===== -->
+<div class="tab-content" id="tab-chat"></div>
+
 <script>
 // Auto-scroll log to bottom on load
 (function() {
@@ -3281,6 +3350,10 @@ function resetUserForm() {
         tabs.forEach(function(t) {
             t.classList.toggle('active', t.id === tabId);
         });
+        // Chat tab: open overlay directly (no intermediate page)
+        if (tabId === 'tab-chat' && typeof ChatApp !== 'undefined') {
+            setTimeout(function() { ChatApp.open(); }, 50);
+        }
         // Persist choice
         try { localStorage.setItem(STORAGE_KEY, tabId); } catch(e) {}
         // Keep all active_tab hidden inputs in sync so every form knows the current tab
@@ -3677,6 +3750,95 @@ function confirmOutcome(threadId, newOutcome) {
     if (document.getElementById('tab-learning') && document.getElementById('tab-learning').classList.contains('active')) loadOutcomes();
 })();
 </script>
+
+<script>
+// ── Estados WhatsApp ──
+function loadEstadosConfig() {
+    fetch(apiUrl('api/estados.php?action=config')).then(r=>r.json()).then(d=>{
+        if (!d.ok) return;
+        var c = d.config;
+        document.getElementById('estados-enabled').checked = !!c.enabled;
+        document.getElementById('estados-freq-tipo').value = c.frecuencia_tipo || 'cada_x_horas';
+        document.getElementById('estados-freq-valor').value = c.frecuencia_valor || 6;
+        document.getElementById('estados-formato').value = c.formato || 'mix_aleatorio';
+        document.getElementById('estados-hora-inicio').value = c.hora_inicio || '08:00';
+        document.getElementById('estados-hora-fin').value = c.hora_fin || '23:00';
+        var lcb = document.getElementById('estados-lines-checkboxes');
+        lcb.innerHTML = (c.available_lines||[]).map(function(l){
+            var checked = (c.lineas||[]).indexOf(l.id) !== -1 ? 'checked' : '';
+            return '<label class="checkbox-label" style="font-size:.78rem"><input type="checkbox" value="'+l.id+'" '+checked+' onchange="saveEstadosConfig()"> '+escHtml(l.label||l.last9)+'</label>';
+        }).join('');
+    });
+}
+function saveEstadosConfig() {
+    var fd = new FormData();
+    fd.append('csrf_token', _csrf);
+    if (document.getElementById('estados-enabled').checked) fd.append('enabled','1');
+    fd.append('frecuencia_tipo', document.getElementById('estados-freq-tipo').value);
+    fd.append('frecuencia_valor', document.getElementById('estados-freq-valor').value);
+    fd.append('formato', document.getElementById('estados-formato').value);
+    fd.append('hora_inicio', document.getElementById('estados-hora-inicio').value);
+    fd.append('hora_fin', document.getElementById('estados-hora-fin').value);
+    var checks = document.querySelectorAll('#estados-lines-checkboxes input[type=checkbox]:checked');
+    checks.forEach(function(c){ fd.append('lineas[]', c.value); });
+    fetch(apiUrl('api/estados.php?action=config'), {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        document.getElementById('estados-status').textContent = d.ok ? '✅ Configuración guardada' : '❌ Error al guardar: '+(d.error||'desconocido');
+        setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 3000);
+    }).catch(function(e){
+        document.getElementById('estados-status').textContent = '❌ Error de red: '+(e.message||'sin conexión');
+        setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 4000);
+    });
+}
+function publishEstado() {
+    document.getElementById('estados-status').textContent = '⏳ Publicando...';
+    var fd = new FormData(); fd.append('csrf_token', _csrf);
+    fetch(apiUrl('api/estados.php?action=publish'), {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        if (d.ok) {
+            var oks = d.results.filter(function(r){return r.ok;}).length;
+            document.getElementById('estados-status').textContent = '✅ Publicado en '+oks+'/'+d.results.length+' líneas';
+            loadEstadosHistory();
+        } else {
+            document.getElementById('estados-status').textContent = '❌ '+(d.error||'Error');
+        }
+        setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 5000);
+    }).catch(function(e){
+        document.getElementById('estados-status').textContent = '❌ Error de red: '+(e.message||'sin conexión');
+        setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 4000);
+    });
+}
+function loadEstadosHistory() {
+    fetch(apiUrl('api/estados.php?action=history')).then(r=>r.json()).then(d=>{
+        if (!d.ok) return;
+        var html = d.log.slice(0,10).map(function(e){
+            var date = e.published_at ? new Date(e.published_at).toLocaleString('es-ES') : '?';
+            return '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:4px;font-size:.8rem"><strong>'+date+'</strong> — '+escHtml(e.formato)+'<br><span style="color:var(--text-muted)">'+escHtml((e.texto||'').substring(0,80))+'</span></div>';
+        }).join('');
+        document.getElementById('estados-history').innerHTML = html || '<p style="color:var(--text-muted);text-align:center;padding:10px">Sin publicaciones</p>';
+    });
+}
+function escHtml(s) { var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+(function() {
+    var btn = document.querySelector('.tab-nav button[data-tab="tab-estados"]');
+    if (btn) {
+        btn.addEventListener('click', function() { loadEstadosConfig(); loadEstadosHistory(); });
+    }
+    if (document.getElementById('tab-estados') && document.getElementById('tab-estados').classList.contains('active')) {
+        loadEstadosConfig(); loadEstadosHistory();
+    }
+})();
+</script>
+
+<script>
+// Global API token for all AJAX calls (for ChatApp)
+var _apiToken = <?php echo json_encode(generateCsrfToken()); ?>;
+function apiUrl(url) {
+    return url + (url.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(_apiToken);
+}
+var _csrf = <?php echo json_encode(generateCsrfToken()); ?>;
+var _isAdminPanel = true;
+</script>
+<script src="assets/chat.js?v=20260610_1"></script>
 
 </body>
 </html>

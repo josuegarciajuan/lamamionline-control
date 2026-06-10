@@ -33,26 +33,26 @@ final class DedupeReply implements PipelineStageInterface
 
     /** @var list<string> */
     private const ALREADY_SENT_PHOTOS = [
-        'ya t las pase mas arriba amor 😘',
-        'mira arriba que ya t las mande cari',
-        'te las mande antes, scrollea arriba',
-        'ya t las pase amor, mira un poco arriba',
-        'ya mandé las fotos antes guapo',
+        'te las vuelvo a pasar amor, aqui estan 😘',
+        'mira te las mando otra vez cari',
+        'aqui las tienes de nuevo guapo 😏',
+        'toma, te las paso otra vez 💕',
+        'perdon amor, te las reenvio 😘',
     ];
 
     /** @var list<string> */
     private const ALREADY_SENT_LOCATION = [
-        'ya t mande la ubi guapo, mira arriba 👆',
-        'te mande el maps antes amor, busca arriba',
-        'la ubicacion ya t la pase, scrollea un poco',
-        'ya te mande el pin antes cari',
+        'aqui te la paso otra vez cari 😊',
+        'toma, te reenvio la ubicacion',
+        'perdon, te la vuelvo a mandar 💕',
+        'aqui tienes el maps de nuevo guapo',
     ];
 
     /** @var list<string> */
     private const ALREADY_SENT_PRICES = [
-        'ya t explique los precios antes amor',
-        'los precios ya t los dije, mira arriba cari',
-        'ya te conte las tarifas antes guapo',
+        'te los recuerdo amor: 40 rapidito, 50 media hora, 100 la hora 😘',
+        'mira te digo los precios otra vez: 40, 50 y 100 cari',
+        '40 rapidito, 50 media, 100 la hora completa guapo',
     ];
 
     /** @var list<string> */
@@ -99,10 +99,11 @@ final class DedupeReply implements PipelineStageInterface
             $yaEnviado = [];
         }
 
-        $photoInsistCount = $ctx['photo_insist_count'] ?? 0;
-        $photoAction      = $ctx['photo_action'] ?? 'none';
+        $photoInsistCount    = (int) ($ctx['photo_insist_count'] ?? 0);
+        $locationInsistCount = (int) ($ctx['location_insist_count'] ?? 0);
+        $photoAction         = $ctx['photo_action'] ?? 'none';
 
-        $categoryVariant = $this->resolveCategoryVariant($outputText, $yaEnviado, $photosSentPerGirl, $photoInsistCount, $photoAction);
+        $categoryVariant = $this->resolveCategoryVariant($outputText, $yaEnviado, $photosSentPerGirl, $photoInsistCount, $locationInsistCount, $photoAction);
 
         if ($categoryVariant !== null) {
             $ctx['output_text']             = $categoryVariant;
@@ -173,12 +174,13 @@ final class DedupeReply implements PipelineStageInterface
      * to send content that is already in ya_enviado, or null if no match.
      *
      * NOVA: photos_sent_per_girl allows new photos (different girl) to pass through.
-     * NOVA: photo_insist_count >= 2 means client insisted — cede, let photos through.
+     * NOVA: photo_insist_count >= 1 means client insisted at least once — cede, let photos through.
+     * NOVA: location_insist_count >= 1 means client insisted at least once — cede, let location through.
      *
      * @param  list<mixed> $yaEnviado
      * @param  list<string> $photosSentPerGirl
      */
-    private function resolveCategoryVariant(string $outputText, array $yaEnviado, array $photosSentPerGirl = [], int $photoInsistCount = 0, string $photoAction = 'none'): ?string
+    private function resolveCategoryVariant(string $outputText, array $yaEnviado, array $photosSentPerGirl = [], int $photoInsistCount = 0, int $locationInsistCount = 0, string $photoAction = 'none'): ?string
     {
         if ($yaEnviado === []) {
             return null;
@@ -189,8 +191,8 @@ final class DedupeReply implements PipelineStageInterface
             in_array('fotos', $yaEnviado, true)
             && $this->detectsPhotoUrls($outputText)
         ) {
-            // If client insisted 2+ times → CEDE, let photos through
-            if ($photoInsistCount >= 2) {
+            // If client insisted at least once → CEDE, let photos through
+            if ($photoInsistCount >= 1) {
                 return null; // Allow photos to go through
             }
 
@@ -228,8 +230,8 @@ final class DedupeReply implements PipelineStageInterface
             in_array('ubicacion_precisa', $yaEnviado, true)
             && $this->detectsLocationContent($outputText)
         ) {
-            // If client insisted 2+ times → CEDE, let location through
-            if ($photoInsistCount >= 2) {
+            // If client insisted at least once → CEDE, let location through
+            if ($locationInsistCount >= 1) {
                 return null;
             }
             return $this->pickVariant(
@@ -243,8 +245,8 @@ final class DedupeReply implements PipelineStageInterface
             in_array('precios', $yaEnviado, true)
             && $this->detectsPriceContent($outputText)
         ) {
-            // If client insisted 2+ times → CEDE, let prices through
-            if ($photoInsistCount >= 2) {
+            // If client insisted at least once → CEDE, let prices through
+            if ($photoInsistCount >= 1) {
                 return null;
             }
             return $this->pickVariant(

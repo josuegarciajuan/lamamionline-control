@@ -10,8 +10,6 @@ declare(strict_types=1);
 define('WASAPBOT_ROOT', dirname(__DIR__, 2));
 $isHttps = (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off");
 session_set_cookie_params(["lifetime"=>0,"path"=>"/","secure"=>$isHttps,"httponly"=>true,"samesite"=>"Lax"]);
-$isHttps = (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off");
-session_set_cookie_params(["lifetime"=>0,"path"=>"/","secure"=>$isHttps,"httponly"=>true,"samesite"=>"Lax"]);
 session_start();
 if (empty($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'Unauthorized']); exit; }
 
@@ -148,6 +146,15 @@ try {
 
             // Build status text
             $formato = $cfg['formato'];
+            // Resolve mix_aleatorio to a concrete format (exclude itself)
+            if ($formato === 'mix_aleatorio') {
+                $noMix = array_values(array_filter(
+                    array_keys($formatOptions),
+                    fn($f) => $f !== 'mix_aleatorio'
+                ));
+                $formato = $noMix[array_rand($noMix)];
+                $cfg['formato'] = $formato;
+            }
             $txt = '';
             $shuffled = $girls;
             shuffle($shuffled);
@@ -169,10 +176,12 @@ try {
                 case 'catalogo_rapido':
                     $txt = '📋 ' . implode(', ', array_map(fn($g) => $g['nombre'], $shuffled));
                     break;
-                case 'mix_aleatorio':
-                    $k = array_rand($formatOptions, 1);
-                    $cfg['formato'] = $k;
-                    break;
+            }
+
+            // Safety net: don't publish empty text
+            if (trim($txt) === '') {
+                echo json_encode(['ok' => false, 'error' => 'No se pudo generar el texto del estado']);
+                break;
             }
 
             $results = [];

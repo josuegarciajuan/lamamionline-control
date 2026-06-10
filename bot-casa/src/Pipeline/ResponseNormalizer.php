@@ -175,7 +175,11 @@ final class ResponseNormalizer implements PipelineStageInterface
 
             // --- ya_enviado (already sent) ---
             if (isset($inner['ya_enviado'])) {
-                $ctx['ya_enviado'] = filter_var($inner['ya_enviado'], FILTER_VALIDATE_BOOLEAN);
+                // Only set from LLM if not already computed by ContextAssembler as array
+                $existing = $ctx['ya_enviado'] ?? null;
+                if (!is_array($existing) || $existing === []) {
+                    $ctx['ya_enviado'] = filter_var($inner['ya_enviado'], FILTER_VALIDATE_BOOLEAN);
+                }
             }
         }
 

@@ -135,7 +135,10 @@ try {
 
         // ── GET|POST /panel → admin panel (requires admin auth) ──
         case ($method === 'GET' || $method === 'POST') && $uri === '/panel':
-            botcasa_require_admin();
+            if (!botcasa_is_authenticated()) {
+                header('Location: login');
+                exit;
+            }
             $panelPath = WASAPBOT_ROOT . '/public/panel.php';
             if (file_exists($panelPath)) {
                 require $panelPath;
@@ -151,7 +154,10 @@ try {
 
         // ── GET|POST /cliente → client panel ──
         case ($method === 'GET' || $method === 'POST') && $uri === '/cliente':
-            botcasa_require_auth();
+            if (!botcasa_is_authenticated()) {
+                header('Location: login');
+                exit;
+            }
             $clientUserId = (int) ($_SESSION['user_id'] ?? 0);
             $isAdmin = ($_SESSION['role'] ?? '') === 'admin';
 
@@ -215,15 +221,13 @@ try {
 
         // ── GET /  or  GET /info → bot info ────────────────────
         case $method === 'GET' && ($uri === '/' || $uri === '/info'):
-            // If accessed standalone (not from CRM API call), redirect to login
+            // Redirect browser access to login if not authenticated
             if ($uri === '/') {
-                $host = (string) ($_SERVER['HTTP_HOST'] ?? '');
-                // Only redirect for browser-like access (not API calls)
                 $acceptHeader = (string) ($_SERVER['HTTP_ACCEPT'] ?? '');
                 if (strpos($acceptHeader, 'text/html') !== false) {
-                    botcasa_require_auth();
-                    // If authenticated, redirect to appropriate panel
-                    if (($_SESSION['role'] ?? '') === 'admin') {
+                    if (!botcasa_is_authenticated()) {
+                        header('Location: login');
+                    } elseif (($_SESSION['role'] ?? '') === 'admin') {
                         header('Location: panel');
                     } else {
                         header('Location: cliente');

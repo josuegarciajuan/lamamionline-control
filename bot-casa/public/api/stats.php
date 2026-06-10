@@ -5,6 +5,12 @@
 declare(strict_types=1);
 
 define('WASAPBOT_ROOT', dirname(__DIR__, 2));
+spl_autoload_register(function (string $class): void {
+    $prefix = 'WasapBot\\'; $prefixLen = strlen($prefix);
+    if (strncmp($prefix, $class, $prefixLen) !== 0) return;
+    $file = WASAPBOT_ROOT . '/src/' . str_replace('\\', '/', substr($class, $prefixLen)) . '.php';
+    if (file_exists($file)) require_once $file;
+});
 $isHttps = (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off");
 session_set_cookie_params(["lifetime"=>0,"path"=>"/","secure"=>$isHttps,"httponly"=>true,"samesite"=>"Lax"]);
 $isHttps = (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off");
@@ -17,8 +23,6 @@ if (($_SESSION['role']??'') === 'admin' && !empty($_SESSION['suplantar_user_id']
     $userId = (int) $_SESSION['suplantar_user_id'];
 }
 
-$leadsFile  = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'leads.ndjson');
-$memoryFile = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'session_memory.ndjson');
 $girlsFile  = WASAPBOT_ROOT . '/data/users/' . $userId . '/girls.json';
 
 function readNdjson(string $path): array {
@@ -33,6 +37,8 @@ function readNdjson(string $path): array {
 header('Content-Type: application/json; charset=utf-8');
 
 try {
+    $leadsFile  = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'leads.ndjson');
+    $memoryFile = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'session_memory.ndjson');
     $todayStr = (new DateTimeImmutable('now', new DateTimeZone('Europe/Madrid')))->format('Y-m-d');
     $weekAgo  = (new DateTimeImmutable('-7 days'))->format('Y-m-d');
 

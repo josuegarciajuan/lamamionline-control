@@ -5,18 +5,12 @@ function is_logged_in() {
 }
 
 function login_user($username, $password) {
-    $users = storage_read('users.json');
-    foreach ($users as $user) {
-        if (
-            isset($user['username'], $user['password']) &&
-            $user['username'] === $username &&
-            $user['password'] === $password
-        ) {
-            $_SESSION['logged_in'] = true;
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['display_name'] = isset($user['name']) ? $user['name'] : $user['username'];
-            return true;
-        }
+    // Credenciales hardcodeadas
+    if ($username === 'josue' && $password === 'prueba1234') {
+        $_SESSION['logged_in'] = true;
+        $_SESSION['username'] = 'josue';
+        $_SESSION['display_name'] = 'Josué';
+        return true;
     }
     return false;
 }

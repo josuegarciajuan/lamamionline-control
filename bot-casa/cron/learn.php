@@ -166,14 +166,66 @@ function sampleConversations(array $outcomeList, array $allThreads, int $max, in
         foreach ($sliceMsgs as $m) {
             $um = trim((string) ($m['user_msg'] ?? ''));
             $br = trim((string) ($m['bot_reply'] ?? ''));
+            $isManual = !empty($m['manual']);
+            $label = $isManual ? 'Humano' : 'Bot';
             if ($um !== '') $convoLines[] = "Cliente: {$um}";
-            if ($br !== '') $convoLines[] = "Bot: {$br}";
+            if ($br !== '') $convoLines[] = "{$label}: {$br}";
         }
 
         $samples[] = [
             'thread_id' => $tid,
             'outcome'   => $o['outcome'],
             'messages'  => count($sliceMsgs) . '/' . count($msgs),
+            'conversation' => implode("\n", $convoLines),
+        ];
+        $count++;
+    }
+    return $samples;
+}
+
+/**
+ * Build sample conversations specifically for human style analysis.
+ * Only includes conversations that have at least one manual (human) reply.
+ *
+ * @param array<string, array> $humanThreads  Threads with human replies (tid => ['msgs'=>..., 'human_count'=>int, 'total'=>int])
+ * @param int                  $max           Maximum samples to return
+ * @param int                  $maxChars      Character budget per conversation
+ * @return list<array>
+ */
+function sampleHumanConversations(array $humanThreads, int $max, int $maxChars = 2000): array
+{
+    $samples = [];
+    $count = 0;
+    foreach ($humanThreads as $tid => $info) {
+        if ($count >= $max) break;
+        $msgs = $info['msgs'];
+
+        // Only include last N messages to stay under char limit
+        $charCount = 0;
+        $sliceMsgs = $msgs;
+        for ($i = count($msgs) - 1; $i >= 0; $i--) {
+            $um = trim((string) ($msgs[$i]['user_msg'] ?? ''));
+            $br = trim((string) ($msgs[$i]['bot_reply'] ?? ''));
+            $charCount += mb_strlen($um) + mb_strlen($br) + 20;
+            if ($charCount > $maxChars) {
+                $sliceMsgs = array_slice($msgs, $i + 1);
+                break;
+            }
+        }
+
+        $convoLines = [];
+        foreach ($sliceMsgs as $m) {
+            $um = trim((string) ($m['user_msg'] ?? ''));
+            $br = trim((string) ($m['bot_reply'] ?? ''));
+            $isManual = !empty($m['manual']);
+            $label = $isManual ? 'Humano' : 'Bot';
+            if ($um !== '') $convoLines[] = "Cliente: {$um}";
+            if ($br !== '') $convoLines[] = "{$label}: {$br}";
+        }
+
+        $samples[] = [
+            'thread_id'    => $tid,
+            'human_replies' => $info['human_count'] . '/' . $info['total'],
             'conversation' => implode("\n", $convoLines),
         ];
         $count++;
@@ -196,6 +248,35 @@ $mareadorSamples = sampleConversations($byOutcome['mareador'] ?? [], $threads, $
 echo "  Lead conversations sampled: " . count($leadSamples) . "\n";
 echo "  Ghosted conversations sampled: " . count($ghostSamples) . "\n";
 echo "  Mareador conversations sampled: " . count($mareadorSamples) . "\n";
+
+// ── Human reply extraction (for style learning) ─────────────────────────────
+echo "\nAnalyzing human-replied conversations...\n";
+
+$humanThreads = [];
+$totalHumanReplies = 0;
+foreach ($threads as $tid => $msgs) {
+    $humanCount = 0;
+    foreach ($msgs as $m) {
+        if (!empty($m['manual']) && !empty(trim((string) ($m['bot_reply'] ?? '')))) {
+            $humanCount++;
+        }
+    }
+    if ($humanCount > 0) {
+        $humanThreads[$tid] = ['msgs' => $msgs, 'human_count' => $humanCount, 'total' => count($msgs)];
+        $totalHumanReplies += $humanCount;
+    }
+}
+echo "  Conversations with human replies: " . count($humanThreads) . "\n";
+echo "  Total human replies found: {$totalHumanReplies}\n";
+
+$humanStyleSamples = [];
+if (!empty($humanThreads)) {
+    $maxHumanSamples = (int) _cfg('cron.learn.max_human_style_samples', 3);
+    $humanStyleSamples = sampleHumanConversations($humanThreads, $maxHumanSamples);
+    echo "  Style samples built: " . count($humanStyleSamples) . "\n";
+} else {
+    echo "  No human replies found — style analysis will be skipped.\n";
+}
 
 $totalSamples = count($leadSamples) + count($ghostSamples) + count($mareadorSamples);
 if ($totalSamples === 0) {
@@ -248,6 +329,17 @@ TU ANÁLISIS DEBE RESPONDER:
    NO escribas reglas IF/THEN. Escribe sabiduría conversacional en prosa natural,
    con ejemplos concretos de las conversaciones que has analizado.
 
+6. ANÁLISIS DE ESTILO HUMANO (solo si hay conversaciones con intervención humana):
+   En las conversaciones etiquetadas como "Humano:", analiza el estilo del operador humano:
+   - Frases típicas, coletillas y muletillas que usa
+   - Tono general (formal/informal, cercano/distante, directo/suave, coqueto/serio)
+   - Longitud media de los mensajes (breves/detallados)
+   - Uso de emojis (cuáles, cuántos, en qué contexto)
+   - Cómo maneja objeciones, preguntas de precio, o dudas sobre el servicio
+   - Estructura típica de sus respuestas: ¿saluda/cierra de forma característica?
+   - Diferencias clave entre cómo responde el humano y cómo respondió el bot en la misma conversación
+   - Qué diría el humano en situaciones donde el bot respondió mal (si las hay)
+
 FORMATO DE SALIDA:
 Escribe MARKDOWN con los siguientes apartados (sin bloque de código, solo texto):
 
@@ -268,6 +360,9 @@ Escribe MARKDOWN con los siguientes apartados (sin bloque de código, solo texto
 
 ## Nuevos principios para el playbook
 [principios concretos en prosa natural, 3-6 puntos]
+
+## Guía de estilo del humano
+[SI hay conversaciones con intervención humana: escribe aquí una guía de estilo concreta con frases literales que usa el humano, coletillas, emojis típicos y tono a imitar. Incluye ejemplos de frases reales del humano. SI NO hay datos de intervención humana en este ciclo, escribe: "No hay datos de intervención humana en este ciclo."]
 
 IMPORTANTE:
 - Céntrate en patrones REALES de los datos, no en teorías.
@@ -307,6 +402,15 @@ if (!empty($mareadorSamples)) {
     $promptParts[] = "\n\n### CONVERSACIONES DE MAREO (" . count($mareadorSamples) . " ejemplos)\n";
     foreach ($mareadorSamples as $i => $s) {
         $promptParts[] = "--- MAREO #" . ($i + 1) . " ---\n" . $s['conversation'] . "\n";
+    }
+}
+
+// Human style samples (for learning operator style)
+if (!empty($humanStyleSamples)) {
+    $promptParts[] = "\n\n### CONVERSACIONES CON INTERVENCIÓN HUMANA — analiza el estilo del operador (" . count($humanStyleSamples) . " ejemplos)\n";
+    $promptParts[] = "IMPORTANTE: Los mensajes etiquetados como 'Humano:' fueron escritos por el operador humano. Los etiquetados como 'Bot:' fueron escritos por la IA. Analiza las diferencias de estilo.\n";
+    foreach ($humanStyleSamples as $i => $s) {
+        $promptParts[] = "--- ESTILO HUMANO #" . ($i + 1) . " (replies: {$s['human_replies']}) ---\n" . $s['conversation'] . "\n";
     }
 }
 
@@ -411,7 +515,7 @@ $playbookHeader = <<<'HEADER'
 
 > Este archivo se genera automáticamente mediante análisis de conversaciones reales.
 > Última actualización: {timestamp}
-> Conversaciones analizadas: {total_analyzed} | Leads: {leads} | Ghosted: {ghosted} | Mareadores: {mareadores}
+> Conversaciones analizadas: {total_analyzed} | Leads: {leads} | Ghosted: {ghosted} | Mareadores: {mareadores} | Human replies: {human_replies}
 > Motor de análisis: {model}
 
 ---
@@ -419,13 +523,14 @@ $playbookHeader = <<<'HEADER'
 HEADER;
 
 $playbookHeader = str_replace(
-    ['{timestamp}', '{total_analyzed}', '{leads}', '{ghosted}', '{mareadores}', '{model}'],
+    ['{timestamp}', '{total_analyzed}', '{leads}', '{ghosted}', '{mareadores}', '{human_replies}', '{model}'],
     [
         date('Y-m-d H:i:s T'),
         (string) count($outcomes),
         (string) (count($byOutcome['lead_probable'] ?? []) + count($byOutcome['lead_detectado'] ?? [])),
         (string) count($byOutcome['lead_ghosted'] ?? []),
         (string) count($byOutcome['mareador'] ?? []),
+        (string) $totalHumanReplies,
         $model,
     ],
     $playbookHeader

@@ -8,6 +8,12 @@
 declare(strict_types=1);
 
 define('WASAPBOT_ROOT', dirname(__DIR__, 2));
+spl_autoload_register(function (string $class): void {
+    $prefix = 'WasapBot\\'; $prefixLen = strlen($prefix);
+    if (strncmp($prefix, $class, $prefixLen) !== 0) return;
+    $file = WASAPBOT_ROOT . '/src/' . str_replace('\\', '/', substr($class, $prefixLen)) . '.php';
+    if (file_exists($file)) require_once $file;
+});
 $isHttps = (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off");
 session_set_cookie_params(["lifetime"=>0,"path"=>"/","secure"=>$isHttps,"httponly"=>true,"samesite"=>"Lax"]);
 $isHttps = (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off");
@@ -84,6 +90,7 @@ try {
             $nombre = trim((string)($_POST['nombre'] ?? ''));
             $desc   = trim((string)($_POST['descripcion'] ?? ''));
             $activa = isset($_POST['activa']) ? (bool)$_POST['activa'] : true;
+            $hasActiva = isset($_POST['activa']); // track whether activa was explicitly sent
 
             if ($nombre === '') { echo json_encode(['ok'=>false,'error'=>'Nombre requerido']); break; }
 
@@ -96,7 +103,8 @@ try {
                     if (($g['id'] ?? '') === $gid) {
                         $g['nombre'] = $nombre;
                         $g['descripcion_corta'] = $desc;
-                        $g['activa'] = $activa;
+                        if ($hasActiva) $g['activa'] = $activa;
+                        if (!isset($g['fotos']) || !is_array($g['fotos'])) $g['fotos'] = [];
                         break;
                     }
                 }
@@ -111,6 +119,58 @@ try {
                     'fotos' => [],
                     'activa' => $activa,
                 ];
+            }
+
+            // ── Process uploaded photos (multipart) ──
+            $photosDir = WASAPBOT_ROOT . '/data/users/' . $userId . '/imgs';
+            $allowedMime = ['image/jpeg', 'image/png', 'image/webp'];
+
+            // Find the girl reference for adding photos
+            $girlRef = null;
+            foreach ($girls as &$gr) {
+                if (($gr['id'] ?? '') === $gid) { $girlRef = &$gr; break; }
+            }
+            unset($gr);
+
+            if ($girlRef !== null && !empty($_FILES['photos'])) {
+                $existingCount = count($girlRef['fotos'] ?? []);
+                $maxNew = max(0, 4 - $existingCount);
+
+                $files = $_FILES['photos'];
+                // Normalize: if single file, wrap in array structure
+                if (!is_array($files['name'])) {
+                    $files = [
+                        'name' => [$files['name']],
+                        'type' => [$files['type']],
+                        'tmp_name' => [$files['tmp_name']],
+                        'error' => [$files['error']],
+                        'size' => [$files['size']],
+                    ];
+                }
+
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                for ($i = 0; $i < count($files['name']) && $i < $maxNew; $i++) {
+                    if ($files['error'][$i] !== UPLOAD_ERR_OK) continue;
+                    if ($files['size'][$i] > 5 * 1024 * 1024) continue;
+
+                    $mime = @finfo_file($finfo, $files['tmp_name'][$i]);
+                    if (!in_array($mime, $allowedMime, true)) continue;
+
+                    $chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+                    $folder = '';
+                    for ($j = 0; $j < 5; $j++) { $folder .= $chars[random_int(0, strlen($chars) - 1)]; }
+                    $imgDir = $photosDir . '/' . $folder;
+                    if (!is_dir($imgDir)) @mkdir($imgDir, 0755, true);
+
+                    $ext = $mime === 'image/png' ? 'png' : ($mime === 'image/webp' ? 'webp' : 'jpg');
+                    $destPath = $imgDir . '/' . $folder . '.' . $ext;
+
+                    if (@move_uploaded_file($files['tmp_name'][$i], $destPath)) {
+                        $photoUrl = '/api/image-proxy.php?uid=' . $userId . '&img=' . $folder . '/' . $folder . '.' . $ext;
+                        $girlRef['fotos'][] = $photoUrl;
+                    }
+                }
+                finfo_close($finfo);
             }
 
             saveGirls($data);
@@ -212,8 +272,8 @@ try {
             }
 
             // The image is served from the same domain via a public symlink or direct path
-            // Store relative URL: /control/bot-casa/data/users/{userId}/imgs/{folder}/{folder}.{ext}
-            $photoUrl = '/control/bot-casa/data/users/' . $userId . '/imgs/' . $folder . '/' . $folder . '.' . $ext;
+            // Store relative URL: /api/image-proxy.php?uid={userId}&img={folder}/{folder}.{ext}
+            $photoUrl = '/api/image-proxy.php?uid=' . $userId . '&img=' . $folder . '/' . $folder . '.' . $ext;
 
             $data = loadGirls();
             foreach ($data['girls'] as &$g) {
@@ -226,6 +286,78 @@ try {
             unset($g);
             saveGirls($data);
             echo json_encode(['ok' => true, 'url' => $photoUrl]);
+            break;
+
+        case 'reorder_photos':
+            if ($method !== 'POST') { echo json_encode(['ok'=>false,'error'=>'POST required']); break; }
+            $gid = trim((string)($_POST['id'] ?? ''));
+            $orderJson = trim((string)($_POST['order'] ?? ''));
+            if ($gid === '' || $orderJson === '') { echo json_encode(['ok'=>false,'error'=>'Parámetros requeridos (id, order)']); break; }
+
+            $newOrder = json_decode($orderJson, true);
+            if (!is_array($newOrder)) { echo json_encode(['ok'=>false,'error'=>'Orden inválido: no es un array JSON']); break; }
+
+            $data = loadGirls();
+            $found = false;
+            foreach ($data['girls'] as &$g) {
+                if (($g['id'] ?? '') === $gid) {
+                    $currentFotos = $g['fotos'] ?? [];
+                    if (count($newOrder) !== count($currentFotos)) {
+                        echo json_encode(['ok'=>false,'error'=>'El número de fotos no coincide con el actual']); break 2;
+                    }
+                    $currentSet = [];
+                    foreach ($currentFotos as $url) { $currentSet[$url] = true; }
+                    foreach ($newOrder as $url) {
+                        if (!isset($currentSet[$url])) {
+                            echo json_encode(['ok'=>false,'error'=>'El orden contiene URLs que no pertenecen a esta chica']); break 3;
+                        }
+                    }
+                    $g['fotos'] = $newOrder;
+                    $found = true;
+                    break;
+                }
+            }
+            unset($g);
+            if (!$found) { echo json_encode(['ok'=>false,'error'=>'Chica no encontrada']); break; }
+            saveGirls($data);
+            echo json_encode(['ok' => true]);
+            break;
+
+        case 'get_catalog':
+            // Return active girls with photos for the image attachment picker.
+            // Admin panel (no suplantar) → remote GirlsService (girls_json URL).
+            // Client panel or admin suplantando → local girls.json.
+            $isAdmin = ($_SESSION['role'] ?? '') === 'admin';
+            $isSuplantando = $isAdmin && !empty($_SESSION['suplantar_user_id']);
+
+            if ($isAdmin && !$isSuplantando) {
+                // Admin → fetch from remote GirlsService
+                $cfg   = new \WasapBot\Core\Config(WASAPBOT_ROOT, $userId);
+                $logger = new \WasapBot\Core\Logger();
+                $http  = new \WasapBot\Core\HttpClient($logger);
+                $gs    = new \WasapBot\Services\GirlsService($cfg, $http, $logger);
+                $allGirls = $gs->fetchActive();
+            } else {
+                // Client → local girls.json
+                $data = loadGirls();
+                $allGirls = array_values(array_filter(
+                    $data['girls'] ?? [],
+                    fn($g) => ($g['activa'] ?? false)
+                ));
+            }
+
+            // Return only id, nombre, fotos (only girls with at least 1 photo)
+            $catalog = [];
+            foreach ($allGirls as $g) {
+                $fotos = $g['fotos'] ?? [];
+                if (!is_array($fotos) || count($fotos) === 0) continue;
+                $catalog[] = [
+                    'id'     => $g['id'] ?? '',
+                    'nombre' => $g['nombre'] ?? '',
+                    'fotos'  => array_values($fotos),
+                ];
+            }
+            echo json_encode(['ok' => true, 'girls' => $catalog]);
             break;
 
         default:

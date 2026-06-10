@@ -152,7 +152,7 @@ final class WahaApi implements WahaApiInterface
 
             $inChars  = min(mb_strlen($incomingText), $maxInChars);
             $readBase = random_int($baseMin, max($baseMin, $baseMax));
-            $readRaw  = ($readBase + ($inChars * $perChar)) * $hab;
+            $readRaw  = ($readBase + ($inChars * $perChar));
             $readMs   = (int) max($clampMin, min($clampMax, $readRaw));
 
             // Type delay: start_delay + (out_chars / chars_per_sec) + chunk_pauses, clamped
@@ -169,8 +169,9 @@ final class WahaApi implements WahaApiInterface
             $typeStart  = random_int($startMin, max($startMin, $startMax));
             $chunks     = $chunkSize > 0 ? (int) floor($outChars / $chunkSize) : 0;
             $chunkPause = $chunks * $chunkFactor * 270;
-            $typeRaw    = ($typeStart + ($outChars > 0 ? ($outChars / $cps) * 1000 : 0) + $chunkPause) * $hab;
-            $typeMs     = (int) max(1200, min(45000, $typeRaw));
+            $typeRaw      = ($typeStart + ($outChars > 0 ? ($outChars / $cps) * 1000 : 0) + $chunkPause) * $hab;
+            $typeClampMax = (int) ($typingCfg['clamp_max_ms'] ?? 45000);
+            $typeMs       = (int) max(1200, min($typeClampMax, $typeRaw));
 
             // After-send delay — uses after_send_fallback_sec from config as base
             // (previously hardcoded as random_int(250,900) ignoring the config value)

@@ -40,6 +40,7 @@ header('X-Frame-Options: DENY');
     <meta name="theme-color" content="#060c16">
     <link rel="manifest" href="manifest.json?v=20260608_6">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="assets/tokens.css?v=20260610">
     <link rel="stylesheet" href="assets/style.css?v=20260608_6">
     <link rel="stylesheet" href="assets/theme.css?v=20260608_6">
 </head>

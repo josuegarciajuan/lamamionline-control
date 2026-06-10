@@ -29,9 +29,8 @@ final class AutoOff
     /**
      * Check pipeline context and turn off the bot if a lead was detected.
      *
-     * Checks for the __auto_off_triggered flag (set by upstream logic,
-     * mirroring the "Auto-Off Lead Trigger" n8n node) OR lead_detected
-     * directly in the context array.
+     * Also creates a per-thread lead lock file to prevent re-triggering
+     * alerts/logs/reminders for the same thread after bot restart.
      *
      * @param array<string, mixed> $ctx  Pipeline context.
      */
@@ -62,6 +61,18 @@ final class AutoOff
             $this->logger->info("AutoOff: bot mode set to STOP — lead detected");
         } else {
             $this->logger->error("AutoOff: failed to write 'stop' to mode file: {$modeFile}");
+        }
+
+        // ── Per-thread lead lock: prevents re-triggering alerts/logs/reminders ──
+        // for the same conversation thread after bot restart or during burst processing.
+        $threadId = (string) ($ctx['thread_id'] ?? '');
+        if ($threadId !== '') {
+            $baseDataDir = (string) $this->config->get('files.base_data_dir', 'data');
+            $leadLockDir = rtrim($baseDataDir, '/') . '/locks/lead_detected';
+            $this->ensureDirectory($leadLockDir);
+            $lockFile = $leadLockDir . '/lead_' . md5($threadId) . '.lock';
+            @touch($lockFile);
+            $this->logger->info("AutoOff: per-thread lead lock created for {$threadId}");
         }
     }
 

@@ -5,6 +5,12 @@
 declare(strict_types=1);
 
 define('WASAPBOT_ROOT', dirname(__DIR__, 2));
+spl_autoload_register(function (string $class): void {
+    $prefix = 'WasapBot\\'; $prefixLen = strlen($prefix);
+    if (strncmp($prefix, $class, $prefixLen) !== 0) return;
+    $file = WASAPBOT_ROOT . '/src/' . str_replace('\\', '/', substr($class, $prefixLen)) . '.php';
+    if (file_exists($file)) require_once $file;
+});
 $isHttps = (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off");
 session_set_cookie_params(["lifetime"=>0,"path"=>"/","secure"=>$isHttps,"httponly"=>true,"samesite"=>"Lax"]);
 $isHttps = (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off");
@@ -19,18 +25,16 @@ if (($_SESSION['role']??'') === 'admin' && !empty($_SESSION['suplantar_user_id']
     $userId = (int) $_SESSION['suplantar_user_id'];
 }
 
-$leadsFile = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'leads.ndjson');
-$memoryFile = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'session_memory.ndjson');
-
 function requireValidCsrf(): void {
     $secretFile = WASAPBOT_ROOT . '/data/.csrf_secret';
     $secret = '';
     if (file_exists($secretFile)) $secret = (string) @file_get_contents($secretFile);
     if (strlen($secret) < 32) $secret = bin2hex(random_bytes(32));
     $token = (string) ($_POST['csrf_token'] ?? '');
-    $current = hash_hmac('sha256', date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
+    $userId = (int) ($_SESSION['user_id'] ?? 0);
+    $current = hash_hmac('sha256', $userId . '|' . date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
     $prevSlot = max(0, floor((int) date('i') / 10) - 1);
-    $prev = hash_hmac('sha256', date('Y-m-d-H') . $prevSlot, $secret);
+    $prev = hash_hmac('sha256', $userId . '|' . date('Y-m-d-H') . $prevSlot, $secret);
     if ($token === '' || (!hash_equals($current, $token) && !hash_equals($prev, $token))) {
         http_response_code(403); echo json_encode(['ok'=>false,'error'=>'CSRF invalid']); exit;
     }
@@ -48,6 +52,8 @@ function readNdjson(string $path): array {
 header('Content-Type: application/json; charset=utf-8');
 
 try {
+    $leadsFile = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'leads.ndjson');
+    $memoryFile = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'session_memory.ndjson');
     switch ($action) {
         case 'list':
             $leads = readNdjson($leadsFile);

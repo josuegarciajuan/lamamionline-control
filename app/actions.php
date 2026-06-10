@@ -127,6 +127,9 @@ function handle_post_actions() {
         case 'jostal_edit_lead':
             action_jostal_edit_lead();
             break;
+        case 'jostal_delete_lead':
+            action_jostal_delete_lead();
+            break;
         case 'jostal_add_venta':
             action_jostal_add_venta();
             break;
@@ -310,6 +313,9 @@ function handle_post_actions() {
             break;
         case 'comercial_export_threads_csv':
             action_comercial_export_threads_csv();
+            break;
+        case 'comercial_run_ai_qualification':
+            action_comercial_run_ai_qualification();
             break;
         case 'save_estados_wasap_config':
             action_save_estados_wasap_config();
@@ -2290,6 +2296,16 @@ function action_jostal_edit_lead() {
 
     storage_upsert('jostal_leads.json', $row);
     set_flash('ok', 'Lead actualizado.');
+    redirect_to('index.php?page=jostal&tab=clientas&edit=' . urlencode($clientaId));
+}
+
+function action_jostal_delete_lead() {
+    $leadId = trim(request_post('lead_id'));
+    $clientaId = trim(request_post('clienta_id'));
+    if ($leadId !== '') {
+        storage_delete('jostal_leads.json', $leadId);
+    }
+    set_flash('ok', 'Lead eliminado.');
     redirect_to('index.php?page=jostal&tab=clientas&edit=' . urlencode($clientaId));
 }
 
@@ -4388,6 +4404,66 @@ function action_comercial_promote_thread() {
     }
     set_flash('error', is_string($result) ? $result : 'No se pudo crear el lead.');
     redirect_to(comercial_page_url('conversaciones'));
+}
+
+function action_comercial_run_ai_qualification() {
+    $threads = comercial_get_threads();
+    $processes = comercial_get_processes();
+    $processesBySlug = array();
+    foreach ($processes as $p) {
+        $processesBySlug[trim((string)($p['slug'] ?? ''))] = $p;
+    }
+
+    $analyzed = 0;
+    $passed = 0;
+    $cutoffTs = time() - (4 * 86400);
+
+    foreach ($threads as $thread) {
+        $thread = comercial_normalize_thread($thread);
+        $stage = trim((string)($thread['stage'] ?? ''));
+
+        // Saltar descartados
+        if ($stage === 'discarded') continue;
+
+        // Solo últimos 4 días
+        $updatedTs = strtotime((string)($thread['updated_at'] ?? ''));
+        if ($updatedTs < $cutoffTs) continue;
+
+        // Saltar si ya fue analizado recientemente (< 24h)
+        $lastAnalysis = trim((string)($thread['ai_qualified_at'] ?? ''));
+        if ($lastAnalysis !== '' && strtotime($lastAnalysis) > time() - 86400) continue;
+
+        // Saltar si no tiene respuestas y no es very_hot
+        $replies = (int)($thread['replies_count'] ?? 0);
+        if ($replies === 0 && $stage !== 'very_hot') continue;
+
+        $processSlug = trim((string)($thread['process_slug'] ?? ''));
+        $process = isset($processesBySlug[$processSlug]) ? $processesBySlug[$processSlug] : array();
+
+        $result = comercial_ai_qualify_lead($thread, $process);
+        $analyzed++;
+
+        if (!empty($result['ok'])) {
+            $thread['ai_qualified_at'] = now_datetime();
+            $thread['ai_interest_score'] = (int)($result['interest_score'] ?? 0);
+            $thread['ai_summary'] = trim((string)($result['summary'] ?? ''));
+            $thread['ai_action_advice'] = trim((string)($result['action_advice'] ?? ''));
+            $thread['ai_is_genuine'] = !empty($result['is_genuine_lead']);
+            $thread['ai_buying_signals'] = (array)($result['buying_signals'] ?? array());
+            $thread['ai_risk_signals'] = (array)($result['risk_signals'] ?? array());
+            $thread['ai_suggested_priority'] = trim((string)($result['suggested_priority'] ?? ''));
+            $thread['ai_reason'] = trim((string)($result['reason'] ?? ''));
+
+            comercial_upsert_thread($thread);
+
+            if (!empty($result['is_genuine_lead'])) {
+                $passed++;
+            }
+        }
+    }
+
+    set_flash('ok', "IA analizó {$analyzed} conversaciones. {$passed} pasaron el filtro.", 'ok');
+    redirect_to(comercial_page_url('agente'));
 }
 
 function action_comercial_export_threads_csv() {

@@ -121,6 +121,11 @@ foreach ($lines as $line) {
         $threads[$tid]['phone'] = $phone;
     }
 
+    // Track human (manual) replies for style learning
+    if (!empty($rec['manual']) && !empty(trim((string) ($rec['bot_reply'] ?? '')))) {
+        $threads[$tid]['human_reply_count'] = ($threads[$tid]['human_reply_count'] ?? 0) + 1;
+    }
+
     // Detect patterns for tagging
     $userMsg = mb_strtolower(trim((string) ($rec['user_msg'] ?? '')), 'UTF-8');
 
@@ -268,6 +273,8 @@ foreach ($threads as $tid => $data) {
         'started'          => $firstTs < PHP_INT_MAX ? date('c', $firstTs) : null,
         'last_activity'    => $lastTs > 0 ? date('c', $lastTs) : null,
         'message_count'    => $msgCount,
+        'human_reply_count' => (int) ($data['human_reply_count'] ?? 0),
+        'has_human_replies' => ($data['human_reply_count'] ?? 0) > 0,
         'selected_girl'    => extractLastSelectedGirl($msgs),
         'outcome'          => $outcome,
         'confidence'       => round($confidence, 2),

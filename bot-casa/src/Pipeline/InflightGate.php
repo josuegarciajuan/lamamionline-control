@@ -33,8 +33,13 @@ final class InflightGate implements PipelineStageInterface
             return $ctx; // Can't determine phone, let through
         }
 
+        // ── Line-aware key: evita que mensajes del mismo remitente
+        //     a distintas líneas WA compartan lock/pending queue ──────
+        $lineLast9 = (string) ($ctx['line_last9'] ?? '');
+        $key = self::compositeKey($fromPhone, $lineLast9);
+
         $lockDir = $this->lockDir();
-        $lockFile = $lockDir . '/' . $fromPhone . '.lock';
+        $lockFile = $lockDir . '/' . $key . '.lock';
 
         if (!file_exists($lockFile)) {
             return $ctx; // No active processor — let through
@@ -48,7 +53,7 @@ final class InflightGate implements PipelineStageInterface
         }
 
         // ── Active processor detected — queue this message ──────────
-        $pendingFile = $lockDir . '/' . $fromPhone . '_pending.json';
+        $pendingFile = $lockDir . '/' . $key . '_pending.json';
 
         $pending = $this->readPending($pendingFile);
         $pending[] = [
@@ -71,40 +76,53 @@ final class InflightGate implements PipelineStageInterface
     // ── Public helpers (also used by Bot.php) ───────────────────────
 
     /**
-     * Create an inflight lock for this phone.
+     * Create an inflight lock for this phone+line combination.
      */
-    public static function createLock(string $lockDir, string $phone): void
+    public static function createLock(string $lockDir, string $phone, string $lineLast9 = ''): void
     {
         if (!is_dir($lockDir)) {
             @mkdir($lockDir, 0777, true);
         }
-        $lockFile = $lockDir . '/' . $phone . '.lock';
+        $key = self::compositeKey($phone, $lineLast9);
+        $lockFile = $lockDir . '/' . $key . '.lock';
         @file_put_contents($lockFile, (string) time());
     }
 
     /**
-     * Remove inflight lock and pending file for a phone.
+     * Remove inflight lock and pending file for a phone+line combination.
      */
-    public static function cleanup(string $lockDir, string $phone): void
+    public static function cleanup(string $lockDir, string $phone, string $lineLast9 = ''): void
     {
-        @unlink($lockDir . '/' . $phone . '.lock');
-        @unlink($lockDir . '/' . $phone . '_pending.json');
+        $key = self::compositeKey($phone, $lineLast9);
+        @unlink($lockDir . '/' . $key . '.lock');
+        @unlink($lockDir . '/' . $key . '_pending.json');
     }
 
     /**
-     * Read and atomically delete pending messages for a phone.
+     * Read and atomically delete pending messages for a phone+line combination.
      *
      * @return list<array{message_text: string, ts: string, thread_id: string}>
      */
-    public static function drainPending(string $lockDir, string $phone): array
+    public static function drainPending(string $lockDir, string $phone, string $lineLast9 = ''): array
     {
-        $pendingFile = $lockDir . '/' . $phone . '_pending.json';
+        $key = self::compositeKey($phone, $lineLast9);
+        $pendingFile = $lockDir . '/' . $key . '_pending.json';
         $pending = self::readPending($pendingFile);
         @unlink($pendingFile);
         return $pending;
     }
 
     // ── Private ─────────────────────────────────────────────────────
+
+    /**
+     * Build a composite key from phone and line for per-conversation isolation.
+     *
+     * When lineLast9 is empty, falls back to phone-only key (legacy behaviour).
+     */
+    private static function compositeKey(string $phone, string $lineLast9): string
+    {
+        return $lineLast9 !== '' ? ($phone . '_' . $lineLast9) : $phone;
+    }
 
     private function lockDir(): string
     {

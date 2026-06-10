@@ -71,27 +71,46 @@ final class DeepSeekClient implements OpenAiClientInterface
 
         $headers = $this->buildAuthHeaders();
 
-        try {
-            [$httpCode, $rawBody] = $this->http->post($chatUrl, $body, $headers, 60);
+        $maxAttempts = (int) $this->config->get('ai_retry.max_attempts', 3);
+        $baseDelay   = (int) $this->config->get('ai_retry.base_delay_sec', 2);
 
-            $this->lastRawResponse = ['http_code' => $httpCode, 'body' => $rawBody];
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            try {
+                [$httpCode, $rawBody] = $this->http->post($chatUrl, $body, $headers, 60);
 
-            if ($httpCode < 200 || $httpCode >= 300) {
+                $this->lastRawResponse = ['http_code' => $httpCode, 'body' => $rawBody];
+
+                if ($httpCode >= 200 && $httpCode < 300) {
+                    return $this->parseChoicesContent($rawBody);
+                }
+
+                // Only retry on timeout (httpCode=0) or server errors (5xx)
+                $isRetryable = ($httpCode === 0) || ($httpCode >= 500);
+
+                if ($isRetryable && $attempt < $maxAttempts) {
+                    $delay = $baseDelay * (int) pow(2, $attempt - 1);
+                    $this->logger->warning("DeepSeek chat — retrying in {$delay}s (attempt {$attempt}/{$maxAttempts})", [
+                        'http_code' => $httpCode,
+                        'error'     => $this->http->lastError(),
+                    ]);
+                    sleep($delay);
+                    continue;
+                }
+
                 $this->logger->warning("DeepSeek chat returned HTTP {$httpCode}", [
-                    'error' => $this->http->lastError(),
-                    'body'  => mb_substr($rawBody, 0, 200),
+                    'error'    => $this->http->lastError(),
+                    'body'     => mb_substr($rawBody, 0, 200),
+                    'attempts' => $attempt,
                 ]);
                 return [];
+
+            } catch (\Throwable $e) {
+                $this->logger->error("DeepSeek chat exception: {$e->getMessage()}");
+                return [];
             }
-
-            $parsed = $this->parseChoicesContent($rawBody);
-
-        } catch (\Throwable $e) {
-            $this->logger->error("DeepSeek chat exception: {$e->getMessage()}");
-            return [];
         }
 
-        return $parsed;
+        return [];
     }
 
     /**

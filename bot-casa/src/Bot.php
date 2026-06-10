@@ -107,7 +107,8 @@ final class Bot implements BotInterface
             }
 
             // ── 3. Verify blacklist ──────────────────────────────────
-            $fromPhone = (string) ($ctx['from_phone'] ?? '');
+            $fromPhone  = (string) ($ctx['from_phone'] ?? '');
+            $lineLast9  = (string) ($ctx['line_last9'] ?? '');
             if ($fromPhone !== '' && $this->blacklistService->isBlacklisted($fromPhone)) {
                 $this->logger->info('Bot::handleWebhook — sender blacklisted', [
                     'phone' => $fromPhone,
@@ -117,7 +118,7 @@ final class Bot implements BotInterface
 
             // ── 3b. Create inflight lock (anti-metralleta) ──────────
             $inflightLockDir = $this->inflightLockDir();
-            \WasapBot\Pipeline\InflightGate::createLock($inflightLockDir, $fromPhone);
+            \WasapBot\Pipeline\InflightGate::createLock($inflightLockDir, $fromPhone, $lineLast9);
 
             // ── 4. Fetch girls catalog ───────────────────────────────
             $girls = $this->girlsService->fetchActive();
@@ -154,21 +155,69 @@ final class Bot implements BotInterface
                 ]);
 
                 // Send the audio reply
+                $ctx['_send_ok'] = true;
                 $this->sendMessages($ctx, [$audioReply]);
 
                 // Append memory
-                $this->sessionMemory->appendMessage(
-                    (string) ($ctx['thread_id'] ?? ''),
-                    $fromPhone,
-                    (string) ($ctx['message_text'] ?? ''),
-                    $audioReply,
-                    $ctx,
-                );
+                if (!empty($ctx['_send_ok']) && empty($ctx['_cancelled'])) {
+                    $this->sessionMemory->appendMessage(
+                        (string) ($ctx['thread_id'] ?? ''),
+                        $fromPhone,
+                        (string) ($ctx['message_text'] ?? ''),
+                        $audioReply,
+                        $ctx,
+                    );
+                }
 
                 return $ctx;
             }
 
-            // ── 8. Classify tone (provider según config global) ──────
+            // ── 8b. First-contact greeting shortcut ──────────────────
+            // New conversation, no speaker girl yet, not audio: send a
+            // minimal greeting and WAIT. Do NOT call the LLM, do NOT
+            // send catalog, do NOT offer girls. Deterministic gate.
+            $isNewConversation = !empty($ctx['__is_new_conversation']);
+            $speakerMode = (string) ($ctx['speaker_mode'] ?? '');
+            if ($isNewConversation && $speakerMode === 'encargada') {
+                $greetings = (array) $this->config->get('message_variants.first_contact_greetings', []);
+                if ($greetings === []) {
+                    $greetings = ['hola cari 😊'];
+                }
+                $greeting = $greetings[array_rand($greetings)];
+
+                $ctx['output_text']   = $greeting;
+                $ctx['lead_detected'] = false;
+                $ctx['photo_action']  = 'none';
+
+                $this->logger->info('Bot::handleWebhook — first-contact greeting gate', [
+                    'phone'     => $fromPhone,
+                    'thread_id' => $ctx['thread_id'] ?? '?',
+                ]);
+
+                $ctx['_send_ok'] = true;
+                $this->sendMessages($ctx, [$greeting]);
+
+                if (!empty($ctx['_send_ok']) && empty($ctx['_cancelled'])) {
+                    $this->sessionMemory->appendMessage(
+                        (string) ($ctx['thread_id'] ?? ''),
+                        $fromPhone,
+                        (string) ($ctx['message_text'] ?? ''),
+                        $greeting,
+                        $ctx,
+                    );
+                }
+
+                \WasapBot\Pipeline\InflightGate::cleanup($inflightLockDir, $fromPhone, $lineLast9);
+
+                $this->logger->info('Bot::handleWebhook — pipeline completed (first-contact gate)', [
+                    'phone'     => $fromPhone,
+                    'thread_id' => $ctx['thread_id'] ?? '?',
+                ]);
+
+                return $ctx;
+            }
+
+            // ── 8c. Classify tone (provider según config global) ──────
             $messageText = (string) ($ctx['message_text'] ?? '');
             $toneProvider = (string) $this->config->get('global_providers.tone_classifier', 'deepseek');
             if ($toneProvider === 'deepseek') {
@@ -239,6 +288,20 @@ final class Bot implements BotInterface
                 $ctx['output_text'] = $openaiResponse['choices'][0]['message']['content'] ?? '';
             }
 
+            // ── 11b. Fallback: if LLM returned empty, send contingency text ──
+            if (trim((string) ($ctx['output_text'] ?? '')) === '') {
+                $fallbackRaw = $this->config->get('message_variants.fallback_empty_text', ['vale cari']);
+                $fallbackVariants = is_string($fallbackRaw) ? [$fallbackRaw] : (array) $fallbackRaw;
+                $fallback = $fallbackVariants !== [] ? $fallbackVariants[array_rand($fallbackVariants)] : 'vale cari';
+                $ctx['output_text']   = $fallback;
+                $ctx['lead_detected'] = false;
+                $this->logger->info('Bot::handleWebhook — using fallback empty text (LLM returned no response)', [
+                    'phone'     => $fromPhone,
+                    'thread_id' => $ctx['thread_id'] ?? '?',
+                    'fallback'  => $fallback,
+                ]);
+            }
+
             // ── 12. Catalog formatter (CatalogFormatter) ─────────────
             $textBeforeCatalog = $ctx['output_text'] ?? '';
             if (isset($this->processors[3]) && $this->processors[3]->name() === 'CatalogFormatter') {
@@ -281,22 +344,36 @@ final class Bot implements BotInterface
             $messages = $ctx['splitted_messages'] ?? [$ctx['output_text'] ?? ''];
 
             // ── 15. Send via WAHA with humanization ──────────────────
+            $ctx['_send_ok'] = true;
             $this->sendMessages($ctx, (array) $messages, $inflightLockDir, $fromPhone);
 
             // ── 16. Append to session memory ─────────────────────────
-            $this->sessionMemory->appendMessage(
-                (string) ($ctx['thread_id'] ?? ''),
-                $fromPhone,
-                (string) ($ctx['message_text'] ?? $messageText),
-                (string) ($ctx['output_text'] ?? ''),
-                $ctx,
-            );
+            if (!empty($ctx['_send_ok']) && empty($ctx['_cancelled'])) {
+                $this->sessionMemory->appendMessage(
+                    (string) ($ctx['thread_id'] ?? ''),
+                    $fromPhone,
+                    (string) ($ctx['message_text'] ?? $messageText),
+                    (string) ($ctx['output_text'] ?? ''),
+                    $ctx,
+                );
+            } elseif (empty($ctx['_cancel_logged'] ?? false) && !empty($ctx['_cancelled'])) {
+                $this->logger->info('Bot::handleWebhook — response cancelled, not saved to memory', [
+                    'thread_id' => $ctx['thread_id'] ?? '?',
+                    'phone'     => $fromPhone,
+                ]);
+                $ctx['_cancel_logged'] = true;
+            } else {
+                $this->logger->error('Bot::handleWebhook — WAHA send failed, response NOT saved', [
+                    'thread_id' => $ctx['thread_id'] ?? '?',
+                    'phone'     => $fromPhone,
+                ]);
+            }
 
             // ── 17. Side effects ─────────────────────────────────────
             $this->runSideEffects($ctx);
 
             // ── 18. Cleanup inflight lock ────────────────────────────
-            \WasapBot\Pipeline\InflightGate::cleanup($inflightLockDir, $fromPhone);
+            \WasapBot\Pipeline\InflightGate::cleanup($inflightLockDir, $fromPhone, $lineLast9);
 
             // ── 19. Return full context ──────────────────────────────
             $this->logger->info('Bot::handleWebhook — pipeline completed', [
@@ -310,9 +387,10 @@ final class Bot implements BotInterface
                 'trace' => $e->getTraceAsString(),
             ]);
             // Cleanup on error
-            $phone = (string) ($ctx['from_phone'] ?? '');
+            $phone     = (string) ($ctx['from_phone'] ?? '');
+            $lineLast9 = (string) ($ctx['line_last9'] ?? '');
             if ($phone !== '') {
-                \WasapBot\Pipeline\InflightGate::cleanup($this->inflightLockDir(), $phone);
+                \WasapBot\Pipeline\InflightGate::cleanup($this->inflightLockDir(), $phone, $lineLast9);
             }
             return null;
         }
@@ -505,12 +583,14 @@ final class Bot implements BotInterface
         $sessionMemory = new \WasapBot\Memory\SessionMemory($config, $logger);
 
         // ── Pipeline: Input gates ────────────────────────────────────
+        $pauseGate = new \WasapBot\Pipeline\PauseGate($config, $logger);
         $inputGates = [
             new \WasapBot\Pipeline\BotModeGate($config, $logger),
             new \WasapBot\Pipeline\RoutingGate($config, $logger),
             new \WasapBot\Pipeline\DedupGate($config, $logger),
             new \WasapBot\Pipeline\Coalescer($config, $logger),
             new \WasapBot\Pipeline\MessageExtractor($config, $logger),
+            $pauseGate,
             new \WasapBot\Pipeline\InflightGate($config),
         ];
 
@@ -621,6 +701,16 @@ final class Bot implements BotInterface
             $playbookContent = @file_get_contents($playbookPath);
             if ($playbookContent !== false && $playbookContent !== '') {
                 $base .= "\n\n### PLAYBOOK\n" . $playbookContent;
+
+                // If playbook contains human style guide, add explicit adoption directive
+                if (strpos($playbookContent, '## Guía de estilo del humano') !== false) {
+                    $base .= "\n\n### DIRECTRIZ DE ESTILO HUMANO\n"
+                           . "Cuando respondas, adopta el estilo de comunicación descrito en la "
+                           . "'Guía de estilo del humano' del playbook. Usa sus mismas coletillas, "
+                           . "emojis, tono, longitud de mensaje y estructura. Tu objetivo es que "
+                           . "el cliente no note la diferencia entre tú y el operador humano que "
+                           . "entrena este bot.\n";
+                }
             }
         }
 
@@ -701,8 +791,35 @@ final class Bot implements BotInterface
      * @param string                        $lockDir    Inflight lock directory (for anti-metralleta).
      * @param string                        $fromPhone  Sender phone (for anti-metralleta).
      */
+
+    /**
+     * Find the PauseGate instance in the input gates array.
+     */
+    private function getPauseGate(): ?\WasapBot\Pipeline\PauseGate
+    {
+        foreach ($this->inputGates as $gate) {
+            if ($gate instanceof \WasapBot\Pipeline\PauseGate) {
+                return $gate;
+            }
+        }
+        return null;
+    }
+
     private function sendMessages(array &$ctx, array $messages, string $lockDir = '', string $fromPhone = ''): void
     {
+        // ── Cancel check: if user paused this thread mid-generation, abort send ──
+        $threadId = (string) ($ctx['thread_id'] ?? $ctx['__thread_id'] ?? '');
+        $pauseGate = $this->getPauseGate();
+        if ($threadId !== '' && $pauseGate !== null && $pauseGate->hasCancelRequest($threadId)) {
+            $this->logger->info('Bot::sendMessages — response cancelled by user pause', [
+                'thread_id' => $threadId,
+            ]);
+            $pauseGate->clearCancelRequest($threadId);
+            $ctx['_cancelled'] = true;
+            $ctx['_send_ok']   = false;
+            return;
+        }
+
         // ── Anti-metralleta: last-moment check BEFORE typing simulation ──
         // Catches messages that arrived during the LLM call + pipeline processing
         // but before we committed to sending via WAHA.
@@ -714,7 +831,8 @@ final class Bot implements BotInterface
         }
 
         if ($lockDir !== '' && $fromPhone !== '') {
-            $pending = \WasapBot\Pipeline\InflightGate::drainPending($lockDir, $fromPhone);
+            $lineLast9 = (string) ($ctx['line_last9'] ?? '');
+            $pending = \WasapBot\Pipeline\InflightGate::drainPending($lockDir, $fromPhone, $lineLast9);
             if ($pending !== []) {
                 // If already re-processed once, merge without full LLM re-run to avoid cascade
                 $alreadyReprocessed = ((int) ($ctx['__pending_drained_count'] ?? 0)) >= 1;
@@ -796,16 +914,27 @@ final class Bot implements BotInterface
                 continue;
             }
 
+            // ── Intra-loop cancel check: user may have paused during typing simulation ──
+            if ($threadId !== '' && $pauseGate !== null && $pauseGate->hasCancelRequest($threadId)) {
+                $this->logger->info('Bot::sendMessages — response cancelled mid-send by user pause', [
+                    'thread_id' => $threadId,
+                ]);
+                $pauseGate->clearCancelRequest($threadId);
+                $ctx['_cancelled'] = true;
+                $ctx['_send_ok']   = false;
+                break;
+            }
+
             // Use quick send for URL-only follow-up messages (no humanization)
             if (!$isFirst) {
-                $this->wahaApi->sendQuick(
+                $ok = $this->wahaApi->sendQuick(
                     $wahaBaseUrl,
                     $wahaChatId,
                     $msgStr,
                     $wahaSession,
                 );
             } else {
-                $this->wahaApi->sendHumanized(
+                $ok = $this->wahaApi->sendHumanized(
                     $wahaBaseUrl,
                     $wahaChatId,
                     $msgStr,
@@ -814,6 +943,10 @@ final class Bot implements BotInterface
                     $incomingText,
                     $turnCount,
                 );
+            }
+
+            if (!$ok) {
+                $ctx['_send_ok'] = false;
             }
 
             // Inter-message delay between split messages (presend_sleep_sec seconds)
@@ -836,6 +969,21 @@ final class Bot implements BotInterface
     {
         $openaiResponse = $ctx['openai_raw_response'] ?? [];
 
+        // ── 0. Check per-thread lead lock (prevents re-trigger after bot restart) ──
+        $threadId = (string) ($ctx['thread_id'] ?? $ctx['__thread_id'] ?? '');
+        $threadAlreadyNotified = false;
+        if ($threadId !== '') {
+            $baseDataDir = (string) $this->config->get('files.base_data_dir', 'data');
+            $leadLockDir = rtrim($baseDataDir, '/') . '/locks/lead_detected';
+            $leadLockFile = $leadLockDir . '/lead_' . md5($threadId) . '.lock';
+            if (is_file($leadLockFile)) {
+                $threadAlreadyNotified = true;
+                $this->logger->info('runSideEffects: thread already has lead lock, skipping alerts/logging', [
+                    'thread_id' => $threadId,
+                ]);
+            }
+        }
+
         // ── 1. AutoOff — stop bot FIRST (before any alert), so new webhooks see "stop" ──
         if (isset($this->sideEffects['autoOff'])) {
             $autoOff = $this->sideEffects['autoOff'];
@@ -844,21 +992,79 @@ final class Bot implements BotInterface
             }
         }
 
-        // ── 2. LeadDetector → TelegramService.sendLeadAlert ─────────────
-        if (isset($this->sideEffects['leadDetector'])) {
+        // ── 2. LeadDetector + server-side validation → TelegramService ──
+        // NOVA: Don't blindly trust the LLM's lead_detected flag.
+        // The DeepSeek model often hallucinates leads from service negotiation
+        // ("1h sin parar"), price questions, or first-message interest.
+        // Server-side gates validate against actual context state.
+        $leadValid = false;
+        $leadConfidence = 0.0;
+        if (!$threadAlreadyNotified && isset($this->sideEffects['leadDetector'])) {
             /** @var \WasapBot\SideEffects\LeadDetectorInterface $leadDetector */
             $leadDetector = $this->sideEffects['leadDetector'];
             if ($leadDetector instanceof \WasapBot\SideEffects\LeadDetectorInterface
                 && $leadDetector->isLead((array) $openaiResponse)
             ) {
-                $this->telegramService->sendLeadAlert($ctx);
+                $leadConfidence = $leadDetector->confidence((array) $openaiResponse);
+                $mapsSent = (bool) ($ctx['maps_sent'] ?? false);
+                $etaFromUser = (bool) ($ctx['eta_from_user_flag'] ?? false);
+                $isNewConvo = !empty($ctx['__is_new_conversation']);
+                $botMsgCount = (int) ($ctx['bot_msg_count_recent'] ?? 0);
+
+                $leadValid = true; // Start trusting LLM, then gate it
+
+                // Gate A: First contact — user hasn't committed to anything yet.
+                // The LLM tends to flag "me gustaría quedar contigo" as lead
+                // on the very first message, which is almost never real.
+                // EXCEPTION: if the user already gave explicit ETA on first message
+                // (e.g., "voy en 20 min" from an auto-generated opener), allow it.
+                if ($isNewConvo && $leadConfidence < 0.98 && !$etaFromUser) {
+                    $leadValid = false;
+                    $this->logger->info('LeadDetector: overridden by first-contact gate (LLM confidence too low for new convo)', [
+                        'phone'               => $ctx['from_phone'] ?? '?',
+                        'thread_id'           => $threadId,
+                        'lead_confidence'     => $leadConfidence,
+                        'user_message'        => (string) ($ctx['message_text'] ?? ''),
+                    ]);
+                }
+
+                // Gate B: No maps sent AND no ETA from user — LLM is hallucinating.
+                // The prompt explicitly requires maps_sent=true for media signals,
+                // but the LLM often ignores this. Enforce it server-side.
+                if ($leadValid && !$mapsSent && !$etaFromUser && $leadConfidence < 0.98) {
+                    $leadValid = false;
+                    $this->logger->info('LeadDetector: overridden by no-evidence gate (maps_sent=false + no ETA from user)', [
+                        'phone'               => $ctx['from_phone'] ?? '?',
+                        'thread_id'           => $threadId,
+                        'lead_confidence'     => $leadConfidence,
+                        'maps_sent'           => $mapsSent,
+                        'eta_from_user_flag'  => $etaFromUser,
+                        'user_message'        => (string) ($ctx['message_text'] ?? ''),
+                    ]);
+                }
+
+                // Gate C: Very early conversation (bot has sent < 2 messages).
+                // The LLM gets overexcited before enough context exists.
+                if ($leadValid && $botMsgCount < 2 && !$etaFromUser && $leadConfidence < 0.98) {
+                    $leadValid = false;
+                    $this->logger->info('LeadDetector: overridden by early-conversation gate', [
+                        'phone'               => $ctx['from_phone'] ?? '?',
+                        'thread_id'           => $threadId,
+                        'lead_confidence'     => $leadConfidence,
+                        'bot_msg_count'       => $botMsgCount,
+                    ]);
+                }
+
+                if ($leadValid) {
+                    $this->telegramService->sendLeadAlert($ctx);
+                }
             }
         }
 
-        // ── 3. LeadLogger ───────────────────────────────────────────────
-        if (isset($this->sideEffects['leadLogger'])) {
+        // ── 3. LeadLogger (only if lead passed server-side validation) ──
+        if (!$threadAlreadyNotified && isset($this->sideEffects['leadLogger'])) {
             $leadLogger = $this->sideEffects['leadLogger'];
-            if (method_exists($leadLogger, 'logLead')) {
+            if ($leadValid && method_exists($leadLogger, 'logLead')) {
                 $leadLogger->logLead($ctx);
             }
         }
@@ -903,7 +1109,51 @@ final class Bot implements BotInterface
         // Must have a selected girl or high insistence (choose_loop_count >= 3)
         $selectedGirl = (string) ($ctx['selected_girl_name'] ?? '');
         $chooseLoopCount = (int) ($ctx['choose_loop_count'] ?? 0);
+
+        // ── ENFORCE maps_solo_chica: no girl selected → strip any maps URL the AI sent ──
+        // The AI sometimes ignores the prompt instruction "PROHIBIDO mandar location_url
+        // sin chica seleccionada" and includes the URL anyway. This code-level guard
+        // removes it before the message reaches the client.
         if ($selectedGirl === '' && $chooseLoopCount < 3) {
+            $outputText = (string) ($ctx['output_text'] ?? '');
+            if ($outputText !== '') {
+                $mapsUrlPattern = '/(?:https?:\/\/)?(?:goo\.gl\/maps|maps\.app\.goo\.gl|google\.com\/maps|maps\.google\.com)[^\s]*/i';
+                $hasMapsUrl = (bool) preg_match($mapsUrlPattern, $outputText);
+                $hasLocationWords = (bool) preg_match(
+                    '/(?:te\s*paso\s*(?:la\s*)?ubicaci[oó]n|te\s*paso\s*(?:el|la)\s*(?:maps?\b|mapa\b|gps\b|direcci[oó]n)|aqui\s*(?:va|tienes|esta)\s*(?:el|la)\s*(?:mapa|ubicaci[oó]n|direcci[oó]n|gps)|te\s*(?:mando|env[ií]o)\s*(?:la\s*)?(?:ubicaci[oó]n|direcci[oó]n|mapa|gps)|ubicaci[oó]n\s*exacta|punto\s*exacto)/iu',
+                    $outputText
+                );
+                if ($hasMapsUrl || $hasLocationWords) {
+                    // Strip maps URL
+                    $cleanedText = preg_replace($mapsUrlPattern, '', $outputText);
+                    // Replace location-sending language with "choose girl first"
+                    $cleanedText = preg_replace(
+                        '/(?:te\s*paso\s*(?:la\s*)?ubicaci[oó]n[^.]*\.?|te\s*paso\s*(?:el|la)\s*(?:maps?\b|mapa\b|gps\b|direcci[oó]n)[^.]*\.?|aqui\s*(?:va|tienes|esta)\s*(?:el|la)\s*(?:mapa|ubicaci[oó]n|direcci[oó]n|gps)[^.]*\.?|te\s*(?:mando|env[ií]o)\s*(?:la\s*)?(?:ubicaci[oó]n|direcci[oó]n|mapa|gps)[^.]*\.?|ubicaci[oó]n\s*exacta[^.]*\.?|punto\s*exacto[^.]*\.?)/iu',
+                        '',
+                        $cleanedText
+                    );
+                    $cleanedText = trim(preg_replace('/\s{2,}/', ' ', $cleanedText));
+                    if ($cleanedText === '' || strlen($cleanedText) < 6) {
+                        $cleanedText = 'dime cual te gusta y te paso la ubicacion cari';
+                    }
+                    $ctx['output_text'] = $cleanedText;
+                    // Update splitted_messages too
+                    $messages = $ctx['splitted_messages'] ?? [$outputText];
+                    foreach ($messages as &$msg) {
+                        if (is_array($msg)) {
+                            $msg['text'] = $cleanedText;
+                        } else {
+                            $msg = $cleanedText;
+                        }
+                    }
+                    unset($msg);
+                    $ctx['splitted_messages'] = $messages;
+                    $this->logger->info('Bot::injectLocationUrl — blocked maps (no girl selected)', [
+                        'phone'     => $ctx['from_phone'] ?? '?',
+                        'thread_id' => $ctx['thread_id'] ?? '?',
+                    ]);
+                }
+            }
             return $ctx;
         }
 
@@ -922,9 +1172,11 @@ final class Bot implements BotInterface
         }
 
         // Check if AI response contains location-sending language
-        $locationWords = '/(?:te\s*paso\s*(?:la\s*)?ubicaci[oó]n|aqui\s*(?:va|tienes|esta)\s*(?:el|la)\s*(?:mapa|ubicaci[oó]n|direcci[oó]n|gps)|te\s*(?:mando|env[ií]o)\s*(?:la\s*)?(?:ubicaci[oó]n|direcci[oó]n|mapa|gps)|ubicaci[oó]n\s*exacta|punto\s*exacto)/iu';
-        if (!preg_match($locationWords, $outputText)) {
-            return $ctx; // Not a location-sending message, skip
+        $locationWords = '/(?:te\s*paso\s*(?:la\s*)?ubicaci[oó]n|te\s*paso\s*(?:el|la)\s*(?:maps?\b|mapa\b|gps\b|direcci[oó]n)|aqui\s*(?:va|tienes|esta)\s*(?:el|la)\s*(?:mapa|ubicaci[oó]n|direcci[oó]n|gps)|te\s*(?:mando|env[ií]o)\s*(?:la\s*)?(?:ubicaci[oó]n|direcci[oó]n|mapa|gps)|ubicaci[oó]n\s*exacta|punto\s*exacto)/iu';
+        // Also trigger if the context flags predict maps is being sent now (deterministic fallback)
+        $mapsBeingSentNow = !empty($ctx['maps_being_sent_now']);
+        if (!preg_match($locationWords, $outputText) && !$mapsBeingSentNow) {
+            return $ctx; // Neither text pattern nor deterministic flag → skip
         }
 
         // Inject the maps URL as a follow-up message
@@ -959,7 +1211,13 @@ final class Bot implements BotInterface
             }
         }
 
-        if (!$hasEta && !empty($messages[0]['text'])) {
+        // NOVA FIX: solo inyectar ETA request si el cliente ya ha mostrado interés fuerte
+        // o ha insistido (choose_loop >= 2). Evita preguntar "cuánto tardas?" a alguien
+        // que solo preguntó la ubicación por curiosidad, sin intención real de venir.
+        $interesFuerte = !empty($ctx['interes_fuerte']);
+        $chooseLoop = (int) ($ctx['choose_loop_count'] ?? 0);
+        $hasEtaFromUser = !empty($ctx['eta_from_user_flag']);
+        if (!$hasEta && !empty($messages[0]['text']) && ($interesFuerte || $chooseLoop >= 2 || $hasEtaFromUser)) {
             $etaVariants = (array) $this->config->get('message_variants.eta_request_variants', [
                 'dime cuanto tardas?',
                 'avisame cuando salgas',
@@ -1033,10 +1291,10 @@ final class Bot implements BotInterface
             return $ctx;
         }
 
-        // Skip if photos were already sent in this conversation
+        // Skip if photos were already sent and client hasn't insisted yet
         $yaEnviado = (array) ($ctx['ya_enviado'] ?? []);
         $photoInsistCount = (int) ($ctx['photo_insist_count'] ?? 0);
-        if (in_array('fotos', $yaEnviado, true) && $photoInsistCount < 2) {
+        if (in_array('fotos', $yaEnviado, true) && $photoInsistCount < 1) {
             // Photos already sent and client hasn't insisted 2+ times → skip
             return $ctx;
         }
@@ -1188,7 +1446,8 @@ final class Bot implements BotInterface
             return $ctx; // Max recursion depth reached
         }
 
-        $pending = \WasapBot\Pipeline\InflightGate::drainPending($lockDir, $fromPhone);
+        $lineLast9 = (string) ($ctx['line_last9'] ?? '');
+        $pending = \WasapBot\Pipeline\InflightGate::drainPending($lockDir, $fromPhone, $lineLast9);
         if ($pending === []) {
             return $ctx; // No new messages — proceed normally
         }

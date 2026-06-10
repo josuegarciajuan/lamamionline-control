@@ -77,10 +77,10 @@ final class ToneBuilder implements PipelineStageInterface
         );
         if ($isNewConversation && $speakerMode === 'encargada' && !$comesFromAd) {
             $directives[] = 'PRIMER CONTACTO: El cliente acaba de llegar. '
-                . 'Preséntale las chicas disponibles mencionando sus nombres de forma natural '
-                . 'y usa photo_action="catalog" en tu JSON para que el sistema adjunte 1 foto de cada una. '
-                . 'No le preguntes "cuál te gusta" sin haberle enseñado las fotos primero. '
-                . 'Si ya has mostrado el catálogo antes en esta conversación, ignora esta directiva.';
+                . 'Salúdale con MÁXIMO 4 palabras y NO digas nada más. '
+                . 'NO menciones chicas. NO presentes catálogo. NO uses photo_action="catalog" ni "selected_all". '
+                . 'Usa photo_action="none". Espera a que el cliente te pregunte algo. '
+                . 'Solo reacciona a lo que te pregunten.';
         }
 
         // ── 4c. Cliente viene de anuncio concreto → NO catálogo ──
@@ -131,10 +131,12 @@ final class ToneBuilder implements PipelineStageInterface
                     . 'Muestra las chicas que AÚN NO se han mostrado (unshown_girls). '
                     . 'NO repitas las mismas fotos.';
             } else {
-                $directives[] = "Ya se mandaron fotos antes. "
-                    . "Si piden las MISMAS fotos: responde 'ya te las mande amor, mira arriba'. "
-                    . 'NO las vuelvas a mandar. '
-                    . 'Si piden MÁS fotos o chicas nuevas: muéstralas.';
+                $directives[] = "Ya se mandaron fotos antes, pero el cliente las pide otra vez. "
+                    . 'Sé amable: dile algo natural como "te las vuelvo a pasar amor 😘" '
+                    . 'y pon photo_action="catalog" o "selected_all" para que el sistema las reenvíe. '
+                    . 'NO le digas que mire arriba ni que scrollee. '
+                    . 'Pásaselas de nuevo, igual no las encontró. '
+                    . 'Si piden MÁS fotos o chicas nuevas: muéstralas también.';
             }
         }
 
@@ -142,10 +144,10 @@ final class ToneBuilder implements PipelineStageInterface
             in_array('ubicacion', $yaEnviado, true)
             || in_array('ubicacion_precisa', $yaEnviado, true)
         ) {
-            $directives[] = 'Ya se mandó la ubicación/maps antes. '
-                . "Si el cliente vuelve a preguntar por la ubicación SIN añadir nada nuevo: "
-                . "responde 'ya te mande el maps cari, mira arriba 👆'. "
-                . 'Varía la redacción para sonar natural, no repitas siempre igual.';
+            $directives[] = 'Ya se mandó la ubicación/maps antes, pero el cliente la pide otra vez. '
+                . 'Sé amable: dile algo como "aqui te la paso otra vez cari 😊" '
+                . 'e incluye location_url de nuevo. '
+                . 'NO le digas que mire arriba. Pásasela otra vez sin problema.';
         }
 
         if (in_array('precios', $yaEnviado, true)) {
@@ -213,19 +215,24 @@ final class ToneBuilder implements PipelineStageInterface
         }
 
         // ------------------------------------------------------------------ //
-        //  11. Haggle (regateo)                                               //
+        //  11. Haggle (regateo) — from config + contextual                      //
         // ------------------------------------------------------------------ //
+        $noRegateo = (bool) $this->config->get('prompt.sections.no_regateo', false);
         $haggleCount = isset($ctx['haggle_count_recent']) && is_int($ctx['haggle_count_recent'])
             ? $ctx['haggle_count_recent']
             : 0;
 
-        if ($haggleCount >= 3) {
-            $directives[] = 'Regateo repetido: modo TAJANTE. '
-                . 'No des descuentos. Frases cortas y firmes. '
-                . 'Si sigue: cierra la conversación.';
+        if ($noRegateo) {
+            $directives[] = 'REGATEO: NO aceptes regateos bajo ningún concepto. Precios fijos. Si el cliente insiste, corta la conversación educadamente.';
+        } elseif ($haggleCount >= 3) {
+            $msg = (string) $this->config->get('prompt.sections.regateo_3', 'si buscas mas barato no soy yo, suerte 😘');
+            $directives[] = 'Regateo repetido (3+): ' . $msg . ' NO responder más sobre precios.';
         } elseif ($haggleCount >= 2) {
-            $directives[] = 'Ya hubo regateo. Sé más firme. '
-                . 'Sin descuentos. Reconducir a las tarifas establecidas.';
+            $msg = (string) $this->config->get('prompt.sections.regateo_2', 'no puedo bajar mas amor, son los precios que tengo');
+            $directives[] = 'Regateo (2º): ' . $msg;
+        } elseif ($haggleCount >= 1) {
+            $msg = (string) $this->config->get('prompt.sections.regateo_1', 'precio fijo cari, por eso la calidad es buena 😏');
+            $directives[] = 'Regateo (1er): ' . $msg;
         }
 
         // ------------------------------------------------------------------ //
@@ -237,11 +244,10 @@ final class ToneBuilder implements PipelineStageInterface
 
         // ── 12a. Preemptive: maps being sent RIGHT NOW → ETA en mismo mensaje ──
         if ($mapsBeingSentNow && !$etaFromUserFlag) {
+            $locationUrl = (string) ($ctx['location_url'] ?? '');
             $directives[] = 'ATTA MODE: Vas a enviar el maps/ubicación AHORA MISMO. '
-                . 'Incluye la petición de ETA EN EL MISMO MENSAJE. '
-                . 'Ejemplos: "te paso el maps cari, dime cuanto tardas? 😊", '
-                . '"aqui tienes la ubicacion, en cuantos min vienes?", '
-                . '"este es el punto, avisame cuando salgas". '
+                . 'Incluye el location_url LITERAL y la petición de ETA EN EL MISMO MENSAJE. '
+                . "IMPERATIVO: copia '{$locationUrl}' exactamente asi en user_visible_reply. "
                 . 'NO envíes el maps sin preguntar ETA.';
         }
 

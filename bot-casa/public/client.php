@@ -303,6 +303,19 @@ if ($method === 'POST' && $action === 'save_config') {
     $notification = '<div class="alert alert-success">✅ Configuración guardada correctamente.</div>';
 }
 
+// ── Config check for A6 (moved here — needed by toggle_bot and progress) ──
+// Load factory-default tariffs from dist config to compare full text (not just prefix)
+$distTarifas = '';
+$distPath = WASAPBOT_ROOT . '/config.dist.json';
+if (file_exists($distPath)) {
+    $distData = @json_decode((string)@file_get_contents($distPath), true);
+    if (is_array($distData)) {
+        $distTarifas = (string)($distData['prompt']['sections']['tarifas'] ?? '');
+    }
+}
+$tarifasVal = (string)$config->get('prompt.sections.tarifas','');
+$promptConfigured = strlen($tarifasVal) > 20 && trim($tarifasVal) !== trim($distTarifas);
+
 // ── Toggle bot ──
 if ($method === 'POST' && $action === 'toggle_bot') {
     requireValidCsrf();
@@ -360,9 +373,10 @@ $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucci
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>bot-casa — <?php echo $clientName; ?></title>
-<link rel="stylesheet" href="assets/style.css?v=20260603_4">
+<link rel="stylesheet" href="assets/style.css?v=20260610_1">
+<link rel="stylesheet" href="assets/chat.css?v=20260610_1">
 <style>
 /* ── Client panel overrides / additions ── */
 .tooltip-icon {
@@ -417,14 +431,65 @@ $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucci
     .prompt-preview-card { position: static !important; max-height: 50vh !important; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ── Header value-prop ── */
+.header-brand { display: flex; flex-direction: column; }
+.header-tagline {
+    font-size: .75rem; color: var(--text-muted); margin-top: 2px;
+    font-weight: 400; opacity: .8; max-width: 360px; line-height: 1.4;
+}
+.header-pills { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.header-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(255,59,141,0.08); border: 1px solid rgba(255,59,141,0.15);
+    border-radius: var(--radius-pill); padding: 4px 12px;
+    font-size: .72rem; color: var(--accent-light);
+    white-space: nowrap; font-weight: 500;
+}
+
+/* ── Wizard polish ── */
+.wizard-hero {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px; font-size: 2rem;
+    animation: wizardPulse 2.5s infinite;
+    box-shadow: 0 0 30px rgba(255,59,141,0.3);
+}
+@keyframes wizardPulse {
+    0%, 100% { box-shadow: 0 0 30px rgba(255,59,141,0.3); }
+    50%      { box-shadow: 0 0 50px rgba(255,59,141,0.55); }
+}
+.wizard-step {
+    animation: wizardStepIn 0.4s cubic-bezier(0.16,1,0.3,1) both;
+}
+.wizard-step:nth-child(1) { animation-delay: 0.1s; }
+.wizard-step:nth-child(2) { animation-delay: 0.2s; }
+.wizard-step:nth-child(3) { animation-delay: 0.3s; }
+@keyframes wizardStepIn {
+    from { opacity: 0; transform: translateX(-12px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Responsive header ── */
+@media (max-width: 768px) {
+    .header-pills { order: 3; width: 100%; }
+    .header-tagline { max-width: 100%; font-size: .7rem; }
+}
 </style>
 </head>
 <body>
 
 <div class="header">
-    <div>
+    <div class="header-brand">
         <h1>casawasap<span style="font-size:.55em;opacity:.7;font-weight:400">.com</span></h1>
         <span class="subtitle"><?php echo $clientName; ?></span>
+        <div class="header-tagline">Tu bot de WhatsApp que atiende, negocia y cierra clientes</div>
+    </div>
+    <div class="header-pills">
+        <span class="header-pill">🤖 IA Conversacional</span>
+        <span class="header-pill">💬 24 Horas</span>
+        <span class="header-pill">📊 Leads Automáticos</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
         <?php if (($_SESSION['role'] ?? '') === 'admin' && ($_SESSION['user_id'] ?? 0) !== $clientUserId): ?>
@@ -436,6 +501,7 @@ $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucci
                 <?php echo $botMode === 'start' ? '⏹ APAGAR' : '▶ ENCENDER'; ?>
             </button>
         </form>
+        <button onclick="window.location.reload()" class="btn btn-sm" title="Recargar panel" style="background:var(--input-bg);color:var(--text-muted);border:1px solid var(--border);cursor:pointer;font-size:.8rem;border-radius:6px;padding:6px 10px">↻ Recargar</button>
         <a href="logout" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted);text-decoration:none">Salir</a>
     </div>
 </div>
@@ -443,11 +509,6 @@ $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucci
 <?php echo $notification; ?>
 
 <?php
-// ── Config check for A6 ──
-$defaultTarifasPrefix = 'TARIFAS ÚNICAS Y FIJAS:';
-$tarifasVal = (string)$config->get('prompt.sections.tarifas','');
-$promptConfigured = strlen($tarifasVal) > 20 && mb_strpos($tarifasVal, $defaultTarifasPrefix) !== 0;
-
 // ── Progress indicator ──
 $progressTotal = 4;
 $progressDone = 0;
@@ -480,22 +541,22 @@ if ($showWizard):
 ?>
 <div id="wizard-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">
     <div style="background:var(--panel);border:1px solid var(--accent);border-radius:var(--radius-lg);padding:32px;max-width:500px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);text-align:center">
-        <div style="font-size:3rem;margin-bottom:8px">🚀</div>
+        <div class="wizard-hero">🚀</div>
         <h2 style="color:var(--accent);margin-bottom:8px">¡Bienvenido a bot-casa!</h2>
         <p style="color:var(--text-muted);margin-bottom:16px;font-size:.9rem">
             Configura tu bot en 3 pasos sencillos para empezar a recibir clientes por WhatsApp automáticamente.
         </p>
         <div style="text-align:left;margin-bottom:20px">
-            <div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--bg-surface);border-radius:var(--radius-sm);margin-bottom:8px">
-                <span style="font-size:1.5rem">1️⃣</span>
+            <div class="wizard-step" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-surface);border-radius:var(--radius-sm);margin-bottom:8px;border-left:3px solid var(--accent)">
+                <span style="font-size:1.5rem;flex-shrink:0">1️⃣</span>
                 <div><strong>Personalidad</strong><br><span style="font-size:.78rem;color:var(--text-muted)">Define tarifas, ubicación y estilo → pestaña 🎭 Personalidad</span></div>
             </div>
-            <div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--bg-surface);border-radius:var(--radius-sm);margin-bottom:8px">
-                <span style="font-size:1.5rem">2️⃣</span>
+            <div class="wizard-step" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-surface);border-radius:var(--radius-sm);margin-bottom:8px;border-left:3px solid var(--accent)">
+                <span style="font-size:1.5rem;flex-shrink:0">2️⃣</span>
                 <div><strong>Líneas WhatsApp</strong><br><span style="font-size:.78rem;color:var(--text-muted)">Vincula tus números → pestaña 📱 Líneas</span></div>
             </div>
-            <div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--bg-surface);border-radius:var(--radius-sm)">
-                <span style="font-size:1.5rem">3️⃣</span>
+            <div class="wizard-step" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-surface);border-radius:var(--radius-sm);border-left:3px solid var(--accent)">
+                <span style="font-size:1.5rem;flex-shrink:0">3️⃣</span>
                 <div><strong>Chicas</strong><br><span style="font-size:.78rem;color:var(--text-muted)">Añade tu catálogo → pestaña 👩 Chicas</span></div>
             </div>
         </div>
@@ -519,7 +580,7 @@ function dismissWizard() {
     <button type="button" data-tab="tab-chicas">👩 Chicas</button>
     <button type="button" data-tab="tab-estados">📢 Estados</button>
     <button type="button" data-tab="tab-clientes">👥 Clientes</button>
-    <button type="button" data-tab="tab-mensajes">💬 Mensajes</button>
+    <button type="button" data-tab="tab-mensajes">💬 Chat</button>
     <button type="button" data-tab="tab-ajustes">⚙️ Ajustes</button>
     <button type="button" data-tab="tab-estadisticas">📈 Estadísticas</button>
     <button type="button" data-tab="tab-registro">📋 Registro</button>
@@ -595,9 +656,21 @@ function dismissWizard() {
     <div class="card">
         <h2>🤖 ¿Cómo funciona tu bot?</h2>
         <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">
-            Tu bot atiende automáticamente a los clientes que te escriben por WhatsApp. 
-            Responde de forma natural, negocia tarifas, envía fotos y ubicación, y te avisa 
-            cuando hay un <strong style="color:var(--accent)">cliente serio de camino</strong>.
+            Tu bot es un asistente virtual que atiende tus conversaciones de WhatsApp 
+            <strong style="color:var(--accent)">las 24 horas del día</strong>. Responde de forma natural, 
+            negocia precios, envía fotos y ubicación, y sabe reconocer cuándo un cliente 
+            está realmente interesado.
+        </p>
+        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:8px">
+            Mientras no puedes contestar —porque estás durmiendo, ocupado o descansando— el bot 
+            mantiene viva cada conversación. En cualquier momento puedes entrar desde la pestaña 
+            <strong style="color:var(--accent)">💬 Chat</strong> y tomar el control tú mismo.
+        </p>
+        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">
+            Además, el bot no solo reacciona: <strong style="color:var(--accent)">publica estados de WhatsApp</strong> 
+            automáticamente para atraer nuevos contactos y hace <strong style="color:var(--accent)">seguimiento 
+            con clientes antiguos</strong> para que vuelvan. Cuando está seguro de que un cliente 
+            viene de camino, <strong style="color:var(--accent)">te avisa al instante</strong>.
         </p>
 
         <div style="margin-top:16px">
@@ -812,6 +885,7 @@ function dismissWizard() {
                     <input type="checkbox" name="prompt[sections][maps_solo_chica]" value="1" <?php echo checked((bool)$config->get('prompt.sections.maps_solo_chica',true)); ?>> Enviar ubicación solo cuando el cliente haya elegido chica
                 </label>
                 <small style="color:var(--text-muted);font-size:.72rem;display:block;margin-top:4px">
+                    Todas las chicas comparten la MISMA casa (no cada una tiene su piso). 
                     El bot no dará la dirección real hasta que el cliente elija a una chica concreta o insista mucho de verdad. 
                     Mientras tanto solo dirá la zona (ej: "Madrid centro"). Así cuando llegue a la casa, ya sabes a qué chica viene. 
                     Ideal si no trabajas con presentación de chicas en persona.
@@ -869,14 +943,16 @@ function dismissWizard() {
                 <span class="tooltip-box">Vincula tus números de WhatsApp para que el bot atienda por ellos. Cada línea es un número distinto.</span>
             </span>
         </h2>
-        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">
-            Añade los números de WhatsApp que quieres vincular al bot. Tras añadir una línea, escanea el código QR con WhatsApp para vincularla.
-        </p>
+        <div class="section-guide">
+            📱 <strong>Cada línea es un número de WhatsApp que conectas al bot.</strong> Cuando alguien 
+            escriba a ese número, el bot contestará automáticamente. Puedes tener varios números 
+            —por ejemplo, uno distinto para cada zona o anuncio— y el bot los atenderá todos.
+        </div>
 
         <!-- Add form -->
         <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:20px">
             <h3 style="margin-bottom:10px">➕ Añadir línea</h3>
-            <p style="color:var(--text-muted);font-size:.75rem;margin-bottom:10px">Esto creará una nueva instancia WAHA en el servidor (puerto 3020+). Las líneas existentes (3000-3011) no se tocan.</p>
+            <p style="color:var(--text-muted);font-size:.75rem;margin-bottom:10px">Al crear una línea, recibirás un código QR. Escanéalo con tu móvil desde WhatsApp → Ajustes → Vincular dispositivo para que el bot pueda usar ese número.</p>
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
                 <div style="flex:2;min-width:160px">
                     <label style="font-size:.78rem;color:var(--text-muted)">Número de teléfono</label>
@@ -887,7 +963,7 @@ function dismissWizard() {
                     <input type="text" id="new-line-label" placeholder="Línea principal" style="width:100%">
                 </div>
                 <div>
-                    <button type="button" class="btn btn-primary" onclick="addLine()" style="white-space:nowrap">Crear línea</button>
+                    <button type="button" id="btn-create-line" class="btn btn-primary" onclick="addLine()" style="white-space:nowrap">Crear línea</button>
                 </div>
             </div>
             <div id="add-line-status" style="margin-top:6px;font-size:.78rem;color:var(--text-muted)"></div>
@@ -915,7 +991,7 @@ function dismissWizard() {
         <div id="test-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;align-items:center;justify-content:center">
             <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);padding:24px;max-width:400px;text-align:center">
                 <h3>📤 Enviar mensaje de prueba</h3>
-                <input type="text" id="test-phone" placeholder="Número de teléfono (con prefijo)" style="width:100%;margin:12px 0">
+                <input type="text" id="test-phone" placeholder="Ej: 666555444 (formato español)" style="width:100%;margin:12px 0">
                 <input type="hidden" id="test-line-id">
                 <button type="button" class="btn btn-primary" onclick="sendTestMessage()">Enviar prueba</button>
                 <button type="button" class="btn btn-sm" style="margin-top:8px;background:var(--input-bg);color:var(--text-muted)" onclick="document.getElementById('test-modal').style.display='none'">Cancelar</button>
@@ -934,8 +1010,15 @@ function dismissWizard() {
             </span>
         </h2>
 
+        <div class="section-guide">
+            👩 <strong>Tu catálogo de chicas.</strong> Añade su nombre, una breve descripción y hasta 
+            4 fotos. Puedes activarlas o desactivarlas cuando quieras —las chicas inactivas no 
+            aparecerán. El bot conoce los datos de cada una: cuando un cliente pregunta por una 
+            chica en concreto, sabe qué decir y qué fotos enviar.
+        </div>
+
         <!-- Add/edit form -->
-        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:20px">
+        <div class="girl-form-card">
             <h3 id="girl-form-title" style="margin-bottom:10px">➕ Nueva chica</h3>
             <input type="hidden" id="girl-edit-id">
             <div class="form-row">
@@ -947,20 +1030,19 @@ function dismissWizard() {
                     <label>Descripción</label>
                     <textarea id="girl-desc" rows="3" placeholder="Ej: Morena, 25 años, cariñosa, simpática..." style="width:100%;min-height:60px"></textarea>
                 </div>
-                <div style="display:flex;align-items:flex-end;gap:6px">
-                    <button type="button" class="btn btn-primary" onclick="saveGirl()">💾 Guardar</button>
-                </div>
             </div>
             <!-- Photo upload -->
-            <div style="margin-top:10px;display:flex;gap:8px;align-items:flex-end">
-                <div style="flex:1">
-                    <label style="font-size:.78rem;color:var(--text-muted)">Añadir foto (JPG, PNG, WebP — máx 5MB)</label>
-                    <input type="file" id="girl-photo-file" accept="image/jpeg,image/png,image/webp" style="width:100%">
+            <div style="margin-top:10px">
+                <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+                    <div style="flex:1;min-width:200px">
+                        <label style="font-size:.78rem;color:var(--text-muted)">Añadir fotos (JPG, PNG, WebP — máx 5MB, 4 máximo)</label>
+                        <input type="file" id="girl-photo-file" accept="image/jpeg,image/png,image/webp" onchange="handlePhotoSelect(this)" multiple style="width:100%">
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-primary" onclick="saveGirl()" id="btn-guardar-chica">💾 Guardar</button>
+                    </div>
                 </div>
-                <div>
-                    <button type="button" class="btn btn-sm btn-success" onclick="uploadGirlPhoto()" id="btn-upload-photo">📤 Subir</button>
-                </div>
-                <span id="upload-status" style="font-size:.75rem;color:var(--text-muted)"></span>
+                <div id="photo-previews" class="photo-previews"></div>
             </div>
         </div>
 
@@ -1044,26 +1126,38 @@ function dismissWizard() {
         </h2>
 
         <div class="section-guide">
-            📱 <strong>¿Quieres recibir avisos cuando llegue un cliente?</strong> Puedes recibir notificaciones por <strong>Telegram</strong> (recomendado) o por <strong>WhatsApp</strong>.<br><br>
-            <strong>Telegram (recomendado):</strong><br>
-            <span style="font-size:.78rem">1. Abre Telegram, busca @BotFather, crea un bot con /newbot y copia el token<br>
-            2. Busca @userinfobot para obtener tu Chat ID personal<br>
-            3. Pega tu Chat ID abajo (uno por línea si tienes varios)<br>
-            4. Activa las alertas con el checkbox</span><br><br>
-            <strong>WhatsApp:</strong><br>
-            <span style="font-size:.78rem">Puedes poner tu número personal para recibir avisos por WhatsApp. <strong>IMPORTANTE:</strong> El número que pongas aquí NO puede ser uno de los que tengas configurados como línea del bot en 📱 Líneas. Usa tu número personal.</span>
+            👥 <strong>El bot te avisa cuando detecta un cliente en camino.</strong> 
+            Cuando alguien pregunta tarifas, ubicación y da una hora aproximada, el bot 
+            lo marca como lead y te notifica al instante para que estés preparado.
+            Tú eliges dónde recibir esos avisos: por <strong>Telegram</strong> (recomendado) 
+            o por <strong>WhatsApp</strong>. Configúralo aquí abajo y activa las alertas.
         </div>
 
         <!-- Telegram config -->
         <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px">
+            <details open>
+                <summary style="padding:0 0 8px 0;cursor:pointer;font-weight:600;font-size:.84rem;color:var(--text)">📱 Configurar avisos (Telegram o WhatsApp)</summary>
+                <div style="padding-top:8px;font-size:.78rem;color:var(--text-muted)">
+                    <strong>Telegram (recomendado):</strong><br>
+                    1. Abre Telegram, busca @BotFather, crea un bot con /newbot y copia el token<br>
+                    2. Busca @userinfobot para obtener tu Chat ID personal<br>
+                    3. Pega tu Chat ID abajo (uno por línea si tienes varios)<br>
+                    4. Activa las alertas con el checkbox<br><br>
+                    <strong>WhatsApp:</strong><br>
+                    Puedes poner tu número personal para recibir avisos por WhatsApp. 
+                    <strong>IMPORTANTE:</strong> El número que pongas aquí NO puede ser uno de los 
+                    que tengas configurados como línea del bot en 📱 Líneas. Usa tu número personal.
+                </div>
+            </details>
+            <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:10px">
             <div class="form-row">
                 <div class="form-group" style="flex:2">
                     <label>Chat IDs de Telegram (uno por línea)</label>
-                    <textarea name="telegram[chat_ids]" rows="2" class="code-area" spellcheck="false"><?php echo cv('telegram.chat_ids'); ?></textarea>
+                    <textarea name="telegram[chat_ids]" rows="2" class="code-area" spellcheck="false"><?php echo h(implode("\n", cva('telegram.chat_ids'))); ?></textarea>
                 </div>
                 <div class="form-group" style="flex:1">
                     <label>Teléfonos WhatsApp para avisos (uno por línea)</label>
-                    <textarea name="telegram[whatsapp_phones]" rows="2" class="code-area" spellcheck="false" placeholder="34600111222"><?php echo cv('telegram.whatsapp_phones'); ?></textarea>
+                    <textarea name="telegram[whatsapp_phones]" rows="2" class="code-area" spellcheck="false" placeholder="34600111222"><?php echo h(implode("\n", cva('telegram.whatsapp_phones'))); ?></textarea>
                     <small style="color:var(--warn);font-size:.7rem">⚠️ No pueden ser números que tengas como líneas del bot.</small>
                 </div>
                 <div class="form-group" style="display:flex;align-items:flex-end">
@@ -1071,6 +1165,7 @@ function dismissWizard() {
                 </div>
             </div>
             <button type="submit" class="btn btn-primary btn-sm">💾 Guardar avisos</button>
+            </div>
         </div>
 
         <!-- Leads table -->
@@ -1080,40 +1175,8 @@ function dismissWizard() {
     </div>
 </div>
 
-<!-- ===== TAB: Mensajes ===== -->
-<div class="tab-content" id="tab-mensajes">
-    <div class="card">
-        <h2>💬 Historial de Conversaciones
-            <span class="tooltip-wrap"><span class="tooltip-icon">?</span>
-                <span class="tooltip-box">Aquí verás todas las conversaciones que ha tenido tu bot. Busca por teléfono, revisa el historial, y marca conversaciones como lead (cliente que fue a la casa).</span>
-            </span>
-        </h2>
-        <div class="section-guide">
-            💡 Desde aquí puedes ver las conversaciones que el bot ha notificado como lead y también marcar manualmente 
-            cualquier conversación como "cliente que llegó a la casa", haya sido notificada o no por el bot. Esto sirve para las estadísticas.
-        </div>
-
-        <div style="display:flex;gap:10px;margin-bottom:16px">
-            <input type="text" id="msg-search" placeholder="Buscar por teléfono..." style="flex:1" oninput="searchThreads()">
-        </div>
-
-        <div id="mensajes-threads-container">
-            <p style="color:var(--text-muted);text-align:center;padding:20px">No hay conversaciones todavía.</p>
-        </div>
-
-        <!-- Chat modal -->
-        <div id="chat-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000" onclick="if(event.target===this)closeChat()">
-            <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px;max-width:600px;width:95%;margin:40px auto;max-height:85vh;overflow-y:auto">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-                    <h3>💬 Conversación</h3>
-                    <button type="button" class="btn btn-sm btn-primary" id="chat-mark-lead-btn" onclick="markAsLeadFromChat()">⭐ Marcar como lead</button>
-                </div>
-                <div id="chat-messages" style="max-height:60vh;overflow-y:auto"></div>
-                <button type="button" class="btn btn-sm" style="margin-top:12px;background:var(--input-bg);color:var(--text-muted)" onclick="closeChat()">Cerrar</button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- ===== TAB: Mensajes (WhatsApp-style Chat) ===== -->
+<div class="tab-content" id="tab-mensajes"></div>
 
 <!-- ===== TAB: Ajustes ===== -->
 <div class="tab-content" id="tab-ajustes">
@@ -1220,6 +1283,11 @@ function dismissWizard() {
 <div class="tab-content" id="tab-estadisticas">
     <div class="card">
         <h2>📈 Estadísticas</h2>
+        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">
+            Consulta el rendimiento de tu bot con datos reales: cuántas conversaciones ha mantenido, 
+            cuántos leads ha generado, cuántos clientes han llegado y qué ratio de conversión tienes. 
+            Entender estas cifras te ayuda a saber si tu inversión funciona y dónde puedes mejorar.
+        </p>
         <div id="estadisticas-container">
             <p style="color:var(--text-muted);text-align:center;padding:30px">Cargando estadísticas...</p>
         </div>
@@ -1248,8 +1316,10 @@ function apiUrl(url) {
     return url + (url.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(_apiToken);
 }
 </script>
+<script src="assets/chat.js?v=20260610_1"></script>
 <script>
 var _csrf = <?php echo json_encode(generateCsrfToken()); ?>;
+var _defaultTarifas = <?php echo json_encode($distTarifas); ?>;
 
 // ── Preview builder ──
 function buildPreview() {
@@ -1279,7 +1349,7 @@ function buildPreview() {
     var ofertasVal   = ofertasEl   ? ofertasEl.value.trim()   : '';
     var noRegateo    = regateoEl   ? regateoEl.checked        : false;
 
-    var tarifasOk   = tarifasVal.length > 20 && tarifasVal.indexOf('TARIFAS ÚNICAS Y FIJAS:') !== 0;
+    var tarifasOk   = tarifasVal.length > 20 && tarifasVal.trim() !== _defaultTarifas.trim();
     var zonaOk      = zonaVal.length > 2;
     var serviciosOk = serviciosVal.length > 10;
     var ofertasOk   = ofertasVal.length > 5;
@@ -1337,12 +1407,16 @@ function loadLines() {
                 var phoneDisp = l.health_phone ? l.health_phone : (l.last9||l.phone);
                 html += '<tr><td><strong>'+escHtml(l.label)+'</strong></td><td class="mono">'+escHtml(phoneDisp)+'</td><td>'+l.port+'</td><td>'+statusIcon+'</td>';
                 html += '<td style="white-space:nowrap">';
-                html += '<button onclick="showQR('+l.id+')" class="btn btn-sm btn-primary" style="margin-right:3px">QR</button>';
-                html += '<button onclick="showTest('+l.id+')" class="btn btn-sm" style="background:var(--info);color:#fff;margin-right:3px">Test</button>';
                 if (st === 'WORKING') {
-                    html += '<button onclick="checkLineStatus('+l.id+')" class="btn btn-sm" style="background:var(--ok);color:#fff;margin-right:3px">✓</button>';
+                    html += '<span style="color:var(--ok);font-size:.8rem;margin-right:6px">✅ Conectada</span>';
+                } else {
+                    html += '<button type="button" onclick="showQR('+l.id+')" class="btn btn-sm btn-primary" style="margin-right:3px">QR</button>';
                 }
-                html += '<button onclick="deleteLine('+l.id+')" class="btn btn-sm btn-danger">🗑</button>';
+                html += '<button type="button" onclick="showTest('+l.id+')" class="btn btn-sm" style="background:var(--info);color:#fff;margin-right:3px">Test</button>';
+                if (st === 'WORKING') {
+                    html += '<button type="button" onclick="checkLineStatus('+l.id+')" class="btn btn-sm" style="background:var(--ok);color:#fff;margin-right:3px">✓</button>';
+                }
+                html += '<button type="button" onclick="deleteLine('+l.id+')" class="btn btn-sm btn-danger">🗑</button>';
                 html += '</td></tr>';
             });
             html += '</tbody></table>';
@@ -1355,6 +1429,8 @@ function addLine() {
     var label = document.getElementById('new-line-label').value.trim();
     if (!phone) return alert('Introduce un número de teléfono');
     var statusEl = document.getElementById('add-line-status');
+    var btn = document.getElementById('btn-create-line');
+    btn.disabled = true; btn.textContent = '⏳ Creando...';
     statusEl.textContent = '⏳ Creando instancia WAHA... (puede tardar 10-15 segundos)';
     var fd = new FormData(); fd.append('phone', phone); fd.append('label', label); fd.append('csrf_token', _csrf);
     fetch('api/lines.php?action=add', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
@@ -1366,7 +1442,11 @@ function addLine() {
         } else {
             statusEl.textContent = '❌ '+(d.error||'Error al crear');
         }
-    }).catch(function(){ statusEl.textContent = '❌ Error de conexión'; });
+        btn.disabled = false; btn.textContent = 'Crear línea';
+    }).catch(function(){
+        statusEl.textContent = '❌ Error de conexión';
+        btn.disabled = false; btn.textContent = 'Crear línea';
+    });
 }
 var currentQrLineId = 0;
 function showQR(lineId) {
@@ -1377,7 +1457,7 @@ function showQR(lineId) {
     fetchQR(lineId);
 }
 function fetchQR(lineId) {
-    fetch(apiUrl('api/lines.php?action=qr&line_id=')+'lineId).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/lines.php?action=qr&line_id='+lineId)).then(r=>r.json()).then(d=>{
         if (d.ok && d.qr_base64) {
             document.getElementById('qr-image').src = 'data:image/png;base64,'+d.qr_base64;
             document.getElementById('qr-status').textContent = d.warning || 'Escanea con WhatsApp → Vincular dispositivo';
@@ -1391,11 +1471,7 @@ function fetchQR(lineId) {
 function regenerateQR() {
     if (!currentQrLineId) return;
     document.getElementById('qr-status').textContent = 'Generando nuevo QR...';
-    // First restart the session to get a fresh QR
-    fetch(apiUrl('api/lines.php?action=start_session&line_id=')+'currentQrLineId).then(r=>r.json()).then(function(){
-        // Small delay then fetch QR
-        setTimeout(function(){ fetchQR(currentQrLineId); }, 2000);
-    });
+    fetchQR(currentQrLineId);
 }
 function checkLineStatus(lineId) {
     fetch(apiUrl('api/lines.php?action=status')).then(r=>r.json()).then(d=>{
@@ -1405,32 +1481,7 @@ function checkLineStatus(lineId) {
         }
     });
 }
-        document.getElementById('lines-container').innerHTML = html;
-    }).catch(function(){ document.getElementById('lines-container').innerHTML = '<p style="color:var(--danger)">Error al cargar líneas</p>'; });
-}
-function addLine() {
-    var phone = document.getElementById('new-line-phone').value.trim();
-    var label = document.getElementById('new-line-label').value.trim();
-    if (!phone) return alert('Introduce un número de teléfono');
-    var fd = new FormData(); fd.append('phone', phone); fd.append('label', label); fd.append('csrf_token', _csrf);
-    fetch('api/lines.php?action=add', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-        if (d.ok) { document.getElementById('new-line-phone').value=''; document.getElementById('new-line-label').value=''; loadLines(); }
-        else alert('Error: '+(d.error||'Desconocido'));
-    });
-}
-function showQR(lineId) {
-    document.getElementById('qr-modal').style.display = 'flex';
-    document.getElementById('qr-image').src = '';
-    document.getElementById('qr-status').textContent = 'Cargando QR...';
-    fetch(apiUrl('api/lines.php?action=qr&line_id=')+'lineId).then(r=>r.json()).then(d=>{
-        if (d.ok && d.qr_base64) {
-            document.getElementById('qr-image').src = 'data:image/png;base64,'+d.qr_base64;
-            document.getElementById('qr-status').textContent = 'Escanea con WhatsApp → Vincular dispositivo';
-        } else {
-            document.getElementById('qr-status').textContent = '❌ '+(d.error||'No se pudo obtener QR');
-        }
-    });
-}
+
 function showTest(lineId) {
     document.getElementById('test-modal').style.display = 'flex';
     document.getElementById('test-line-id').value = lineId;
@@ -1444,7 +1495,12 @@ function sendTestMessage() {
     var fd = new FormData(); fd.append('line_id', lineId); fd.append('test_phone', phone); fd.append('csrf_token', _csrf);
     document.getElementById('test-result').textContent = 'Enviando...';
     fetch('api/lines.php?action=test', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-        document.getElementById('test-result').textContent = d.ok ? '✅ Mensaje enviado' : '❌ '+(d.error||'Error');
+        if (d.ok) {
+            document.getElementById('test-result').textContent = '✅ Mensaje enviado (HTTP '+d.http_code+')';
+        } else {
+            var err = d.error || ('HTTP '+d.http_code);
+            document.getElementById('test-result').textContent = '❌ '+err;
+        }
     });
 }
 function deleteLine(lineId) {
@@ -1471,71 +1527,328 @@ function startLinePolling() { linePollInterval = setInterval(function() {
 startLinePolling();
 
 // ── Chicas ──
+var _allGirls = [];
 function loadGirls() {
+    var container = document.getElementById('girls-container');
+    if (!container) return;
+    container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px">Cargando chicas...</p>';
     fetch(apiUrl('api/girls.php?action=list')).then(r=>r.json()).then(d=>{
-        if (!d.ok) return;
+        if (!d.ok) { container.innerHTML = '<p style="color:var(--danger);text-align:center;padding:20px">Error al cargar chicas.</p>'; return; }
+        _allGirls = d.girls;
         var html = '';
         if (d.girls.length === 0) {
             html = '<p style="color:var(--text-muted);text-align:center;padding:20px">No hay chicas configuradas. Añade la primera arriba.</p>';
         } else {
-            html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:8px">';
+            html = '<div class="girls-grid">';
             d.girls.forEach(function(g) {
-                var active = g.activa ? '✅ Activa' : '❌ Inactiva';
+                var fotoCount = (g.fotos||[]).length;
+                var heroImg = (g.fotos||[]).length > 0 ? g.fotos[0] : '';
+                var heroStyle = heroImg ? 'background-image:url('+escHtml(heroImg)+');background-size:cover;background-position:center top' : '';
                 var activeColor = g.activa ? 'var(--ok)' : 'var(--text-muted)';
-                var photos = (g.fotos||[]).slice(0,3).map(function(u,i){ return '<img src="'+escHtml(u)+'" style="width:60px;height:60px;object-fit:cover;border-radius:6px;margin:2px" onerror="this.style.display=\'none\'">'; }).join('');
-                html += '<div style="background:var(--bg-surface);border:1px solid '+(g.activa?'rgba(45,212,191,.25)':'var(--border)')+';border-radius:var(--radius-sm);padding:12px">';
-                html += '<strong>'+escHtml(g.nombre)+'</strong>';
-                html += '<span style="font-size:.75rem;color:'+activeColor+';margin-left:8px">'+active+'</span>';
-                html += '<div style="font-size:.78rem;color:var(--text-muted);margin:4px 0">'+escHtml(g.descripcion_corta||'')+'</div>';
-                if (photos) html += '<div style="margin-top:6px">'+photos+'</div>';
-                html += '<div style="margin-top:8px;display:flex;gap:4px">';
-                html += '<button onclick="editGirl(\''+escHtml(g.id)+'\',\''+escHtml(g.nombre)+'\',\''+escHtml(g.descripcion_corta||'')+'\')" class="btn btn-sm btn-warning">✏️</button>';
-                html += '<button onclick="toggleGirl(\''+escHtml(g.id)+'\')" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted)">'+(g.activa?'Pausar':'Activar')+'</button>';
-                html += '<button onclick="deleteGirl(\''+escHtml(g.id)+'\')" class="btn btn-sm btn-danger">🗑</button>';
-                html += '</div></div>';
+                html += '<div class="girl-card'+(g.activa?' girl-card--active':'')+'">';
+                // Hero image
+                if (heroImg) {
+                    html += '<div class="girl-card-hero" style="'+heroStyle+'">';
+                    html += '<span class="girl-badge '+(g.activa?'girl-badge--on':'girl-badge--off')+'">'+(g.activa?'Activa':'Inactiva')+'</span>';
+                    html += '</div>';
+                }
+                html += '<div class="girl-card-body">';
+                html += '<div class="girl-card-header">';
+                html += '<strong class="girl-card-name">'+escHtml(g.nombre)+'</strong>';
+                if (!heroImg) {
+                    html += '<span class="girl-badge '+(g.activa?'girl-badge--on':'girl-badge--off')+'">'+(g.activa?'Activa':'Inactiva')+'</span>';
+                }
+                html += '</div>';
+                html += '<div class="girl-card-desc">'+escHtml(g.descripcion_corta||'Sin descripción')+'</div>';
+                html += '<div class="girl-card-meta">';
+                html += '<span class="girl-photo-count">📸 '+(fotoCount)+'/4 fotos</span>';
+                html += '</div>';
+                html += '<div class="girl-card-actions">';
+                html += '<button type="button" onclick="editGirl(\''+escHtml(g.id)+'\',\''+escHtml(g.nombre)+'\',\''+escHtml(g.descripcion_corta||'')+'\')" class="btn btn-sm btn-warning" title="Editar">✏️</button>';
+                html += '<button type="button" onclick="toggleGirl(\''+escHtml(g.id)+'\')" class="btn btn-sm '+(g.activa?'btn-toggle-on':'btn-toggle-off')+'" title="'+(g.activa?'Desactivar':'Activar')+'">'+(g.activa?'🟢':'🔴')+'</button>';
+                html += '<button type="button" onclick="deleteGirl(\''+escHtml(g.id)+'\')" class="btn btn-sm btn-danger" title="Eliminar">🗑</button>';
+                html += '</div></div></div>';
             });
             html += '</div>';
         }
-        document.getElementById('girls-container').innerHTML = html;
+        container.innerHTML = html;
+    }).catch(function(e){
+        container.innerHTML = '<p style="color:var(--danger);text-align:center;padding:20px">Error de conexión al cargar chicas.</p>';
     });
 }
 function saveGirl() {
     var id = document.getElementById('girl-edit-id').value;
+    var nombre = document.getElementById('girl-nombre').value.trim();
+    if (!nombre) return alert('El nombre es obligatorio.');
+    var btn = document.getElementById('btn-guardar-chica');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando...'; }
     var fd = new FormData();
     if (id) fd.append('id', id);
-    fd.append('nombre', document.getElementById('girl-nombre').value.trim());
+    fd.append('nombre', nombre);
     fd.append('descripcion', document.getElementById('girl-desc').value.trim());
-    fd.append('activa', '1');
+    // Solo enviar activa al crear (nuevas chicas arrancan activas). Al editar se respeta el valor actual.
+    if (!id) fd.append('activa', '1');
     fd.append('csrf_token', (typeof _csrf!=='undefined'?_csrf:''));
+    // Append selected photos
+    for (var i = 0; i < selectedPhotos.length; i++) {
+        fd.append('photos[]', selectedPhotos[i]);
+    }
     fetch('api/girls.php?action=save', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-        if (d.ok) { document.getElementById('girl-edit-id').value=''; document.getElementById('girl-nombre').value=''; document.getElementById('girl-desc').value=''; document.getElementById('girl-form-title').textContent='➕ Nueva chica'; loadGirls(); }
-        else alert('Error: '+(d.error||'Desconocido'));
+        if (d.ok) {
+            document.getElementById('girl-edit-id').value='';
+            document.getElementById('girl-nombre').value='';
+            document.getElementById('girl-desc').value='';
+            document.getElementById('girl-form-title').textContent='➕ Nueva chica';
+            clearPhotoPreviews();
+            loadGirls();
+        } else { alert('Error: '+(d.error||'Desconocido')); }
+        if (btn) { btn.disabled = false; btn.textContent = '💾 Guardar'; }
+    }).catch(function(){
+        alert('Error de conexión al guardar.');
+        if (btn) { btn.disabled = false; btn.textContent = '💾 Guardar'; }
     });
 }
 function editGirl(id, nombre, desc) {
+    clearPhotoPreviews();
     document.getElementById('girl-edit-id').value = id;
     document.getElementById('girl-nombre').value = nombre;
     document.getElementById('girl-desc').value = desc;
     document.getElementById('girl-form-title').textContent = '✏️ Editar chica';
+    // Scroll to the form so the user sees it
     document.getElementById('girl-nombre').focus();
+    document.getElementById('girl-form-title').scrollIntoView({behavior:'smooth',block:'start'});
+    // Show existing photos with delete buttons
+    var girl = _allGirls.find(function(g) { return g.id === id; });
+    if (girl && girl.fotos && girl.fotos.length > 0) {
+        renderExistingPhotos(girl.fotos, id);
+    } else {
+        var previewContainer = document.getElementById('photo-previews');
+        if (previewContainer) {
+            previewContainer.innerHTML = '<span style="font-size:.75rem;color:var(--text-muted);padding:8px">📸 Sin fotos todavía. Añade hasta 4 en total.</span>';
+        }
+    }
 }
-function uploadGirlPhoto() {
-    var id = document.getElementById('girl-edit-id').value;
+
+// ── Render existing photos in the edit form with drag-and-drop ──
+function renderExistingPhotos(photos, girlId) {
+    var container = document.getElementById('photo-previews');
+    if (!container) return;
+    container.innerHTML = '';
+    // Title with instructions
+    var title = document.createElement('div');
+    title.style.cssText = 'width:100%;font-size:.75rem;color:var(--text-muted);padding:0 0 6px 0';
+    title.innerHTML = '📸 Fotos ('+photos.length+'/4) — arrastra para reordenar · <span style="color:var(--accent);font-weight:600">⭐</span> = principal';
+    container.appendChild(title);
+    // Thumbnails
+    photos.forEach(function(url, idx) {
+        var wrapper = document.createElement('div');
+        wrapper.className = 'photo-preview-item' + (idx === 0 ? ' primary' : '');
+        wrapper.setAttribute('data-photo-idx', idx);
+        wrapper.setAttribute('data-girl-id', girlId);
+        wrapper.setAttribute('draggable', 'true');
+        // Drag events
+        wrapper.addEventListener('dragstart', handlePhotoDragStart);
+        wrapper.addEventListener('dragend', handlePhotoDragEnd);
+        wrapper.addEventListener('dragover', handlePhotoDragOver);
+        wrapper.addEventListener('dragleave', handlePhotoDragLeave);
+        wrapper.addEventListener('drop', handlePhotoDrop);
+        // Inner HTML: star badge, image, delete button
+        wrapper.innerHTML =
+            (idx === 0
+                ? '<span class="primary-star" title="Foto principal">⭐</span>'
+                : '<span class="set-primary-btn" onclick="event.stopPropagation();setAsPrimary(\''+escHtml(girlId)+'\','+idx+')" title="Marcar como principal">☆</span>') +
+            '<img src="'+url+'" style="object-fit:cover;width:100%;height:100%" draggable="false">' +
+            '<button type="button" onclick="event.stopPropagation();removeExistingPhoto(\''+escHtml(girlId)+'\','+idx+')" title="Eliminar esta foto">✕</button>';
+        container.appendChild(wrapper);
+    });
+}
+
+// ── Drag & drop: reorder photos ──
+var _dragSrcIdx = null;
+
+function handlePhotoDragStart(e) {
+    _dragSrcIdx = parseInt(this.getAttribute('data-photo-idx'));
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(_dragSrcIdx));
+    this.classList.add('dragging');
+}
+function handlePhotoDragEnd(e) {
+    this.classList.remove('dragging');
+    document.querySelectorAll('.photo-preview-item.drag-over').forEach(function(el) { el.classList.remove('drag-over'); });
+    _dragSrcIdx = null;
+}
+function handlePhotoDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    this.classList.add('drag-over');
+}
+function handlePhotoDragLeave(e) {
+    this.classList.remove('drag-over');
+}
+function handlePhotoDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.classList.remove('drag-over');
+    var targetIdx = parseInt(this.getAttribute('data-photo-idx'));
+    if (_dragSrcIdx === null || _dragSrcIdx === targetIdx) return;
+    var girlId = this.getAttribute('data-girl-id');
+    var girl = _allGirls.find(function(g) { return g.id === girlId; });
+    if (!girl || !girl.fotos) return;
+    // Reorder array
+    var fotos = girl.fotos.slice();
+    var moved = fotos.splice(_dragSrcIdx, 1)[0];
+    fotos.splice(targetIdx, 0, moved);
+    girl.fotos = fotos;
+    // Re-render
+    renderExistingPhotos(fotos, girlId);
+    // Save to server
+    savePhotoOrder(girlId, fotos);
+}
+
+// ── Set a photo as primary (move to index 0) ──
+function setAsPrimary(girlId, idx) {
+    if (idx === 0) return;
+    var girl = _allGirls.find(function(g) { return g.id === girlId; });
+    if (!girl || !girl.fotos) return;
+    var fotos = girl.fotos.slice();
+    var moved = fotos.splice(idx, 1)[0];
+    fotos.unshift(moved);
+    girl.fotos = fotos;
+    renderExistingPhotos(fotos, girlId);
+    savePhotoOrder(girlId, fotos);
+}
+
+// ── Persist photo order to server ──
+function savePhotoOrder(girlId, fotos) {
+    var fd = new FormData();
+    fd.append('id', girlId);
+    fd.append('order', JSON.stringify(fotos));
+    fd.append('csrf_token', (typeof _csrf !== 'undefined' ? _csrf : ''));
+    fetch('api/girls.php?action=reorder_photos', { method: 'POST', body: fd }).then(function(r) { return r.json(); }).then(function(d) {
+        if (!d.ok) {
+            // Reload to recover correct state on error
+            loadGirls();
+            // Refresh edit form if still editing
+            var currentEditId = document.getElementById('girl-edit-id').value;
+            if (currentEditId) {
+                return fetch(apiUrl('api/girls.php?action=list')).then(function(r) { return r.json(); }).then(function(data) {
+                    if (data && data.ok) {
+                        _allGirls = data.girls;
+                        var girl = _allGirls.find(function(g) { return g.id === currentEditId; });
+                        if (girl) renderExistingPhotos(girl.fotos || [], currentEditId);
+                    }
+                });
+            }
+        }
+    }).catch(function() {});
+}
+
+// ── Remove an existing photo from a girl (server-side) ──
+function removeExistingPhoto(girlId, photoIndex) {
+    if (!confirm('¿Eliminar esta foto?')) return;
+    var fd = new FormData();
+    fd.append('id', girlId);
+    fd.append('photo_index', photoIndex);
+    fd.append('csrf_token', (typeof _csrf!=='undefined'?_csrf:''));
+    fetch('api/girls.php?action=remove_photo', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        if (!d.ok) { alert('Error: '+(d.error||'No se pudo eliminar la foto')); return; }
+        // Reload girls data and refresh both the card grid and the edit form
+        return fetch(apiUrl('api/girls.php?action=list')).then(r=>r.json());
+    }).then(function(d) {
+        if (!d || !d.ok) return;
+        _allGirls = d.girls;
+        // Refresh the card grid
+        loadGirls();
+        // Refresh the edit form photos (if still editing)
+        var currentEditId = document.getElementById('girl-edit-id').value;
+        if (currentEditId) {
+            var girl = _allGirls.find(function(g) { return g.id === currentEditId; });
+            if (girl) {
+                renderExistingPhotos(girl.fotos||[], currentEditId);
+            }
+        }
+    }).catch(function(e){
+        alert('Error de conexión al eliminar foto: '+(e.message||'sin conexión'));
+    });
+}
+
+// ── Photo preview management ──
+var selectedPhotos = [];
+function handlePhotoSelect(input) {
+    var files = input.files;
+    var container = document.getElementById('photo-previews');
+    if (!container) return;
+    // In edit mode, keep existing photo thumbnails. Only clear new-photo previews.
+    var isEditMode = document.getElementById('girl-edit-id').value !== '';
+    if (!isEditMode) {
+        container.innerHTML = '';
+    } else {
+        // Remove only the "new photo" preview items (marked with data-idx), keep existing ones
+        container.querySelectorAll('.photo-preview-item:not([data-photo-idx])').forEach(function(el) { el.remove(); });
+    }
+    for (var n = 0; n < files.length; n++) {
+        if (selectedPhotos.length >= 4) { alert('Máximo 4 fotos.'); break; }
+        var file = files[n];
+        if (file.size > 5*1024*1024) { alert(file.name + ' supera 5MB.'); continue; }
+        if (!file.type.match(/^image\/(jpeg|png|webp)$/)) { alert(file.name + ' formato no válido.'); continue; }
+        selectedPhotos.push(file);
+        var url = URL.createObjectURL(file);
+        var idx = selectedPhotos.length - 1;
+        var wrapper = document.createElement('div');
+        wrapper.className = 'photo-preview-item';
+        wrapper.setAttribute('data-idx', idx);
+        wrapper.innerHTML = '<img src="'+url+'" onload="URL.revokeObjectURL(this.src)"><button type="button" onclick="removePreviewPhoto('+idx+')">✕</button>';
+        container.appendChild(wrapper);
+    }
+    input.value = '';
+    if (selectedPhotos.length >= 4) { input.style.display = 'none'; }
+}
+function removePreviewPhoto(index) {
+    selectedPhotos.splice(index, 1);
+    var container = document.getElementById('photo-previews');
+    if (!container) return;
+    // Remove only the "new photo" preview items (not existing photos with data-photo-idx)
+    container.querySelectorAll('.photo-preview-item:not([data-photo-idx])').forEach(function(el) { el.remove(); });
+    // Rebuild new-photo previews with correct indices
+    selectedPhotos.forEach(function(file, i) {
+        var url = URL.createObjectURL(file);
+        var wrapper = document.createElement('div');
+        wrapper.className = 'photo-preview-item';
+        wrapper.setAttribute('data-idx', i);
+        wrapper.innerHTML = '<img src="'+url+'" onload="URL.revokeObjectURL(this.src)"><button type="button" onclick="removePreviewPhoto('+i+')">✕</button>';
+        container.appendChild(wrapper);
+    });
     var fileInput = document.getElementById('girl-photo-file');
-    if (!id) return alert('Primero guarda la chica (nombre + descripción) y luego sube fotos.');
-    if (!fileInput.files || !fileInput.files[0]) return alert('Selecciona una imagen.');
-    var file = fileInput.files[0];
-    if (file.size > 5*1024*1024) return alert('La imagen no puede superar 5 MB.');
-    var status = document.getElementById('upload-status');
-    status.textContent = '⏳ Subiendo...';
-    var fd = new FormData(); fd.append('id', id); fd.append('photo', file); fd.append('csrf_token', (typeof _csrf!=='undefined'?_csrf:''));
-    fetch('api/girls.php?action=upload_photo', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-        if (d.ok) { fileInput.value=''; status.textContent='✅ Subida'; loadGirls(); }
-        else { status.textContent='❌ '+(d.error||'Error'); }
-    }).catch(function(){ status.textContent='❌ Error de conexión'; });
+    if (fileInput) fileInput.style.display = '';
 }
-function toggleGirl(id) { var fd = new FormData(); fd.append('id', id); fd.append('csrf_token', (typeof _csrf!=='undefined'?_csrf:'')); fetch('api/girls.php?action=toggle',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{ if(d.ok) loadGirls(); }); }
-function deleteGirl(id) { if(!confirm('¿Eliminar esta chica?')) return; var fd = new FormData(); fd.append('id', id); fd.append('csrf_token', (typeof _csrf!=='undefined'?_csrf:'')); fetch('api/girls.php?action=delete',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{ if(d.ok) loadGirls(); }); }
+function clearPhotoPreviews() {
+    selectedPhotos = [];
+    var container = document.getElementById('photo-previews');
+    if (container) container.innerHTML = '';
+    var fileInput = document.getElementById('girl-photo-file');
+    if (fileInput) { fileInput.style.display = ''; fileInput.value = ''; }
+}
+function toggleGirl(id) {
+    var fd = new FormData();
+    fd.append('id', id);
+    fd.append('csrf_token', (typeof _csrf!=='undefined'?_csrf:''));
+    fetch('api/girls.php?action=toggle', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        if (d.ok) { loadGirls(); } else { alert('Error: '+(d.error||'Desconocido')); }
+    }).catch(function(e){
+        alert('Error de conexión al cambiar estado: '+(e.message||'sin conexión'));
+    });
+}
+function deleteGirl(id) {
+    if (!confirm('¿Eliminar esta chica? Esta acción no se puede deshacer.')) return;
+    var fd = new FormData();
+    fd.append('id', id);
+    fd.append('csrf_token', (typeof _csrf!=='undefined'?_csrf:''));
+    fetch('api/girls.php?action=delete', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        if (d.ok) { loadGirls(); } else { alert('Error: '+(d.error||'No se pudo eliminar')); }
+    }).catch(function(e){
+        alert('Error de conexión al eliminar: '+(e.message||'sin conexión'));
+    });
+}
 
 // ── Estados ──
 function loadEstadosConfig() {
@@ -1567,15 +1880,18 @@ function saveEstadosConfig() {
     fd.append('hora_fin', document.getElementById('estados-hora-fin').value);
     var checks = document.querySelectorAll('#estados-lines-checkboxes input[type=checkbox]:checked');
     checks.forEach(function(c){ fd.append('lineas[]', c.value); });
-    fetch('api/estados.php?action=config', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-        document.getElementById('estados-status').textContent = d.ok ? '✅ Configuración guardada' : '❌ Error al guardar';
+    fetch(apiUrl('api/estados.php?action=config'), {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        document.getElementById('estados-status').textContent = d.ok ? '✅ Configuración guardada' : '❌ Error al guardar: '+(d.error||'desconocido');
         setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 3000);
+    }).catch(function(e){
+        document.getElementById('estados-status').textContent = '❌ Error de red: '+(e.message||'sin conexión');
+        setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 4000);
     });
 }
 function publishEstado() {
     document.getElementById('estados-status').textContent = '⏳ Publicando...';
     var fd = new FormData(); fd.append('csrf_token', _csrf);
-    fetch('api/estados.php?action=publish', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/estados.php?action=publish'), {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
         if (d.ok) {
             var oks = d.results.filter(function(r){return r.ok;}).length;
             document.getElementById('estados-status').textContent = '✅ Publicado en '+oks+'/'+d.results.length+' líneas';
@@ -1584,6 +1900,9 @@ function publishEstado() {
             document.getElementById('estados-status').textContent = '❌ '+(d.error||'Error');
         }
         setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 5000);
+    }).catch(function(e){
+        document.getElementById('estados-status').textContent = '❌ Error de red: '+(e.message||'sin conexión');
+        setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 4000);
     });
 }
 function loadEstadosHistory() {
@@ -1613,8 +1932,8 @@ function loadClientes() {
             d.leads.forEach(function(l){
                 var arrivedIcon = l.arrived ? '✅ Sí' : '❌ No';
                 var arrivedBtn = l.arrived
-                    ? '<button onclick="markLeadArrived(\''+escHtml(l.thread_id)+'\',false)" class="btn btn-sm" style="background:var(--ok-bg);color:var(--ok)">✅ Sí</button>'
-                    : '<button onclick="markLeadArrived(\''+escHtml(l.thread_id)+'\',true)" class="btn btn-sm btn-warning">Marcar llegó</button>';
+                    ? '<button type="button" onclick="markLeadArrived(\''+escHtml(l.thread_id)+'\',false)" class="btn btn-sm" style="background:var(--ok-bg);color:var(--ok)">✅ Sí</button>'
+                    : '<button type="button" onclick="markLeadArrived(\''+escHtml(l.thread_id)+'\',true)" class="btn btn-sm btn-warning">Marcar llegó</button>';
                 var confColor = parseInt(l.confidence) > 80 ? 'color:var(--ok)' : (parseInt(l.confidence) > 50 ? 'color:var(--warn)' : 'color:var(--text-muted)');
                 html += '<tr><td class="mono">'+escHtml(l.ts)+'</td><td class="mono">'+escHtml(l.phone)+'</td><td>'+escHtml(l.line_label)+'</td><td style="'+confColor+'">'+l.confidence+'</td><td>'+arrivedBtn+'</td></tr>';
             });
@@ -1631,54 +1950,10 @@ function markLeadArrived(threadId, arrived) {
     });
 }
 
-// ── Mensajes ──
-var currentChatThreadId = '';
-function loadMensajes() { searchThreads(); }
-function searchThreads() {
-    var q = document.getElementById('msg-search').value.trim();
-    fetch(apiUrl('api/mensajes.php?action=threads&search=')+'encodeURIComponent(q)).then(r=>r.json()).then(d=>{
-        if (!d.ok) return;
-        var html = '';
-        if (d.threads.length === 0) {
-            html = '<p style="color:var(--text-muted);text-align:center;padding:20px">No se encontraron conversaciones.</p>';
-        } else {
-            html = '<table class="memory-table" style="font-size:.82rem"><thead><tr><th>Teléfono</th><th>Mensajes</th><th>Último</th><th>Acción</th></tr></thead><tbody>';
-            d.threads.forEach(function(t){
-                var phoneDisp = t.phone.length > 6 ? '...' + t.phone.substring(t.phone.length-6) : t.phone;
-                html += '<tr><td class="mono"><strong>'+escHtml(phoneDisp)+'</strong></td><td>'+t.count+'</td><td style="font-size:.75rem;color:var(--text-muted)">'+escHtml(t.last_msg)+'</td>';
-                html += '<td><button onclick="openChat(\''+escHtml(t.thread_id)+'\')" class="btn btn-sm btn-primary">Ver</button></td></tr>';
-            });
-            html += '</tbody></table>';
-        }
-        document.getElementById('mensajes-threads-container').innerHTML = html;
-    });
-}
-function openChat(threadId) {
-    currentChatThreadId = threadId;
-    document.getElementById('chat-modal').style.display = 'block';
-    document.getElementById('chat-messages').innerHTML = '<p style="color:var(--text-muted)">Cargando...</p>';
-    fetch(apiUrl('api/mensajes.php?action=conversation&thread_id=')+'encodeURIComponent(threadId)).then(r=>r.json()).then(d=>{
-        if (!d.ok) return;
-        var html = '';
-        d.conversation.forEach(function(m){
-            var dt = m.ts ? new Date(m.ts).toLocaleString('es-ES') : '';
-            html += '<div style="margin-bottom:10px;padding:8px 12px;background:var(--bg-surface);border-radius:var(--radius-sm);font-size:.82rem">';
-            if (m.user_msg) html += '<div style="color:var(--info);margin-bottom:2px"><strong>👤 Cliente:</strong> '+escHtml(m.user_msg)+'</div>';
-            if (m.bot_reply) html += '<div style="color:var(--ok)"><strong>🤖 Bot:</strong> '+escHtml(m.bot_reply)+'</div>';
-            html += '<div style="font-size:.7rem;color:var(--text-muted);margin-top:2px">'+dt+'</div></div>';
-        });
-        document.getElementById('chat-messages').innerHTML = html || '<p style="color:var(--text-muted)">Conversación vacía</p>';
-    });
-}
-function closeChat() { document.getElementById('chat-modal').style.display = 'none'; currentChatThreadId = ''; }
-function markAsLeadFromChat() {
-    if (!currentChatThreadId) return;
-    var fd = new FormData(); fd.append('thread_id', currentChatThreadId);
-    fetch('api/mensajes.php?action=mark_lead', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-        alert(d.ok ? 'Conversación marcada como lead ✅' : 'Error: '+(d.error||'Desconocido'));
-        closeChat();
-    });
-}
+// ── Mensajes (via ChatApp modal) ──
+// The WhatsApp-style chat is loaded from chat.js / chat.css. 
+// Clicking the "Abrir Chat" button calls ChatApp.open().
+// No additional init needed here — ChatApp handles everything.
 
 // ── Estadísticas ──
 function loadEstadisticas() {
@@ -1775,7 +2050,7 @@ var tabLoaders = {
     'tab-chicas': loadGirls,
     'tab-estados': function() { loadEstadosConfig(); loadEstadosHistory(); },
     'tab-clientes': loadClientes,
-    'tab-mensajes': loadMensajes,
+    'tab-mensajes': function() { if (typeof ChatApp !== 'undefined') { setTimeout(function() { ChatApp.open(); }, 50); } }, // ChatApp modal — direct open
     'tab-estadisticas': loadEstadisticas,
     'tab-registro': loadRegistro,
 };
@@ -1845,7 +2120,7 @@ document.querySelectorAll('#tabNav button[data-tab]').forEach(function(btn){
         var ofertasVal   = ofertasEl   ? ofertasEl.value.trim()   : '';
         var noRegateo    = regateoEl   ? regateoEl.checked        : false;
 
-        var tarifasOk   = tarifasVal.length > 20 && tarifasVal.indexOf('TARIFAS ÚNICAS Y FIJAS:') !== 0;
+    var tarifasOk   = tarifasVal.length > 20 && tarifasVal.trim() !== _defaultTarifas.trim();
         var zonaOk      = zonaVal.length > 2;
         var serviciosOk = serviciosVal.length > 10;
         var ofertasOk   = ofertasVal.length > 5;
@@ -1883,111 +2158,7 @@ document.querySelectorAll('#tabNav button[data-tab]').forEach(function(btn){
         setTimeout(buildPreview, 500);
     });
 })();
-<script>
-// ── Chicas catalog (isolated — works regardless of main JS) ──
-(function() {
-    function escHtml(s) { var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
-    var csrf = '';
-
-    function loadGirls() {
-        var container = document.getElementById('girls-container');
-        if (!container) return;
-        container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px">Cargando chicas...</p>';
-        fetch(apiUrl('api/girls.php?action=list')).then(function(r){return r.json()}).then(function(d){
-            if (!d.ok) { container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px">Error al cargar.</p>'; return; }
-            var html = '';
-            if (d.girls.length === 0) {
-                html = '<p style="color:var(--text-muted);text-align:center;padding:20px">No hay chicas configuradas. Añade la primera arriba.</p>';
-            } else {
-                html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:8px">';
-                d.girls.forEach(function(g){
-                    var active = g.activa ? '✅ Activa' : '❌ Inactiva';
-                    var activeColor = g.activa ? 'var(--ok)' : 'var(--text-muted)';
-                    var photos = (g.fotos||[]).slice(0,3).map(function(u){ return '<img src="'+escHtml(u)+'" style="width:60px;height:60px;object-fit:cover;border-radius:6px;margin:2px" onerror="this.style.display=\'none\'">'; }).join('');
-                    html += '<div style="background:var(--bg-surface);border:1px solid '+(g.activa?'rgba(45,212,191,.25)':'var(--border)')+';border-radius:var(--radius-sm);padding:12px">';
-                    html += '<strong>'+escHtml(g.nombre)+'</strong>';
-                    html += '<span style="font-size:.75rem;color:'+activeColor+';margin-left:8px">'+active+'</span>';
-                    html += '<div style="font-size:.78rem;color:var(--text-muted);margin:4px 0">'+escHtml(g.descripcion_corta||'')+'</div>';
-                    if (photos) html += '<div style="margin-top:6px">'+photos+'</div>';
-                    html += '<div style="margin-top:8px;display:flex;gap:4px">';
-                    html += '<button onclick="w_editGirl(\''+escHtml(g.id)+'\',\''+escHtml(g.nombre)+'\',\''+escHtml(g.descripcion_corta||'')+'\')" class="btn btn-sm btn-warning">✏️</button>';
-                    html += '<button onclick="w_toggleGirl(\''+escHtml(g.id)+'\')" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted)">'+(g.activa?'Pausar':'Activar')+'</button>';
-                    html += '<button onclick="w_deleteGirl(\''+escHtml(g.id)+'\')" class="btn btn-sm btn-danger">🗑</button>';
-                    html += '</div></div>';
-                });
-                html += '</div>';
-            }
-            container.innerHTML = html;
-        }).catch(function(e){ container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px">Error de conexión.</p>'; });
-    }
-
-    function saveGirl() {
-        var id = document.getElementById('girl-edit-id'); if (!id) return;
-        var idVal = id.value;
-        var nombre = document.getElementById('girl-nombre'); if (!nombre) return;
-        var desc = document.getElementById('girl-desc'); if (!desc) return;
-        var fd = new FormData();
-        if (idVal) fd.append('id', idVal);
-        fd.append('nombre', nombre.value.trim());
-        fd.append('descripcion', desc.value.trim());
-        fd.append('activa', '1');
-        fd.append('csrf_token', csrf);
-        fetch(apiUrl('api/girls.php?action=save'), {method:'POST',body:fd}).then(function(r){return r.json()}).then(function(d){
-            if (d.ok) { id.value=''; nombre.value=''; desc.value=''; document.getElementById('girl-form-title').textContent='➕ Nueva chica'; loadGirls(); }
-            else { alert('Error: '+(d.error||'Desconocido')); }
-        });
-    }
-
-    function w_editGirl(gid, nombre, descrip) {
-        var idEl = document.getElementById('girl-edit-id'); if (idEl) idEl.value = gid;
-        var nEl = document.getElementById('girl-nombre'); if (nEl) { nEl.value = nombre; nEl.focus(); }
-        var dEl = document.getElementById('girl-desc'); if (dEl) dEl.value = descrip;
-        var tEl = document.getElementById('girl-form-title'); if (tEl) tEl.textContent = '✏️ Editar chica';
-    }
-
-    function uploadGirlPhoto() {
-        var id = document.getElementById('girl-edit-id'); if (!id) return;
-        var idVal = id.value;
-        var fileInput = document.getElementById('girl-photo-file'); if (!fileInput) return;
-        if (!idVal) return alert('Primero guarda la chica (nombre + descripción) y luego sube fotos.');
-        if (!fileInput.files || !fileInput.files[0]) return alert('Selecciona una imagen.');
-        var file = fileInput.files[0];
-        if (file.size > 5*1024*1024) return alert('La imagen no puede superar 5 MB.');
-        var status = document.getElementById('upload-status'); if (status) status.textContent = '⏳ Subiendo...';
-        var fd = new FormData(); fd.append('id', idVal); fd.append('photo', file); fd.append('csrf_token', csrf);
-        fetch(apiUrl('api/girls.php?action=upload_photo'), {method:'POST',body:fd}).then(function(r){return r.json()}).then(function(d){
-            if (d.ok) { fileInput.value=''; if (status) status.textContent='✅ Subida'; loadGirls(); }
-            else { if (status) status.textContent='❌ '+(d.error||'Error'); }
-        }).catch(function(){ if (status) status.textContent='❌ Error de conexión'; });
-    }
-
-    function w_toggleGirl(gid) { 
-        var fd = new FormData(); fd.append('id', gid); fd.append('csrf_token', csrf);
-        fetch(apiUrl('api/girls.php?action=toggle'),{method:'POST',body:fd}).then(function(r){return r.json()}).then(function(d){ if(d.ok) loadGirls(); }); 
-    }
-    function w_deleteGirl(gid) { 
-        if(!confirm('¿Eliminar esta chica?')) return; 
-        var fd = new FormData(); fd.append('id', gid); fd.append('csrf_token', csrf);
-        fetch(apiUrl('api/girls.php?action=delete'),{method:'POST',body:fd}).then(function(r){return r.json()}).then(function(d){ if(d.ok) loadGirls(); }); 
-    }
-
-    window.loadGirls = loadGirls;
-    window.saveGirl = saveGirl;
-    window.uploadGirlPhoto = uploadGirlPhoto;
-    window.w_editGirl = w_editGirl;
-    window.w_toggleGirl = w_toggleGirl;
-    window.w_deleteGirl = w_deleteGirl;
-
-    // Load on any tab switch to chicas
-    setTimeout(function() {
-        try {
-            var container = document.getElementById('girls-container');
-            if (container && container.textContent.indexOf('Cargando') !== -1) {
-                loadGirls();
-            }
-        } catch(e) {}
-    }, 1000);
-})();
 </script>
+
 </body>
 </html>

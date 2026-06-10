@@ -8,7 +8,43 @@
             "name": "Administrador",
             "created_at": "2026-06-03T09:57:15+00:00",
             "active": true
+        },
+        {
+            "id": 2,
+            "username": "test",
+            "password_hash": "$2y$12$z6qKeqmKscNqPcCPpGxvsuWjtD/cfNASITjsr9uZqiuhSRd8Dh3W.",
+            "role": "user",
+            "name": "test",
+            "created_at": "2026-06-03T10:28:46+00:00",
+            "active": false
+        },
+        {
+            "id": 3,
+            "username": "test2",
+            "password_hash": "$2y$12$7W6qGNUXqZEfFd0IDNe5ZeUSzk.GCmzmcauhmM8lH341jaLYJEWLO",
+            "role": "user",
+            "name": "test2",
+            "created_at": "2026-06-03T14:19:12+00:00",
+            "active": true
+        },
+        {
+            "id": 4,
+            "username": "test3",
+            "password_hash": "$2y$12$XNk/5E1yetRcwkmd.rHDgO6rfI490L98GqufyybMxcewIwUpIxHSe",
+            "role": "user",
+            "name": "test3",
+            "created_at": "2026-06-03T15:43:05+00:00",
+            "active": true
+        },
+        {
+            "id": 5,
+            "username": "test4",
+            "password_hash": "$2y$12$OitcLXSCLfNOUTWqL253Wu3GAzQUWo9/P3/wV6diMFwkNBtlMg9dG",
+            "role": "user",
+            "name": "test4",
+            "created_at": "2026-06-09T14:12:26+00:00",
+            "active": true
         }
     ],
-    "next_id": 2
+    "next_id": 6
 }

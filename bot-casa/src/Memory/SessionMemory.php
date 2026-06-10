@@ -350,6 +350,7 @@ final class SessionMemory implements SessionMemoryInterface
             'unshown_girls'      => $meta['unshown_girls'] ?? $meta['__unshown_girls'] ?? [],
             'wants_more_girls'   => !empty($meta['wants_more_girls']),
             'ya_enviado'         => $meta['ya_enviado'] ?? [],
+            'sender_lid'         => (string) ($meta['sender_lid'] ?? ''),
         ];
     }
 

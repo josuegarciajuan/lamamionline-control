@@ -62,6 +62,104 @@ function removeLineMap(string $last9): void {
     @file_put_contents($linesMapFile, json_encode($map, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE)."\n", LOCK_EX);
 }
 
+/**
+ * Load telefonos.json and build a lookup map: last9 → descripcion (notas or nombre).
+ * @return array<string, string>
+ */
+function loadTelefonosNotas(): array {
+    $candidates = [
+        WASAPBOT_ROOT . '/../../data/telefonos.json',
+        WASAPBOT_ROOT . '/../data/telefonos.json',
+        WASAPBOT_ROOT . '/data/telefonos.json',
+        dirname(WASAPBOT_ROOT, 3) . '/data/telefonos.json',
+    ];
+    $raw = null;
+    foreach ($candidates as $path) {
+        $real = realpath($path);
+        if ($real !== false && file_exists($real)) {
+            $contents = @file_get_contents($real);
+            if ($contents !== false) { $raw = $contents; break; }
+        }
+    }
+    if ($raw === null) return [];
+
+    try {
+        $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+    } catch (\JsonException) {
+        return [];
+    }
+    if (!is_array($decoded)) return [];
+
+    $map = [];
+    foreach ($decoded as $t) {
+        if (!is_array($t)) continue;
+        $tfono = trim((string)($t['tfono'] ?? ''));
+        if ($tfono === '') continue;
+        $digits = preg_replace('/[^0-9]/', '', $tfono);
+        if ($digits === '' || strlen($digits) < 9) continue;
+        $last9 = substr($digits, -9);
+        $notas = trim((string)($t['notas'] ?? ''));
+        $nombre = trim((string)($t['nombre'] ?? ''));
+        $descripcion = ($notas !== '') ? $notas : $nombre;
+        if ($descripcion !== '') {
+            $map[$last9] = $descripcion;
+        }
+    }
+    return $map;
+}
+
+/**
+ * Enrich a lines array with descripcion from telefonos.json notas field.
+ * @param list<array<string,mixed>> $lines
+ * @return list<array<string,mixed>>
+ */
+function enrichLinesWithDescripcion(array $lines): array {
+    static $notasMap = null;
+    if ($notasMap === null) {
+        $notasMap = loadTelefonosNotas();
+    }
+    foreach ($lines as &$line) {
+        $last9 = (string)($line['last9'] ?? '');
+        if ($last9 !== '' && isset($notasMap[$last9])) {
+            $line['descripcion'] = $notasMap[$last9];
+        } elseif (($line['label'] ?? '') !== '') {
+            $line['descripcion'] = $line['label'];
+        } else {
+            $line['descripcion'] = 'Línea ' . ($line['id'] ?? '');
+        }
+    }
+    unset($line);
+    return $lines;
+}
+
+/**
+ * Fallback: load routing lines from root config when the admin user
+ * has no per-user lines.json. Returns lines in chat-compatible format.
+ */
+function loadRoutingLinesFallback(): array {
+    $rootConfig = new \WasapBot\Core\Config(WASAPBOT_ROOT);
+    $routingLines = $rootConfig->get('routing.lines', []);
+    if (!is_array($routingLines)) return [];
+    $lines = [];
+    $idx = 1;
+    foreach ($routingLines as $rl) {
+        if (!is_array($rl)) continue;
+        if (!((bool)($rl['enabled'] ?? true))) continue;
+        $last9 = (string)($rl['last9'] ?? '');
+        $lines[] = [
+            'id'              => $idx++,
+            'last9'           => $last9,
+            'phone'           => $last9,
+            'label'           => (string)($rl['label'] ?? ('Línea ' . ($rl['port'] ?? ''))),
+            'port'            => (int)($rl['port'] ?? 0),
+            'container_port'  => (int)($rl['port'] ?? 0),
+            'created_at'      => date('c'),
+            'health_status'   => 'unknown',
+        ];
+    }
+    return $lines;
+}
+
 $wahaCfg = [
     'waha_server' => '100.117.92.74',
     'waha_api_key' => 'local321',
@@ -76,6 +174,11 @@ try {
 
         case 'list':
             $lines = loadLines();
+            if (empty($lines) && $isAdmin && empty($_SESSION['suplantar_user_id'])) {
+                $lines = loadRoutingLinesFallback();
+            }
+            // Enrich with descripcion from telefonos.json
+            $lines = enrichLinesWithDescripcion($lines);
             // Try to cross-reference with WAHA status (fails gracefully)
             try {
                 $realStatus = $wm->scanInstances();
@@ -144,23 +247,27 @@ try {
                 $result = ['ok' => false, 'error' => 'WAHA no disponible'];
             }
 
-            $nextId = count($lines) > 0 ? max(array_column($lines, 'id')) + 1 : 1;
-            $line = [
-                'id' => $nextId,
-                'last9' => $last9,
-                'phone' => $phone,
-                'label' => $label !== '' ? $label : ('Línea ' . $nextId),
-                'port' => $result['port'] ?? $port,
-                'container_port' => $port,
-                'created_at' => date('c'),
-                'health_status' => $result['ok'] ? 'starting' : 'error',
-                'error' => $result['ok'] ? '' : ($result['error'] ?? ''),
-            ];
-
-            $lines[] = $line;
-            saveLines($lines);
-            if ($result['ok']) updateLineMap($last9, $userId);
-            echo json_encode(['ok' => $result['ok'], 'line' => $line, 'result' => $result]);
+            if ($result['ok']) {
+                $nextId = count($lines) > 0 ? max(array_column($lines, 'id')) + 1 : 1;
+                $line = [
+                    'id' => $nextId,
+                    'last9' => $last9,
+                    'phone' => $phone,
+                    'label' => $label !== '' ? $label : ('Línea ' . $nextId),
+                    'port' => $result['port'] ?? $port,
+                    'container_port' => $port,
+                    'created_at' => date('c'),
+                    'health_status' => 'starting',
+                    'error' => '',
+                ];
+                $lines[] = $line;
+                saveLines($lines);
+                updateLineMap($last9, $userId);
+                echo json_encode(['ok' => true, 'line' => $line, 'result' => $result]);
+            } else {
+                // Don't persist the line when WAHA creation fails — avoid phantom lines
+                echo json_encode(['ok' => false, 'error' => $result['error'] ?? 'WAHA no disponible — inténtalo de nuevo.']);
+            }
             break;
 
         case 'qr':
@@ -171,6 +278,11 @@ try {
             if (!$found || empty($found['port'])) { echo json_encode(['ok'=>false,'error'=>'Línea no encontrada o sin puerto']); break; }
 
             $port = (int) $found['port'];
+
+            // Start session before getting QR (idempotent if already running)
+            $wm->startSession($port);
+
+            // getQrCode retries internally up to 5 times if WAHA is still booting
             $qr = $wm->getQrCode($port);
 
             // Add warning about expiration
@@ -178,6 +290,18 @@ try {
                 $qr['warning'] = '⚠️ El QR caduca en 30-60 segundos. Ten el móvil listo para escanear.';
             }
             echo json_encode($qr);
+            break;
+
+        case 'start_session':
+            $lineId = (int) ($_GET['line_id'] ?? 0);
+            $lines = loadLines();
+            $found = null;
+            foreach ($lines as $l) { if ((int)($l['id']??0) === $lineId) { $found = $l; break; } }
+            if (!$found || empty($found['port'])) { echo json_encode(['ok'=>false,'error'=>'Línea no encontrada o sin puerto']); break; }
+
+            $port = (int) $found['port'];
+            $result = $wm->startSession($port);
+            echo json_encode(['ok' => $result['ok'] ?? true, 'result' => $result]);
             break;
 
         case 'test':
@@ -192,6 +316,10 @@ try {
             if (!$found || empty($found['port'])) { echo json_encode(['ok'=>false,'error'=>'Línea no encontrada']); break; }
 
             $digits = preg_replace('/[^0-9]/', '', $testPhone);
+            // Auto-detect Spanish local numbers (9 digits, starting with 6/7) → prepend 34
+            if (strlen($digits) === 9 && preg_match('/^[67]/', $digits)) {
+                $digits = '34' . $digits;
+            }
             $chatId = $digits . '@c.us';
             $result = $wm->sendTestMessage((int) $found['port'], $chatId, '✅ Mensaje de prueba desde bot-casa');
             echo json_encode($result);
@@ -199,6 +327,10 @@ try {
 
         case 'status':
             $lines = loadLines();
+            if (empty($lines) && $isAdmin && empty($_SESSION['suplantar_user_id'])) {
+                $lines = loadRoutingLinesFallback();
+            }
+            $lines = enrichLinesWithDescripcion($lines);
             $realStatus = $wm->scanInstances();
             $statuses = [];
             foreach ($lines as $line) {

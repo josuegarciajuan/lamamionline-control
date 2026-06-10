@@ -65,6 +65,11 @@ final readonly class Coalescer implements PipelineStageInterface
                 return $ctx;
             }
 
+            // ── Line-aware key: evita agrupar mensajes del mismo remitente
+            //     enviados a distintas líneas WA simultáneamente ───────────
+            $lineKey = $this->extractLineKey($ctx);
+            $compositeKey = $lineKey !== '' ? ($fromPhone . '_' . $lineKey) : $fromPhone;
+
             $coalesceDir = (string) $this->config->get('files.coalesce_dir', 'data/locks/coalesce');
             $windowSec = (int) $this->config->get('dedup_coalesce.coalesce_window_sec', 12);
             $sleepSec = (int) $this->config->get('dedup_coalesce.coalesce_sleep_before_send_sec', 4);
@@ -74,9 +79,9 @@ final readonly class Coalescer implements PipelineStageInterface
                 @mkdir($coalesceDir, 0755, true);
             }
 
-            $metaFile = $coalesceDir . '/' . $fromPhone . '.meta';
-            $bufFile  = $coalesceDir . '/' . $fromPhone . '.buf';
-            $lockDir  = $coalesceDir . '/' . $fromPhone . '.lock';
+            $metaFile = $coalesceDir . '/' . $compositeKey . '.meta';
+            $bufFile  = $coalesceDir . '/' . $compositeKey . '.buf';
+            $lockDir  = $coalesceDir . '/' . $compositeKey . '.lock';
 
             $wamid = $this->extractMessageId($ctx);
             $text  = $this->extractText($ctx);
@@ -238,6 +243,52 @@ final readonly class Coalescer implements PipelineStageInterface
 
         // Normalize: strip everything but digits
         return (string) preg_replace('/[^0-9]/', '', $raw);
+    }
+
+    /**
+     * Extract receiver line identifier from the context.
+     *
+     * Prefers ctx['line_last9'] (set by RoutingGate at gate 2).
+     * Falls back to extracting from raw payload me.id / to fields.
+     *
+     * This is used to build a composite coalesce key (sender + receiver)
+     * so that concurrent messages from the same sender to DIFFERENT
+     * WhatsApp lines are NOT incorrectly grouped together.
+     */
+    private function extractLineKey(array $ctx): string
+    {
+        // ── Prefer line_last9 from RoutingGate (already parsed) ───────
+        $lineLast9 = (string) ($ctx['line_last9'] ?? '');
+        if ($lineLast9 !== '') {
+            return $lineLast9;
+        }
+
+        // ── Fallback: extract from raw payload ────────────────────────
+        $body = $ctx['body'] ?? null;
+        if (!is_array($body)) {
+            return '';
+        }
+
+        // me.id is the receiver in WAHA webhooks
+        $me = $body['me'] ?? null;
+        if (is_array($me) && isset($me['id'])) {
+            $raw = (string) $me['id'];
+            $digits = (string) preg_replace('/[^0-9]/', '', $raw);
+            if ($digits !== '') {
+                return mb_substr($digits, -9);
+            }
+        }
+
+        // to field as last resort
+        $to = $body['to'] ?? null;
+        if (is_string($to) && $to !== '') {
+            $digits = (string) preg_replace('/[^0-9]/', '', $to);
+            if ($digits !== '') {
+                return mb_substr($digits, -9);
+            }
+        }
+
+        return '';
     }
 
     /**

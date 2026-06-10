@@ -650,7 +650,6 @@
         var appBackdrop = document.getElementById('appBackdrop');
         var sidebar = document.getElementById('appSidebar');
         var appMain = document.getElementById('appMain');
-        var mobileMenuToggle = document.getElementById('mobileMenuToggle');
         var mobileAvisosToggle = document.getElementById('mobileAvisosToggle');
         var avisosPanel = document.getElementById('avisosPanel');
         var isMobile = window.matchMedia('(max-width: 767px)').matches;
@@ -659,7 +658,6 @@
         function closeMobilePanels() {
             document.body.classList.remove('mobile-nav-open');
             document.body.classList.remove('mobile-avisos-open');
-            if (mobileMenuToggle) mobileMenuToggle.setAttribute('aria-expanded', 'false');
             if (mobileAvisosToggle) mobileAvisosToggle.setAttribute('aria-expanded', 'false');
             if (appBackdrop) appBackdrop.hidden = true;
         }
@@ -668,16 +666,6 @@
             if (!appBackdrop) return;
             var open = document.body.classList.contains('mobile-nav-open') || document.body.classList.contains('mobile-avisos-open');
             appBackdrop.hidden = !open;
-        }
-
-        if (mobileMenuToggle && sidebar) {
-            mobileMenuToggle.addEventListener('click', function () {
-                var open = document.body.classList.toggle('mobile-nav-open');
-                document.body.classList.remove('mobile-avisos-open');
-                mobileMenuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-                if (mobileAvisosToggle) mobileAvisosToggle.setAttribute('aria-expanded', 'false');
-                syncBackdrop();
-            });
         }
 
         if (mobileAvisosToggle) {
@@ -690,7 +678,6 @@
                 var open = document.body.classList.toggle('mobile-avisos-open');
                 document.body.classList.remove('mobile-nav-open');
                 mobileAvisosToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-                if (mobileMenuToggle) mobileMenuToggle.setAttribute('aria-expanded', 'false');
                 syncBackdrop();
             });
         }

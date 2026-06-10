@@ -91,6 +91,21 @@ final readonly class BotModeGate implements PipelineStageInterface
                 return null;
             }
 
+            // ── Per-thread lead lock: if this thread already had a lead detected ──
+            // (even if bot was restarted back to "start"), block processing
+            // to prevent re-triggering alerts/logs for the same conversation.
+            $threadId = (string) ($ctx['thread_id'] ?? $ctx['__thread_id'] ?? '');
+            if ($threadId !== '') {
+                $baseDataDir = (string) $this->config->get('files.base_data_dir', 'data');
+                $leadLockFile = rtrim($rootDir, '/') . '/' . rtrim($baseDataDir, '/')
+                    . '/locks/lead_detected/lead_' . md5($threadId) . '.lock';
+                if (is_file($leadLockFile)) {
+                    // Lead already detected for this thread — block to prevent re-trigger
+                    $ctx['bot_mode'] = 'stop_thread_lead';
+                    return null;
+                }
+            }
+
             return $ctx;
         } catch (\Throwable) {
             return $ctx;
