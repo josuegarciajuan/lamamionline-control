@@ -88,15 +88,16 @@
                 var actionsHtml = '';
 
                 cells.forEach(function (td, i) {
-                    var content = td.innerHTML.trim();
-                    if (!content || content === '&nbsp;' || content === '&mdash;' || content === '—' || content === '-') return;
+                    var content = td.textContent.trim(); // V2: textContent for safety (not innerHTML)
+                    if (!content || content === '—' || content === '-') return;
 
                     var label = labels[i] ? labels[i] : '';
-                    // Skip "Acciones" column — render its content as bottom action bar
+                    // Skip "Acciones" column — render its HTML content as bottom action bar
                     if (label.toLowerCase() === 'acciones' || label.toLowerCase() === 'acción' || label.toLowerCase() === 'action' || label === '' || label === '—') {
                         if (content) {
                             hasActions = true;
-                            actionsHtml += content;
+                            // Actions column needs innerHTML to preserve buttons/forms
+                            actionsHtml += td.innerHTML.trim();
                         }
                         return;
                     }
@@ -110,7 +111,7 @@
 
                     var valueDiv = document.createElement('div');
                     valueDiv.className = 'card-stack-value';
-                    valueDiv.innerHTML = content;
+                    valueDiv.textContent = content; // V2: textContent for safety
 
                     rowDiv.appendChild(labelSpan);
                     rowDiv.appendChild(valueDiv);

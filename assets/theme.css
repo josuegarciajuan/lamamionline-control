@@ -2370,8 +2370,66 @@ a.subtab.active {
     display: inline-flex !important;
   }
 
+  /* ── Safe Area: top, left, right, bottom on main content ── */
   .main {
-    padding: 14px 10px;
+    padding: max(14px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  }
+
+  /* Toolbar: respect top safe area and horizontal insets */
+  .app-shell-tools {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  /* Bottom nav: horizontal safe area */
+  .mobile-bottom-nav {
+    padding-left: max(4px, env(safe-area-inset-left));
+    padding-right: max(4px, env(safe-area-inset-right));
+  }
+
+  /* "Más" sheet: horizontal safe area */
+  .mobile-mas-sheet-panel {
+    padding-left: max(18px, env(safe-area-inset-left));
+    padding-right: max(18px, env(safe-area-inset-right));
+  }
+
+  /* Form sheet: horizontal safe area */
+  .mobile-form-sheet-panel {
+    padding-left: max(18px, env(safe-area-inset-left));
+    padding-right: max(18px, env(safe-area-inset-right));
+  }
+
+  /* ── Touch Targets: ensure all interactive elements meet 44px minimum ── */
+  .mobile-nav-item {
+    min-height: 44px;
+  }
+
+  .app-shell-btn {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .subtab,
+  a.subtab {
+    min-height: 32px;
+  }
+
+  .btn-wa,
+  .btn-primary,
+  .btn-secondary-mini,
+  .btn-danger-mini,
+  .btn-panel-link,
+  .runtime-toggle-btn {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* FAB: ensure it clears the safe area + bottom nav */
+  .mobile-fab {
+    bottom: calc(80px + max(8px, env(safe-area-inset-bottom)));
   }
 
   /* Cards: ensure consistent collapse over style.css !important overrides */
@@ -3852,5 +3910,140 @@ a.subtab.active {
   .crud-mobile-toggle {
     min-width: 0 !important;
     width: auto !important;
+  }
+}
+
+/* ==========================================================================
+   D2: SKELETON LOADERS — Shimmer animation for loading states
+   ========================================================================== */
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--panel, #111b2e);
+  border-radius: var(--radius-md, 14px);
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%,
+    transparent 100%
+  );
+  animation: skeletonShimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes skeletonShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Skeleton variants: matching real component sizes */
+.skeleton-card {
+  height: 120px;
+}
+
+.skeleton-kpi {
+  height: 100px;
+}
+
+.skeleton-row {
+  height: 52px;
+  margin-bottom: 8px;
+}
+
+.skeleton-text {
+  height: 16px;
+  margin-bottom: 8px;
+}
+
+.skeleton-text-sm {
+  height: 12px;
+  width: 60%;
+  margin-bottom: 6px;
+}
+
+/* Skeleton pulse: simpler alternative without shimmer */
+.skeleton-pulse {
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+/* ==========================================================================
+   D2: STAGGERED CARD ENTRANCE — Sequential fade-in for card stacks
+   ========================================================================== */
+
+@keyframes cardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card-stack-item {
+  animation: cardEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.card-stack-item:nth-child(1)  { animation-delay: 0.00s; }
+.card-stack-item:nth-child(2)  { animation-delay: 0.04s; }
+.card-stack-item:nth-child(3)  { animation-delay: 0.08s; }
+.card-stack-item:nth-child(4)  { animation-delay: 0.12s; }
+.card-stack-item:nth-child(5)  { animation-delay: 0.16s; }
+.card-stack-item:nth-child(6)  { animation-delay: 0.20s; }
+.card-stack-item:nth-child(7)  { animation-delay: 0.24s; }
+.card-stack-item:nth-child(8)  { animation-delay: 0.28s; }
+.card-stack-item:nth-child(9)  { animation-delay: 0.32s; }
+.card-stack-item:nth-child(10) { animation-delay: 0.36s; }
+.card-stack-item:nth-child(n+11) { animation-delay: 0.40s; }
+
+/* ==========================================================================
+   D2: PREFERS-REDUCED-MOTION — Accessibility override
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+
+  .skeleton-pulse {
+    animation: none;
+    opacity: 0.6;
+  }
+
+  .card-stack-item {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .mobile-fab,
+  .mobile-nav-item,
+  .mobile-form-sheet-panel,
+  .mobile-mas-sheet-panel {
+    animation: none;
+    transition: none;
+  }
+
+  .db-alert-warn.is-critical {
+    animation: none;
+  }
+
+  .mobile-nav-popover {
+    animation: none;
   }
 }

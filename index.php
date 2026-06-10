@@ -40,9 +40,9 @@ header('X-Frame-Options: DENY');
     <meta name="theme-color" content="#060c16">
     <link rel="manifest" href="manifest.json?v=20260608_6">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="assets/tokens.css?v=20260610_3">
-    <link rel="stylesheet" href="assets/style.css?v=20260610_3">
-    <link rel="stylesheet" href="assets/theme.css?v=20260610_3">
+    <link rel="stylesheet" href="assets/tokens.css?v=20260610_4">
+    <link rel="stylesheet" href="assets/style.css?v=20260610_4">
+    <link rel="stylesheet" href="assets/theme.css?v=20260610_4">
 </head>
 <body class="page-<?= e($page) ?>" data-page="<?= e($page) ?>">
 <?php if ($page === 'login'): ?>
@@ -134,6 +134,6 @@ header('X-Frame-Options: DENY');
         </main>
     </div>
 <?php endif; ?>
-<script src="assets/app.js?v=20260610_3"></script>
+<script src="assets/app.js?v=20260610_4"></script>
 </body>
 </html>

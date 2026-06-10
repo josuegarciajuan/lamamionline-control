@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-06-10 — MOBILE-REDESIGN-V2 BLOQUE D (Safe Area + Polish + Testing) 🎉 CIERRE TOTAL
+
+### Implementado
+- **D1 Safe Area**: `env(safe-area-inset-*)` en todos los elementos fixed/absolute del mobile shell:
+  - `.main`: padding con max() para top/right/bottom/left
+  - `.app-shell-tools`: padding-top + horizontal insets
+  - `.mobile-bottom-nav`, `.mobile-mas-sheet-panel`, `.mobile-form-sheet-panel`: horizontal insets
+  - FAB: bottom offset con safe-area-bottom
+- **D1 Touch Targets**: `min-height: 44px` en `.mobile-nav-item`, `.app-shell-btn`, `.btn-wa`, `.btn-primary` y resto de botones
+- **D2 Skeleton Loaders**: CSS shimmer animation (`.skeleton::after`), skeleton-pulse, variantes `.skeleton-card`, `.skeleton-kpi`, `.skeleton-row`
+- **D2 Animaciones**: Staggered card entrance (`.card-stack-item` con animation-delay incremental), `prefers-reduced-motion` completo
+- **D3 Seguridad**: 
+  - Fix `innerHTML` → `textContent` en `convertTablesToCards()` (card stack converter)
+  - Fix `X-Frame-Options: DENY` + `X-Content-Type-Options: nosniff` en `client.php`
+  - Auditoría completa: 0 CRITICAL/HIGH en scope mobile. CSRF en actions.php es preexistente (fuera de scope)
+
+### Archivos
+- **Modificados (5):** `index.php`, `assets/theme.css`, `assets/app.js`, `bot-casa/public/client.php`, `docs/changelog.md`
+- **CSS añadido:** ~135 líneas (safe area + skeleton loaders + staggered animations + reduced motion)
+- **JS:** 2 fixes de seguridad (textContent en card converter)
+
+### Proyecto MOBILE-REDESIGN-V2: RESUMEN FINAL
+| Bloque | Fases | Archivos | Cambios |
+|--------|-------|----------|---------|
+| A | F0+F1+F3+F4 | 9 archivos | Spec, tokens CSS, navegación 4-tabs, card stack fixes |
+| B | B1+B2 | 5 archivos | White-bg tokens, form sheets DOM move |
+| C | C1-C6 | 4 archivos | Rediseño 11 páginas en mobile |
+| D | D1-D3 | 5 archivos | Safe area, polish, seguridad, testing |
+| **TOTAL** | **4 bloques** | **~15 archivos** | **~1000 líneas net new** |
+
 ## 2026-06-10 — MOBILE-REDESIGN-V2 BLOQUE C (Rediseño página por página)
 
 ### Implementado

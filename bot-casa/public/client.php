@@ -32,6 +32,10 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 $isLoggedIn = !empty($_SESSION['user_id']);
 if (!$isLoggedIn) { header('Location: login'); exit; }
 
+// ── Security headers ──
+header('X-Frame-Options: DENY');
+header('X-Content-Type-Options: nosniff');
+
 // ── Determine effective user ID ──
 // $clientUserId is set by index.php (for admin suplantar)
 // For normal users, it's their own user_id

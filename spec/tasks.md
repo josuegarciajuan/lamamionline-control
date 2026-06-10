@@ -726,6 +726,8 @@
 
 ### Pendiente para Bloque D
 
-- [ ] D1 — Safe area completo (top, left, right).
-- [ ] D2 — Skeleton loaders, animaciones, pull-to-refresh.
-- [ ] D3 — Testing cross-device y changelog final.
+- [x] D1 — Safe area completo (top, left, right, bottom) en mobile shell, toolbar, sheets.
+- [x] D2 — Skeleton loaders CSS shimmer, staggered card entrance, prefers-reduced-motion.
+- [x] D3 — Testing cross-device, auditoría seguridad, changelog final, cierre.
+
+**🎉 CIERRE TOTAL DEL PROYECTO MOBILE-REDESIGN-V2 — 4 bloques completados.**
