@@ -316,6 +316,25 @@ if (file_exists($distPath)) {
 $tarifasVal = (string)$config->get('prompt.sections.tarifas','');
 $promptConfigured = strlen($tarifasVal) > 20 && trim($tarifasVal) !== trim($distTarifas);
 
+// ── Has notifications check ──
+$hasNotifications = false;
+$tgVal = $config->get('telegram.chat_ids', '');
+$waVal = $config->get('telegram.whatsapp_phones', '');
+if (is_array($tgVal)) $hasNotifications = count(array_filter($tgVal, fn($v) => trim((string)$v) !== '')) > 0;
+elseif (is_string($tgVal) && trim($tgVal) !== '') $hasNotifications = true;
+if (!$hasNotifications) {
+    if (is_array($waVal)) $hasNotifications = count(array_filter($waVal, fn($v) => trim((string)$v) !== '')) > 0;
+    elseif (is_string($waVal) && trim($waVal) !== '') $hasNotifications = true;
+}
+
+// ── Active girls count ──
+$girlsActiveCount = 0;
+$gf = WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/girls.json';
+if (file_exists($gf)) {
+    $gd = @json_decode((string)@file_get_contents($gf), true);
+    if (is_array($gd)) $girlsActiveCount = count(array_filter($gd['girls']??[], fn($g)=>!empty($g['activa'])));
+}
+
 // ── Toggle bot ──
 if ($method === 'POST' && $action === 'toggle_bot') {
     requireValidCsrf();
@@ -342,7 +361,7 @@ if ($method === 'POST' && $action === 'toggle_bot') {
         $waVal2 = $config->get('telegram.whatsapp_phones', '');
         if (is_array($waVal2)) $hasWhatsApp2 = count(array_filter($waVal2, fn($v) => trim((string)$v) !== '')) > 0;
         elseif (is_string($waVal2) && trim($waVal2) !== '') $hasWhatsApp2 = true;
-        if (!$hasTelegram2 && !$hasWhatsApp2) $errors[] = 'No has configurado dónde recibir avisos. Ve a 👥 Clientes y añade tu Chat ID de Telegram o tu teléfono WhatsApp.';
+        if (!$hasTelegram2 && !$hasWhatsApp2) $errors[] = 'No has configurado dónde recibir avisos. Ve a 🔔 Notificaciones y añade tu Chat ID de Telegram o tu teléfono WhatsApp.';
         if (!empty($errors)) {
             $notification = '<div class="alert alert-warning"><strong>⚠️ No se puede encender el bot todavía:</strong><br>• ' . implode('<br>• ', $errors) . '</div>';
         } else {
@@ -375,8 +394,8 @@ $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucci
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>bot-casa — <?php echo $clientName; ?></title>
-<link rel="stylesheet" href="assets/style.css?v=20260610_1">
-<link rel="stylesheet" href="assets/chat.css?v=20260610_1">
+<link rel="stylesheet" href="assets/style.css?v=20260610_2">
+<link rel="stylesheet" href="assets/chat.css?v=20260610_2">
 <style>
 /* ── Client panel overrides / additions ── */
 .tooltip-icon {
@@ -480,20 +499,25 @@ $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucci
 </head>
 <body>
 
-<div class="header">
+<div class="header-client">
     <div class="header-brand">
-        <h1>casawasap<span style="font-size:.55em;opacity:.7;font-weight:400">.com</span></h1>
-        <span class="subtitle"><?php echo $clientName; ?></span>
-        <div class="header-tagline">Tu bot de WhatsApp que atiende, negocia y cierra clientes</div>
+        <div class="brand-icon">🏠</div>
+        <div class="brand-text">
+            <h1>CasaWasap<span>.com</span></h1>
+            <span class="header-slogan">Deja de vivir pegado al WhatsApp</span>
+        </div>
     </div>
     <div class="header-pills">
         <span class="header-pill">🤖 IA Conversacional</span>
         <span class="header-pill">💬 24 Horas</span>
         <span class="header-pill">📊 Leads Automáticos</span>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
+    <div class="header-user">
+        <?php $userInitial = mb_substr($clientName, 0, 1); ?>
+        <div class="user-avatar"><?php echo h($userInitial); ?></div>
+        <span class="user-name"><?php echo $clientName; ?></span>
         <?php if (($_SESSION['role'] ?? '') === 'admin' && ($_SESSION['user_id'] ?? 0) !== $clientUserId): ?>
-        <span style="color:var(--accent);font-size:.8rem">👁 Suplantando</span>
+        <span style="color:var(--warn);font-size:.78rem;font-weight:600;background:rgba(251,191,36,.2);padding:3px 10px;border-radius:var(--radius-pill)">👁 Suplantando</span>
         <?php endif; ?>
         <form method="post" action="cliente?action=toggle_bot" style="display:inline">
             <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
@@ -501,8 +525,8 @@ $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucci
                 <?php echo $botMode === 'start' ? '⏹ APAGAR' : '▶ ENCENDER'; ?>
             </button>
         </form>
-        <button onclick="window.location.reload()" class="btn btn-sm" title="Recargar panel" style="background:var(--input-bg);color:var(--text-muted);border:1px solid var(--border);cursor:pointer;font-size:.8rem;border-radius:6px;padding:6px 10px">↻ Recargar</button>
-        <a href="logout" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted);text-decoration:none">Salir</a>
+        <button onclick="window.location.reload()" class="btn btn-sm" title="Recargar panel">↻</button>
+        <a href="logout" class="btn btn-sm">Salir</a>
     </div>
 </div>
 
@@ -539,29 +563,34 @@ if ($progressPct < 100):
 $showWizard = $progressPct < 25 && !isset($_COOKIE['botcasa_wizard_done']);
 if ($showWizard):
 ?>
-<div id="wizard-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">
-    <div style="background:var(--panel);border:1px solid var(--accent);border-radius:var(--radius-lg);padding:32px;max-width:500px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);text-align:center">
+<div id="wizard-overlay" class="wizard-overlay">
+    <div class="wizard-card">
         <div class="wizard-hero">🚀</div>
-        <h2 style="color:var(--accent);margin-bottom:8px">¡Bienvenido a bot-casa!</h2>
-        <p style="color:var(--text-muted);margin-bottom:16px;font-size:.9rem">
-            Configura tu bot en 3 pasos sencillos para empezar a recibir clientes por WhatsApp automáticamente.
+        <h2 style="color:var(--accent);margin-bottom:6px">¡Bienvenido a CasaWasap!</h2>
+        <p style="color:var(--text-muted);margin-bottom:20px;font-size:.88rem">
+            Configura tu bot en 3 pasos para empezar a recibir clientes automáticamente.
         </p>
         <div style="text-align:left;margin-bottom:20px">
-            <div class="wizard-step" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-surface);border-radius:var(--radius-sm);margin-bottom:8px;border-left:3px solid var(--accent)">
-                <span style="font-size:1.5rem;flex-shrink:0">1️⃣</span>
-                <div><strong>Personalidad</strong><br><span style="font-size:.78rem;color:var(--text-muted)">Define tarifas, ubicación y estilo → pestaña 🎭 Personalidad</span></div>
+            <?php
+            $wizSteps = [
+                ['Personalidad', 'Define tarifas, ubicación y estilo', 'tab-personalidad', $promptConfigured],
+                ['Líneas WhatsApp', 'Vincula tus números de teléfono', 'tab-lineas', $linesForUser > 0],
+                ['Chicas activas', 'Añade tu catálogo de chicas', 'tab-chicas', $girlsActiveCount > 0],
+            ];
+            foreach ($wizSteps as $step):
+                $ok = $step[3];
+            ?>
+            <div class="wizard-step wizard-step--<?php echo $ok ? 'ok' : 'fail'; ?>">
+                <span class="ws-icon"><?php echo $ok ? '✅' : '❌'; ?></span>
+                <div class="ws-body">
+                    <strong><?php echo $step[0]; ?></strong>
+                    <span><?php echo $step[1]; ?> → pestaña <?php echo $step[2]; ?></span>
+                </div>
             </div>
-            <div class="wizard-step" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-surface);border-radius:var(--radius-sm);margin-bottom:8px;border-left:3px solid var(--accent)">
-                <span style="font-size:1.5rem;flex-shrink:0">2️⃣</span>
-                <div><strong>Líneas WhatsApp</strong><br><span style="font-size:.78rem;color:var(--text-muted)">Vincula tus números → pestaña 📱 Líneas</span></div>
-            </div>
-            <div class="wizard-step" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-surface);border-radius:var(--radius-sm);border-left:3px solid var(--accent)">
-                <span style="font-size:1.5rem;flex-shrink:0">3️⃣</span>
-                <div><strong>Chicas</strong><br><span style="font-size:.78rem;color:var(--text-muted)">Añade tu catálogo → pestaña 👩 Chicas</span></div>
-            </div>
+            <?php endforeach; ?>
         </div>
         <button type="button" class="btn btn-primary btn-lg" onclick="dismissWizard()" style="width:100%">¡Empezar!</button>
-        <p style="font-size:.7rem;color:var(--text-muted);margin-top:10px">Este asistente solo aparece una vez. Puedes volver a verlo desde Ajustes.</p>
+        <p style="font-size:.7rem;color:var(--text-muted);margin-top:10px">Este asistente solo aparece una vez. Los cambios se guardan automáticamente.</p>
     </div>
 </div>
 <script>
@@ -574,16 +603,15 @@ function dismissWizard() {
 
 <div class="tab-nav" id="tabNav">
     <button type="button" class="active" data-tab="tab-dashboard">📊 Inicio</button>
-    <button type="button" data-tab="tab-mibot">🤖 Mi Bot</button>
     <button type="button" data-tab="tab-personalidad">🎭 Personalidad</button>
     <button type="button" data-tab="tab-lineas">📱 Líneas</button>
     <button type="button" data-tab="tab-chicas">👩 Chicas</button>
     <button type="button" data-tab="tab-estados">📢 Estados</button>
-    <button type="button" data-tab="tab-clientes">👥 Clientes</button>
+    <button type="button" data-tab="tab-clientes">🔔 Notificaciones</button>
     <button type="button" data-tab="tab-mensajes">💬 Chat</button>
+    <button type="button" data-tab="tab-seguimiento">📨 Seguimiento</button>
     <button type="button" data-tab="tab-ajustes">⚙️ Ajustes</button>
     <button type="button" data-tab="tab-estadisticas">📈 Estadísticas</button>
-    <button type="button" data-tab="tab-registro">📋 Registro</button>
 </div>
 
 <form method="post" action="cliente?action=save_config" class="main-form">
@@ -599,6 +627,74 @@ function dismissWizard() {
             <span class="bot-status-text"><?php echo h($botStatusLabel); ?></span>
         </div>
     </div>
+
+    <?php
+    // ── Setup cards data ──
+    $setupCards = [
+        [
+            'id' => 'lineas',
+            'icon' => '📱',
+            'title' => 'Vincular WhatsApp',
+            'ok' => $linesForUser > 0,
+            'okText' => 'Conectado',
+            'failText' => 'Pendiente',
+            'hint' => 'Vincula tus números en Líneas',
+            'tab' => 'tab-lineas',
+        ],
+        [
+            'id' => 'tarifas',
+            'icon' => '💰',
+            'title' => 'Configurar tarifas',
+            'ok' => $promptConfigured,
+            'okText' => 'Configuradas',
+            'failText' => 'Sin definir',
+            'hint' => 'Define tus precios en Personalidad',
+            'tab' => 'tab-personalidad',
+        ],
+        [
+            'id' => 'chicas',
+            'icon' => '👩',
+            'title' => 'Chicas activas',
+            'ok' => $girlsActiveCount > 0,
+            'okText' => $girlsActiveCount . ' activa' . ($girlsActiveCount !== 1 ? 's' : ''),
+            'failText' => 'Ninguna',
+            'hint' => 'Añade tu catálogo en Chicas',
+            'tab' => 'tab-chicas',
+        ],
+        [
+            'id' => 'avisos',
+            'icon' => '📬',
+            'title' => 'Configurar avisos',
+            'ok' => $hasNotifications,
+            'okText' => 'Activados',
+            'failText' => 'Sin avisos',
+            'hint' => 'Configura Telegram o WhatsApp en Notificaciones',
+            'tab' => 'tab-clientes',
+        ],
+    ];
+    ?>
+    <div class="setup-grid">
+        <?php foreach ($setupCards as $card): ?>
+        <div class="setup-card <?php echo $card['ok'] ? 'setup-card--ok' : 'setup-card--fail'; ?>" onclick="switchTab('<?php echo $card['tab']; ?>')">
+            <span class="setup-icon"><?php echo $card['icon']; ?></span>
+            <span class="setup-title"><?php echo $card['title']; ?></span>
+            <span class="setup-badge <?php echo $card['ok'] ? 'setup-badge--ok' : 'setup-badge--fail'; ?>">
+                <?php echo $card['ok'] ? '✅ ' . $card['okText'] : '❌ ' . $card['failText']; ?>
+            </span>
+            <?php if (!$card['ok']): ?>
+            <span class="setup-hint"><?php echo $card['hint']; ?></span>
+            <?php endif; ?>
+        </div>
+        <?php endforeach; ?>
+    </div>
+
+    <?php if ($progressPct >= 100): ?>
+    <div class="setup-cta">
+        <div class="cta-icon">🚀</div>
+        <div class="cta-title">¡Todo listo!</div>
+        <div class="cta-sub">Enciende tu bot y empieza a recibir clientes automáticamente.</div>
+    </div>
+    <?php endif; ?>
 
     <div class="card">
         <h2>Estadísticas</h2>
@@ -624,14 +720,7 @@ function dismissWizard() {
                 <div class="stat-label">Líneas WhatsApp</div>
                 <div class="stat-sub">Vinculadas al bot</div>
             </div>
-            <?php
-            $girlsActiveCount = 0;
-            $gf = WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/girls.json';
-            if (file_exists($gf)) {
-                $gd = @json_decode((string)@file_get_contents($gf), true);
-                if (is_array($gd)) $girlsActiveCount = count(array_filter($gd['girls']??[], fn($g)=>!empty($g['activa'])));
-            }
-            ?>
+            <?php ?>
             <div class="stat-card">
                 <div class="stat-num" style="color:#a78bfa"><?php echo $girlsActiveCount; ?></div>
                 <div class="stat-label">Chicas activas</div>
@@ -646,97 +735,6 @@ function dismissWizard() {
                 <div class="stat-num" style="color:#f97316"><?php echo count($allThreads)>0 ? round(count($allThreads)/max($leadsTotal,1),1) : 0; ?></div>
                 <div class="stat-label">Ratio conv/lead</div>
                 <div class="stat-sub">Conversaciones por lead</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- ===== TAB: Mi Bot ===== -->
-<div class="tab-content" id="tab-mibot">
-    <div class="card">
-        <h2>🤖 ¿Cómo funciona tu bot?</h2>
-        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">
-            Tu bot es un asistente virtual que atiende tus conversaciones de WhatsApp 
-            <strong style="color:var(--accent)">las 24 horas del día</strong>. Responde de forma natural, 
-            negocia precios, envía fotos y ubicación, y sabe reconocer cuándo un cliente 
-            está realmente interesado.
-        </p>
-        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:8px">
-            Mientras no puedes contestar —porque estás durmiendo, ocupado o descansando— el bot 
-            mantiene viva cada conversación. En cualquier momento puedes entrar desde la pestaña 
-            <strong style="color:var(--accent)">💬 Chat</strong> y tomar el control tú mismo.
-        </p>
-        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">
-            Además, el bot no solo reacciona: <strong style="color:var(--accent)">publica estados de WhatsApp</strong> 
-            automáticamente para atraer nuevos contactos y hace <strong style="color:var(--accent)">seguimiento 
-            con clientes antiguos</strong> para que vuelvan. Cuando está seguro de que un cliente 
-            viene de camino, <strong style="color:var(--accent)">te avisa al instante</strong>.
-        </p>
-
-        <div style="margin-top:16px">
-            <h3>✅ Configuración necesaria</h3>
-            <?php
-            $promptConfigured = $promptConfigured;
-            $linesConfigured = $linesForUser > 0;
-            $hasNotifications = false;
-            $tgVal = $config->get('telegram.chat_ids', '');
-            $waVal = $config->get('telegram.whatsapp_phones', '');
-            if (is_array($tgVal)) $hasNotifications = count(array_filter($tgVal, fn($v) => trim((string)$v) !== '')) > 0;
-            elseif (is_string($tgVal) && trim($tgVal) !== '') $hasNotifications = true;
-            if (!$hasNotifications) {
-                if (is_array($waVal)) $hasNotifications = count(array_filter($waVal, fn($v) => trim((string)$v) !== '')) > 0;
-                elseif (is_string($waVal) && trim($waVal) !== '') $hasNotifications = true;
-            }
-            $checkItems = [
-                ['✅ Vincular WhatsApp', $linesConfigured, 'Configura tus líneas en la pestaña 📱 Líneas.'],
-                ['✅ Configurar tarifas', $promptConfigured, 'Define tus precios en la pestaña 🎭 Personalidad.'],
-                ['⏳ Chicas configuradas', false, 'Añade tu catálogo en la pestaña 👩 Chicas.'],
-                ['✅ Avisos configurados', $hasNotifications, 'Pon tu Chat ID de Telegram o teléfono en 👥 Clientes.'],
-            ];
-            ?>
-            <div class="config-checklist">
-                <?php foreach ($checkItems as [$label, $done, $tip]): ?>
-                <div class="checklist-item <?php echo $done ? 'check-ok' : 'check-warn'; ?>">
-                    <span class="check-icon"><?php echo $done ? '✅' : '⚠️'; ?></span>
-                    <span><?php echo $label; ?>
-                        <span class="tooltip-wrap">
-                            <span class="tooltip-icon">?</span>
-                            <span class="tooltip-box"><?php echo h($tip); ?></span>
-                        </span>
-                    </span>
-                </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
-    </div>
-
-    <div class="card">
-        <h2>🚀 Empezar</h2>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:8px">
-            <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center">
-                <div style="font-size:2rem;margin-bottom:4px">🎭</div>
-                <strong>Personalidad</strong>
-                <p style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Define tarifas, estilo y ubicación</p>
-            </div>
-            <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center">
-                <div style="font-size:2rem;margin-bottom:4px">📱</div>
-                <strong>Líneas WhatsApp</strong>
-                <p style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Vincula tus números</p>
-            </div>
-            <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center">
-                <div style="font-size:2rem;margin-bottom:4px">👩</div>
-                <strong>Catálogo de chicas</strong>
-                <p style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Añade tu equipo</p>
-            </div>
-            <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center">
-                <div style="font-size:2rem;margin-bottom:4px">👥</div>
-                <strong>Avisos</strong>
-                <p style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Configura Telegram o WhatsApp</p>
-            </div>
-            <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center">
-                <div style="font-size:2rem;margin-bottom:4px">🚀</div>
-                <strong>¡A funcionar!</strong>
-                <p style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Enciende y recibe clientes</p>
             </div>
         </div>
     </div>
@@ -1116,10 +1114,10 @@ function dismissWizard() {
     </div>
 </div>
 
-<!-- ===== TAB: Clientes ===== -->
+<!-- ===== TAB: Notificaciones ===== -->
 <div class="tab-content" id="tab-clientes">
     <div class="card">
-        <h2>👥 Clientes (Leads)
+        <h2>🔔 Notificaciones y Avisos
             <span class="tooltip-wrap"><span class="tooltip-icon">?</span>
                 <span class="tooltip-box">Lista de clientes que han mostrado interés en venir. Marca los que llegaron de verdad para medir la efectividad del bot.</span>
             </span>
@@ -1177,6 +1175,61 @@ function dismissWizard() {
 
 <!-- ===== TAB: Mensajes (WhatsApp-style Chat) ===== -->
 <div class="tab-content" id="tab-mensajes"></div>
+
+<!-- ===== TAB: Seguimiento ===== -->
+<div class="tab-content" id="tab-seguimiento">
+    <div class="card">
+        <h2>📨 Seguimiento automático</h2>
+        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">
+            Estas funciones te ayudan a <strong style="color:var(--accent)">no perder clientes</strong> y a mantenerlos informados sin que tengas que hacer nada.
+        </p>
+
+        <!-- Follow-up -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3>🔄 Recontactar leads antiguos</h3>
+                <label class="checkbox-label" style="display:inline-flex;align-items:center;gap:6px;font-size:.82rem;cursor:pointer">
+                    <input type="hidden" name="cron[followup][enabled]" value="0">
+                    <input type="checkbox" name="cron[followup][enabled]" value="1" <?php echo checked((bool)$config->get('cron.followup.enabled',false)); ?> onchange="this.closest('.feature-card').classList.toggle('feature-card--on',this.checked)"> Activado
+                </label>
+            </div>
+            <p>
+                El bot revisa periódicamente los leads antiguos y les envía un mensaje con fotos de las chicas disponibles para intentar que vuelvan.
+                Es como un <strong>"te echamos de menos"</strong> automático.
+            </p>
+            <p style="color:var(--text-muted);font-size:.78rem">
+                <strong>¿Cuándo se envía?</strong> Solo a clientes con los que se habló hace 48-72h y que NO hayan sido marcados como "llegó".
+            </p>
+            <div class="alert-warning" style="margin-bottom:12px;font-size:.8rem;padding:10px 14px;border-radius:8px">
+                ⚠️ <strong>Importante:</strong> Marca los leads como "llegó" en la pestaña Notificaciones. Si no los marcas, el bot les reenviará mensajes y puede quedar raro.
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Máx leads por ejecución</label><input type="number" name="cron[followup][max_leads_per_run]" value="<?php echo cv('cron.followup.max_leads_per_run','10'); ?>"></div>
+                <div class="form-group"><label>Horario inicio</label><input type="text" name="cron[followup][send_window_start]" value="<?php echo cv('cron.followup.send_window_start','10:00'); ?>"></div>
+                <div class="form-group"><label>Horario fin</label><input type="text" name="cron[followup][send_window_end]" value="<?php echo cv('cron.followup.send_window_end','22:00'); ?>"></div>
+            </div>
+        </div>
+
+        <!-- Recordatorios ETA -->
+        <div class="feature-card">
+            <div class="feature-header">
+                <h3>⏰ Recordatorios de llegada</h3>
+                <label class="checkbox-label" style="display:inline-flex;align-items:center;gap:6px;font-size:.82rem;cursor:pointer">
+                    <input type="hidden" name="cron[reminder][enabled]" value="0">
+                    <input type="checkbox" name="cron[reminder][enabled]" value="1" <?php echo checked((bool)$config->get('cron.reminder.enabled',false)); ?>> Activado
+                </label>
+            </div>
+            <p>
+                Si un cliente dice <strong>"llego en 20 minutos"</strong>, el bot le enviará <strong>un solo recordatorio</strong> pasado ese tiempo para confirmar que sigue en camino.
+            </p>
+            <div class="alert-warning" style="margin-bottom:10px;font-size:.85rem;padding:12px 14px;border-radius:8px;border:2px solid var(--warn);background:rgba(251,191,36,.12)">
+                ⚠️ <strong>IMPORTANTE:</strong> Este recordatorio se envía automáticamente aunque no hayas marcado el lead como "llegó". El bot se basa solo en lo que el cliente dijo.
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="margin-top:8px">💾 Guardar configuración de seguimiento</button>
+    </div>
+</div>
 
 <!-- ===== TAB: Ajustes ===== -->
 <div class="tab-content" id="tab-ajustes">
@@ -1240,41 +1293,6 @@ function dismissWizard() {
             </div>
         </details>
 
-        <details style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0;margin-bottom:8px">
-            <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:.9rem">📨 Follow-up (recontactar leads)</summary>
-            <div style="padding:12px 16px;border-top:1px solid var(--border)">
-                <p style="color:var(--text-muted);font-size:.8rem;margin-bottom:8px">
-                    <strong>¿Qué hace?</strong> El bot revisa periódicamente los leads antiguos y les envía un mensaje con fotos de las chicas disponibles para intentar que vuelvan. 
-                    Es como un "te echamos de menos" automático.<br><br>
-                    <strong>¿Cuándo se envía?</strong> Solo a clientes con los que se habló hace 48-72h y que NO hayan sido marcados como "llegó" en la pestaña 👥 Clientes.
-                </p>
-                <div class="alert-warning" style="margin-bottom:10px;font-size:.8rem;padding:8px 12px;border-radius:8px">
-                    ⚠️ <strong>Importante:</strong> Marca los leads como "llegó" en la pestaña Clientes. Si no los marcas, el bot les reenviará mensajes y puede quedar raro.
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label class="checkbox-label"><input type="hidden" name="cron[followup][enabled]" value="0"><input type="checkbox" name="cron[followup][enabled]" value="1" <?php echo checked((bool)$config->get('cron.followup.enabled',false)); ?>> Activado</label></div>
-                    <div class="form-group"><label>Máx leads por ejecución</label><input type="number" name="cron[followup][max_leads_per_run]" value="<?php echo cv('cron.followup.max_leads_per_run','10'); ?>"></div>
-                    <div class="form-group"><label>Horario inicio</label><input type="text" name="cron[followup][send_window_start]" value="<?php echo cv('cron.followup.send_window_start','10:00'); ?>"></div>
-                    <div class="form-group"><label>Horario fin</label><input type="text" name="cron[followup][send_window_end]" value="<?php echo cv('cron.followup.send_window_end','22:00'); ?>"></div>
-                </div>
-            </div>
-        </details>
-
-        <details style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0;margin-bottom:8px">
-            <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:.9rem">⏰ Recordatorios ETA</summary>
-            <div style="padding:12px 16px;border-top:1px solid var(--border)">
-                <p style="color:var(--text-muted);font-size:.8rem;margin-bottom:8px">
-                    <strong>¿Qué hace?</strong> Si un cliente dice "llego en 20 minutos", el bot le enviará UN SOLO recordatorio pasado ese tiempo.
-                </p>
-                <div class="alert-warning" style="margin-bottom:10px;font-size:.85rem;padding:12px 14px;border-radius:8px;border:2px solid var(--warn);background:rgba(251,191,36,.12)">
-                    ⚠️ <strong style="font-size:.95rem">IMPORTANTE:</strong> Este recordatorio se envía automáticamente aunque no hayas marcado el lead como "llegó" en la pestaña Clientes. El bot se basa solo en lo que el cliente dijo.
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label class="checkbox-label"><input type="hidden" name="cron[reminder][enabled]" value="0"><input type="checkbox" name="cron[reminder][enabled]" value="1" <?php echo checked((bool)$config->get('cron.reminder.enabled',false)); ?>> Activado</label></div>
-                </div>
-            </div>
-        </details>
-
         <button type="submit" class="btn btn-primary" style="margin-top:12px">💾 Guardar Ajustes</button>
     </div>
 </div>
@@ -1294,21 +1312,22 @@ function dismissWizard() {
     </div>
 </div>
 
-<!-- ===== TAB: Registro (Logs) ===== -->
-<div class="tab-content" id="tab-registro">
-    <div class="card">
-        <h2>📋 Registro de actividad</h2>
-        <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:12px">
-            Últimas 200 líneas del registro del bot. Por curiosidad — no contiene datos sensibles.
-        </p>
-        <div id="registro-container">
-            <pre id="registro-pre" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;max-height:500px;overflow:auto;font-family:monospace;font-size:.72rem;white-space:pre-wrap;color:var(--text-muted)">Haz clic en la pestaña para cargar el registro de actividad.</pre>
-        </div>
-    </div>
-</div>
-
 </form>
 <script>
+// ── Tab switching helper ──
+function switchTab(tabId) {
+    var tabNav = document.getElementById('tabNav');
+    if (tabNav) {
+        var btns = tabNav.querySelectorAll('button[data-tab]');
+        btns.forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-tab') === tabId); });
+    }
+    var contents = document.querySelectorAll('.tab-content');
+    contents.forEach(function(c) { c.classList.toggle('active', c.id === tabId); });
+    // Update hidden input for form submission
+    var input = document.querySelector('.js-active-tab-input');
+    if (input) input.value = tabId;
+}
+
 // Global API token for all AJAX calls (works even without session cookie)
 var _apiToken = <?php echo json_encode(generateCsrfToken()); ?>;
 // Helper: append token to any API URL
@@ -1316,7 +1335,7 @@ function apiUrl(url) {
     return url + (url.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(_apiToken);
 }
 </script>
-<script src="assets/chat.js?v=20260610_1"></script>
+<script src="assets/chat.js?v=20260610_2"></script>
 <script>
 var _csrf = <?php echo json_encode(generateCsrfToken()); ?>;
 var _defaultTarifas = <?php echo json_encode($distTarifas); ?>;
@@ -2052,7 +2071,6 @@ var tabLoaders = {
     'tab-clientes': loadClientes,
     'tab-mensajes': function() { if (typeof ChatApp !== 'undefined') { setTimeout(function() { ChatApp.open(); }, 50); } }, // ChatApp modal — direct open
     'tab-estadisticas': loadEstadisticas,
-    'tab-registro': loadRegistro,
 };
 var loadedTabs = {};
 document.querySelectorAll('#tabNav button[data-tab]').forEach(function(btn){

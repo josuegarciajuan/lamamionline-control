@@ -274,7 +274,12 @@ var ChatApp = (function() {
         sidebarHeader.className = 'chat-sidebar-header';
         sidebarHeader.innerHTML =
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
-                '<h3 style="margin-bottom:0">💬 Conversaciones</h3>' +
+                '<h3 style="margin-bottom:0;display:flex;align-items:center;gap:6px">💬 Conversaciones' +
+                    '<span class="tooltip-wrap" style="display:inline-flex;position:relative">' +
+                        '<span class="tooltip-icon" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--info);color:#fff;font-size:.7rem;font-weight:700;cursor:help;line-height:1">?</span>' +
+                        '<span class="tooltip-box" style="display:none;position:absolute;z-index:100;top:100%;left:0;margin-top:6px;background:var(--panel);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;font-size:.75rem;color:var(--text);max-width:260px;box-shadow:0 10px 30px rgba(0,0,0,.6);line-height:1.55;white-space:normal;font-weight:400">Desde aqui puedes:<br>• <strong>Contestar tu mismo</strong> a las conversaciones<br>• <strong>Ver en directo</strong> como responde el bot<br>• <strong>Pausar el bot</strong> para una conversacion concreta<br>• <strong>Intervenir</strong> cuando quieras<br>• <strong>Volver a encender</strong> el bot para esa conversacion</span>' +
+                    '</span>' +
+                '</h3>' +
                 '<button class="chat-sidebar-close" title="Cerrar chat" onclick="ChatApp.close()">✕</button>' +
             '</div>' +
             '<div class="chat-search-wrap"><input type="text" class="chat-search" id="chat-search" placeholder="Buscar por teléfono..." oninput="ChatApp.filter()"></div>';

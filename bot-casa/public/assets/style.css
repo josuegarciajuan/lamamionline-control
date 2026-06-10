@@ -680,3 +680,322 @@ input[type="checkbox"] { width: auto; margin-right: 6px; accent-color: var(--acc
     pointer-events: none;
     flex-shrink: 0;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Client Panel — Header Redesign (exclusive to client.php)
+   ═══════════════════════════════════════════════════════════════════════ */
+.header-client {
+    background: linear-gradient(135deg, var(--accent-dark) 0%, var(--accent2) 100%);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+}
+.header-client::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 55%),
+        radial-gradient(ellipse at 80% 50%, rgba(255,255,255,0.05) 0%, transparent 55%);
+    pointer-events: none;
+}
+.header-brand { display: flex; align-items: center; gap: 12px; }
+.brand-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.18);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; flex-shrink: 0;
+}
+.brand-text h1 {
+    font-size: 1.25rem; font-weight: 700; color: #fff; margin: 0; line-height: 1.2;
+}
+.brand-text h1 span { font-size: .55em; opacity: .6; font-weight: 400; }
+.header-slogan {
+    font-size: .73rem; color: rgba(255,255,255,.65);
+    font-style: italic; letter-spacing: .25px; display: block; margin-top: 1px;
+}
+.header-user { display: flex; align-items: center; gap: 12px; }
+.user-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255,255,255,.2);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: .85rem; color: #fff;
+    border: 2px solid rgba(255,255,255,.3); flex-shrink: 0;
+}
+.user-name { color: #fff; font-weight: 600; font-size: .88rem; }
+.header-client .btn {
+    box-shadow: 0 2px 8px rgba(0,0,0,.2);
+}
+.header-client .btn-sm {
+    background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.2);
+}
+.header-client .btn-sm:hover {
+    background: rgba(255,255,255,.25); color: #fff;
+}
+.header-client .btn-danger {
+    background: rgba(255,71,87,.85); color: #fff; border: none;
+}
+.header-client .btn-danger:hover { background: #ff5e6b; }
+.header-client .btn-success {
+    background: rgba(45,212,191,.85); color: #fff; border: none;
+}
+.header-client .btn-success:hover { background: #3ddbc7; }
+
+@media (max-width: 768px) {
+    .header-client {
+        padding: 12px 14px;
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+        gap: 8px;
+    }
+    .brand-icon { width: 36px; height: 36px; font-size: 1.1rem; }
+    .brand-text h1 { font-size: 1.05rem; }
+    .header-slogan { display: none; }
+    .user-name { display: none; }
+    .user-avatar { width: 30px; height: 30px; font-size: .75rem; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Client Panel — Setup Grid (Dashboard)
+   ═══════════════════════════════════════════════════════════════════════ */
+.setup-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.setup-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 20px 18px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s cubic-bezier(0.16,1,0.3,1), border-color 0.25s;
+    position: relative;
+    overflow: hidden;
+}
+.setup-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+}
+.setup-card--ok {
+    border-color: rgba(45,212,191,.25);
+    background: rgba(45,212,191,.04);
+}
+.setup-card--ok:hover { border-color: rgba(45,212,191,.4); }
+.setup-card--fail {
+    border-color: rgba(255,71,87,.2);
+    background: rgba(255,71,87,.03);
+}
+.setup-card--fail:hover { border-color: rgba(255,71,87,.35); }
+
+.setup-icon {
+    font-size: 2rem; display: block; margin-bottom: 8px;
+}
+.setup-card .setup-title {
+    font-weight: 700; font-size: .88rem; color: var(--text);
+    margin-bottom: 8px; display: block;
+}
+.setup-badge {
+    display: inline-block;
+    font-size: .7rem; font-weight: 600;
+    padding: 4px 12px; border-radius: var(--radius-pill);
+    letter-spacing: .2px; text-transform: uppercase;
+}
+.setup-badge--ok {
+    background: rgba(45,212,191,.15); color: var(--ok);
+    border: 1px solid rgba(45,212,191,.25);
+}
+.setup-badge--fail {
+    background: rgba(255,71,87,.1); color: var(--danger);
+    border: 1px solid rgba(255,71,87,.2);
+}
+.setup-card .setup-hint {
+    display: block; font-size: .68rem; color: var(--text-muted);
+    margin-top: 6px; opacity: .7;
+}
+
+@media (max-width: 768px) {
+    .setup-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .setup-card { padding: 14px 12px; }
+    .setup-icon { font-size: 1.6rem; }
+    .setup-card .setup-title { font-size: .78rem; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Client Panel — Feature Cards (Seguimiento, Notificaciones)
+   ═══════════════════════════════════════════════════════════════════════ */
+.feature-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    margin-bottom: 16px;
+    transition: border-color .2s, box-shadow .2s;
+}
+.feature-card:hover {
+    border-color: rgba(255,255,255,.1);
+    box-shadow: var(--shadow-sm);
+}
+.feature-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+.feature-header h3 {
+    font-size: .95rem; font-weight: 700; color: var(--text);
+    margin: 0; display: flex; align-items: center; gap: 6px;
+}
+.feature-card p {
+    font-size: .82rem; color: var(--text-muted);
+    line-height: 1.55; margin-bottom: 12px;
+}
+.feature-card .form-row { margin-top: 8px; }
+.feature-card .checkbox-label {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: .82rem; color: var(--text-muted);
+    cursor: pointer; white-space: nowrap;
+}
+.feature-card input[type="checkbox"] {
+    accent-color: var(--ok); width: 16px; height: 16px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Client Panel — Setup CTA (Dashboard success)
+   ═══════════════════════════════════════════════════════════════════════ */
+.setup-cta {
+    text-align: center; padding: 24px;
+    background: linear-gradient(135deg, rgba(45,212,191,.06), rgba(124,92,255,.06));
+    border: 1px solid rgba(45,212,191,.15);
+    border-radius: var(--radius-md);
+}
+.setup-cta .cta-icon { font-size: 2.5rem; margin-bottom: 8px; }
+.setup-cta .cta-title {
+    font-size: 1.05rem; font-weight: 700; color: var(--ok);
+    margin-bottom: 4px;
+}
+.setup-cta .cta-sub {
+    font-size: .8rem; color: var(--text-muted);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Client Panel — Wizard Overlay (improved)
+   ═══════════════════════════════════════════════════════════════════════ */
+.wizard-overlay {
+    position: fixed; inset: 0; background: rgba(5,5,16,.9);
+    backdrop-filter: blur(8px);
+    z-index: 9999; display: flex;
+    align-items: center; justify-content: center;
+    padding: 20px;
+}
+.wizard-card {
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    max-width: 500px; width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    text-align: center;
+    animation: wizardIn .3s cubic-bezier(0.16,1,0.3,1);
+}
+@keyframes wizardIn {
+    from { opacity: 0; transform: translateY(20px) scale(.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.wizard-card .wizard-icon { font-size: 3rem; margin-bottom: 8px; }
+.wizard-step {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px; border-radius: var(--radius-sm);
+    margin-bottom: 8px; text-align: left;
+    transition: background .15s;
+}
+.wizard-step:hover { background: rgba(255,255,255,.03); }
+.wizard-step--ok {
+    background: rgba(45,212,191,.06);
+    border: 1px solid rgba(45,212,191,.15);
+}
+.wizard-step--fail {
+    background: rgba(255,71,87,.04);
+    border: 1px solid rgba(255,71,87,.1);
+}
+.wizard-step .ws-icon { font-size: 1.5rem; flex-shrink: 0; }
+.wizard-step .ws-body strong { display: block; font-size: .88rem; }
+.wizard-step .ws-body span { font-size: .75rem; color: var(--text-muted); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Client Panel — Chicas card hover polish
+   ═══════════════════════════════════════════════════════════════════════ */
+.girl-card-hero {
+    height: 210px;
+    position: relative;
+}
+.girl-card-hero::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,.55) 0%, transparent 50%);
+    pointer-events: none;
+}
+.girl-card-hero .hero-name {
+    position: absolute; bottom: 10px; left: 12px;
+    font-size: .95rem; font-weight: 700; color: #fff;
+    z-index: 2; text-shadow: 0 1px 4px rgba(0,0,0,.4);
+}
+.girl-card-actions {
+    opacity: 0.35; transition: opacity .2s;
+}
+.girl-card:hover .girl-card-actions { opacity: 1; }
+.girls-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
+}
+.girl-card:hover {
+    transform: translateY(-4px) scale(1.01);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Client Panel — Notificaciones: provider setup cards
+   ═══════════════════════════════════════════════════════════════════════ */
+.notify-providers {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+    margin-bottom: 16px;
+}
+.notify-provider-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 6px;
+}
+.notify-provider-card .np-icon {
+    font-size: 2.2rem; margin-bottom: 4px;
+}
+.notify-provider-card .np-name {
+    font-weight: 700; font-size: .9rem; color: var(--text);
+}
+.notify-provider-card .np-steps {
+    font-size: .72rem; color: var(--text-muted);
+    line-height: 1.5; margin-top: 4px;
+    text-align: left; width: 100%;
+}
+.notify-provider-card .np-steps ol {
+    margin: 0; padding-left: 18px;
+}
+.notify-provider-card .np-steps ol li {
+    margin-bottom: 3px;
+}
