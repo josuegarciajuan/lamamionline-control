@@ -2061,17 +2061,16 @@ a.subtab.active{
   .page-casawasap .table-wrap,
   .page-lamami .table-wrap,
   .page-bots .table-wrap{
-    margin-left:-12px;
-    margin-right:-12px;
-    width:calc(100% + 24px);
     border-radius:0;
+    /* V2: removed negative margins and forced width that caused horizontal overflow */
   }
 
   .page-jostal .table-wrap table,
   .page-casawasap .table-wrap table,
   .page-lamami .table-wrap table,
   .page-bots .table-wrap table{
-    min-width:640px;
+    min-width:0;
+    /* V2: removed forced min-width:640px — card stack handles mobile layout */
   }
 
   .page-jostal .money-callout,

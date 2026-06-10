@@ -2370,48 +2370,52 @@
         convertTablesToCards();
         setupSubtabOverflow();
 
-        // ── Dropdown popover toggles (MOBILE-REDESIGN: replaces Más sheet) ──
-        var dropIds = ['dropCtrl', 'dropNeg', 'dropCom', 'dropSis'];
-        var activePop = null;
+        // ── "Más" bottom sheet toggle (MOBILE-REDESIGN-V2) ──
+        var masToggle = document.getElementById('mobileMasToggle');
+        var masSheet = document.getElementById('mobileMasSheet');
+        var masBackdrop = document.getElementById('mobileMasBackdrop');
 
-        function closeAllPops() {
-            dropIds.forEach(function (id) {
-                var pop = document.getElementById(id + 'Pop');
-                var btn = document.getElementById(id);
-                if (pop) pop.hidden = true;
-                if (btn) btn.setAttribute('aria-expanded', 'false');
-            });
-            activePop = null;
+        function openMasSheet() {
+            if (!masSheet) return;
+            masSheet.hidden = false;
+            document.body.style.overflow = 'hidden';
+            if (masToggle) masToggle.setAttribute('aria-expanded', 'true');
         }
 
-        dropIds.forEach(function (id) {
-            var btn = document.getElementById(id);
-            var pop = document.getElementById(id + 'Pop');
-            if (!btn || !pop) return;
+        function closeMasSheet() {
+            if (!masSheet) return;
+            masSheet.hidden = true;
+            document.body.style.overflow = '';
+            if (masToggle) masToggle.setAttribute('aria-expanded', 'false');
+        }
 
-            btn.addEventListener('click', function (e) {
+        if (masToggle) {
+            masToggle.addEventListener('click', function (e) {
                 e.stopPropagation();
-                if (activePop === id) {
-                    closeAllPops();
+                if (masSheet && !masSheet.hidden) {
+                    closeMasSheet();
                 } else {
-                    closeAllPops();
-                    pop.hidden = false;
-                    btn.setAttribute('aria-expanded', 'true');
-                    activePop = id;
+                    openMasSheet();
                 }
             });
+        }
 
-            // Close when clicking a link inside the popover
-            pop.querySelectorAll('.mobile-nav-popover-link').forEach(function (link) {
-                link.addEventListener('click', function () {
-                    closeAllPops();
-                });
+        if (masBackdrop) {
+            masBackdrop.addEventListener('click', closeMasSheet);
+        }
+
+        // Close "Más" sheet when any link inside is clicked
+        if (masSheet) {
+            masSheet.querySelectorAll('.mobile-mas-link').forEach(function (link) {
+                link.addEventListener('click', closeMasSheet);
             });
-        });
+        }
 
-        // Click outside closes any open popover
-        document.addEventListener('click', function () {
-            if (activePop) closeAllPops();
+        // Escape key closes "Más" sheet
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && masSheet && !masSheet.hidden) {
+                closeMasSheet();
+            }
         });
     });
 })();

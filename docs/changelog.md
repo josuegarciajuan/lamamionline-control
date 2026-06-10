@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-06-10 — MOBILE-REDESIGN-V2 BLOQUE A (Spec + Tokens + Navegación 4-Tabs + Card Stack Fixes)
+
+### Implementado
+- **F0 Spec**: `specs/05-mobile-responsive-redesign-v2.md` con plan Bloque A documentado.
+- **F1 Tokens CSS**: Nuevo `assets/tokens.css` con todas las variables `:root` del tema. Cargado antes de `style.css` y `theme.css` en `index.php`.
+- **F3 Navegación 4-tabs + hamburguesa "Más"**:
+  - Reemplazada la bottom nav de 8 items por 4 tabs (Home, Negocio, Comercial, Bot) + ☰ hamburguesa.
+  - "Más" abre un bottom sheet con secciones agrupadas (Gestión, Herramientas, Sistema).
+  - Toolbar superior simplificada: eliminado botón "Menú" redundante, solo Avisos + Voz.
+  - CSS V2: tabs más anchos (min-width 44px), labels 10px (antes 7px), icons 20px, gold indicators.
+  - JS: eliminada lógica de dropdown popovers, nuevo toggle "Más" sheet con backdrop/Escape.
+- **F4 Card Stacks & Anti-Overflow**:
+  - Eliminado `min-width:640px` forzado en tablas mobile (`style.css`).
+  - Eliminados negative margins en `.table-wrap` mobile.
+  - FAB: gradiente cambiado de rosa a dorado, tamaño 52→56px.
+
+### Archivos
+- **Nuevos (1):** `assets/tokens.css`, `specs/05-mobile-responsive-redesign-v2.md`
+- **Modificados (5):** `index.php`, `app/views.php`, `assets/theme.css`, `assets/style.css`, `assets/app.js`
+- **Documentación:** `docs/changelog.md`, `spec/tasks.md`
+
+### Verificación
+- `php -l index.php`: OK
+- `php -l app/views.php`: OK
+- Navegación: 4 tabs + hamburger "Más" con bottom sheet
+- Overflow: sin min-width:640px, sin negative margins
+- Sin regresión en desktop (todo dentro de `@media max-width:767px`)
+
 ## 2026-06-08 — MOBILE-REDESIGN FASE 6 (Pulido final, kill min-widths, verificación 20 secciones, cierre 🎉)
 
 ### Implementado

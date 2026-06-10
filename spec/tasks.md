@@ -675,3 +675,52 @@
 - [x] T6.4 — Dual-panel bot-casa verificado: `panel.php` + `client.php` sin regresión (CSS responsive independiente).
 
 **🎉 CIERRE TOTAL DEL PROYECTO MOBILE-REDESIGN — 7 fases completadas.**
+
+---
+
+## MOBILE-REDESIGN-V2 — Rediseño responsive profundo (Bloque A: Fundación)
+
+### MOBILE-REDESIGN-V2-F0 — Spec & Auditoría
+
+- [x] T0.1 — Crear `specs/05-mobile-responsive-redesign-v2.md` con el plan Bloque A (F0+F1+F3+F4).
+- [x] T0.2 — Auditar elementos con `min-width` > 320px que causan overflow horizontal.
+- [x] T0.3 — Confirmar decisiones: 4 tabs + hamburguesa, golden FAB, card stacks mejorados.
+
+### MOBILE-REDESIGN-V2-F1 — Consolidación de Tokens CSS
+
+- [x] T1.1 — Crear `assets/tokens.css` con todas las variables `:root` del tema (colores, sombras, radios, tipografía).
+- [x] T1.2 — Cargar `tokens.css` en `index.php` antes de `style.css` y `theme.css`.
+- [x] T1.3 — Bump cache-busting: `tokens.css?v=20260610`.
+
+### MOBILE-REDESIGN-V2-F3 — Nueva Navegación 4 Tabs + Hamburguesa "Más"
+
+- [x] T3.1 — HTML: 4 tabs (Home, Negocio, Comercial, Bot) + ☰ hamburguesa en `render_global_ui()`.
+- [x] T3.2 — HTML: bottom sheet "Más" con secciones agrupadas (Gestión, Herramientas, Sistema).
+- [x] T3.3 — HTML: eliminar botón "Menú" de la toolbar superior (redundante con bottom nav).
+- [x] T3.4 — CSS: nuevo bottom nav V2 (tabs más anchos, labels 10px, icons 20px, min-height 56px).
+- [x] T3.5 — CSS: "Más" bottom sheet con handle, backdrop, grupos, animaciones slideUp.
+- [x] T3.6 — JS: toggle "Más" sheet con backdrop, Escape key, links cierran sheet.
+- [x] T3.7 — JS: eliminar vieja lógica de dropdown popovers (`dropCtrl`, `dropNeg`, `dropCom`, `dropSis`).
+
+### MOBILE-REDESIGN-V2-F4 — Card Stacks & Anti-Overflow
+
+- [x] T4.1 — Eliminar `min-width:640px` forzado en tablas mobile (`style.css` L2074).
+- [x] T4.2 — Eliminar negative margins en `.table-wrap` mobile (`style.css` L2064-2066).
+- [x] T4.3 — FAB: cambiar gradiente rosa `#e83e8c → #8a5cf6` a dorado `--accent → --accent-dark`.
+- [x] T4.4 — FAB: aumentar tamaño de 52px a 56px.
+- [x] T4.5 — Bump cache-busting: `style.css?v=20260610`, `theme.css?v=20260610`, `app.js?v=20260610`.
+
+### Pendiente para Bloque B
+
+- [ ] B1 — Quitar `!important` en theme.css (secciones 25-28).
+- [ ] B2 — Form sheets con DOM move (no cloneNode).
+
+### Pendiente para Bloque C
+
+- [ ] C1 — Rediseño página por página (Dashboard, LaMami, Comercial, Publicista, Jostal, resto).
+
+### Pendiente para Bloque D
+
+- [ ] D1 — Safe area completo (top, left, right).
+- [ ] D2 — Skeleton loaders, animaciones, pull-to-refresh.
+- [ ] D3 — Testing cross-device y changelog final.
