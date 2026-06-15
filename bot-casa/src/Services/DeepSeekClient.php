@@ -44,7 +44,7 @@ final class DeepSeekClient implements OpenAiClientInterface
 
         $userContent = $userMessage;
         if ($context !== []) {
-            $userContent .= "\n\n### CONTEXTO\n" . json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $userContent .= "\n\n### CONTEXTO\n" . $this->formatContext($context);
         }
 
         // Build multi-turn messages: system + history + current user message
@@ -84,19 +84,29 @@ final class DeepSeekClient implements OpenAiClientInterface
                     return $this->parseChoicesContent($rawBody);
                 }
 
-                // Only retry on timeout (httpCode=0) or server errors (5xx)
+                // Rate limit (429) — honour Retry-After if present, else exponential backoff
+                if ($httpCode === 429 && $attempt < $maxAttempts) {
+                    $retryAfter = (int) ($headers['Retry-After'] ?? ($baseDelay * (int) pow(2, $attempt)));
+                    $this->logger->warning("DeepSeek chat — rate limited, retrying in {$retryAfter}s (attempt {$attempt}/{$maxAttempts})");
+                    sleep(max(1, $retryAfter));
+                    continue;
+                }
+
+                // Server errors (5xx) and timeouts — exponential backoff with jitter
                 $isRetryable = ($httpCode === 0) || ($httpCode >= 500);
 
                 if ($isRetryable && $attempt < $maxAttempts) {
-                    $delay = $baseDelay * (int) pow(2, $attempt - 1);
+                    $jitterMs = random_int(0, 500);
+                    $delay = $baseDelay * (int) pow(2, $attempt - 1) + ($jitterMs / 1000);
                     $this->logger->warning("DeepSeek chat — retrying in {$delay}s (attempt {$attempt}/{$maxAttempts})", [
                         'http_code' => $httpCode,
                         'error'     => $this->http->lastError(),
                     ]);
-                    sleep($delay);
+                    usleep((int) ($delay * 1_000_000));
                     continue;
                 }
 
+                // Client errors (4xx except 429) — no retry
                 $this->logger->warning("DeepSeek chat returned HTTP {$httpCode}", [
                     'error'    => $this->http->lastError(),
                     'body'     => mb_substr($rawBody, 0, 200),
@@ -105,7 +115,15 @@ final class DeepSeekClient implements OpenAiClientInterface
                 return [];
 
             } catch (\Throwable $e) {
-                $this->logger->error("DeepSeek chat exception: {$e->getMessage()}");
+                // Network errors — retry with backoff
+                if ($attempt < $maxAttempts) {
+                    $jitterMs = random_int(0, 500);
+                    $delay = $baseDelay * (int) pow(2, $attempt - 1) + ($jitterMs / 1000);
+                    $this->logger->warning("DeepSeek chat exception, retrying in {$delay}s (attempt {$attempt}/{$maxAttempts}): {$e->getMessage()}");
+                    usleep((int) ($delay * 1_000_000));
+                    continue;
+                }
+                $this->logger->error("DeepSeek chat exception after {$maxAttempts} attempts: {$e->getMessage()}");
                 return [];
             }
         }
@@ -114,15 +132,84 @@ final class DeepSeekClient implements OpenAiClientInterface
     }
 
     /**
-     * Classify the sentiment, register, and urgency of a user message.
+     * Classify the sentiment, register, and urgency of a user message
+     * by calling the DeepSeek API with a lightweight tone prompt.
      *
-     * NOTE: This delegates to the same logic as OpenAiClient because
-     * tone classification is a lightweight call (50 tokens) and not
-     * provider-sensitive.
+     * Returns neutral defaults on any failure so the pipeline never halts.
+     *
+     * @return array{sentiment: string, register: string, urgency: string}
      */
     public function classifyTone(string $userMessage): array
     {
-        return ['sentiment' => 'neutro', 'register' => 'coloquial', 'urgency' => 'media'];
+        $defaults = ['sentiment' => 'neutral', 'register' => 'coloquial', 'urgency' => 'media'];
+
+        $toneUrl  = $this->config->get('deepseek.chat_url', 'https://api.deepseek.com/v1/chat/completions');
+        $toneModel = $this->config->get('deepseek.tone_model', 'deepseek-v4-flash');
+
+        $body = [
+            'model'           => $toneModel,
+            'response_format' => ['type' => 'json_object'],
+            'messages'        => [
+                [
+                    'role'    => 'system',
+                    'content' => "Eres un clasificador de tono para mensajes de WhatsApp en español de España. "
+                               . "Analiza el mensaje y devuelve SOLO un JSON con estos 3 campos exactos:\n"
+                               . '- sentiment: "positivo", "negativo", "neutro", "hostil", "urgente", "ansioso" o "emocionado"' . "\n"
+                               . '- register: "coloquial", "formal", "vulgar", "cortante" o "normal"' . "\n"
+                               . '- urgency: "alta", "media" o "baja"' . "\n"
+                               . "Ejemplo: {\"sentiment\":\"positivo\",\"register\":\"coloquial\",\"urgency\":\"media\"}",
+                ],
+                ['role' => 'user', 'content' => $userMessage],
+            ],
+            'temperature'     => 0.0,
+            'max_tokens'      => 80,
+        ];
+
+        $headers = $this->buildAuthHeaders();
+
+        try {
+            [$httpCode, $rawBody] = $this->http->post($toneUrl, $body, $headers, 15);
+        } catch (\Throwable $e) {
+            $this->logger->warning('DeepSeek tone classification — HTTP exception: ' . $e->getMessage());
+            return $defaults;
+        }
+
+        if ($httpCode < 200 || $httpCode >= 300) {
+            $this->logger->warning("DeepSeek tone classification — HTTP {$httpCode}, using defaults");
+            return $defaults;
+        }
+
+        try {
+            $apiResponse = json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
+            $content = $apiResponse['choices'][0]['message']['content'] ?? null;
+            if ($content === null) {
+                return $defaults;
+            }
+            $parsed = json_decode((string) $content, true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($parsed)) {
+                return $defaults;
+            }
+
+            $validSentiments = ['positivo', 'negativo', 'neutro', 'hostil', 'urgente', 'ansioso', 'emocionado'];
+            $validRegisters  = ['coloquial', 'formal', 'vulgar', 'cortante', 'normal'];
+            $validUrgencies  = ['alta', 'media', 'baja'];
+
+            $result = $defaults;
+            if (isset($parsed['sentiment']) && is_string($parsed['sentiment']) && in_array($parsed['sentiment'], $validSentiments, true)) {
+                $result['sentiment'] = $parsed['sentiment'];
+            }
+            if (isset($parsed['register']) && is_string($parsed['register']) && in_array($parsed['register'], $validRegisters, true)) {
+                $result['register'] = $parsed['register'];
+            }
+            if (isset($parsed['urgency']) && is_string($parsed['urgency']) && in_array($parsed['urgency'], $validUrgencies, true)) {
+                $result['urgency'] = $parsed['urgency'];
+            }
+
+            return $result;
+        } catch (\JsonException $e) {
+            $this->logger->warning('DeepSeek tone classification — JSON parse error: ' . $e->getMessage());
+            return $defaults;
+        }
     }
 
     /**
@@ -140,6 +227,109 @@ final class DeepSeekClient implements OpenAiClientInterface
     // ─────────────────────────────────────────────────────────────────────
 
     /**
+     * Format the full context array as human-readable structured text
+     * instead of a raw JSON dump.  This helps the LLM parse key fields
+     * faster and reduces token waste on repeated keys / null values.
+     *
+     * @param array<string, mixed> $ctx
+     */
+    private function formatContext(array $ctx): string
+    {
+        $lines = [];
+
+        // ── Identity ──────────────────────────────────────────────────
+        $speaker  = trim((string) ($ctx['speaker_girl_name'] ?? ''));
+        $selected = trim((string) ($ctx['selected_girl_name'] ?? ''));
+        $mode     = (string) ($ctx['speaker_mode'] ?? '');
+
+        if ($speaker !== '') {
+            $lines[] = "IDENTIDAD: eres {$speaker}" . ($mode === 'chica' ? ' (chica)' : '');
+        } else {
+            $lines[] = 'IDENTIDAD: encargada (modo genérico, no digas que eres la encargada)';
+        }
+
+        if ($selected !== '' && $selected !== $speaker) {
+            $lines[] = "CHICA ELEGIDA POR EL CLIENTE: {$selected} (ella es tu amiga, háblale de ella en 3ª persona)";
+        } elseif ($selected !== '') {
+            $lines[] = "CHICA ELEGIDA: {$selected} (el cliente ya eligió, NO ofrezcas otras)";
+        }
+
+        // ── Conversation state ────────────────────────────────────────
+        $stateTags = [];
+        $yaEnviado = (array) ($ctx['ya_enviado'] ?? []);
+        if (in_array('fotos', $yaEnviado, true))             $stateTags[] = 'fotos';
+        if (in_array('precios', $yaEnviado, true))           $stateTags[] = 'precios';
+        if (in_array('ubicacion', $yaEnviado, true))         $stateTags[] = 'mapa';
+        if (in_array('ubicacion_precisa', $yaEnviado, true)) $stateTags[] = 'mapa_preciso';
+        if (!empty($ctx['maps_sent']))                        $stateTags[] = 'maps_enviado';
+        if (!empty($ctx['eta_from_user_flag']))               $stateTags[] = 'cliente_dio_ETA';
+        if (!empty($ctx['wants_more_girls']))                 $stateTags[] = 'cliente_pide_mas_chicas';
+        if (!empty($ctx['photo_rejected']))                   $stateTags[] = 'cliente_rechazo_fotos';
+        if (!empty($ctx['__is_new_conversation']))            $stateTags[] = 'primera_vez';
+        if (!empty($ctx['__is_urgent']))                      $stateTags[] = 'URGENTE';
+        if (!empty($ctx['__is_burst']))                       $stateTags[] = 'rafaga_mensajes';
+
+        if ($stateTags !== []) {
+            $lines[] = 'ESTADO: ' . implode(', ', $stateTags);
+        }
+
+        // ── Catalog info (compact) ────────────────────────────────────
+        $catalogCount = (int) ($ctx['catalog_count'] ?? 0);
+        if ($catalogCount > 0) {
+            $lines[] = "CATÁLOGO MOSTRADO: {$catalogCount} veces";
+        }
+
+        $shownGirls = (array) ($ctx['shown_girls'] ?? []);
+        $unshownGirls = (array) ($ctx['unshown_girls'] ?? []);
+        if ($shownGirls !== []) {
+            $lines[] = 'CHICAS MOSTRADAS: ' . implode(', ', $shownGirls);
+        }
+        if ($unshownGirls !== []) {
+            $lines[] = 'CHICAS NO MOSTRADAS AÚN: ' . implode(', ', $unshownGirls);
+        }
+
+        // ── Conversation metrics ──────────────────────────────────────
+        $fillerCount = (int) ($ctx['__filler_loop_count'] ?? 0);
+        if ($fillerCount > 0) {
+            $lines[] = "MONOSÍLABOS CONSECUTIVOS: {$fillerCount}";
+        }
+
+        $chooseLoop = (int) ($ctx['choose_loop_count'] ?? 0);
+        if ($chooseLoop > 0) {
+            $lines[] = "VUELTAS SIN ELEGIR CHICA: {$chooseLoop}";
+        }
+
+        $haggleCount = (int) ($ctx['haggle_count_recent'] ?? 0);
+        if ($haggleCount > 0) {
+            $lines[] = "REGATEOS DEL CLIENTE: {$haggleCount}";
+        }
+
+        $botMsgCount = (int) ($ctx['bot_msg_count_recent'] ?? 0);
+        if ($botMsgCount > 0) {
+            $lines[] = "MENSAJES ENVIADOS POR TI: {$botMsgCount}";
+        }
+
+        // ── End intent ────────────────────────────────────────────────
+        if (!empty($ctx['conversation_end_intent'])) {
+            $lines[] = 'ATENCIÓN: el cliente se está despidiendo. Responde MUY corto.';
+        }
+
+        // ── Client profile hint ───────────────────────────────────────
+        $profileHint = trim((string) ($ctx['client_profile_hint'] ?? ''));
+        if ($profileHint !== '') {
+            $lines[] = "PERFIL DEL CLIENTE: {$profileHint}";
+        }
+
+        // ── Location URL ──────────────────────────────────────────────
+        $locationUrl = trim((string) ($ctx['location_url'] ?? ''));
+        if ($locationUrl !== '') {
+            $lines[] = "MAPS DISPONIBLE: {$locationUrl}";
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
      * Parse choices[0].message.content from the API response.
      */
     private function parseChoicesContent(string $rawBody): array
@@ -154,6 +344,13 @@ final class DeepSeekClient implements OpenAiClientInterface
         $content = $apiResponse['choices'][0]['message']['content'] ?? null;
 
         if ($content === null) {
+            $this->logger->warning('DeepSeek chat — choices[0].message.content is null', [
+                'choice_count'  => count($apiResponse['choices'] ?? []),
+                'finish_reason' => $apiResponse['choices'][0]['finish_reason'] ?? '?',
+                'raw_keys'      => array_keys($apiResponse),
+                'has_usage'     => isset($apiResponse['usage']),
+                'raw_head'      => mb_substr($rawBody, 0, 400),
+            ]);
             return [];
         }
 

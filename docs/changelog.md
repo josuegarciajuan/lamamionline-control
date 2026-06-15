@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-15 — BOT-CASA-MEJORA FASE 1: Correcciones inmediatas (P1, P3, P9, P13, P14)
+
+### Implementado
+- **P1 classifyTone() real**: `DeepSeekClient::classifyTone()` ahora llama a la API de DeepSeek con un prompt ligero de clasificación (sentimiento, registro, urgencia). Antes devolvía valores hardcodeados (`neutral/coloquial/media`) que hacían que el ToneBuilder trabajara con datos falsos. En caso de fallo de API, devuelve defaults seguros para no interrumpir el pipeline.
+- **P3 Contexto estructurado**: Nuevo método `formatContext()` en `DeepSeekClient`. En vez de `json_encode()` crudo, el contexto se envía como texto estructurado con secciones: IDENTIDAD, CHICA ELEGIDA, ESTADO (fotos/precios/mapa enviados), CATÁLOGO MOSTRADO, CHICAS MOSTRADAS/NO MOSTRADAS, MÉTRICAS (monosílabos, regateos, vueltas sin elegir), PERFIL DEL CLIENTE. Reduce tokens y mejora la adherencia del LLM al contexto.
+- **P9 Retry + jitter**: Mejora del bucle de reintentos en `DeepSeekClient::chat()`: exponential backoff con jitter aleatorio (±500ms), manejo específico de HTTP 429 (Rate Limit) honrando cabecera `Retry-After`, reintentos solo para errores de red y 5xx (los 4xx excepto 429 no se reintentan).
+- **P13 Servicios sin sexo**: Añadida sección "SERVICIOS SIN SEXO" al system prompt (config.dist.json) especificando tarifa de masaje 40€/30min con final manual. Añadidas 4 variantes `no_sexo_replies` en `message_variants` para cuando el cliente dice que no quiere sexo.
+- **P14 Guard anti-doble-maps**: `Bot::injectLocationUrl()` ahora verifica `ya_enviado` (ubicacion/ubicacion_precisa) antes de inyectar el mapa. Si ya se envió y el cliente no lo pidió explícitamente en su mensaje actual, se salta la inyección. Esto evita el bug de doble envío de maps que ocurría cuando el pipeline crasheaba y el estado se corrompía.
+
+### Archivos
+- **Modificados (3):** `bot-casa/src/Services/DeepSeekClient.php`, `bot-casa/src/Bot.php`, `bot-casa/config.dist.json`
+- **Documentación:** `spec/tasks.md` (nuevo plan BOT-CASA-MEJORA), `docs/changelog.md`
+
+### Notas
+- La Fase 1 es la primera de 4 fases del plan BOT-CASA-MEJORA (14 puntos en total).
+- Los cambios de config.dist.json requieren regenerar config.local.json o migrar manualmente las secciones nuevas.
+
 ## 2026-06-10 — MOBILE-REDESIGN-V2 BLOQUE D (Safe Area + Polish + Testing) 🎉 CIERRE TOTAL
 
 ### Implementado

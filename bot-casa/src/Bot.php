@@ -176,9 +176,13 @@ final class Bot implements BotInterface
             // New conversation, no speaker girl yet, not audio: send a
             // minimal greeting and WAIT. Do NOT call the LLM, do NOT
             // send catalog, do NOT offer girls. Deterministic gate.
+            //
+            // NOVA: también se activa cuando __is_ad_intro=true
+            // (cliente viene de anuncio concreto, NO debe ver catálogo).
             $isNewConversation = !empty($ctx['__is_new_conversation']);
+            $isAdIntro         = !empty($ctx['__is_ad_intro']);
             $speakerMode = (string) ($ctx['speaker_mode'] ?? '');
-            if ($isNewConversation && $speakerMode === 'encargada') {
+            if ($isNewConversation && ($speakerMode === 'encargada' || $isAdIntro)) {
                 $greetings = (array) $this->config->get('message_variants.first_contact_greetings', []);
                 if ($greetings === []) {
                     $greetings = ['hola cari 😊'];
@@ -290,6 +294,19 @@ final class Bot implements BotInterface
 
             // ── 11b. Fallback: if LLM returned empty, send contingency text ──
             if (trim((string) ($ctx['output_text'] ?? '')) === '') {
+                // ── DIAGNÓSTICO: loggear estado del raw response ──
+                $raw = $ctx['openai_raw_response'] ?? null;
+                $this->logger->warning('Bot::handleWebhook — output_text empty after ResponseNormalizer', [
+                    'phone'         => $fromPhone,
+                    'thread_id'     => $ctx['thread_id'] ?? '?',
+                    'raw_type'      => gettype($raw),
+                    'raw_keys'      => is_array($raw) ? implode(',', array_keys($raw)) : 'N/A',
+                    'raw_count'     => is_array($raw) ? count($raw) : 'N/A',
+                    'has_user_vr'   => is_array($raw) && array_key_exists('user_visible_reply', $raw) ? 'yes' : 'no',
+                    'user_vr_val'   => is_array($raw) ? json_encode($raw['user_visible_reply'] ?? null, JSON_UNESCAPED_UNICODE) : 'N/A',
+                    'raw_json_head' => is_string($raw) ? mb_substr($raw, 0, 120) : (is_array($raw) ? 'array(' . count($raw) . ')' : 'N/A'),
+                ]);
+
                 $fallbackRaw = $this->config->get('message_variants.fallback_empty_text', ['vale cari']);
                 $fallbackVariants = is_string($fallbackRaw) ? [$fallbackRaw] : (array) $fallbackRaw;
                 $fallback = $fallbackVariants !== [] ? $fallbackVariants[array_rand($fallbackVariants)] : 'vale cari';
@@ -336,6 +353,36 @@ final class Bot implements BotInterface
 
             // ── 14c. POST-AI: inyectar fotos si el AI promete enviarlas pero no llegaron ──
             $ctx = $this->injectPhotoUrls($ctx);
+
+            // ── 14c2. POST-AI: anti-catalog gate ─────────────────────
+            // Si ya se ha mostrado catálogo demasiadas veces o el cliente
+            // rechazó las fotos, eliminar cualquier URL de compartir.site
+            // que pudiera haber quedado en output_text.
+            $catalogCount   = (int) ($ctx['catalog_count'] ?? 0);
+            $photoRejected  = !empty($ctx['photo_rejected']);
+            $photoAction    = (string) ($ctx['photo_action'] ?? 'none');
+
+            if (($catalogCount >= 2 || $photoRejected) && $photoAction === 'catalog') {
+                // Force strip photo URLs and reset photo_action
+                $outputText = (string) ($ctx['output_text'] ?? '');
+                $cleaned = preg_replace(
+                    '/(?:https?:\/\/)?compartir\.site\/[a-zA-Z0-9]+\/?\s*/i',
+                    '',
+                    $outputText
+                );
+                $cleaned = trim(preg_replace('/\n{3,}/', "\n\n", $cleaned));
+                if ($cleaned !== '' && $cleaned !== $outputText) {
+                    $ctx['output_text']   = $cleaned;
+                    $ctx['photo_action']  = 'none';
+                    $ctx['splitted_messages'] = [$cleaned];
+                    $this->logger->info('Bot::anti-catalog gate — stripped catalog photos', [
+                        'phone'          => $fromPhone,
+                        'thread_id'      => $ctx['thread_id'] ?? '?',
+                        'catalog_count'  => $catalogCount,
+                        'photo_rejected' => $photoRejected,
+                    ]);
+                }
+            }
 
             $messages = $ctx['splitted_messages'] ?? [$ctx['output_text'] ?? ''];
 
@@ -472,7 +519,23 @@ final class Bot implements BotInterface
             if (!is_dir($userDataDir)) {
                 @mkdir($userDataDir, 0700, true);
             }
-            return $userDataDir . '/' . ltrim($relative, '/');
+            // If the path is absolute, extract only the basename to prevent
+            // recursive nesting: each bootstrap() call would otherwise
+            // prepend the user data dir again, creating paths like
+            // .../users/9/var/www/.../users/9/var/www/... (ADR-011)
+            if (str_starts_with($relative, '/')) {
+                $relative = basename($relative);
+            }
+            $fullPath = $userDataDir . '/' . ltrim($relative, '/');
+
+            // Ensure parent directory exists (e.g., data/ subdir)
+            // so that downstream code (webhook, API) can write immediately.
+            // Ownership is set by whoever runs bootstrap (www-data for web).
+            $parentDir = dirname($fullPath);
+            if (!is_dir($parentDir)) {
+                @mkdir($parentDir, 0700, true);
+            }
+            return $fullPath;
         }
 
         // For admin (userId=1) or legacy (userId=0): 
@@ -505,11 +568,38 @@ final class Bot implements BotInterface
                 if (!is_dir($userDir)) {
                     @mkdir($userDir, 0755, true);
                 }
-                // If no config.local.json in user dir, create from dist template (not root's local)
+                // If no config.local.json in user dir, create it by merging
+                // the dist template with the root's config.local.json so
+                // the user inherits real API keys (waha, openai, deepseek)
+                // instead of CHANGEME_* placeholders.
                 if (!file_exists($userDir . '/config.local.json')) {
+                    $merged = [];
+                    // 1. Base: dist template (structure + defaults)
                     $rootDist = $rootDir . '/config.dist.json';
                     if (file_exists($rootDist)) {
-                        @copy($rootDist, $userDir . '/config.local.json');
+                        $dist = @json_decode((string) @file_get_contents($rootDist), true);
+                        if (is_array($dist)) {
+                            $merged = $dist;
+                        }
+                    }
+                    // 2. Overlay: root config.local.json (real API keys, routing, etc.)
+                    $rootLocal = $rootDir . '/config.local.json';
+                    if (file_exists($rootLocal)) {
+                        $local = @json_decode((string) @file_get_contents($rootLocal), true);
+                        if (is_array($local)) {
+                            $merged = array_replace_recursive($merged, $local);
+                        }
+                    }
+                    // 3. Ensure user-specific routing starts clean (will be injected by bootstrap)
+                    $merged['routing'] = [
+                        'default_enabled_if_not_found' => false,
+                        'lines' => [],
+                        'sender_blacklist' => [],
+                    ];
+                    // 4. Write the merged config
+                    $json = json_encode($merged, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    if ($json !== false) {
+                        @file_put_contents($userDir . '/config.local.json', $json . "\n", LOCK_EX);
                     }
                 }
                 return $userDir;
@@ -531,6 +621,7 @@ final class Bot implements BotInterface
             $fileKeys = [
                 'files.session_memory', 'files.leads', 'files.reminders',
                 'files.playbook', 'files.wa_raw_payload', 'files.bot_log',
+                'files.paused_threads',
                 'bot.mode_file',
             ];
             foreach ($fileKeys as $key) {
@@ -553,6 +644,47 @@ final class Bot implements BotInterface
                     $userDataDir = rtrim($rootDir, '/') . '/data/users/' . $userId;
                     if (is_dir($userDataDir)) {
                         $config->set($key, $resolved);
+                    }
+                }
+            }
+        }
+
+        // ── Inject lines.json into routing.lines for multi-user clients ──
+        // api/lines.php manages WAHA lines in data/users/{id}/lines.json,
+        // but RoutingGate reads from config.local.json → routing.lines.
+        // When routing.lines is empty (config initialized from dist template),
+        // auto-populate it from the user's lines.json so the bot can process
+        // incoming messages without manual routing configuration.
+        if ($userId > 1) {
+            $routingLines = $config->get('routing.lines', []);
+            if (!is_array($routingLines) || $routingLines === []) {
+                $linesJsonPath = self::resolveUserDataPath($rootDir, $userId, 'lines.json');
+                if (file_exists($linesJsonPath)) {
+                    $linesData = @json_decode((string) @file_get_contents($linesJsonPath), true);
+                    if (is_array($linesData) && $linesData !== []) {
+                        $injected = [];
+                        foreach ($linesData as $line) {
+                            if (!is_array($line)) {
+                                continue;
+                            }
+                            $injected[] = [
+                                'last9'       => (string) ($line['last9'] ?? ''),
+                                'port'        => (int) ($line['port'] ?? 0),
+                                'label'       => (string) ($line['label'] ?? ''),
+                                'enabled'     => true,
+                                'ai_provider' => (string) ($line['ai_provider'] ?? 'openai'),
+                                'ai_model'    => $line['ai_model'] ?? null,
+                            ];
+                        }
+                        if ($injected !== []) {
+                            $config->set('routing.lines', $injected);
+                            // Persist so panel.php routing tab shows the lines too
+                            try {
+                                $config->save();
+                            } catch (\Throwable) {
+                                // Best-effort: in-memory set() is sufficient for the current request
+                            }
+                        }
                     }
                 }
             }
@@ -942,6 +1074,9 @@ final class Bot implements BotInterface
                     $humanDelays,
                     $incomingText,
                     $turnCount,
+                    (float) ($ctx['user_response_time_sec'] ?? 60),
+                    (bool)  ($ctx['__is_burst'] ?? false),
+                    (bool)  ($ctx['__is_urgent'] ?? false),
                 );
             }
 
@@ -1100,6 +1235,43 @@ final class Bot implements BotInterface
             return $ctx;
         }
 
+        // ── NOVA: anti-double-maps guard ──────────────────────────────
+        // If ya_enviado already contains ubicacion or ubicacion_precisa,
+        // the map was already sent in a previous turn. Only re-send if the
+        // client EXPLICITLY asked for the location again in their CURRENT
+        // message (the LLM will have included the URL in output_text).
+        $yaEnviado = (array) ($ctx['ya_enviado'] ?? []);
+        $mapAlreadySent = in_array('ubicacion', $yaEnviado, true)
+                       || in_array('ubicacion_precisa', $yaEnviado, true);
+        if ($mapAlreadySent) {
+            $outputText = (string) ($ctx['output_text'] ?? '');
+            $hasMapsInOutput = (bool) preg_match(
+                '/(?:maps\.app\.goo\.gl|goo\.gl\/maps|google\.com\/maps)/i',
+                $outputText
+            );
+            // If the LLM already embedded the URL in its reply, let it
+            // through (the LLM decided to re-send).  If there's no URL
+            // in the text, skip injection — this prevents the "double
+            // maps" bug where the safety net re-injects after a pipeline
+            // crash corrupted state.
+            if ($hasMapsInOutput) {
+                return $ctx;
+            }
+            $userMsg = (string) ($ctx['message_text'] ?? '');
+            $askedAgain = (bool) preg_match(
+                '/(?:ubicaci[oó]n|maps?|mapa|gps|direcci[oó]n|donde\s+est[aá]|calle|piso)/iu',
+                $userMsg
+            );
+            if (!$askedAgain) {
+                // Map already sent, client didn't ask again → skip injection
+                $this->logger->info('Bot::injectLocationUrl — skipped (map already sent, client did not ask again)', [
+                    'phone'     => $ctx['from_phone'] ?? '?',
+                    'thread_id' => $ctx['thread_id'] ?? '?',
+                ]);
+                return $ctx;
+            }
+        }
+
         // Only if we have a location URL to send
         $locationUrl = (string) ($ctx['location_url'] ?? '');
         if ($locationUrl === '') {
@@ -1172,7 +1344,7 @@ final class Bot implements BotInterface
         }
 
         // Check if AI response contains location-sending language
-        $locationWords = '/(?:te\s*paso\s*(?:la\s*)?ubicaci[oó]n|te\s*paso\s*(?:el|la)\s*(?:maps?\b|mapa\b|gps\b|direcci[oó]n)|aqui\s*(?:va|tienes|esta)\s*(?:el|la)\s*(?:mapa|ubicaci[oó]n|direcci[oó]n|gps)|te\s*(?:mando|env[ií]o)\s*(?:la\s*)?(?:ubicaci[oó]n|direcci[oó]n|mapa|gps)|ubicaci[oó]n\s*exacta|punto\s*exacto)/iu';
+        $locationWords = '/(?:te\s*paso\s*(?:la\s*)?ubicaci[oó]n|te\s*paso\s*(?:el|la)\s*(?:maps?\b|mapa\b|gps\b|direcci[oó]n|dire\b|ubicacion\b|ubicación\b)|aqui\s*(?:va|tienes|esta|tiene)\s*(?:el|la)\s*(?:mapa|ubicaci[oó]n|direcci[oó]n|gps|ubicacion|dire\b)|te\s*(?:mando|env[ií]o)\s*(?:la\s*)?(?:ubicaci[oó]n|direcci[oó]n|mapa|gps|ubicacion|dire\b)|ubicaci[oó]n\s*exacta|punto\s*exacto|te\s*env[ií]o\s*(?:el|la)\s*(?:mapa|ubicaci[oó]n|direcci[oó]n|dire\b|ubicacion\b)|directo\s+al\s+grano|ah[ií]\s+te\s+va|toma\s+la\s+(?:ubicaci[oó]n|direcci[oó]n|dire\b|ubicacion\b))/iu';
         // Also trigger if the context flags predict maps is being sent now (deterministic fallback)
         $mapsBeingSentNow = !empty($ctx['maps_being_sent_now']);
         if (!preg_match($locationWords, $outputText) && !$mapsBeingSentNow) {
@@ -1303,10 +1475,15 @@ final class Bot implements BotInterface
         $promisePatterns = [
             '/te\s*paso\s*fotos?\b/iu',
             '/te\s*(?:las\s*)?(?:mando|env[ií]o|ense[ñn]o)\s*fotos?\b/iu',
-            '/te\s*las\s*(?:mando|env[ií]o|paso)\s*otra\s*vez\b/iu',
+            '/te\s*las\s*(?:mando|env[ií]o|paso|ense[ñn]o)\s*otra\s*vez\b/iu',
             '/mira\s*te\s*ense[ñn]o\s*a\b/iu',
             '/te\s*las\s*env[ií]o\b/iu',
             '/te\s*las\s*mando\b/iu',
+            '/te\s*paso\s*(?:otra\s*vez\s*)?las\s*chicas\b/iu',
+            '/aqui\s*(?:las\s*)?tienes\s*(?:de\s*nuevo\s*)?(?:las\s*chicas|las\s*fotos?|el\s*cat[aá]logo)\b/iu',
+            '/mira\s*te\s*las?\s*(?:mando|paso|ense[ñn]o)\s*otra\s*vez\b/iu',
+            '/toma\s*te\s*las?\s*paso\b/iu',
+            '/todas\s*est[aá]n\s*bien\s*papi\b/iu', // "todas estan bien papi" con contexto de fotos
         ];
 
         $hasPromise = false;
@@ -1549,6 +1726,15 @@ final class Bot implements BotInterface
         // Steps 11-14: re-run normalizers and formatters
         if (isset($this->processors[2]) && $this->processors[2]->name() === 'ResponseNormalizer') {
             $ctx = $this->processors[2]->process($ctx);
+        }
+
+        // ── Fallback: if re-processing LLM returned empty ──
+        if (trim((string) ($ctx['output_text'] ?? '')) === '') {
+            $fallbackRaw = $this->config->get('message_variants.fallback_empty_text', ['vale cari']);
+            $fallbackVariants = is_string($fallbackRaw) ? [$fallbackRaw] : (array) $fallbackRaw;
+            $fallback = $fallbackVariants !== [] ? $fallbackVariants[array_rand($fallbackVariants)] : 'vale cari';
+            $ctx['output_text']   = $fallback;
+            $ctx['lead_detected'] = false;
         }
         if (isset($this->processors[3]) && $this->processors[3]->name() === 'CatalogFormatter') {
             $ctx = $this->processors[3]->process($ctx);

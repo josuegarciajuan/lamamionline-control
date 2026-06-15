@@ -143,6 +143,36 @@
 
 **CIERRE TOTAL DEL PROYECTO BOT-CASA — todas las fases completadas.**
 
+## BOT-CASA-MEJORA — Mejora integral del pipeline bot-casa
+
+Plan de 14 puntos en 4 fases para mejorar inteligencia, anti-bucles, y calidad de respuesta.
+
+### BOT-CASA-MEJORA-F1 — FASE 1: Correcciones inmediatas (P1, P3, P9, P13, P14)
+
+- [x] P1 — classifyTone() real: DeepSeekClient ahora llama a la API para clasificar sentimiento/registro/urgencia en vez de devolver valores hardcodeados (`neutral/coloquial/media`).
+- [x] P3 — Contexto estructurado: se formatea el contexto como texto legible con secciones (IDENTIDAD, ESTADO, CHICAS MOSTRADAS, etc.) en vez de `json_encode()` crudo.
+- [x] P9 — Retry con exponential backoff + jitter: manejo de 429 (Retry-After), 5xx con backoff+jitter, errores de red con reintentos.
+- [x] P13 — Servicios sin sexo: añadida sección "SERVICIOS SIN SEXO" al system prompt + 4 variantes `no_sexo_replies` en message_variants.
+- [x] P14 — Guard anti-doble-maps: `injectLocationUrl()` ahora verifica `ya_enviado` (ubicacion/ubicacion_precisa) antes de reinyectar el mapa. Solo reenvía si el cliente lo pide explícitamente.
+
+### BOT-CASA-MEJORA-F2 — FASE 2: Anti-bucle + estado (P2, P10, P11, P12)
+
+- [ ] P2 — IntentRouter pre-LLM: nuevo stage que clasifica intención (greeting/price/location/photos/goodbye) y responde con templates sin LLM (~60% mensajes).
+- [ ] P10 — Anti-bucle: 3 capas de detección de fin de conversación (despedida con silencio, filler loop con silencio, cierre único antes del silencio).
+- [ ] P11 — POST-AI guard "todas comparten" + fix `__is_ad_intro` state corruption.
+- [ ] P12 — Sticky state: fallback al último estado conocido si el cálculo actual pierde speaker/selected.
+
+### BOT-CASA-MEJORA-F3 — FASE 3: Contexto + FSM (P4, P6, P8)
+
+- [ ] P4 — Compresión de historial multi-turno (resumen tras 10 turnos).
+- [ ] P6 — Detección temprana de conversación muerta (24h silencio, 3+ fillers, hostil, 5+ msg sin avance, >15 msg mareador).
+- [ ] P8 — FSM conversacional (NEW→GREETING_SENT→...→CONFIRMED/DEAD).
+
+### BOT-CASA-MEJORA-F4 — FASE 4: Analytics (P5, P7)
+
+- [ ] P5 — Response scoring (trackear qué respuestas convierten vs ghostean).
+- [ ] P7 — Personality A/B testing (pesos ajustables por conversión).
+
 ---
 
 ## Publiscort — Nueva rama comercial
