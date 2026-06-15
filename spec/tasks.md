@@ -173,6 +173,8 @@ Plan de 14 puntos en 4 fases para mejorar inteligencia, anti-bucles, y calidad d
 - [x] P5 — Response scoring: nuevo `ResponseScorer.php` que evalúa cada respuesta del bot cuando llega el siguiente mensaje. Modelo de scoring: +1.0 continuación significativa, +0.5 filler, -0.5 pregunta repetida, -1.0 ghosted, -2.0 rechazo explícito. Datos en `response_scores.ndjson`. Integrado en Bot.php tras ContextAssembler (best-effort, no bloquea el pipeline).
 - [x] P7 — Personality A/B testing: nuevo `PersonalityTracker.php` que registra pares personalidad→outcome en `personality_scores.ndjson`. `getWeights()` calcula pesos por conversión (lead_probable +1.0, ghosted -0.5, muerta -1.0, hostil -2.0). ToneBuilder ahora usa selección ponderada (`personality.weights`) en vez de `array_rand` puro. `cron/learn.php` recalcula y persiste los pesos en cada ejecución.
 
+**CIERRE TOTAL DEL PROYECTO BOT-CASA-MEJORA — las 4 fases completadas (14 puntos implementados).**
+
 ---
 
 ## Publiscort — Nueva rama comercial
