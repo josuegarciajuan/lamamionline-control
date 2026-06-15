@@ -43,6 +43,70 @@ final class ToneBuilder implements PipelineStageInterface
         $directives[] = "Usa registro {$register}, tono {$sentiment}, urgencia {$urgency}.";
 
         // ------------------------------------------------------------------ //
+        //  2b. Personality variation — elige estilo al inicio de conversación //
+        // ------------------------------------------------------------------ //
+        $isNewConv = !empty($ctx['__is_new_conversation']);
+        $messageText = (string) ($ctx['message_text'] ?? '');
+
+        $styles = (array) $this->config->get('message_variants.personality_styles', []);
+        if ($styles === []) {
+            $styles = [
+                'cariñosa'   => 'Dulce, usa muchos "cari", "amor", "papi". Tierna.',
+                'pícara'     => 'Provocativa, insinuante, usa emojis 🔥😏. Juega con doble sentido.',
+                'directa'    => 'Va al grano, sin rodeos. Frases cortas, tono profesional pero cálido.',
+                'tímida'     => 'Reservada, habla poco, responde con monosílabos. Se hace la dura.',
+            ];
+        }
+        if ($isNewConv) {
+            $styleNames = array_keys($styles);
+            // ── NOVA P7: Weighted personality selection ──────────────
+            // Instead of pure random, use weights from personality scoring
+            // data. Higher weight = better historical conversion. Falls
+            // back to uniform random if no tracking data exists.
+            $weights = (array) $this->config->get('personality.weights', []);
+            $weightedPool = [];
+            foreach ($styleNames as $name) {
+                $w = (float) ($weights[$name] ?? 1.0);
+                $w = max(0.1, $w); // Never zero — ensure every style has a chance
+                $count = (int) round($w * 10);
+                for ($j = 0; $j < $count; $j++) {
+                    $weightedPool[] = $name;
+                }
+            }
+            $picked = $weightedPool !== [] ? $weightedPool[array_rand($weightedPool)] : $styleNames[array_rand($styleNames)];
+            // Persist the style choice for this conversation (via context, not session)
+            $ctx['__personality_style'] = $picked;
+        }
+        $activeStyle = (string) ($ctx['__personality_style'] ?? '');
+        if ($activeStyle !== '' && isset($styles[$activeStyle])) {
+            $directives[] = "Tu estilo de personalidad para ESTA conversación: {$activeStyle} — {$styles[$activeStyle]} "
+                . 'Mantenlo SIEMPRE. No cambies de personalidad a mitad de conversación.';
+        }
+
+        // ------------------------------------------------------------------ //
+        //  2c. Anti-muletilla — frases PROHIBIDAS                             //
+        // ------------------------------------------------------------------ //
+        $forbiddenPhrases = (array) $this->config->get(
+            'message_variants.forbidden_phrases',
+            [
+                'vale cari',
+                'vale, te cuento rapido vale cari',
+                'ok, vamos a ello vale cari',
+                'mira te las mando otra vez cari',
+                'toma, te las paso otra vez',
+                'aqui las tienes de nuevo',
+                'aqui las tienes de nuevo guapo',
+                'mira te las mando otra vez',
+                'te las paso otra vez',
+            ]
+        );
+        if ($forbiddenPhrases !== []) {
+            $quoted = array_map(fn(string $p): string => '"' . $p . '"', $forbiddenPhrases);
+            $directives[] = 'FRASES PROHIBIDAS: NUNCA uses estas frases exactas: ' . implode(', ', $quoted)
+                . '. Si necesitas decir algo similar, BUSCA una alternativa completamente distinta.';
+        }
+
+        // ------------------------------------------------------------------ //
         //  3. Greeting suppression                                            //
         // ------------------------------------------------------------------ //
         $hasGreeted     = !empty($ctx['__has_greeted']);
@@ -84,12 +148,18 @@ final class ToneBuilder implements PipelineStageInterface
         }
 
         // ── 4c. Cliente viene de anuncio concreto → NO catálogo ──
-        if ($comesFromAd) {
-            $directives[] = 'ATENCIÓN: El cliente viene del enlace de un anuncio concreto '
-                . '(viene buscando a UNA chica específica). NO muestres catálogo de otras chicas. '
-                . 'NO uses photo_action="catalog". Céntrate en la chica del anuncio. '
-                . 'Si no sabes el nombre de la chica del anuncio, dedúcelo del enlace o pregúntalo '
-                . 'de forma natural pero SIN mostrar otras chicas. '
+        $isAdIntro = !empty($ctx['__is_ad_intro']);
+        $effectiveComesFromAd = $comesFromAd || $isAdIntro;
+        if ($effectiveComesFromAd) {
+            $directives[] = 'ATENCIÓN CRÍTICA: El cliente viene del enlace de un anuncio concreto '
+                . '(viene buscando a UNA chica específica). '
+                . 'PROHIBIDO TOTAL: mostrar catálogo de otras chicas, decir "mira que chicas tengo", '
+                . '"te presento a", "todas disponibles". '
+                . 'NO uses photo_action="catalog" ni "selected_all". '
+                . 'Céntrate en la chica del anuncio. '
+                . 'Si es el primer mensaje: saluda con MÁXIMO 4 palabras y NO digas nada más. '
+                . 'Si no sabes el nombre de la chica del anuncio, dedúcelo del enlace NATURALMENTE '
+                . 'pero SIN mostrar otras chicas. '
                 . 'NUNCA digas "mira que chicas tengo" ni "te presento a mis amigas".';
         }
 
@@ -99,13 +169,58 @@ final class ToneBuilder implements PipelineStageInterface
         $wantsMoreGirls = !empty($ctx['wants_more_girls']);
 
         if ($wantsMoreGirls) {
-            $directives[] = 'El cliente pidió ver más chicas antes. '
-                . 'Si su mensaje actual va de eso, usa photo_action="catalog". '
-                . 'Si está preguntando OTRA COSA distinta, NO mandes fotos ni catálogo.';
+            $catalogCapped = ($catalogCount >= 2);
+            if ($catalogCapped) {
+                $directives[] = 'El cliente pidió ver más chicas antes, pero YA has mostrado el catálogo '
+                    . 'varias veces. NO vuelvas a mandar catálogo. '
+                    . 'Responde con naturalidad y pide que elija entre las que ya vio.';
+            } else {
+                $directives[] = 'El cliente pidió ver más chicas antes. '
+                    . 'Si su mensaje actual va de eso, usa photo_action="catalog". '
+                    . 'Si está preguntando OTRA COSA distinta, NO mandes fotos ni catálogo.';
+            }
         }
 
         if (!empty($ctx['info_pack_ready'])) {
             $directives[] = 'INFO DUMP: Suelta TODO de golpe (precios, chicas, zona, servicios). No preguntes nada.';
+        }
+
+        // ------------------------------------------------------------------ //
+        //  5b. Anti-catalog — prevenir envío repetido de catálogo            //
+        // ------------------------------------------------------------------ //
+        $catalogCount = (int) ($ctx['catalog_count'] ?? 0);
+        if ($catalogCount >= 2) {
+            $directives[] = 'CATÁLOGO AGOTADO: Ya has mostrado el catálogo de chicas 2 o más veces '
+                . 'en esta conversación. PROHIBIDO TOTAL photo_action="catalog". '
+                . 'NO mandes más fotos del catálogo. '
+                . 'Si el cliente quiere ver chicas, dile algo como "ya las viste cari, dime cual te gusta 😘" '
+                . 'pero SIN volver a enviar fotos.';
+        }
+
+        $photoRejected = !empty($ctx['photo_rejected']);
+        if ($photoRejected) {
+            $directives[] = 'FOTOS RECHAZADAS: El cliente ha dicho que no le gustan las fotos '
+                . 'o que no es la chica que busca. NO mandes más fotos bajo ningún concepto. '
+                . 'NO insistas con el catálogo. Respuesta corta y educada. '
+                . 'Si el cliente claramente no está interesado, despídete en 4 palabras.';
+        }
+
+        // ------------------------------------------------------------------ //
+        //  5c. Filler loop — monosílabos consecutivos                        //
+        // ------------------------------------------------------------------ //
+        $fillerLoopCount = (int) ($ctx['__filler_loop_count'] ?? 0);
+        if ($fillerLoopCount >= 2) {
+            $selectedName = (string) ($ctx['selected_girl_name'] ?? '');
+            if ($selectedName !== '') {
+                $directives[] = 'CONVERSACIÓN ESTANCADA: El cliente solo dice monosílabos (ok, vale, dime). '
+                    . "Ya eligió a {$selectedName}. Pregúntale cuándo viene o despídete en 4 palabras. "
+                    . 'NO uses frases de relleno. Sé directa.';
+            } else {
+                $directives[] = 'CONVERSACIÓN ESTANCADA: El cliente solo dice monosílabos. '
+                    . 'No ha elegido chica. Pregúntale qué chica le gusta (muy breve, 1 frase) '
+                    . 'o despídete en 4 palabras. NO uses frases de relleno. '
+                    . 'NO mandes catálogo si ya se envió antes.';
+            }
         }
 
         // ------------------------------------------------------------------ //

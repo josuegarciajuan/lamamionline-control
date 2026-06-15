@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-15 — BOT-CASA-MEJORA FASE 4: Analytics (P5, P7) 🎉 CIERRE TOTAL
+
+### Implementado
+- **P5 Response scoring**: Nuevo `ResponseScorer.php` que evalúa la efectividad de cada respuesta del bot. Cuando llega el siguiente mensaje del cliente, se puntúa la respuesta anterior: +1.0 (continuación significativa), +0.5 (filler), -0.5 (pregunta repetida = bot no entendió), -1.0 (ghosted), -2.0 (rechazo explícito). Datos en `response_scores.ndjson` para que `learn.php` los ingiera y mejore el playbook. Integrado en Bot.php como best-effort (nunca bloquea el pipeline).
+- **P7 Personality A/B testing**: Nuevo `PersonalityTracker.php` que registra pares personalidad→outcome en `personality_scores.ndjson`. `getWeights()` calcula pesos por estilo basados en conversión real (lead_probable +1.0, ghosted +0.3, muerta -1.0, hostil -2.0). `ToneBuilder.php` ahora usa selección ponderada (`personality.weights`) en vez de `array_rand` puro — los estilos que convierten mejor ganan más peso automáticamente. `cron/learn.php` recalcula y persiste los pesos en cada ejecución diaria.
+
+### Archivos
+- **Nuevos (2):** `bot-casa/src/SideEffects/ResponseScorer.php`, `bot-casa/src/SideEffects/PersonalityTracker.php`
+- **Modificados (3):** `bot-casa/src/Bot.php`, `bot-casa/src/Pipeline/ToneBuilder.php`, `bot-casa/cron/learn.php`
+- **Documentación:** `spec/tasks.md`, `docs/changelog.md`
+
+### Notas
+- Los datos de scoring y personalidad se acumulan en archivos NDJSON. Los pesos iniciales son uniformes (1.0) y convergen con el tiempo según datos reales.
+- **CIERRE TOTAL DEL PROYECTO BOT-CASA-MEJORA — las 4 fases completadas (14 puntos).**
+
 ## 2026-06-15 — BOT-CASA-MEJORA FASE 3: Contexto + FSM (P4, P6, P8)
 
 ### Implementado

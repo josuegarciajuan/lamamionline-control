@@ -546,5 +546,38 @@ if ($bytes === false) {
 }
 
 echo "\n✅ Playbook written: {$playbookFile} ({$bytes} bytes)\n";
+
+// ── NOVA P7: Compute personality weights from tracking data ──────────────────
+echo "\n── Computing personality weights ──\n";
+
+// Autoload PersonalityTracker if not already available
+$trackerFile = $phpBotRoot . '/src/SideEffects/PersonalityTracker.php';
+if (file_exists($trackerFile)) {
+    require_once $trackerFile;
+    try {
+        $personalityTracker = new \WasapBot\SideEffects\PersonalityTracker($config, null);
+        $weights = $personalityTracker->getWeights();
+
+        echo "  Personality conversion weights:\n";
+        foreach ($weights as $style => $weight) {
+            echo "    {$style}: " . number_format($weight, 2) . "\n";
+        }
+
+        // Persist weights to config so ToneBuilder uses them
+        try {
+            $config->set('personality.weights', $weights);
+            $config->save();
+            echo "  ✅ Weights persisted to config.local.json\n";
+        } catch (\Throwable $e) {
+            echo "  ⚠️  Could not persist weights: {$e->getMessage()}\n";
+            echo "     (ToneBuilder will continue using default uniform weights)\n";
+        }
+    } catch (\Throwable $e) {
+        echo "  ⚠️  PersonalityTracker failed: {$e->getMessage()}\n";
+    }
+} else {
+    echo "  ⚠️  PersonalityTracker.php not found — skipping\n";
+}
+
 echo "   The bot will now use these learnings in its system prompt.\n";
 echo "\nDone.\n";

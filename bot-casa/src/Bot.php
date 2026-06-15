@@ -63,6 +63,7 @@ final class Bot implements BotInterface
         private readonly SessionMemoryInterface       $sessionMemory,
         private readonly ?\WasapBot\Services\ClientProfileService $clientProfileService = null,
         private readonly ?\WasapBot\Pipeline\ConversationStateMachine $stateMachine = null,
+        private readonly ?\WasapBot\SideEffects\ResponseScorer $responseScorer = null,
         array                                      $inputGates = [],
         array                                      $processors = [],
         array                                      $sideEffects = [],
@@ -134,6 +135,21 @@ final class Bot implements BotInterface
                 $ctx = $this->processors[0]->process($ctx);
                 if ($ctx === null) {
                     return null; // conversation_dead — stop, no OpenAI call
+                }
+            }
+
+            // ── 6a. Score previous bot reply ──────────────────────────
+            // Evaluate how effective the LAST bot reply was based on
+            // what the client just sent us now. This feeds the learning
+            // engine to improve the playbook over time.
+            if ($this->responseScorer !== null && !empty($ctx['__is_new_conversation']) === false) {
+                try {
+                    $this->responseScorer->scorePreviousReply($ctx);
+                } catch (\Throwable $e) {
+                    // Scoring is best-effort; never block the pipeline
+                    if (isset($this->logger)) {
+                        $this->logger->warning('Bot::responseScorer — failed: ' . $e->getMessage());
+                    }
                 }
             }
 
@@ -846,6 +862,9 @@ final class Bot implements BotInterface
         // ── Conversation State Machine ────────────────────────────────
         $stateMachine = new \WasapBot\Pipeline\ConversationStateMachine($config, $logger);
 
+        // ── Response Scorer ───────────────────────────────────────────
+        $responseScorer = new \WasapBot\SideEffects\ResponseScorer($config, $logger, $sessionMemory);
+
         // ── Pipeline: Input gates ────────────────────────────────────
         $pauseGate = new \WasapBot\Pipeline\PauseGate($config, $logger);
         $inputGates = [
@@ -892,6 +911,7 @@ final class Bot implements BotInterface
             sessionMemory:         $sessionMemory,
             clientProfileService:  $clientProfileSvc,
             stateMachine:          $stateMachine,
+            responseScorer:        $responseScorer,
             inputGates:            $inputGates,
             processors:            $processors,
             sideEffects:           $sideEffects,
