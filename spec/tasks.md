@@ -157,10 +157,10 @@ Plan de 14 puntos en 4 fases para mejorar inteligencia, anti-bucles, y calidad d
 
 ### BOT-CASA-MEJORA-F2 — FASE 2: Anti-bucle + estado (P2, P10, P11, P12)
 
-- [ ] P2 — IntentRouter pre-LLM: nuevo stage que clasifica intención (greeting/price/location/photos/goodbye) y responde con templates sin LLM (~60% mensajes).
-- [ ] P10 — Anti-bucle: 3 capas de detección de fin de conversación (despedida con silencio, filler loop con silencio, cierre único antes del silencio).
-- [ ] P11 — POST-AI guard "todas comparten" + fix `__is_ad_intro` state corruption.
-- [ ] P12 — Sticky state: fallback al último estado conocido si el cálculo actual pierde speaker/selected.
+- [x] P2 — IntentRouter pre-LLM: nuevo stage `IntentRouter.php` que clasifica intención (greeting/price/location/photos/goodbye/confirm/fallback) con regex. Responde con templates sin LLM para ~60% de mensajes. Integrado en Bot.php como processor[1].
+- [x] P10 — Anti-bucle: 3 capas en ContextAssembler: (A) farewell explícito → `__conversation_ended`, (B) 3+ fillers → `return null` (silencio total), (C) conversación ya terminada + filler → silencio. Métodos `wasConversationEndedRecently()` e `isPureFiller()`.
+- [x] P11 — POST-AI guard "todas comparten": regex en Bot.php que limpia frases de casa-compartida del output_text a menos que el cliente pregunte explícitamente por independencia. Fix `__is_ad_intro`: ya no fuerza `speaker_mode=encargada` si el historial tiene una chica identificada.
+- [x] P12 — Sticky state: fallback en ContextAssembler que restaura `speaker_girl_name` y `selected_girl_name` desde el historial si el cálculo actual los pierde (ej: tras cross-line merge nulo o mensaje ambiguo).
 
 ### BOT-CASA-MEJORA-F3 — FASE 3: Contexto + FSM (P4, P6, P8)
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-06-15 — BOT-CASA-MEJORA FASE 2: Anti-bucle + estado (P2, P10, P11, P12)
+
+### Implementado
+- **P2 IntentRouter pre-LLM**: Nuevo pipeline stage `IntentRouter.php` que clasifica la intención del mensaje del cliente (greeting, price, location, photos, goodbye, confirm, fallback) usando regex. Las intenciones comunes se responden con templates sin llamar al LLM, reduciendo ~60% de llamadas y latencia. Integrado en Bot.php como processor[1] entre ContextAssembler y ToneBuilder. Fast-path en handleWebhook que envía directamente la respuesta si `__skip_llm` está activo.
+- **P10 Anti-bucle**: 3 capas de detección de fin de conversación en ContextAssembler. Capa A: farewell explícito ("adios", "hasta luego", etc.) → marca `__conversation_ended`. Capa B: 3+ monosílabos consecutivos ("ok", "vale", "si", "jj", emojis) → `return null` (silencio total, pipeline detenido). Capa C: conversación ya terminada + nuevo filler → silencio inmediato. Métodos `wasConversationEndedRecently()` (detecta despedidas en últimas 3 replies) e `isPureFiller()` (detecta 30+ patrones de relleno).
+- **P11 POST-AI guard**: Regex guard en Bot.php después de ResponseNormalizer que limpia frases como "todas comparten casita", "todas están en la misma casa" del output_text, a menos que el cliente haya preguntado explícitamente si son independientes. Fix en ContextAssembler: `__is_ad_intro` ya no fuerza `speaker_mode=encargada` cuando el historial ya tiene una chica identificada con ese nombre, evitando la pérdida de contexto en conversaciones multi-línea.
+- **P12 Sticky state**: Fallback al final de ContextAssembler.process() que restaura `speaker_girl_name` y `selected_girl_name` desde el historial si el cálculo actual los dejó vacíos (caso típico: mensaje ambiguo como "Donde es?" tras haber elegido chica, o cross-line merge que devuelve null).
+
+### Archivos
+- **Nuevos (1):** `bot-casa/src/Pipeline/IntentRouter.php`
+- **Modificados (2):** `bot-casa/src/Bot.php`, `bot-casa/src/Pipeline/ContextAssembler.php`
+- **Documentación:** `spec/tasks.md`, `docs/changelog.md`
+
 ## 2026-06-15 — BOT-CASA-MEJORA FASE 1: Correcciones inmediatas (P1, P3, P9, P13, P14)
 
 ### Implementado

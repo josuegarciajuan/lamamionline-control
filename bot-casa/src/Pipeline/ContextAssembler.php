@@ -240,6 +240,54 @@ final class ContextAssembler implements PipelineStageInterface
         // --- speaker_mode: depende de speaker_girl (quién habla) ---
         $speakerMode = ($speakerGirlName !== '') ? 'chica' : 'encargada';
 
+        // ── NOVA: __is_ad_intro ───────────────────────────────────────────
+        // Si el primer mensaje del cliente contiene una URL de anuncio,
+        // viene buscando a UNA chica concreta. NO debemos asignar speaker_mode
+        // 'chica' todavía para que el first-contact gate de Bot.php pueda
+        // saludar sin catálogo.
+        $isAdIntro = false;
+        if ($recent === [] && $history === []) {
+            $adUrls = [
+                'nuevapasion\.com\/anuncio',
+                'milanuncios\.com\/contacto',
+                'adultguia\.com',
+                'destacamos\.com',
+                'pasions\.com',
+                'sexoservicios\.com',
+                'mundosexanuncio\.com',
+                'm\.mundosexanuncio\.com',
+                'slumi\.com',
+                'erosguia\.com',
+                'photokines\.com',
+            ];
+            if (preg_match('/' . implode('|', $adUrls) . '/i', $messageText)) {
+                $isAdIntro = true;
+                // Si la chica del anuncio se detectó por nombre en el texto,
+                // la guardamos como speaker pero MANTENEMOS speaker_mode='encargada'
+                // para que el gate de first-contact dispare (solo saludo, sin catálogo).
+                // El speaker_girl se usará en mensajes posteriores cuando se confirme.
+                //
+                // NOVA FIX: si YA hay historial de conversación con una chica
+                // identificada, NO forzar speaker_mode='encargada' — eso
+                // causaría que el bot pierda la identidad de la chica y
+                // vuelva a ofrecer catálogo a un cliente que ya eligió.
+                $hasPriorSpeaker = false;
+                foreach ($history as $rec) {
+                    $sn = (string) ($rec['speaker_girl_name'] ?? '');
+                    if ($sn !== '' && $sn === $speakerGirlName) {
+                        $hasPriorSpeaker = true;
+                        break;
+                    }
+                }
+                if ($speakerGirlName !== '' && !$hasPriorSpeaker) {
+                    // Guardar la chica detectada pero mantener modo encargada
+                    // para evitar que el bot envíe catálogo en el primer mensaje
+                    $speakerMode = 'encargada';
+                }
+            }
+        }
+        $ctx['__is_ad_intro'] = $isAdIntro;
+
         // Escribir resultados deterministas en $ctx
         $ctx['speaker_girl_id']     = $speakerGirlId;
         $ctx['speaker_girl_name']   = $speakerGirlName;
@@ -331,6 +379,230 @@ final class ContextAssembler implements PipelineStageInterface
         // True when there's no history AND no recent messages. Used by ToneBuilder
         // to trigger proactive catalog on first contact.
         $ctx['__is_new_conversation'] = ($recent === [] && $history === []);
+
+        // ── NOVA B2: catalog_count — cuántas veces se ha mostrado catálogo ──
+        // (todas las chicas juntas) en esta conversación. Si >= 2, prohibir reenvío.
+        $catalogCount = 0;
+        foreach ($history as $rec) {
+            $shown = $rec['shown_girls'] ?? [];
+            if (is_array($shown) && count($shown) >= 2) {
+                $catalogCount++;
+            }
+        }
+        $ctx['catalog_count'] = $catalogCount;
+
+        // ── NOVA B3: photo_rejected — cliente rechazó explícitamente las fotos ──
+        $photoRejected = false;
+        $rejectPatterns = [
+            '/\bno\s+(?:es|son)\s+(?:esa|esa chica|las|ellas)\b/i',
+            '/\bno\s+(?:est[aá]|est[aá]n)\b/i',
+            '/\bno\s+me\s+gusta\b/i',
+            '/\bya\s+(?:las?\s+)?(?:vi|he\s+visto)\b/i',
+            '/\bno\s+(?:es|era)\s+(?:lo|eso)\s+que\b/i',
+            '/\bno\s+estoy\s+interesado\b/i',
+        ];
+        foreach ($rejectPatterns as $p) {
+            if (preg_match($p, $normalizedText)) {
+                $photoRejected = true;
+                break;
+            }
+        }
+        // También revisar si el historial tiene rechazo previo (persistente)
+        if (!$photoRejected) {
+            foreach ($history as $rec) {
+                $um = (string) ($rec['user_msg'] ?? '');
+                foreach ($rejectPatterns as $p) {
+                    if (preg_match($p, $um)) {
+                        $photoRejected = true;
+                        break 2;
+                    }
+                }
+            }
+        }
+        $ctx['photo_rejected'] = $photoRejected;
+
+        // ── NOVA B4: __filler_loop_count — monosílabos consecutivos ──
+        $fillerLoopCount = 0;
+        $fillerPatterns = '/\b(ok|vale|oka|oki|vle|okey|dime|dime\s*algo|dimelo)\b/i';
+        for ($i = count($history) - 1; $i >= 0; $i--) {
+            $um = (string) ($history[$i]['user_msg'] ?? '');
+            if ($um === '') continue;
+            if (preg_match($fillerPatterns, $this->normalizeStr($um)) || mb_strlen(trim($um)) <= 3) {
+                $fillerLoopCount++;
+            } else {
+                break;
+            }
+        }
+        // También contar el mensaje actual
+        if (preg_match($fillerPatterns, $normalizedText) || mb_strlen(trim($normalizedText)) <= 3) {
+            $fillerLoopCount++;
+        }
+        $ctx['__filler_loop_count'] = $fillerLoopCount;
+
+        // ── B0: Pace — user response time (seconds since last bot reply) ──
+        $paceCfg = $this->config->get('human_delays.pace', []);
+        $paceRef = (float) (is_array($paceCfg) ? ($paceCfg['reference_sec'] ?? 60) : 60);
+        $userResponseTimeSec = $paceRef; // default: neutral
+        for ($i = count($history) - 1; $i >= 0; $i--) {
+            $reply = (string) ($history[$i]['bot_reply'] ?? '');
+            if ($reply !== '') {
+                $ts = strtotime((string) ($history[$i]['ts'] ?? ''));
+                if ($ts !== false) {
+                    $userResponseTimeSec = max(1.0, (float) (time() - $ts));
+                }
+                break;
+            }
+        }
+        $ctx['user_response_time_sec'] = $userResponseTimeSec;
+
+        // ── B9: Burst detection — 3+ user messages in last N seconds ──
+        $burstCfg = $this->config->get('human_delays.burst', []);
+        $burstWindow    = (int) (is_array($burstCfg) ? ($burstCfg['window_sec']    ?? 30) : 30);
+        $burstThreshold = (int) (is_array($burstCfg) ? ($burstCfg['threshold_msgs'] ?? 3)  : 3);
+        $burstCount = 0;
+        $now = time();
+        for ($i = count($history) - 1; $i >= 0; $i--) {
+            $ts = strtotime((string) ($history[$i]['ts'] ?? ''));
+            if ($ts === false || ($now - $ts) > $burstWindow) {
+                break;
+            }
+            $msg = (string) ($history[$i]['user_msg'] ?? '');
+            if ($msg !== '') {
+                $burstCount++;
+            }
+        }
+        $ctx['__is_burst'] = ($burstCount >= $burstThreshold);
+
+        // ── B10: Urgent detection — user says "rápido", "date prisa", etc. ──
+        $urgentPatterns = '/\br[aá]pido\b|\bdate\s+prisa\b|\bcontesta\s+ya\b|\bresponde\s+ya\b|\bdime\s+ya\b|\btengo\s+prisa\b|\bvoy\s+con\s+prisa\b|\bestoy\s+esperando\b|\?{3,}|!{3,}/iu';
+        $ctx['__is_urgent'] = (bool) preg_match($urgentPatterns, $normalizedText);
+
+        // ── NOVA B5: Cross-line context merge ─────────────────────────────
+        // Si el mismo teléfono ha hablado con nosotros por otra línea,
+        // copiamos speaker_girl, selected_girl y ya_enviado para mantener
+        // coherencia de conversación entre líneas.
+        if ($ctx['__is_new_conversation'] && $this->sessionMemory !== null) {
+            $fromPhone = (string) ($ctx['from_phone'] ?? '');
+            if ($fromPhone !== '') {
+                $merged = $this->mergeContextFromOtherLines($fromPhone, $ctx['thread_id'] ?? '', $ctx);
+                if ($merged !== null) {
+                    $ctx = $merged;
+                }
+            }
+        }
+
+        // ── NOVA B6: Anti-bucle — conversation end detection ─────────
+        // Three layers:
+        //   A) Explicit farewell → send goodbye, set __conversation_ended
+        //   B) Filler loop (3+ monosyllables) → detect death, halt pipeline
+        //   C) Previously ended + filler → silence completely
+
+        $convEndedRecently = $this->wasConversationEndedRecently($history);
+
+        if ($convEndedRecently) {
+            $ctx['__conversation_ended_recently'] = true;
+        }
+
+        // B. Filler loop detection
+        $fillerLoopCount = (int) ($ctx['__filler_loop_count'] ?? 0);
+        $isJustFiller = $this->isPureFiller($messageText);
+
+        if ($isJustFiller) {
+            if ($convEndedRecently) {
+                // Conversation already ended, client is teasing → SILENCE
+                $ctx['__conversation_dead'] = true;
+                $ctx['output_text'] = '';
+                if ($this->logger !== null) {
+                    $this->logger->info('ContextAssembler: conversation dead — filler after end', [
+                        'phone' => $ctx['from_phone'] ?? '?',
+                    ]);
+                }
+                return null; // Halt pipeline completely
+            }
+
+            if ($fillerLoopCount >= 3) {
+                // 3+ consecutive fillers → conversation is dead
+                $ctx['__conversation_dead'] = true;
+                $ctx['output_text'] = '';
+                if ($this->logger !== null) {
+                    $this->logger->info('ContextAssembler: conversation dead — filler loop detected', [
+                        'phone' => $ctx['from_phone'] ?? '?',
+                        'filler_count' => $fillerLoopCount,
+                    ]);
+                }
+                return null; // Halt pipeline
+            }
+
+            if ($fillerLoopCount >= 2 && !$convEndedRecently) {
+                // 2 fillers → one last closing emoji, then end
+                $closingEmojis = ['😘', '😊', '😏', '😉'];
+                $ctx['output_text'] = $closingEmojis[array_rand($closingEmojis)];
+                $ctx['__conversation_ended'] = true;
+                $ctx['__skip_llm'] = true;
+                $ctx['lead_detected'] = false;
+                $ctx['photo_action'] = 'none';
+                if ($this->logger !== null) {
+                    $this->logger->info('ContextAssembler: filler loop → closing emoji sent', [
+                        'phone' => $ctx['from_phone'] ?? '?',
+                    ]);
+                }
+            }
+        }
+
+        // A. Explicit farewell → set ended flag
+        $endIntent = $ctx['conversation_end_intent'] ?? false;
+        if ($endIntent) {
+            $ctx['__conversation_ended'] = true;
+        }
+
+        // ── NOVA B7: Sticky state fallback ───────────────────────────
+        // If the current iteration lost speaker/selected girl state
+        // (e.g., due to cross-line merge returning null, ad_intro forcing
+        // encargada, or ambiguous message), restore from the most recent
+        // record in history that has speaker/selected set.
+        $currentSpeaker  = trim((string) ($ctx['speaker_girl_name'] ?? ''));
+        $currentSelected = trim((string) ($ctx['selected_girl_name'] ?? ''));
+
+        if ($currentSpeaker === '' || $currentSelected === '') {
+            for ($i = count($history) - 1; $i >= 0; $i--) {
+                $rec = $history[$i];
+                $hSpeaker  = trim((string) ($rec['speaker_girl_name'] ?? ''));
+                $hSelected = trim((string) ($rec['selected_girl_name'] ?? ''));
+                $hMode     = (string) ($rec['speaker_mode'] ?? '');
+
+                if ($currentSpeaker === '' && $hSpeaker !== '') {
+                    $ctx['speaker_girl_name'] = $hSpeaker;
+                    $ctx['speaker_girl_id']   = (string) ($rec['speaker_girl_id'] ?? '');
+                    if ($hMode === 'chica') {
+                        $ctx['speaker_mode'] = 'chica';
+                    }
+                    if ($this->logger !== null) {
+                        $this->logger->info('ContextAssembler: sticky state — restored speaker from history', [
+                            'speaker' => $hSpeaker,
+                            'phone'   => $ctx['from_phone'] ?? '?',
+                        ]);
+                    }
+                    break; // Found speaker, stop scanning
+                }
+            }
+
+            for ($i = count($history) - 1; $i >= 0; $i--) {
+                $rec = $history[$i];
+                $hSelected = trim((string) ($rec['selected_girl_name'] ?? ''));
+
+                if ($currentSelected === '' && $hSelected !== '') {
+                    $ctx['selected_girl_name'] = $hSelected;
+                    $ctx['selected_girl_id']   = (string) ($rec['selected_girl_id'] ?? '');
+                    if ($this->logger !== null) {
+                        $this->logger->info('ContextAssembler: sticky state — restored selected from history', [
+                            'selected' => $hSelected,
+                            'phone'    => $ctx['from_phone'] ?? '?',
+                        ]);
+                    }
+                    break;
+                }
+            }
+        }
 
         return $ctx;
     }
@@ -754,9 +1026,70 @@ final class ContextAssembler implements PipelineStageInterface
     private function detectConversationEndIntent(string $normalizedText): bool
     {
         return (bool) preg_match(
-            '/(adios|hasta\s*luego|hasta\s*ahora|me\s*voy|otro\s*dia|luego\s*hablamos|ya\s*te\s*digo|gracias\s*y\s*perdon|vale\s*gracias|ok\s*gracias)/iu',
+            '/(adios|hasta\s*luego|hasta\s*ahora|me\s*voy|otro\s*dia|luego\s*hablamos|ya\s*te\s*digo|gracias\s*y\s*perdon|vale\s*gracias|ok\s*gracias'
+            . '|chao|bye|nos\s*vemos|me\s*despido|te\s*llamo\s*mañana|hablamos\s*mañana|me\s*voy\s*ya|suerte|buenas\s*noches|hasta\s*mañana)/iu',
             $normalizedText
         );
+    }
+
+    /**
+     * Check if the conversation was already ended in recent history.
+     * Looks for short farewell bot replies or previously set __conversation_ended flag.
+     */
+    private function wasConversationEndedRecently(array $history): bool
+    {
+        if ($history === []) return false;
+
+        // Check last 3 bot replies for farewell patterns
+        $farewellWords = ['hablamos', 'adios', 'chao', 'bye', 'suerte', 'ya me diras',
+                         'descansa', 'sueña', 'hasta mañana', 'nos vemos', 'cuando quieras'];
+        $checked = 0;
+        for ($i = count($history) - 1; $i >= 0 && $checked < 3; $i--) {
+            $botReply = (string) ($history[$i]['bot_reply'] ?? '');
+            if ($botReply === '') continue;
+            $checked++;
+
+            // Short emoji-only or very short replies after farewell → conversation ended
+            $trimmed = trim($botReply);
+            if (mb_strlen($trimmed) <= 3) {
+                return true;
+            }
+
+            $lower = mb_strtolower($trimmed, 'UTF-8');
+            foreach ($farewellWords as $w) {
+                if (str_contains($lower, $w)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Determine if a message is purely filler (monosyllabic acknowledgment, emoji only, etc.)
+     */
+    private function isPureFiller(string $text): bool
+    {
+        $t = trim($text);
+        if ($t === '') return false;
+
+        // Emoji-only messages (up to 3 emojis)
+        if (preg_match('/^[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}\s]{1,3}$/u', $t)) {
+            return true;
+        }
+
+        // Pure monosyllabic fillers
+        $tNormalized = mb_strtolower($t, 'UTF-8');
+        $pureFillers = ['ok', 'oki', 'okey', 'oka', 'vale', 'vle', 'si', 'sip', 'yas',
+                       'da', 'dale', 'jj', 'jjj', 'jjjj', 'jaja', 'jeje', 'jiji',
+                       'ta bien', 'claro', 'perfecto', 'genial', 'guay', 'de acuerdo',
+                       '👍', '👌', '✅', '🔥', '💋', '😘', '😊', '😏', '😉'];
+
+        if (in_array($tNormalized, $pureFillers, true) || mb_strlen($tNormalized) <= 3) {
+            return true;
+        }
+
+        return false;
     }
 
     private function detectInteresFuerte(string $normalizedText): bool
@@ -1069,5 +1402,96 @@ final class ContextAssembler implements PipelineStageInterface
             }
         }
         return $count;
+    }
+
+    /**
+     * NOVA B5: merge context from other WhatsApp lines for the same phone.
+     *
+     * When a client contacts us via multiple WhatsApp numbers, each line creates
+     * a separate thread_id. This method scans all threads in session memory,
+     * finds the most recent one for the same phone, and copies speaker_girl,
+     * selected_girl, and ya_enviado to maintain conversation coherence.
+     *
+     * @param  string               $fromPhone  Client phone number
+     * @param  string               $currentTid Current thread_id (to skip)
+     * @param  array<string, mixed> $ctx        Current context (reference)
+     * @return array<string, mixed>|null        Updated ctx or null if no merge needed
+     */
+    private function mergeContextFromOtherLines(string $fromPhone, string $currentTid, array $ctx): ?array
+    {
+        if ($this->sessionMemory === null) return null;
+
+        // Scan ALL threads in session memory for the same phone
+        $allThreads = $this->sessionMemory->listThreadIds();
+        if (empty($allThreads)) return null;
+
+        $bestRec = null;
+        $bestTs  = 0;
+        foreach ($allThreads as $tid) {
+            if ($tid === $currentTid) continue;
+            if (!str_ends_with((string) $tid, '_' . $fromPhone)) continue;
+
+            $records = $this->sessionMemory->readThread($tid);
+            if (empty($records)) continue;
+
+            // Find the most recent record with context
+            for ($i = count($records) - 1; $i >= 0; $i--) {
+                $rec = $records[$i];
+                $ts = strtotime((string) ($rec['ts'] ?? ''));
+                if ($ts === false) continue;
+                if ($ts > $bestTs && !empty($rec['speaker_girl_name'])) {
+                    $bestTs  = $ts;
+                    $bestRec = $rec;
+                }
+            }
+        }
+
+        if ($bestRec === null) return null;
+
+        // Merge context fields
+        $merged = false;
+        $speakerName = (string) ($bestRec['speaker_girl_name'] ?? '');
+        $speakerId   = (string) ($bestRec['speaker_girl_id'] ?? '');
+        $selectedName = (string) ($bestRec['selected_girl_name'] ?? '');
+        $selectedId   = (string) ($bestRec['selected_girl_id'] ?? '');
+        $yaEnviado    = (array) ($bestRec['ya_enviado'] ?? []);
+        $shownGirls   = (array) ($bestRec['shown_girls'] ?? []);
+        $unshownGirls = (array) ($bestRec['unshown_girls'] ?? []);
+
+        if ($speakerName !== '' && ($ctx['speaker_girl_name'] ?? '') === '') {
+            $ctx['speaker_girl_name'] = $speakerName;
+            $ctx['speaker_girl_id']   = $speakerId;
+            $ctx['speaker_mode']      = 'chica';
+            $merged = true;
+        }
+        if ($selectedName !== '' && ($ctx['selected_girl_name'] ?? '') === '') {
+            $ctx['selected_girl_name'] = $selectedName;
+            $ctx['selected_girl_id']   = $selectedId;
+            $merged = true;
+        }
+        if (!empty($yaEnviado)) {
+            $currentYa = (array) ($ctx['ya_enviado'] ?? []);
+            $ctx['ya_enviado'] = array_unique(array_merge($currentYa, $yaEnviado));
+            $merged = true;
+        }
+        if (!empty($shownGirls)) {
+            $ctx['shown_girls'] = $shownGirls;
+            $merged = true;
+        }
+        if (!empty($unshownGirls)) {
+            $ctx['unshown_girls'] = $unshownGirls;
+            $merged = true;
+        }
+
+        if ($merged && $this->logger !== null) {
+            $this->logger->info('ContextAssembler::mergeContextFromOtherLines — merged context from other line', [
+                'phone'      => $fromPhone,
+                'speaker'    => $speakerName,
+                'selected'   => $selectedName,
+                'ya_enviado' => $ctx['ya_enviado'] ?? [],
+            ]);
+        }
+
+        return $ctx;
     }
 }

@@ -136,6 +136,61 @@ final class Bot implements BotInterface
                 }
             }
 
+            // ── 6b. IntentRouter — lightweight intent classification ──
+            // Runs after ContextAssembler (needs context flags) and BEFORE
+            // the LLM.  Common intents (greeting, price, location, photos,
+            // goodbye, confirm) are served from templates without an LLM
+            // call, cutting latency and cost for ~60% of messages.
+            if (isset($this->processors[1]) && $this->processors[1]->name() === 'IntentRouter') {
+                $ctx = $this->processors[1]->process($ctx);
+                if ($ctx === null) {
+                    return null;
+                }
+            }
+
+            // ── 6c. Conversation-ended fast path ──────────────────────
+            // If IntentRouter or ContextAssembler detected that the
+            // conversation should end (goodbye, filler loop, dead), send
+            // the farewell/emoji directly without touching the LLM.
+            $skipLlm  = !empty($ctx['__skip_llm']);
+            $convEnded = !empty($ctx['__conversation_ended']);
+
+            if ($skipLlm && !empty($ctx['output_text'])) {
+                $fromPhone = (string) ($ctx['from_phone'] ?? '');
+                $lineLast9 = (string) ($ctx['line_last9'] ?? '');
+                $inflightLockDir = $this->inflightLockDir();
+
+                // ── Run catalog formatter if photo_action is set ─────
+                if (!empty($ctx['photo_action']) && $ctx['photo_action'] !== 'none') {
+                    if (isset($this->processors[4]) && $this->processors[4]->name() === 'CatalogFormatter') {
+                        $ctx = $this->processors[4]->process($ctx);
+                    }
+                }
+
+                $ctx['_send_ok'] = true;
+                $this->sendMessages($ctx, [$ctx['output_text'] ?? '']);
+
+                if (!empty($ctx['_send_ok']) && empty($ctx['_cancelled'])) {
+                    $this->sessionMemory->appendMessage(
+                        (string) ($ctx['thread_id'] ?? ''),
+                        $fromPhone,
+                        (string) ($ctx['message_text'] ?? ''),
+                        (string) ($ctx['output_text'] ?? ''),
+                        $ctx,
+                    );
+                }
+
+                \WasapBot\Pipeline\InflightGate::cleanup($inflightLockDir, $fromPhone, $lineLast9);
+
+                $this->logger->info('Bot::handleWebhook — pipeline completed (intent router fast path)', [
+                    'phone'     => $fromPhone,
+                    'thread_id' => $ctx['thread_id'] ?? '?',
+                    'intent'    => $ctx['__intent'] ?? '?',
+                ]);
+
+                return $ctx;
+            }
+
             // ── 7. Client profile context ─────────────────────────────
             if ($this->clientProfileService !== null) {
                 $ctx['client_profile_hint'] = $this->clientProfileService->getClientContextHint($fromPhone);
@@ -235,8 +290,8 @@ final class Bot implements BotInterface
             $ctx['urgency']   = $tone['urgency']   ?? 'baja';
 
             // ── 9. Build tone directives (ToneBuilder) ───────────────
-            if (isset($this->processors[1]) && $this->processors[1]->name() === 'ToneBuilder') {
-                $ctx = $this->processors[1]->process($ctx);
+            if (isset($this->processors[2]) && $this->processors[2]->name() === 'ToneBuilder') {
+                $ctx = $this->processors[2]->process($ctx);
             }
 
             // ── 10. Call AI chat completion (OpenAI or DeepSeek) ──────
@@ -286,8 +341,8 @@ final class Bot implements BotInterface
             $ctx['openai_choices']      = $openaiResponse['choices'] ?? [];
 
             // ── 11. Normalize response (ResponseNormalizer) ──────────
-            if (isset($this->processors[2]) && $this->processors[2]->name() === 'ResponseNormalizer') {
-                $ctx = $this->processors[2]->process($ctx);
+            if (isset($this->processors[3]) && $this->processors[3]->name() === 'ResponseNormalizer') {
+                $ctx = $this->processors[3]->process($ctx);
             } elseif (!empty($openaiResponse['choices'])) {
                 $ctx['output_text'] = $openaiResponse['choices'][0]['message']['content'] ?? '';
             }
@@ -319,10 +374,56 @@ final class Bot implements BotInterface
                 ]);
             }
 
+            // ── 11c. POST-AI guard: strip "todas comparten casita" ───
+            // The LLM sometimes mentions that all girls share the same
+            // house even when the client didn't ask about independence.
+            // This guard strips those phrases unless the client explicitly
+            // asked whether girls are independent or share a location.
+            $userMessageText = (string) ($ctx['message_text'] ?? '');
+            $askedAboutIndependence = (bool) preg_match(
+                '/\b(independiente|particular|sola|compart[eí]s|cada\s+una|vuestra\s+casa|tu\s+casa|piso\s+compartido|eres\s+tu\s+sola)/iu',
+                $userMessageText
+            );
+            if (!$askedAboutIndependence) {
+                $outputText = (string) ($ctx['output_text'] ?? '');
+                if ($outputText !== '') {
+                    $original = $outputText;
+                    $outputText = preg_replace(
+                        '/tod[ao]s?\s+compart[ei]n\s+casita\s+en\s+/iu',
+                        '',
+                        $outputText
+                    );
+                    $outputText = preg_replace(
+                        '/tod[ao]s?\s+est[áa]n?\s+en\s+la\s+misma\s+casa[^.]*\.?\s*/iu',
+                        '',
+                        $outputText
+                    );
+                    $outputText = preg_replace(
+                        '/compartimos\s+casa[^.]*\.?\s*/iu',
+                        '',
+                        $outputText
+                    );
+                    $outputText = preg_replace(
+                        '/estamos\s+tod[ao]s\s+en\s+el\s+mismo\s+piso[^.]*\.?\s*/iu',
+                        '',
+                        $outputText
+                    );
+                    $outputText = trim(preg_replace('/\s{2,}/', ' ', $outputText));
+                    if ($outputText !== $original && $outputText !== '') {
+                        $ctx['output_text'] = $outputText;
+                        if (isset($this->logger)) {
+                            $this->logger->info('Bot::POST-AI guard — stripped "todas comparten casita"', [
+                                'phone' => $fromPhone ?? '?',
+                            ]);
+                        }
+                    }
+                }
+            }
+
             // ── 12. Catalog formatter (CatalogFormatter) ─────────────
             $textBeforeCatalog = $ctx['output_text'] ?? '';
-            if (isset($this->processors[3]) && $this->processors[3]->name() === 'CatalogFormatter') {
-                $ctx = $this->processors[3]->process($ctx);
+            if (isset($this->processors[4]) && $this->processors[4]->name() === 'CatalogFormatter') {
+                $ctx = $this->processors[4]->process($ctx);
             }
             // Diagnostic: log if CatalogFormatter added photos via regex fallback
             $textAfterCatalog = $ctx['output_text'] ?? '';
@@ -339,13 +440,13 @@ final class Bot implements BotInterface
             }
 
             // ── 13. Dedupe reply (DedupeReply) ───────────────────────
-            if (isset($this->processors[4]) && $this->processors[4]->name() === 'DedupeReply') {
-                $ctx = $this->processors[4]->process($ctx);
+            if (isset($this->processors[5]) && $this->processors[5]->name() === 'DedupeReply') {
+                $ctx = $this->processors[5]->process($ctx);
             }
 
             // ── 14. Image splitter (ImageSplitter) ───────────────────
-            if (isset($this->processors[5]) && $this->processors[5]->name() === 'ImageSplitter') {
-                $ctx = $this->processors[5]->process($ctx);
+            if (isset($this->processors[6]) && $this->processors[6]->name() === 'ImageSplitter') {
+                $ctx = $this->processors[6]->process($ctx);
             }
 
             // ── 14b. POST-AI: inyectar location_url si el AI dice que envía mapa pero no incluye URL ──
@@ -729,6 +830,7 @@ final class Bot implements BotInterface
         // ── Pipeline: Processors ─────────────────────────────────────
         $processors = [
             new \WasapBot\Pipeline\ContextAssembler($config, $logger, $memory, $sessionMemory),
+            new \WasapBot\Pipeline\IntentRouter($config, $logger),
             new \WasapBot\Pipeline\ToneBuilder($config, $logger),
             new \WasapBot\Pipeline\ResponseNormalizer($config, $logger),
             new \WasapBot\Pipeline\CatalogFormatter($config, $logger),
@@ -832,6 +934,10 @@ final class Bot implements BotInterface
         if (file_exists($playbookPath) && is_readable($playbookPath)) {
             $playbookContent = @file_get_contents($playbookPath);
             if ($playbookContent !== false && $playbookContent !== '') {
+                // Clean playbook: remove English meta-analysis written by
+                // the LLM that generated it, keeping only Spanish pattern content.
+                // The spanglish confuses the chat model and degrades Spanish quality.
+                $playbookContent = $this->cleanPlaybook($playbookContent);
                 $base .= "\n\n### PLAYBOOK\n" . $playbookContent;
 
                 // If playbook contains human style guide, add explicit adoption directive
@@ -847,6 +953,140 @@ final class Bot implements BotInterface
         }
 
         return $base;
+    }
+
+    /**
+     * Remove English meta-analysis lines from the playbook.
+     *
+     * The playbook is auto-generated by an LLM that writes analysis in English
+     * interspersed with Spanish patterns. The English confuses the chat model
+     * and degrades Spanish output quality.
+     *
+     * Strategy: strip lines that are predominantly English analysis while
+     * keeping Spanish pattern descriptions and section headers.
+     */
+    private function cleanPlaybook(string $content): string
+    {
+        if (trim($content) === '') {
+            return '';
+        }
+
+        $lines = explode("\n", $content);
+        $cleaned = [];
+        $englishBlock = false;
+
+        // Keywords that signal English meta-analysis (not Spanish patterns)
+        $englishAnalysisMarkers = [
+            '/^We need to/',
+            "/^Let'?s extract/",
+            '/^First, /',
+            '/^Now, /',
+            '/^The lead was /',
+            '/^But we can /',
+            '/^Overall, /',
+            '/^However, /',
+            '/^This is /',
+            '/^It suggests/',
+            '/^I\'ll /',
+            '/^So I\'ll /',
+            '/^Not much\.$/',
+            '/^I note /',
+            '/^From the /',
+            '/^The key /',
+            '/^The bot\'s /',
+            '/^This /',
+            '/^The human /',
+            '/^Also, /',
+            '/^From /',
+            '/^Specifically, /',
+            '/^The client /',
+            '/^Ghosting often /',
+            '/^The human uses /',
+            '/^But the /',
+            '/^Another /',
+            '/^The point of/',
+            '/^This suggests/',
+            '/^This is messy/',
+            '/^Not much/',
+            '/^So the/',
+            '/^That shows/',
+            '/^That creates/',
+            '/^This matches/',
+            '/^So new insight/',
+            '/^The playbook already/',
+            '/^The mareo/',
+            '/^The tone is/',
+            '/^The human also/',
+            '/^The human did/',
+            '/^Not a strong/',
+            '/^The inflexion/',
+            '/^So that/',
+            '/^The success/',
+        ];
+
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+
+            // Always keep blank lines and markdown headers
+            if ($trimmed === '') {
+                $cleaned[] = $line;
+                $englishBlock = false;
+                continue;
+            }
+
+            // Always keep markdown headers (##, ###)
+            if (str_starts_with($trimmed, '#')) {
+                $cleaned[] = $line;
+                $englishBlock = false;
+                continue;
+            }
+
+            // Keep metadata header lines (start with >)
+            if (str_starts_with($trimmed, '>')) {
+                $cleaned[] = $line;
+                continue;
+            }
+
+            // Keep separator lines (---)
+            if ($trimmed === '---') {
+                $cleaned[] = $line;
+                continue;
+            }
+
+            // Detect English analysis lines
+            $isEnglishAnalysis = false;
+            foreach ($englishAnalysisMarkers as $pattern) {
+                if (preg_match($pattern, $trimmed)) {
+                    $isEnglishAnalysis = true;
+                    break;
+                }
+            }
+
+            if ($isEnglishAnalysis) {
+                $englishBlock = true;
+                // Skip this line (English meta-analysis)
+                continue;
+            }
+
+            // If we're in an English paragraph, check if it's ending
+            if ($englishBlock) {
+                // Check if this line has Spanish content
+                $hasSpanish = (bool) preg_match('/[áéíóúñü¡¿]/iu', $trimmed);
+                if (!$hasSpanish) {
+                    // Check for indented continuation or list items without Spanish
+                    if (preg_match('/^\s+/', $line) || str_starts_with($trimmed, '-')) {
+                        continue; // continuation of English block
+                    }
+                }
+                // Spanish content found → exit English block
+                $englishBlock = false;
+            }
+
+            // Keep the line
+            $cleaned[] = $line;
+        }
+
+        return implode("\n", $cleaned);
     }
 
     /**
@@ -1676,8 +1916,8 @@ final class Bot implements BotInterface
         $ctx['urgency']   = $tone['urgency']   ?? 'baja';
 
         // Step 9: re-run ToneBuilder
-        if (isset($this->processors[1]) && $this->processors[1]->name() === 'ToneBuilder') {
-            $ctx = $this->processors[1]->process($ctx);
+        if (isset($this->processors[2]) && $this->processors[2]->name() === 'ToneBuilder') {
+            $ctx = $this->processors[2]->process($ctx);
         }
 
         // Step 10: re-run LLM call with coalesced message
@@ -1724,8 +1964,8 @@ final class Bot implements BotInterface
         $ctx['openai_choices']      = $openaiResponse['choices'] ?? [];
 
         // Steps 11-14: re-run normalizers and formatters
-        if (isset($this->processors[2]) && $this->processors[2]->name() === 'ResponseNormalizer') {
-            $ctx = $this->processors[2]->process($ctx);
+        if (isset($this->processors[3]) && $this->processors[3]->name() === 'ResponseNormalizer') {
+            $ctx = $this->processors[3]->process($ctx);
         }
 
         // ── Fallback: if re-processing LLM returned empty ──
@@ -1736,14 +1976,14 @@ final class Bot implements BotInterface
             $ctx['output_text']   = $fallback;
             $ctx['lead_detected'] = false;
         }
-        if (isset($this->processors[3]) && $this->processors[3]->name() === 'CatalogFormatter') {
-            $ctx = $this->processors[3]->process($ctx);
-        }
-        if (isset($this->processors[4]) && $this->processors[4]->name() === 'DedupeReply') {
+        if (isset($this->processors[4]) && $this->processors[4]->name() === 'CatalogFormatter') {
             $ctx = $this->processors[4]->process($ctx);
         }
-        if (isset($this->processors[5]) && $this->processors[5]->name() === 'ImageSplitter') {
+        if (isset($this->processors[5]) && $this->processors[5]->name() === 'DedupeReply') {
             $ctx = $this->processors[5]->process($ctx);
+        }
+        if (isset($this->processors[6]) && $this->processors[6]->name() === 'ImageSplitter') {
+            $ctx = $this->processors[6]->process($ctx);
         }
 
         // Re-run safety nets
