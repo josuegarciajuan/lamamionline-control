@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-06-15 — BOT-CASA-MEJORA FASE 3: Contexto + FSM (P4, P6, P8)
+
+### Implementado
+- **P4 Compresión de historial**: `buildChatHistory()` en Bot.php ahora comprime turnos antiguos cuando la conversación supera 10 intercambios. Los mensajes antiguos se resumen en un bloque `[RESUMEN ANTERIOR]` con metadatos clave (chica que habla, chica elegida, qué se envió: fotos/precios/mapa, si el cliente dio ETA). Solo los últimos 10 turnos se mantienen como mensajes completos. Nuevo método `summarizeHistoryTurns()`. Configurable vía `memory.compress_after_turns`.
+- **P6 Detección temprana de muertas**: Nuevo método `isConversationDead()` en ContextAssembler que evalúa 4 señales antes de llamar al LLM: (1) 24h+ de silencio desde el último mensaje, (2) perfil de cliente marcado como hostil + mensaje actual hostil, (3) 5+ mensajes del usuario sin mencionar chica/precio/ubicación (sin interés real), (4) 15+ mensajes totales sin mapa enviado ni ETA del cliente (mareador confirmado). Si se detecta muerte → `return null` (pipeline detenido, 0 coste LLM). Configurable vía `dead_detection.*`.
+- **P8 FSM conversacional**: Nuevo archivo `ConversationStateMachine.php` con 11 estados (NEW, GREETING_SENT, AWAITING_INTEREST, CATALOG_SHOWN, GIRL_SELECTED, PRICE_GIVEN, MAPS_SENT, WAITING_ETA, CONFIRMED, DEAD, COMPLETED). El estado se calcula determinísticamente desde el historial de sesión. `getStateHint()` genera una directiva en lenguaje natural para el LLM según el estado actual. `canTransition()` valida transiciones válidas. Integrado en Bot.php después de ContextAssembler; el estado y hint se inyectan en `__conversation_state` y `__state_hint`.
+
+### Archivos
+- **Nuevos (1):** `bot-casa/src/Pipeline/ConversationStateMachine.php`
+- **Modificados (2):** `bot-casa/src/Bot.php`, `bot-casa/src/Pipeline/ContextAssembler.php`
+- **Documentación:** `spec/tasks.md`, `docs/changelog.md`
+
 ## 2026-06-15 — BOT-CASA-MEJORA FASE 2: Anti-bucle + estado (P2, P10, P11, P12)
 
 ### Implementado

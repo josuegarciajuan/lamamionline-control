@@ -62,6 +62,7 @@ final class Bot implements BotInterface
         private readonly TelegramServiceInterface     $telegramService,
         private readonly SessionMemoryInterface       $sessionMemory,
         private readonly ?\WasapBot\Services\ClientProfileService $clientProfileService = null,
+        private readonly ?\WasapBot\Pipeline\ConversationStateMachine $stateMachine = null,
         array                                      $inputGates = [],
         array                                      $processors = [],
         array                                      $sideEffects = [],
@@ -145,6 +146,33 @@ final class Bot implements BotInterface
                 $ctx = $this->processors[1]->process($ctx);
                 if ($ctx === null) {
                     return null;
+                }
+            }
+
+            // ── 6c. Conversation State Machine ─────────────────────────
+            // Compute the logical conversation stage from history and
+            // inject a state hint for the LLM. This helps the LLM stay
+            // on track and avoid regressions (re-asking "cual te gusta?"
+            // after the client already chose a girl).
+            if ($this->stateMachine !== null) {
+                $threadId = (string) ($ctx['thread_id'] ?? '');
+                $fsmHistory = [];
+                if ($threadId !== '') {
+                    try {
+                        $fsmHistory = $this->sessionMemory->readThread($threadId);
+                        $fsmHistory = array_values(array_filter($fsmHistory, static fn(array $r): bool =>
+                            empty($r['_pending'])
+                        ));
+                    } catch (\Throwable) {}
+                }
+                $ctx['__conversation_state'] = $this->stateMachine->computeState($fsmHistory, $ctx);
+                $ctx['__state_hint'] = $this->stateMachine->getStateHint($ctx['__conversation_state']);
+
+                if ($this->logger !== null) {
+                    $this->logger->debug('Bot::handleWebhook — FSM state computed', [
+                        'state' => $ctx['__conversation_state'],
+                        'phone' => $fromPhone ?? '?',
+                    ]);
                 }
             }
 
@@ -815,6 +843,9 @@ final class Bot implements BotInterface
         // ── Session Memory ───────────────────────────────────────────
         $sessionMemory = new \WasapBot\Memory\SessionMemory($config, $logger);
 
+        // ── Conversation State Machine ────────────────────────────────
+        $stateMachine = new \WasapBot\Pipeline\ConversationStateMachine($config, $logger);
+
         // ── Pipeline: Input gates ────────────────────────────────────
         $pauseGate = new \WasapBot\Pipeline\PauseGate($config, $logger);
         $inputGates = [
@@ -860,6 +891,7 @@ final class Bot implements BotInterface
             telegramService:       $telegramService,
             sessionMemory:         $sessionMemory,
             clientProfileService:  $clientProfileSvc,
+            stateMachine:          $stateMachine,
             inputGates:            $inputGates,
             processors:            $processors,
             sideEffects:           $sideEffects,
@@ -1119,13 +1151,16 @@ final class Bot implements BotInterface
         // Filter to recent window (last 6h) and take last N turns
         $recentWindowH = (int) $this->config->get('memory.recent_window_hours', 6);
         $maxTurns      = (int) $this->config->get('memory.max_history_turns', 15);
+        $compressAfter = (int) $this->config->get('memory.compress_after_turns', 10);
         $now           = time();
 
         $recent = [];
+        $lastTs  = 0;
         foreach ($rawHistory as $rec) {
             $ts = strtotime((string) ($rec['ts'] ?? ''));
             if ($ts !== false && ($now - $ts) <= $recentWindowH * 3600) {
                 $recent[] = $rec;
+                $lastTs = max($lastTs, $ts);
             }
         }
 
@@ -1136,8 +1171,27 @@ final class Bot implements BotInterface
             $recent = array_slice($recent, -$maxTurns);
         }
 
+        // ── NOVA P4: History compression ────────────────────────────
+        // When conversation exceeds compressAfter turns, summarize older
+        // messages into a single compressed context block so the LLM
+        // keeps focus on the most recent exchange without losing earlier
+        // decisions (which girl was chosen, prices given, maps sent, etc.)
+        $historySummary = '';
+        if (count($recent) > $compressAfter) {
+            $olderTurns = array_slice($recent, 0, count($recent) - $compressAfter);
+            $recent     = array_slice($recent, -$compressAfter);
+            $historySummary = $this->summarizeHistoryTurns($olderTurns);
+        }
+
         // Build alternating user/assistant messages
         $history = [];
+
+        // Prepend summary as a synthetic system context if available
+        if ($historySummary !== '') {
+            $history[] = ['role' => 'user', 'content' => '[RESUMEN ANTERIOR] ' . $historySummary];
+            $history[] = ['role' => 'assistant', 'content' => '✓'];
+        }
+
         foreach ($recent as $rec) {
             $userMsg = (string) ($rec['user_msg'] ?? '');
             $botMsg  = (string) ($rec['bot_reply'] ?? '');
@@ -1151,6 +1205,69 @@ final class Bot implements BotInterface
         }
 
         return $history;
+    }
+
+    /**
+     * Summarize older conversation turns into a compact text block.
+     *
+     * Extracts key decisions and state changes so the LLM doesn't lose
+     * context when older messages are compressed out of the chat window.
+     *
+     * @param list<array<string, mixed>> $turns
+     */
+    private function summarizeHistoryTurns(array $turns): string
+    {
+        if ($turns === []) return '';
+
+        $firstTs = strtotime((string) ($turns[0]['ts'] ?? ''));
+        $lastTs  = strtotime((string) ($turns[count($turns) - 1]['ts'] ?? ''));
+        $durationMin = ($firstTs && $lastTs) ? round(($lastTs - $firstTs) / 60) : 0;
+
+        $parts = [];
+        if ($durationMin > 0) {
+            $parts[] = "conversación de {$durationMin} minutos";
+        }
+        $parts[] = count($turns) . ' mensajes';
+
+        // Find key state decisions in the summary window
+        $lastSpeaker  = '';
+        $lastSelected = '';
+        $sentPhotos   = false;
+        $sentPrices   = false;
+        $sentMaps     = false;
+        $gaveEta      = false;
+
+        foreach ($turns as $rec) {
+            $sn = trim((string) ($rec['speaker_girl_name'] ?? ''));
+            $sel = trim((string) ($rec['selected_girl_name'] ?? ''));
+            if ($sn !== '') $lastSpeaker = $sn;
+            if ($sel !== '') $lastSelected = $sel;
+
+            $ya = (array) ($rec['ya_enviado'] ?? []);
+            if (in_array('fotos', $ya, true)) $sentPhotos = true;
+            if (in_array('precios', $ya, true)) $sentPrices = true;
+            if (in_array('ubicacion', $ya, true) || in_array('ubicacion_precisa', $ya, true)) $sentMaps = true;
+
+            if (!empty($rec['eta_from_user_flag'])) $gaveEta = true;
+        }
+
+        if ($lastSpeaker !== '') {
+            $parts[] = "chica que habla: {$lastSpeaker}";
+        }
+        if ($lastSelected !== '' && $lastSelected !== $lastSpeaker) {
+            $parts[] = "cliente eligió a: {$lastSelected}";
+        } elseif ($lastSelected !== '') {
+            $parts[] = "cliente eligió a: {$lastSelected}";
+        }
+
+        $sent = [];
+        if ($sentPhotos) $sent[] = 'fotos';
+        if ($sentPrices) $sent[] = 'precios';
+        if ($sentMaps)   $sent[] = 'mapa';
+        if ($sent !== []) $parts[] = 'enviado: ' . implode(', ', $sent);
+        if ($gaveEta) $parts[] = 'cliente dio ETA';
+
+        return implode(' | ', $parts) . '.';
     }
 
     /**

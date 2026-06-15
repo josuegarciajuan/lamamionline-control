@@ -164,9 +164,9 @@ Plan de 14 puntos en 4 fases para mejorar inteligencia, anti-bucles, y calidad d
 
 ### BOT-CASA-MEJORA-F3 — FASE 3: Contexto + FSM (P4, P6, P8)
 
-- [ ] P4 — Compresión de historial multi-turno (resumen tras 10 turnos).
-- [ ] P6 — Detección temprana de conversación muerta (24h silencio, 3+ fillers, hostil, 5+ msg sin avance, >15 msg mareador).
-- [ ] P8 — FSM conversacional (NEW→GREETING_SENT→...→CONFIRMED/DEAD).
+- [x] P4 — Compresión de historial: `buildChatHistory()` ahora resume turnos antiguos (>10) en un bloque `[RESUMEN ANTERIOR]` con datos clave (chica, precios, mapa, ETA). Mantiene solo los últimos 10 turnos como mensajes completos. Nuevo método `summarizeHistoryTurns()`.
+- [x] P6 — Detección temprana de muertas: `isConversationDead()` en ContextAssembler evalúa 4 señales: (1) 24h+ de silencio, (2) perfil hostil + mensaje hostil, (3) 5+ mensajes sin progreso (sin chica/precio/ubicación), (4) 15+ mensajes totales sin señales de lead (mareador). Si muerta → `return null` (sin LLM).
+- [x] P8 — FSM conversacional: nuevo `ConversationStateMachine.php` con 11 estados (NEW→GREETING_SENT→AWAITING_INTEREST→CATALOG_SHOWN→GIRL_SELECTED→PRICE_GIVEN→MAPS_SENT→WAITING_ETA→CONFIRMED→DEAD/COMPLETED). Método `computeState()` determinista desde historial, `getStateHint()` genera directiva para el LLM, `canTransition()` valida transiciones. Integrado en Bot.php tras ContextAssembler.
 
 ### BOT-CASA-MEJORA-F4 — FASE 4: Analytics (P5, P7)
 

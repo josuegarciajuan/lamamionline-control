@@ -555,6 +555,25 @@ final class ContextAssembler implements PipelineStageInterface
             $ctx['__conversation_ended'] = true;
         }
 
+        // ── NOVA B8: Early dead conversation detection ───────────────
+        // Check if the conversation should be treated as dead BEFORE
+        // wasting an LLM call.  Multiple signals are evaluated:
+        //   - 24h+ of silence since last user message
+        //   - Client profile marked as hostile + current message hostile
+        //   - 5+ exchanges without meaningful progress (no girl, no price, no location)
+        //   - 15+ messages total without any lead signals (mareador confirmado)
+        if ($this->isConversationDead($ctx, $history)) {
+            $ctx['__conversation_dead'] = true;
+            $ctx['output_text'] = '';
+            if ($this->logger !== null) {
+                $this->logger->info('ContextAssembler: conversation dead — early detection', [
+                    'phone' => $ctx['from_phone'] ?? '?',
+                    'thread_id' => $ctx['thread_id'] ?? '?',
+                ]);
+            }
+            return null;
+        }
+
         // ── NOVA B7: Sticky state fallback ───────────────────────────
         // If the current iteration lost speaker/selected girl state
         // (e.g., due to cross-line merge returning null, ad_intro forcing
@@ -1087,6 +1106,87 @@ final class ContextAssembler implements PipelineStageInterface
 
         if (in_array($tNormalized, $pureFillers, true) || mb_strlen($tNormalized) <= 3) {
             return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Early dead conversation detection — evaluated BEFORE calling the LLM.
+     *
+     * Multiple signals are checked to avoid wasting API credits on
+     * conversations that have no chance of converting.
+     *
+     * @param array<string, mixed> $ctx     Current pipeline context.
+     * @param list<array<string, mixed>> $history  Filtered history records.
+     * @return bool  True if the conversation should be treated as dead.
+     */
+    private function isConversationDead(array $ctx, array $history): bool
+    {
+        $now = time();
+
+        // ── Signal 1: 24h+ of silence ────────────────────────────────
+        $deadHours = (int) $this->config->get('dead_detection.silence_hours', 24);
+        if ($history !== []) {
+            $lastRec = $history[count($history) - 1];
+            $lastTs = strtotime((string) ($lastRec['ts'] ?? ''));
+            if ($lastTs !== false && ($now - $lastTs) >= $deadHours * 3600) {
+                return true;
+            }
+        }
+
+        // ── Signal 2: Client profile marks as hostile ────────────────
+        $profileHint = (string) ($ctx['client_profile_hint'] ?? '');
+        if ($profileHint !== '' && stripos($profileHint, 'hostil') !== false) {
+            $messageText = (string) ($ctx['message_text'] ?? '');
+            $hostilePatterns = '/\b(vete|fuera|no\s+me\s+interesa|deja\s+de\s+escribir|para\s+ya|pesad[oa]|mentira|engaño|estafa)\b/iu';
+            if (preg_match($hostilePatterns, $messageText)) {
+                return true;
+            }
+        }
+
+        // ── Signal 3: 5+ exchanges without meaningful progress ───────
+        // No girl selected, no price asked, no location requested in the
+        // last 5 user messages — the client isn't engaging.
+        $deadAfterNoProgress = (int) $this->config->get('dead_detection.no_progress_msgs', 5);
+        $userMsgsChecked = 0;
+        $hasProgress = false;
+        for ($i = count($history) - 1; $i >= 0 && $userMsgsChecked < $deadAfterNoProgress; $i--) {
+            $userMsg = (string) ($history[$i]['user_msg'] ?? '');
+            if ($userMsg === '') continue;
+            $userMsgsChecked++;
+
+            if (preg_match('/\b(precio|tarifa|cu[aá]nto|ubicaci[oó]n|donde\s+est|maps?|mapa|direcci[oó]n|quiero\s+a\b|me\s+gusta\s+\w|voy\s+para|voy\s+en|llego\s+en|tardo\s+\d+|estoy\s+fuera|estoy\s+cerca)\b/iu', $userMsg)) {
+                $hasProgress = true;
+                break;
+            }
+        }
+        if ($userMsgsChecked >= $deadAfterNoProgress && !$hasProgress) {
+            $selectedGirl = trim((string) ($ctx['selected_girl_name'] ?? ''));
+            if ($selectedGirl === '') {
+                return true; // No girl + no progress = dead
+            }
+        }
+
+        // ── Signal 4: 15+ total messages, no lead signals ────────────
+        $totalMsgs = count($history);
+        $mareoMin = (int) $this->config->get('dead_detection.mareador_min_messages', 15);
+        if ($totalMsgs >= $mareoMin) {
+            $hasLeadSignal = false;
+            foreach ($history as $rec) {
+                if (!empty($rec['maps_sent']) || !empty($rec['eta_from_user_flag'])) {
+                    $hasLeadSignal = true;
+                    break;
+                }
+                $ya = (array) ($rec['ya_enviado'] ?? []);
+                if (in_array('ubicacion', $ya, true) || in_array('ubicacion_precisa', $ya, true)) {
+                    $hasLeadSignal = true;
+                    break;
+                }
+            }
+            if (!$hasLeadSignal) {
+                return true; // Mareador confirmado
+            }
         }
 
         return false;
