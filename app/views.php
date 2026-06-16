@@ -7509,8 +7509,13 @@ function render_configm_section() {
 }
 
 function render_josue_page() {
+    $anunciosUnlocked = !empty($_SESSION['josue_anuncios_unlocked']);
+
     $tab = request_get('tab', 'publias');
-    $allowed = array('publias', 'captacion', 'notas', 'waha', 'telefonos', 'agenda', 'eurekas', 'config', 'configm', 'sendtaxs');
+    $allowed = array('publias', 'captacion', 'sendtaxs', 'notas', 'autotube', 'waha', 'telefonos', 'agenda', 'config', 'configm');
+    if ($anunciosUnlocked) {
+        $allowed[] = 'anuncios';
+    }
 
     if (!in_array($tab, $allowed, true)) {
         $tab = 'publias';
@@ -7520,11 +7525,10 @@ function render_josue_page() {
     $anuncios = storage_read('anuncios.json');
     $telefonos = storage_read('telefonos.json');
     $agenda = storage_read('agenda.json');
-    $eurekas = storage_read('eurekas.json');
-
     $sendtaxsState = isset($settings['sendtaxs_state']) && is_array($settings['sendtaxs_state'])
         ? $settings['sendtaxs_state']
         : array();
+
     $sendtaxsDefaults = array_merge(array(
         'porc_plaza' => '31.5',
         'porc_publi_sched' => '28.4',
@@ -7532,7 +7536,6 @@ function render_josue_page() {
         'porc_pubcasas' => '19.1',
         'total_deseado' => '51',
     ), $sendtaxsState);
-
 
     $text = in_array($tab, array('publias', 'captacion', 'notas', 'waha'), true)
         ? (isset($settings[$tab . '_text']) ? (string)$settings[$tab . '_text'] : '')
@@ -7548,272 +7551,499 @@ function render_josue_page() {
 
     echo '<section class="panel panel-josue">';
 
+    if (!$anunciosUnlocked) {
+        echo '<div class="josue-unlock-box">';
+        echo '<form method="post" class="josue-unlock-form">';
+        echo '<input type="hidden" name="action" value="unlock_josue_anuncios">';
+        echo '<div class="field">';
+        echo '<label>Desbloquear Anuncios</label>';
+        echo '<input type="password" name="password" placeholder="Contraseña">';
+        echo '</div>';
+        echo '<button class="btn-secondary-mini">Entrar</button>';
+        echo '</form>';
+        echo '</div>';
+    }
+
     echo '<div class="subtabs">';
-    echo '<a class="subtab ' . ($tab === 'telefonos' ? 'active' : '') . '" href="' . e(comercial_page_url('lineas')) . '">Telefonos →</a>';
+    if ($anunciosUnlocked) {
+        echo '<a class="subtab ' . ($tab === 'anuncios' ? 'active' : '') . '" href="index.php?page=josue&tab=anuncios">Anuncios</a>';
+    }
+    echo '<a class="subtab ' . ($tab === 'telefonos' ? 'active' : '') . '" href="index.php?page=josue&tab=telefonos">Telefonos</a>';
     echo '<a class="subtab ' . ($tab === 'waha' ? 'active' : '') . '" href="index.php?page=josue&tab=waha">WAHA</a>';
     echo '<a class="subtab ' . ($tab === 'publias' ? 'active' : '') . '" href="index.php?page=josue&tab=publias">PublIas</a>';
     echo '<a class="subtab ' . ($tab === 'captacion' ? 'active' : '') . '" href="index.php?page=josue&tab=captacion">Captacion</a>';
+    echo '<a class="subtab ' . ($tab === 'sendtaxs' ? 'active' : '') . '" href="index.php?page=josue&tab=sendtaxs">SendTaxs</a>';
     echo '<a class="subtab ' . ($tab === 'agenda' ? 'active' : '') . '" href="index.php?page=josue&tab=agenda">Agenda</a>';
-    echo '<a class="subtab ' . ($tab === 'eurekas' ? 'active' : '') . '" href="index.php?page=josue&tab=eurekas">Eurekas</a>';
     //echo '<a class="subtab ' . ($tab === 'avisos' ? 'active' : '') . '" href="index.php?page=josue&tab=avisos">Avisos</a>';
     echo '<a class="subtab ' . ($tab === 'config' ? 'active' : '') . '" href="index.php?page=josue&tab=config">Config</a>';
     echo '<a class="subtab ' . ($tab === 'configm' ? 'active' : '') . '" href="index.php?page=josue&tab=configm">ConfigM</a>';
     echo '<a class="subtab ' . ($tab === 'notas' ? 'active' : '') . '" href="index.php?page=josue&tab=notas">Notas</a>';    
-    echo '<a class="subtab ' . ($tab === 'sendtaxs' ? 'active' : '') . '" href="index.php?page=josue&tab=sendtaxs">SendTaxs</a>';
+    echo '<a class="subtab ' . ($tab === 'autotube' ? 'active' : '') . '" href="index.php?page=josue&tab=autotube">Autotube</a>';
     
     echo '</div>';
 
     echo '<div class="subtab-content">';
 
+    if ($tab === 'sendtaxs') {
+        echo '<div class="sendtaxs-tool">';
+        echo '<div class="sendtaxs-head">';
+        echo '<h2>Ajustador de Porcentajes y Tasas de Envío</h2>';
+        echo '<p>Ingresa los porcentajes deseados. Puedes editarlos libremente aunque no sumen 100%. Usa "Normalizar a 100%" para escalar proporcionalmente, o pulsa "Calcular" y se normalizará automáticamente antes de generar los ajustes.</p>';
+        echo '</div>';
 
-    if ($tab === 'config') {
+        echo '<div class="sendtaxs-grid">';
+        echo '  <div class="field"><label>Porcentaje Plaza</label><input type="number" id="porc_plaza" value="' . e($sendtaxsDefaults['porc_plaza']) . '" min="0" max="100" step="0.1"></div>';
+        echo '  <div class="field"><label>Porcentaje Lamami</label><input type="number" id="porc_publi_sched" value="' . e($sendtaxsDefaults['porc_publi_sched']) . '" min="0" max="100" step="0.1"></div>';
+        echo '  <div class="field"><label>Porcentaje Publicista</label><input type="number" id="porc_publipub" value="' . e($sendtaxsDefaults['porc_publipub']) . '" min="0" max="100" step="0.1"></div>';
+        echo '  <div class="field"><label>Porcentaje Casawasap</label><input type="number" id="porc_pubcasas" value="' . e($sendtaxsDefaults['porc_pubcasas']) . '" min="0" max="100" step="0.1"></div>';
+        echo '</div>';
+
+        echo '<div class="sendtaxs-toolbar">';
+        echo '  <button type="button" class="btn-secondary-mini" onclick="sendtaxsNormalizar()">Normalizar a 100%</button>';
+        echo '</div>';
+
+        echo '<div class="sendtaxs-grid sendtaxs-grid-single">';
+        echo '  <div class="field"><label>Total mensajes diarios deseado</label><input type="number" id="total_deseado" value="' . e($sendtaxsDefaults['total_deseado']) . '" min="1" step="1"></div>';
+        echo '</div>';
+
+        echo '<div class="sendtaxs-toolbar">';
+        echo '  <button type="button" class="btn-primary" onclick="sendtaxsCalcular()">Calcular envíos y ajustes</button>';
+        echo '</div>';
+
+        echo '<div id="sendtaxs_resultados" class="sendtaxs-resultados"></div>';
+        echo '</div>';
+
+        echo <<<'HTML'
+<script>
+(function () {
+    const sendtaxsEnvActual = { plaza: 14, publi_sched: 12.6, publipub: 9.3, pubcasas: 8.5 };
+    const sendtaxsRangosActual = {
+        plaza_pico_min: 2300, plaza_pico_max: 5000, plaza_resto_min: 3000, plaza_resto_max: 6000,
+        publi_pico_min: 2300, publi_pico_max: 5200, publi_resto_min: 5300, publi_resto_max: 6300,
+        publipub_min: 45, publipub_max: 90,
+        pubcasas_min: 90, pubcasas_max: 120
+    };
+
+    function sendtaxsGetIds() {
+        return ["porc_plaza", "porc_publi_sched", "porc_publipub", "porc_pubcasas"];
+    }
+
+    window.sendtaxsNormalizar = function () {
+        const ids = sendtaxsGetIds();
+        let suma = 0;
+        ids.forEach(function (id) {
+            const el = document.getElementById(id);
+            suma += parseFloat(el ? el.value : 0) || 0;
+        });
+        if (suma === 0) return;
+
+        ids.forEach(function (id) {
+            const el = document.getElementById(id);
+            const val = parseFloat(el ? el.value : 0) || 0;
+            const nuevoVal = (val / suma) * 100;
+            if (el) el.value = nuevoVal.toFixed(1);
+        });
+    };
+
+    window.sendtaxsCalcular = function () {
+        const ids = sendtaxsGetIds();
+        let suma = 0;
+        ids.forEach(function (id) {
+            const el = document.getElementById(id);
+            suma += parseFloat(el ? el.value : 0) || 0;
+        });
+
+        if (Math.abs(suma - 100) > 0.1) {
+            window.sendtaxsNormalizar();
+        }
+
+        const porcPlazaEl = document.getElementById("porc_plaza");
+        const porcPubliSchedEl = document.getElementById("porc_publi_sched");
+        const porcPublipubEl = document.getElementById("porc_publipub");
+        const porcPubcasasEl = document.getElementById("porc_pubcasas");
+        const totalEl = document.getElementById("total_deseado");
+        const resultadosEl = document.getElementById("sendtaxs_resultados");
+
+        if (!porcPlazaEl || !porcPubliSchedEl || !porcPublipubEl || !porcPubcasasEl || !totalEl || !resultadosEl) {
+            return;
+        }
+
+        const porcs = {
+            plaza: (parseFloat(porcPlazaEl.value) || 0) / 100,
+            publi_sched: (parseFloat(porcPubliSchedEl.value) || 0) / 100,
+            publipub: (parseFloat(porcPublipubEl.value) || 0) / 100,
+            pubcasas: (parseFloat(porcPubcasasEl.value) || 0) / 100
+        };
+
+        const total = parseFloat(totalEl.value) || 0;
+        if (total <= 0) {
+            resultadosEl.innerHTML = '<div class="sendtaxs-card"><strong>Indica un total válido mayor que 0.</strong></div>';
+            return;
+        }
+
+        const envNuevos = {
+            plaza: (total * porcs.plaza).toFixed(1),
+            publi_sched: (total * porcs.publi_sched).toFixed(1),
+            publipub: (total * porcs.publipub).toFixed(1),
+            pubcasas: (total * porcs.pubcasas).toFixed(1)
+        };
+
+        const plazaVal = parseFloat(envNuevos.plaza);
+        const publiSchedVal = parseFloat(envNuevos.publi_sched);
+        const publipubVal = parseFloat(envNuevos.publipub);
+        const pubcasasVal = parseFloat(envNuevos.pubcasas);
+
+        const scales = {
+            plaza: plazaVal > 0 ? (sendtaxsEnvActual.plaza / plazaVal) : 0,
+            publi_sched: publiSchedVal > 0 ? (sendtaxsEnvActual.publi_sched / publiSchedVal) : 0,
+            publipub: publipubVal > 0 ? (sendtaxsEnvActual.publipub / publipubVal) : 0,
+            pubcasas: pubcasasVal > 0 ? (sendtaxsEnvActual.pubcasas / pubcasasVal) : 0
+        };
+
+        let html = "";
+        html += `<div class="sendtaxs-card">`;
+        html += `<h3>Envíos diarios calculados</h3>`;
+        html += `<ul class="sendtaxs-list">`;
+        html += `<li><strong>Plaza:</strong> ${envNuevos.plaza} mensajes/día</li>`;
+        html += `<li><strong>Lamami:</strong> ${envNuevos.publi_sched} mensajes/día</li>`;
+        html += `<li><strong>Publicista:</strong> ${envNuevos.publipub} mensajes/día</li>`;
+        html += `<li><strong>Casawasap:</strong> ${envNuevos.pubcasas} mensajes/día</li>`;
+        html += `</ul>`;
+        html += `</div>`;
+
+        html += `<div class="sendtaxs-card">`;
+        html += `<h3>Ajustes en scripts</h3>`;
+
+        html += `<div class="sendtaxs-block">`;
+        html += `<strong>Plaza_scheduler.sh</strong><br>`;
+        html += `<span class="muted">/var/www/html/jostal/plaza_scheduler.sh</span><br><br>`;
+        html += `Pico (15-19): min_s=${Math.round(sendtaxsRangosActual.plaza_pico_min * scales.plaza)}, max_s=${Math.round(sendtaxsRangosActual.plaza_pico_max * scales.plaza)}<br>`;
+        html += `Resto: min_s=${Math.round(sendtaxsRangosActual.plaza_resto_min * scales.plaza)}, max_s=${Math.round(sendtaxsRangosActual.plaza_resto_max * scales.plaza)}`;
+        html += `</div>`;
+
+        html += `<div class="sendtaxs-block">`;
+        html += `<strong>Publicidad_scheduler.sh (Lamami)</strong><br>`;
+        html += `<span class="muted">/var/www/html/atupuerta/publicidad_scheduler.sh</span><br><br>`;
+        html += `Pico (13-19): min_s=${Math.round(sendtaxsRangosActual.publi_pico_min * scales.publi_sched)}, max_s=${Math.round(sendtaxsRangosActual.publi_pico_max * scales.publi_sched)}<br>`;
+        html += `Resto: min_s=${Math.round(sendtaxsRangosActual.publi_resto_min * scales.publi_sched)}, max_s=${Math.round(sendtaxsRangosActual.publi_resto_max * scales.publi_sched)}`;
+        html += `</div>`;
+
+        html += `<div class="sendtaxs-block">`;
+        html += `<strong>enviar-publicistas.php (Publicista)</strong><br>`;
+        html += `<span class="muted">/var/www/html/wasapbot/botPubli/enviar-publicistas.php</span><br>`;
+        html += `<span class="muted">/var/www/html/wasapbot/botPubli/enviar-publicistas2.php</span><br><br>`;
+        html += `MIN_WAIT_MINUTES=${Math.round(sendtaxsRangosActual.publipub_min * scales.publipub)}<br>`;
+        html += `MAX_WAIT_MINUTES=${Math.round(sendtaxsRangosActual.publipub_max * scales.publipub)}`;
+        html += `</div>`;
+
+        html += `<div class="sendtaxs-block">`;
+        html += `<strong>enviar.php (Casawasap)</strong><br>`;
+        html += `<span class="muted">/var/www/html/wasapbot/botPubli/enviar.php</span><br>`;
+        html += `<span class="muted">/var/www/html/wasapbot/botPubli/enviar2.php</span><br><br>`;
+        html += `MIN_WAIT_MINUTES=${Math.round(sendtaxsRangosActual.pubcasas_min * scales.pubcasas)}<br>`;
+        html += `MAX_WAIT_MINUTES=${Math.round(sendtaxsRangosActual.pubcasas_max * scales.pubcasas)}`;
+        html += `</div>`;
+
+        html += `</div>`;
+
+        resultadosEl.innerHTML = html;
+
+        fetch('index.php?page=josue&tab=sendtaxs', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+            },
+            body: new URLSearchParams({
+                action: 'save_sendtaxs_state',
+                porc_plaza: porcPlazaEl.value,
+                porc_publi_sched: porcPubliSchedEl.value,
+                porc_publipub: porcPublipubEl.value,
+                porc_pubcasas: porcPubcasasEl.value,
+                total_deseado: totalEl.value
+            })
+        }).catch(function () {});
+
+    };
+})();
+</script>
+HTML;
+
+if (!empty($sendtaxsState)) {
+    echo '<script>window.sendtaxsCalcular && window.sendtaxsCalcular();</script>';
+}
+
+/*
+    } elseif ($tab === 'avisos') {
+        render_avisos_section('index.php?page=josue&tab=avisos');
+*/
+    } elseif ($tab === 'config') {
         render_config_section();
 
     } elseif ($tab === 'configm') {
         render_configm_section();
 
     } elseif ($tab === 'anuncios') {
-        echo '<section class="panel panel-space">';
-        echo '<div class="branch-panel-head"><h2>Anuncios movido a Publicista</h2><span class="summary-badge">Reubicado</span></div>';
-        echo '<div class="info-strip">La gestión de cuentas de portales ya no vive en Josué. Ahora está en <strong>Publicista &gt; Cuentas</strong> para que quede unida al futuro módulo de campañas.</div>';
-        echo '<div style="margin-top:12px;"><a class="btn-primary" href="' . e(publicista_page_url('cuentas')) . '">Abrir cuentas en Publicista</a></div>';
+        $editId = request_get('edit', '');
+        $edit = $editId !== '' ? storage_find_by_id('anuncios.json', $editId) : null;
+
+        $telefonosByAnuncio = array();
+        foreach ($telefonos as $tel) {
+            $aid = $tel['destacamos_id'] ?? '';
+            if ($aid === '') continue;
+            if (!isset($telefonosByAnuncio[$aid])) $telefonosByAnuncio[$aid] = array();
+            $telefonosByAnuncio[$aid][] = $tel;
+        }
+
+        echo '<div class="cards two">';
+
+        echo '<section class="panel">';
+        echo '<div class="josue-head">';
+        echo '<h2>' . ($edit ? 'Editar anuncio' : 'Nuevo anuncio') . '</h2>';
+        echo '</div>';
+
+        echo '<form method="post" class="form-grid">';
+        echo '<input type="hidden" name="action" value="save_anuncio">';
+        echo '<input type="hidden" name="id" value="' . e($edit['id'] ?? '') . '">';
+        field_input('url', 'URL', $edit['url'] ?? '', true);
+        field_input('user', 'User', $edit['user'] ?? '', true);
+        field_input('pass', 'Pass', $edit['pass'] ?? '', true);
+        field_textarea('descripcion', 'Descripción', $edit['descripcion'] ?? '', 4);
+        echo '<div class="full"><button class="btn-primary">Guardar anuncio</button></div>';
+        echo '</form>';
+
+        if ($edit) {
+            $linked = $telefonosByAnuncio[$edit['id']] ?? array();
+            echo '<hr class="sep">';
+            echo '<h2>Teléfonos vinculados</h2>';
+            if (empty($linked)) {
+                echo '<div class="empty">No hay teléfonos vinculados a este anuncio.</div>';
+            } else {
+                echo '<div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Teléfono</th><th>WAHA Port</th><th>WAHA</th></tr></thead><tbody>';
+                foreach ($linked as $tel) {
+                    echo '<tr>';
+                    echo '<td><a class="mini-link" href="index.php?page=josue&tab=telefonos&edit=' . e($tel['id']) . '">' . e($tel['nombre'] ?? '') . '</a></td>';
+                    echo '<td>' . e($tel['tfono'] ?? '') . '</td>';
+                    echo '<td>' . e($tel['waha_port'] ?? '') . '</td>';
+                    echo '<td>' . e($tel['waha'] ?? '') . '</td>';
+                    echo '</tr>';
+                }
+                echo '</tbody></table></div>';
+            }
+        }
         echo '</section>';
-    } elseif ($tab === 'telefonos') {
-        echo '<section class="panel panel-space">';
-        echo '<div class="branch-panel-head"><h2>Gestión de líneas movida</h2><span class="summary-badge">Reubicado</span></div>';
-        echo '<div class="info-strip">La gestión de líneas telefónicas (crear, editar, eliminar, ver salud WAHA) ahora está en <strong>Comercial &gt; Líneas</strong>.</div>';
-        echo '<div style="margin-top:12px;"><a class="btn-primary" href="' . e(comercial_page_url('lineas')) . '">Abrir Líneas en Comercial</a></div>';
+
+        echo '<section class="panel">';
+        echo '<h2>Listado anuncios</h2>';
+        if (empty($anuncios)) {
+            echo '<div class="empty">Todavía no hay anuncios registrados.</div>';
+        } else {
+            $anuncios = sort_desc_by_key($anuncios, 'created_at');
+            render_live_filter('#anunciosRows tr[data-filter-text]', 'Buscar anuncio...');
+            echo '<div class="table-wrap"><table><thead><tr>';
+            echo '<th>URL</th><th>User</th><th>Pass</th><th>Descripción</th><th>Acciones</th>';
+            echo '</tr></thead><tbody id="anunciosRows">';
+            foreach ($anuncios as $row) {
+                $searchText = strtolower(trim(
+                    ($row['url'] ?? '') . ' ' .
+                    ($row['user'] ?? '') . ' ' .
+                    ($row['pass'] ?? '') . ' ' .
+                    ($row['descripcion'] ?? '')
+                ));
+
+                echo '<tr data-filter-text="' . e($searchText) . '">';
+                echo '<td><div class="copy-row copy-row-vertical"><span>' . e($row['url'] ?? '') . '</span><button type="button" class="btn-copy-mini" data-copy="' . e($row['url'] ?? '') . '">Copiar</button></div></td>';
+                echo '<td><div class="copy-row copy-row-vertical"><span>' . e($row['user'] ?? '') . '</span><button type="button" class="btn-copy-mini" data-copy="' . e($row['user'] ?? '') . '">Copiar</button></div></td>';
+                echo '<td><div class="copy-row copy-row-vertical"><span>' . e($row['pass'] ?? '') . '</span><button type="button" class="btn-copy-mini" data-copy="' . e($row['pass'] ?? '') . '">Copiar</button></div></td>';
+                echo '<td>' . nl2br(e($row['descripcion'] ?? '')) . '</td>';
+                echo '<td>';
+                echo '<a class="mini-link" href="index.php?page=josue&tab=anuncios&edit=' . e($row['id']) . '">Editar</a> ';
+                echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar este anuncio?\')">';
+                echo '<input type="hidden" name="action" value="delete_anuncio">';
+                echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
+                echo '<button class="btn-danger-mini">Eliminar</button>';
+                echo '</form>';
+                echo '</td>';
+                echo '</tr>';
+
+                $linked = $telefonosByAnuncio[$row['id']] ?? array();
+                echo '<tr class="subrow-phones" data-filter-text="' . e($searchText) . '">';
+                echo '<td colspan="5">';
+                echo '<div class="subrow-label">Teléfonos vinculados:</div>';
+                if (empty($linked)) {
+                    echo '<div class="muted">Ninguno</div>';
+                } else {
+                    echo '<div class="linked-tags">';
+                    foreach ($linked as $tel) {
+                        $label = trim(($tel['nombre'] ?? '') . ' · ' . ($tel['tfono'] ?? ''));
+                        echo '<a class="linked-tag" href="index.php?page=josue&tab=telefonos&edit=' . e($tel['id']) . '">' . e($label) . '</a>';
+                    }
+                    echo '</div>';
+                }
+                echo '<hr class="sep">';
+                echo '</td>';
+                echo '</tr>';
+            }
+            echo '</tbody></table></div>';
+        }
         echo '</section>';
+
+        echo '</div>';
     } elseif ($tab === 'agenda') {
         $editId = request_get('edit', '');
         $edit = $editId !== '' ? storage_find_by_id('agenda.json', $editId) : null;
-        $agendaRows = sort_desc_by_key($agenda, 'updated_at');
 
         echo '<div class="cards two">';
 
         echo '<section class="panel">';
         echo '<div class="josue-head">';
-        echo '<h2>' . ($edit ? 'Editar contacto' : 'Nuevo contacto') . '</h2>';
-        if ($edit) {
-            echo '<a class="btn-secondary-mini" href="index.php?page=josue&tab=agenda">Nuevo contacto</a>';
-        }
+        echo '<h2>' . ($edit ? 'Ficha agenda' : 'Nuevo contacto agenda') . '</h2>';
         echo '</div>';
-        echo '<div class="info-strip">Agenda simple para guardar teléfonos útiles de Josué. Mantiene el mismo JSON y flujo actual.</div>';
 
-        echo '<form method="post" class="form-grid" style="margin-top:12px;">';
+        echo '<form method="post" class="form-grid">';
         echo '<input type="hidden" name="action" value="save_agenda">';
         echo '<input type="hidden" name="id" value="' . e($edit['id'] ?? '') . '">';
         field_input('nombre', 'Nombre', $edit['nombre'] ?? '', true);
-        field_input('telefono', 'Telefono', $edit['telefono'] ?? '', true);
-        field_textarea('observaciones', 'Observaciones', $edit['observaciones'] ?? '', 6);
-        echo '<div class="full josue-actions">';
-        echo '<button class="btn-primary" type="submit">' . ($edit ? 'Guardar cambios' : 'Crear contacto') . '</button>';
-        if ($edit) {
-            echo '<a class="btn-secondary-mini" href="index.php?page=josue&tab=agenda">Cancelar</a>';
-        }
-        echo '</div>';
+        field_input('telefono', 'Teléfono', $edit['telefono'] ?? '', true);
+        field_textarea('observaciones', 'Observaciones', $edit['observaciones'] ?? '', 5);
+        echo '<div class="full"><button class="btn-primary">Guardar contacto</button></div>';
         echo '</form>';
         echo '</section>';
 
         echo '<section class="panel">';
-        echo '<div class="josue-head">';
-        echo '<h2>Agenda</h2>';
-        echo '<span class="summary-badge">' . count($agendaRows) . ' contactos</span>';
-        echo '</div>';
+        echo '<h2>Listado agenda</h2>';
 
-        if (empty($agendaRows)) {
-            echo '<div class="empty">Todavía no hay contactos en la agenda.</div>';
+        if (empty($agenda)) {
+            echo '<div class="empty">Todavía no hay contactos en agenda.</div>';
         } else {
-            render_live_filter('#agendaCards .contact-card[data-filter-text]', 'Buscar por nombre, telefono u observaciones...');
-            echo '<div id="agendaCards" class="stack-list">';
-            foreach ($agendaRows as $row) {
-                $nombre = trim((string)($row['nombre'] ?? ''));
-                $telefono = trim((string)($row['telefono'] ?? ''));
-                $observaciones = trim((string)($row['observaciones'] ?? ''));
-                $searchText = strtolower(trim($nombre . ' ' . $telefono . ' ' . $observaciones));
+            $agenda = sort_desc_by_key($agenda, 'created_at');
 
-                echo '<article class="contact-card info-strip" data-filter-text="' . e($searchText) . '">';
-                echo '<div class="contact-card-main">';
-                echo '<div class="contact-card-body">';
-                echo '<div class="contact-card-name">' . e($nombre !== '' ? $nombre : 'Sin nombre') . '</div>';
-                if ($telefono !== '') {
-                    echo '<div class="contact-card-phone-wrap">';
-                    crm_render_phone_value($telefono, array('tel_link' => true));
-                    echo '</div>';
-                } else {
-                    echo '<div class="muted contact-card-subline">Sin telefono</div>';
-                }
-                if ($observaciones !== '') {
-                    echo '<div class="muted contact-card-notes">' . e($observaciones) . '</div>';
-                } else {
-                    echo '<div class="muted contact-card-notes">Sin observaciones</div>';
-                }
-                echo '</div>';
+            render_live_filter('#agendaRows tr[data-filter-text]', 'Buscar contacto agenda...');
 
-                echo '<div class="contact-card-actions">';
-                if ($telefono !== '') {
-                    echo '<a class="mini-link" href="tel:' . e($telefono) . '">Llamar</a>';
-                }
-                echo '<a class="mini-link" href="index.php?page=josue&tab=agenda&edit=' . e($row['id']) . '">Editar</a>';
-                echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar este contacto de agenda?\')">';
+            echo '<div class="table-wrap"><table><thead><tr>';
+            echo '<th>Nombre</th><th>Teléfono</th><th>Observaciones</th><th>Acciones</th>';
+            echo '</tr></thead><tbody id="agendaRows">';
+
+            foreach ($agenda as $row) {
+                $searchText = strtolower(trim(
+                    ($row['nombre'] ?? '') . ' ' .
+                    ($row['telefono'] ?? '') . ' ' .
+                    ($row['observaciones'] ?? '')
+                ));
+
+                echo '<tr data-filter-text="' . e($searchText) . '">';
+                echo '<td>' . e($row['nombre'] ?? '') . '</td>';
+                echo '<td>' . e($row['telefono'] ?? '') . '</td>';
+                echo '<td>' . e($row['observaciones'] ?? '') . '</td>';
+                echo '<td>';
+                echo '<a class="mini-link" href="index.php?page=josue&tab=agenda&edit=' . e($row['id']) . '">Editar</a> ';
+                echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar este contacto?\')">';
                 echo '<input type="hidden" name="action" value="delete_agenda">';
                 echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
-                echo '<button class="btn-danger-mini" type="submit">Eliminar</button>';
+                echo '<button class="btn-danger-mini">Eliminar</button>';
                 echo '</form>';
-                echo '</div>';
-                echo '</div>';
-
-                echo '<div class="muted contact-card-meta">Actualizado: ' . e($row['updated_at'] ?? '-') . '</div>';
-                echo '</article>';
+                echo '</td>';
+                echo '</tr>';
             }
-            echo '</div>';
+
+            echo '</tbody></table></div>';
         }
+
         echo '</section>';
 
         echo '</div>';
-    } elseif ($tab === 'eurekas') {
+    } elseif ($tab === 'telefonos') {
         $editId = request_get('edit', '');
-        $edit = $editId !== '' ? storage_find_by_id('eurekas.json', $editId) : null;
-        $eurekaRows = sort_desc_by_key($eurekas, 'updated_at');
-        $statusLabels = array(
-            'pendiente' => 'Pendiente',
-            'descartada' => 'Descartada',
-            'cumplida' => 'Cumplida',
-        );
-        $estadoFilter = trim((string)request_get('estado', 'todas'));
-        if ($estadoFilter !== 'todas' && !isset($statusLabels[$estadoFilter])) {
-            $estadoFilter = 'todas';
-        }
-        if ($estadoFilter !== 'todas') {
-            $eurekaRows = array_values(array_filter($eurekaRows, function ($row) use ($estadoFilter) {
-                return trim((string)($row['estado'] ?? 'pendiente')) === $estadoFilter;
-            }));
+        $edit = $editId !== '' ? storage_find_by_id('telefonos.json', $editId) : null;
+
+        $anunciosIndex = array();
+        foreach ($anuncios as $an) {
+            $anunciosIndex[$an['id']] = $an;
         }
 
         echo '<div class="cards two">';
 
         echo '<section class="panel">';
         echo '<div class="josue-head">';
-        echo '<h2>' . ($edit ? 'Editar eureka' : 'Nueva eureka') . '</h2>';
-        if ($edit) {
-            echo '<a class="btn-secondary-mini" href="index.php?page=josue&tab=eurekas">Nueva eureka</a>';
-        }
+        echo '<h2>' . ($edit ? 'Ficha teléfono' : 'Nuevo teléfono') . '</h2>';
         echo '</div>';
 
-
-        echo '<form method="post" class="form-grid" style="margin-top:12px;">';
-        echo '<input type="hidden" name="action" value="save_eureka">';
+        echo '<form method="post" class="form-grid">';
+        echo '<input type="hidden" name="action" value="save_telefono">';
         echo '<input type="hidden" name="id" value="' . e($edit['id'] ?? '') . '">';
-        field_textarea('descripcion', 'Descripción', $edit['descripcion'] ?? '', 8);
-        echo '<div class="full josue-actions">';
-        echo '<button class="btn-primary" type="submit">' . ($edit ? 'Guardar cambios' : 'Crear eureka') . '</button>';
-        if ($edit) {
-            echo '<a class="btn-secondary-mini" href="index.php?page=josue&tab=eurekas">Cancelar</a>';
+        field_input('nombre', 'Nombre', $edit['nombre'] ?? '', true);
+        field_input('tfono', 'Tfono', $edit['tfono'] ?? '', true);
+        field_input('uso', 'Uso', $edit['uso'] ?? '');
+        field_input('pin', 'PIN', $edit['pin'] ?? '');
+        field_input('compania', 'Compañía', $edit['compania'] ?? '');
+        field_input('waha_port', 'WAHA Port', $edit['waha_port'] ?? '');
+        field_input('waha', 'WAHA', $edit['waha'] ?? '');
+        echo '<div class="field">';
+        echo '<label>Destacamos</label>';
+        echo '<select name="destacamos_id">';
+        echo '<option value="">Sin vincular</option>';
+        foreach ($anuncios as $an) {
+            $val = $an['id'] ?? '';
+            $label = trim(($an['url'] ?? '') . ' - ' . ($an['user'] ?? ''));
+            $sel = (($edit['destacamos_id'] ?? '') === $val) ? ' selected' : '';
+            echo '<option value="' . e($val) . '"' . $sel . '>' . e($label) . '</option>';
         }
+        echo '</select>';
         echo '</div>';
+        field_textarea('notas', 'Notas', $edit['notas'] ?? '', 4);
+        echo '<div class="full"><button class="btn-primary">Guardar teléfono</button></div>';
         echo '</form>';
         echo '</section>';
 
         echo '<section class="panel">';
-        echo '<div class="josue-head">';
-        echo '<h2>Eurekas</h2>';
-        echo '<span class="summary-badge">' . count($eurekaRows) . ' items</span>';
-        echo '</div>';
-
-        echo '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 6px;">';
-        $filterOptions = array('todas' => 'Todas', 'pendiente' => 'Pendientes', 'cumplida' => 'Cumplidas', 'descartada' => 'Descartadas');
-        foreach ($filterOptions as $filterValue => $filterLabel) {
-            $href = 'index.php?page=josue&tab=eurekas';
-            if ($filterValue !== 'todas') {
-                $href .= '&estado=' . urlencode($filterValue);
-            }
-            $class = ($estadoFilter === $filterValue) ? 'btn-primary' : 'btn-secondary-mini';
-            echo '<a class="' . $class . '" href="' . e($href) . '">' . e($filterLabel) . '</a>';
-        }
-        echo '</div>';
-
-        if (empty($eurekaRows)) {
-            echo '<div class="empty">Todavía no hay eurekas guardadas.</div>';
+        echo '<h2>Listado teléfonos</h2>';
+        if (empty($telefonos)) {
+            echo '<div class="empty">Todavía no hay teléfonos registrados.</div>';
         } else {
-            render_live_filter('#eurekaCards .contact-card[data-filter-text]', 'Buscar por descripción o estado...');
-            echo '<div id="eurekaCards" class="stack-list">';
-            foreach ($eurekaRows as $row) {
-                $descripcion = trim((string)($row['descripcion'] ?? ''));
-                $estado = trim((string)($row['estado'] ?? 'pendiente'));
-                $promptCodex = trim((string)($row['prompt_codex'] ?? ''));
-                $promptGeneratedAt = trim((string)($row['prompt_generated_at'] ?? ''));
-                if (!isset($statusLabels[$estado])) {
-                    $estado = 'pendiente';
-                }
-                $searchText = strtolower(trim($descripcion . ' ' . $estado));
-
-                echo '<article class="contact-card info-strip" data-filter-text="' . e($searchText) . '">';
-                echo '<div class="contact-card-main">';
-                echo '<div class="contact-card-body">';
-                echo '<div class="contact-card-name">' . e($statusLabels[$estado]) . '</div>';
-                echo '<div class="contact-card-notes">' . nl2br(e($descripcion !== '' ? $descripcion : 'Sin descripción')) . '</div>';
-                echo '</div>';
-
-                echo '<div class="contact-card-actions">';
-                if ($estado !== 'pendiente') {
-                    echo '<form method="post" class="inline-form">';
-                    echo '<input type="hidden" name="action" value="set_eureka_estado">';
-                    echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
-                    echo '<input type="hidden" name="estado" value="pendiente">';
-                    echo '<button class="mini-link" type="submit">Pendiente</button>';
-                    echo '</form>';
-                }
-                if ($estado !== 'cumplida') {
-                    echo '<form method="post" class="inline-form">';
-                    echo '<input type="hidden" name="action" value="set_eureka_estado">';
-                    echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
-                    echo '<input type="hidden" name="estado" value="cumplida">';
-                    echo '<button class="mini-link" type="submit">Cumplida</button>';
-                    echo '</form>';
-                }
-                if ($estado !== 'descartada') {
-                    echo '<form method="post" class="inline-form">';
-                    echo '<input type="hidden" name="action" value="set_eureka_estado">';
-                    echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
-                    echo '<input type="hidden" name="estado" value="descartada">';
-                    echo '<button class="mini-link" type="submit">Descartar</button>';
-                    echo '</form>';
-                }
-                echo '<form method="post" class="inline-form">';
-                echo '<input type="hidden" name="action" value="generate_eureka_prompt">';
+            $telefonos = sort_desc_by_key($telefonos, 'created_at');
+            render_live_filter('#telefonosRows tr[data-filter-text]', 'Buscar teléfono...');
+            echo '<div class="table-wrap"><table><thead><tr>';
+            echo '<th>Nombre</th><th>Tfono</th><th>Uso</th><th>WAHA Port</th><th>WAHA</th><th>Destacamos</th><th>Acciones</th>';
+            echo '</tr></thead><tbody id="telefonosRows">';
+            foreach ($telefonos as $row) {
+                $dest = $anunciosIndex[$row['destacamos_id'] ?? ''] ?? null;
+                $destLabel = $dest ? trim(($dest['url'] ?? '') . ' - ' . ($dest['user'] ?? '')) : '-';
+                $searchText = strtolower(trim(
+                    ($row['nombre'] ?? '') . ' ' .
+                    ($row['tfono'] ?? '') . ' ' .
+                    ($row['uso'] ?? '') . ' ' .
+                    ($row['compania'] ?? '') . ' ' .
+                    ($row['waha_port'] ?? '') . ' ' .
+                    ($row['waha'] ?? '') . ' ' .
+                    ($destLabel ?? '')
+                ));
+                echo '<tr data-filter-text="' . e($searchText) . '">';
+                echo '<td>' . e($row['nombre'] ?? '') . '</td>';
+                echo '<td>' . e($row['tfono'] ?? '') . '</td>';
+                echo '<td>' . e($row['uso'] ?? '') . '</td>';
+                echo '<td>' . e($row['waha_port'] ?? '') . '</td>';
+                echo '<td>' . e($row['waha'] ?? '') . '</td>';
+                echo '<td>' . e($destLabel) . '</td>';
+                echo '<td>';
+                echo '<a class="mini-link" href="index.php?page=josue&tab=telefonos&edit=' . e($row['id']) . '">Editar</a> ';
+                echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar este teléfono?\')">';
+                echo '<input type="hidden" name="action" value="delete_telefono">';
                 echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
-                echo '<button class="mini-link" type="submit">' . e($promptCodex !== '' ? 'Regenerar prompt' : 'Generar prompt') . '</button>';
+                echo '<button class="btn-danger-mini">Eliminar</button>';
                 echo '</form>';
-                echo '<a class="mini-link" href="index.php?page=josue&tab=eurekas&edit=' . e($row['id']) . '">Editar</a>';
-                echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar esta eureka?\')">';
-                echo '<input type="hidden" name="action" value="delete_eureka">';
-                echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
-                echo '<button class="btn-danger-mini" type="submit">Eliminar</button>';
-                echo '</form>';
-                echo '</div>';
-                echo '</div>';
-
-                if ($promptCodex !== '') {
-                    echo '<details style="margin-top:12px;">';
-                    echo '<summary>Prompt Codex' . ($promptGeneratedAt !== '' ? ' · ' . e(format_created_at($promptGeneratedAt)) : '') . '</summary>';
-                    echo '<div class="generated-box" style="margin-top:10px;">';
-                    echo '<div class="generated-box-head">';
-                    echo '<h3>Prompt listo para pasar a Codex</h3>';
-                    echo '<button type="button" class="btn-copy-mini" data-copy="' . e($promptCodex) . '">Copiar prompt</button>';
-                    echo '</div>';
-                    echo '<textarea class="generated-textarea" rows="14" readonly>' . e($promptCodex) . '</textarea>';
-                    echo '</div>';
-                    echo '</details>';
-                }
-
-                echo '<div class="muted contact-card-meta">Actualizado: ' . e($row['updated_at'] ?? '-') . '</div>';
-                echo '</article>';
+                echo '</td>';
+                echo '</tr>';
             }
-            echo '</div>';
+            echo '</tbody></table></div>';
         }
         echo '</section>';
 
         echo '</div>';
+    } elseif ($tab === 'autotube') {
+        echo '<div class="josue-head"><h2>Autotube</h2></div>';
+        echo '<div style="padding:0;overflow:visible;border-radius:8px;background:#0a0a0f">';
+        echo '<iframe src="/autotube/" style="width:100%;min-height:calc(100vh - 280px);height:auto;border:none;display:block" title="Panel Autotube" loading="lazy" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>';
+        echo '</div>';
+
     } else {
         $title = ($tab === 'publias') ? 'PublIas' : (($tab === 'captacion') ? 'Captacion' : (($tab === 'notas') ? 'Notas' : 'WAHA'));
 
