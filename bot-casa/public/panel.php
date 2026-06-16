@@ -257,19 +257,15 @@ function validateCsrfToken(string $token): bool
 {
     $secret = getCsrfSecret();
     $userId = (int) ($_SESSION['user_id'] ?? 0);
-
-    // Accept current time window
-    $current = hash_hmac('sha256', $userId . '|' . date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
-    if (hash_equals($current, $token)) {
-        return true;
+    // Accept current slot + up to 5 previous 10-min windows (60 min total).
+    // Uses time() + offset so hour-day boundaries are handled correctly.
+    $now = time();
+    for ($offset = 0; $offset <= 5; $offset++) {
+        $t = $now - ($offset * 600);
+        $expected = hash_hmac('sha256', $userId . '|' . date('Y-m-d-H', $t) . (int) floor((int) date('i', $t) / 10), $secret);
+        if (hash_equals($expected, $token)) return true;
     }
-
-    // Also accept previous time window — prevents false negatives when
-    // the page was loaded just before a 10-minute boundary and submitted
-    // shortly after.
-    $prevSlot = max(0, floor((int) date('i') / 10) - 1);
-    $previous = hash_hmac('sha256', $userId . '|' . date('Y-m-d-H') . $prevSlot, $secret);
-    return hash_equals($previous, $token);
+    return false;
 }
 
 function requireValidCsrf(): void
@@ -551,12 +547,27 @@ if ($method === 'POST' && $action === 'save_user') {
     $role     = (string) ($_POST['role'] ?? 'user');
     $name     = trim((string) ($_POST['name'] ?? ''));
     $active   = isset($_POST['active']) ? (bool) $_POST['active'] : true;
+    $unlimited = isset($_POST['unlimited']) && (bool) $_POST['unlimited'];
 
     if ($userId > 0) {
         // Update existing user
         $fields = ['username' => $username, 'role' => $role, 'name' => $name, 'active' => $active];
         if ($password !== '') {
             $fields['password'] = $password;
+        }
+        // Handle unlimited toggle for existing users
+        if ($unlimited) {
+            $fields['subscription_status'] = 'unlimited';
+        } elseif (isset($_POST['unlimited'])) {
+            // User explicitly unchecked unlimited → put them on trial if they were unlimited
+            $userBefore = $userManager->getUser($userId);
+            if (($userBefore['subscription_status'] ?? '') === 'unlimited') {
+                $now = date('c');
+                $trialEnd = (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Madrid')))->modify('+10 days')->format('c');
+                $fields['subscription_status'] = 'trial';
+                $fields['trial_start'] = $now;
+                $fields['trial_end'] = $trialEnd;
+            }
         }
         $result = $userManager->updateUser($userId, $fields);
         if ($result['ok']) {
@@ -566,7 +577,7 @@ if ($method === 'POST' && $action === 'save_user') {
         }
     } else {
         // Create new user
-        $result = $userManager->createUser($username, $password, $role, $name);
+        $result = $userManager->createUser($username, $password, $role, $name, $unlimited);
         if ($result['ok']) {
             $redirectMsg = 'user_created=1';
         } else {
@@ -737,12 +748,13 @@ function castNumericValue(string $key, string $value): mixed
 {
     static $intKeys = [
         'waha.default_port', 'openai.tone_max_tokens',
-        'human_delays.seen.fallback_sec', 'human_delays.seen.random_min_sec', 'human_delays.seen.random_max_sec',
-        'human_delays.typing.fallback_sec', 'human_delays.typing.chars_per_sec_min', 'human_delays.typing.chars_per_sec_max',
+        'human_delays.seen.random_min_sec', 'human_delays.seen.random_max_sec',
+        'human_delays.typing.chars_per_sec_min', 'human_delays.typing.chars_per_sec_max',
         'human_delays.typing.chunk_size', 'human_delays.typing.start_min_ms', 'human_delays.typing.start_max_ms',
-        'human_delays.typing.max_incoming_chars',
+        'human_delays.typing.max_incoming_chars', 'human_delays.typing.clamp_max_ms',
         'human_delays.read.base_min_ms', 'human_delays.read.base_max_ms', 'human_delays.read.per_char_ms',
         'human_delays.read.clamp_min_ms', 'human_delays.read.clamp_max_ms',
+        'human_delays.read.short_threshold_chars', 'human_delays.read.short_base_min_ms', 'human_delays.read.short_base_max_ms',
         'human_delays.presend_sleep_sec', 'catalog.max_girls_without_explicit_request',
         'catalog.girls_json_timeout_ms',
         'cron.followup.max_leads_per_run', 'cron.followup.curl_timeout_sec',
@@ -751,13 +763,20 @@ function castNumericValue(string $key, string $value): mixed
         'cron.reminder.max_per_run', 'cron.reminder.curl_timeout_sec', 'cron.reminder.cleanup_interval',
         'cron.reminder.cleanup_max_age_sec', 'dedup_coalesce.lock_acquire_tries', 'dedup_coalesce.lead_log_lock_tries',
         'dedup_coalesce.dedup_file_ttl_minutes',
+        'human_delays.correction.pause_min_ms', 'human_delays.correction.pause_max_ms',
+        'human_delays.pattern_variation.weight_standard', 'human_delays.pattern_variation.weight_skip_read', 'human_delays.pattern_variation.weight_read_first',
+        'human_delays.burst.window_sec', 'human_delays.burst.threshold_msgs',
     ];
 
     static $floatKeys = [
         'openai.tone_temperature', 'openai.temperature', 'deepseek.temperature',
         'human_delays.typing.chunk_pause_factor',
         'human_delays.habituation.start_boost', 'human_delays.habituation.decay', 'human_delays.habituation.floor',
-        'human_delays.short_typing_sec', 'human_delays.after_send_fallback_sec',
+        'human_delays.after_send_fallback_sec',
+        'human_delays.pace.min_factor', 'human_delays.pace.max_factor', 'human_delays.pace.reference_sec', 'human_delays.pace.steepness',
+        'human_delays.correction.probability',
+        'human_delays.burst.rapid_factor',
+        'human_delays.urgent.factor',
         'dedup_coalesce.lock_acquire_sleep_sec', 'dedup_coalesce.lead_log_lock_sleep_sec',
         'dedup_coalesce.coalesce_window_sec', 'dedup_coalesce.coalesce_sleep_before_send_sec',
     ];
@@ -775,6 +794,11 @@ function castNumericValue(string $key, string $value): mixed
         'bot.auto_off_on_lead',
         'cron.followup.enabled',
         'cron.reminder.enabled',
+        'human_delays.pace.enabled',
+        'human_delays.correction.enabled',
+        'human_delays.pattern_variation.enabled',
+        'human_delays.burst.enabled',
+        'human_delays.urgent.enabled',
     ];
     if (in_array($key, $boolKeys, true)) {
         return (bool) $value;
@@ -1515,8 +1539,8 @@ if (file_exists($logFilePath) && is_readable($logFilePath)) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>wasapBot — Admin Panel</title>
-<link rel="stylesheet" href="assets/style.css?v=20260610_1">
-<link rel="stylesheet" href="assets/chat.css?v=20260610_1">
+<link rel="stylesheet" href="assets/style.css?v=20260614_1">
+<link rel="stylesheet" href="assets/chat.css?v=20260614_1">
 </head>
 <body>
 
@@ -1534,7 +1558,6 @@ if (file_exists($logFilePath) && is_readable($logFilePath)) {
         <a href="logout" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted);text-decoration:none;display:inline-flex;align-items:center;font-size:.8rem">Cerrar sesión</a>
         <?php endif; ?>
         <a href="https://casawasap.com/girlsconf/" target="_blank" rel="noopener noreferrer" class="btn btn-sm" style="background:var(--accent);color:#fff;text-decoration:none;display:inline-flex;align-items:center;font-size:.8rem;border-radius:6px;padding:6px 12px;font-weight:600" title="Abrir panel de chicas">👩 Panel chicas</a>
-        <button onclick="window.location.reload()" class="btn btn-sm" title="Recargar panel" style="background:var(--input-bg);color:var(--text-muted);border:1px solid var(--border);cursor:pointer;font-size:.8rem;border-radius:6px;padding:6px 10px">↻ Recargar</button>
         <form method="post" action="<?php echo h($baseUrl); ?>?action=toggle_bot" style="display:inline">
             <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
             <input type="hidden" name="active_tab" class="js-active-tab-input" value="tab-status">
@@ -2368,10 +2391,6 @@ document.addEventListener('DOMContentLoaded', function() {
             </p>
             <div class="form-row">
                 <div class="form-group">
-                    <label>Fallback (seg) <span style="color:var(--text-muted);font-weight:400">— si falla el cálculo aleatorio</span></label>
-                    <input type="number" step="0.1" name="human_delays[seen][fallback_sec]" value="<?php echo config_val('human_delays.seen.fallback_sec', '1'); ?>" placeholder="1">
-                </div>
-                <div class="form-group">
                     <label>Mínimo aleatorio (seg) <span style="color:var(--text-muted);font-weight:400">— límite inferior</span></label>
                     <input type="number" step="0.1" name="human_delays[seen][random_min_sec]" value="<?php echo config_val('human_delays.seen.random_min_sec', '1'); ?>" placeholder="1">
                 </div>
@@ -2434,10 +2453,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     <label>Velocidad máxima (chars/seg) <span style="color:var(--text-muted);font-weight:400">— tipeo rápido</span></label>
                     <input type="number" name="human_delays[typing][chars_per_sec_max]" value="<?php echo config_val('human_delays.typing.chars_per_sec_max', '85'); ?>" placeholder="85">
                 </div>
-                <div class="form-group">
-                    <label>Fallback (seg) <span style="color:var(--text-muted);font-weight:400">— si falla el cálculo</span></label>
-                    <input type="number" step="0.1" name="human_delays[typing][fallback_sec]" value="<?php echo config_val('human_delays.typing.fallback_sec', '4'); ?>" placeholder="4">
-                </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
@@ -2461,6 +2476,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="form-group">
                     <label>Chunk pause factor <span style="color:var(--text-muted);font-weight:400">— fracción del tiempo chunk para pausar (0.65 = 65%)</span></label>
                     <input type="number" step="0.01" name="human_delays[typing][chunk_pause_factor]" value="<?php echo config_val('human_delays.typing.chunk_pause_factor', '0.65'); ?>" placeholder="0.65">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Clamp máx typing (ms) <span style="color:var(--text-muted);font-weight:400">— nunca "escribe" más de esto. <strong>Recom: 90000</strong></span></label>
+                    <input type="number" name="human_delays[typing][clamp_max_ms]" value="<?php echo config_val('human_delays.typing.clamp_max_ms', '90000'); ?>" placeholder="90000">
                 </div>
             </div>
         </div>
@@ -2500,12 +2521,153 @@ document.addEventListener('DOMContentLoaded', function() {
                     <input type="number" step="0.1" name="human_delays[presend_sleep_sec]" value="<?php echo config_val('human_delays.presend_sleep_sec', '15'); ?>" placeholder="15">
                 </div>
                 <div class="form-group">
-                    <label>Short typing (seg) <span style="color:var(--text-muted);font-weight:400">— typing para respuestas de audio. <strong>Recom: 0.8</strong></span></label>
-                    <input type="number" step="0.1" name="human_delays[short_typing_sec]" value="<?php echo config_val('human_delays.short_typing_sec', '0.8'); ?>" placeholder="0.8">
-                </div>
-                <div class="form-group">
                     <label>After send fallback (seg) <span style="color:var(--text-muted);font-weight:400">— pausa mínima tras enviar. <strong>Recom: 0.4</strong></span></label>
                     <input type="number" step="0.1" name="human_delays[after_send_fallback_sec]" value="<?php echo config_val('human_delays.after_send_fallback_sec', '0.4'); ?>" placeholder="0.4">
+                </div>
+            </div>
+        </div>
+
+        <!-- B0: Pace Matching -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px">
+            <h3 style="margin:0 0 4px">🎯 Pace Matching — Adaptación al ritmo del usuario</h3>
+            <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:12px">
+                El bot ajusta su velocidad según cuánto tarda el usuario en contestar.
+                Si el usuario contesta rápido, el bot acelera; si tarda, el bot se relaja.
+                <strong>Recomendado: min=0.5, max=2.0, ref=60, steepness=0.2.</strong>
+            </p>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Activado</label>
+                    <input type="hidden" name="human_delays[pace][enabled]" value="0">
+                    <input type="checkbox" name="human_delays[pace][enabled]" value="1" <?php echo checked(config_val('human_delays.pace.enabled', '1') === '1'); ?>>
+                </div>
+                <div class="form-group">
+                    <label>Factor mínimo <span style="color:var(--text-muted);font-weight:400">— para respuestas instantáneas</span></label>
+                    <input type="number" step="0.01" name="human_delays[pace][min_factor]" value="<?php echo config_val('human_delays.pace.min_factor', '0.5'); ?>" placeholder="0.5">
+                </div>
+                <div class="form-group">
+                    <label>Factor máximo <span style="color:var(--text-muted);font-weight:400">— para respuestas muy lentas</span></label>
+                    <input type="number" step="0.01" name="human_delays[pace][max_factor]" value="<?php echo config_val('human_delays.pace.max_factor', '2'); ?>" placeholder="2">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Referencia (seg) <span style="color:var(--text-muted);font-weight:400">— tiempo neutro (factor=1)</span></label>
+                    <input type="number" step="0.1" name="human_delays[pace][reference_sec]" value="<?php echo config_val('human_delays.pace.reference_sec', '60'); ?>" placeholder="60">
+                </div>
+                <div class="form-group">
+                    <label>Steepness <span style="color:var(--text-muted);font-weight:400">— agresividad de la curva</span></label>
+                    <input type="number" step="0.01" name="human_delays[pace][steepness]" value="<?php echo config_val('human_delays.pace.steepness', '0.2'); ?>" placeholder="0.2">
+                </div>
+            </div>
+        </div>
+
+        <!-- B1: Corrección simulada -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px">
+            <h3 style="margin:0 0 4px">✏️ Corrección simulada</h3>
+            <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:12px">
+                Ocasionalmente, el bot empieza a escribir, se detiene, y vuelve a empezar (simula borrar y reescribir).
+                <strong>Recomendado: prob=0.12, pausa 400–1800 ms.</strong>
+            </p>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Activado</label>
+                    <input type="hidden" name="human_delays[correction][enabled]" value="0">
+                    <input type="checkbox" name="human_delays[correction][enabled]" value="1" <?php echo checked(config_val('human_delays.correction.enabled', '1') === '1'); ?>>
+                </div>
+                <div class="form-group">
+                    <label>Probabilidad <span style="color:var(--text-muted);font-weight:400">— 0.12 = 12% de los mensajes</span></label>
+                    <input type="number" step="0.01" name="human_delays[correction][probability]" value="<?php echo config_val('human_delays.correction.probability', '0.12'); ?>" placeholder="0.12">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Pausa mín (ms) <span style="color:var(--text-muted);font-weight:400"></span></label>
+                    <input type="number" name="human_delays[correction][pause_min_ms]" value="<?php echo config_val('human_delays.correction.pause_min_ms', '400'); ?>" placeholder="400">
+                </div>
+                <div class="form-group">
+                    <label>Pausa máx (ms) <span style="color:var(--text-muted);font-weight:400"></span></label>
+                    <input type="number" name="human_delays[correction][pause_max_ms]" value="<?php echo config_val('human_delays.correction.pause_max_ms', '1800'); ?>" placeholder="1800">
+                </div>
+            </div>
+        </div>
+
+        <!-- B6: Patrón variable -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px">
+            <h3 style="margin:0 0 4px">🔀 Patrón de secuencia variable</h3>
+            <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:12px">
+                Rompe el patrón rígido seen→read→typing→send con 3 secuencias distintas elegidas al azar.
+                <strong>Recomendado: 70/20/10.</strong>
+            </p>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Activado</label>
+                    <input type="hidden" name="human_delays[pattern_variation][enabled]" value="0">
+                    <input type="checkbox" name="human_delays[pattern_variation][enabled]" value="1" <?php echo checked(config_val('human_delays.pattern_variation.enabled', '1') === '1'); ?>>
+                </div>
+                <div class="form-group">
+                    <label>Peso Standard (%) <span style="color:var(--text-muted);font-weight:400">— seen→read→typing→send</span></label>
+                    <input type="number" name="human_delays[pattern_variation][weight_standard]" value="<?php echo config_val('human_delays.pattern_variation.weight_standard', '70'); ?>" placeholder="70">
+                </div>
+                <div class="form-group">
+                    <label>Peso Skip Read (%) <span style="color:var(--text-muted);font-weight:400">— seen→typing→send</span></label>
+                    <input type="number" name="human_delays[pattern_variation][weight_skip_read]" value="<?php echo config_val('human_delays.pattern_variation.weight_skip_read', '20'); ?>" placeholder="20">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Peso Read First (%) <span style="color:var(--text-muted);font-weight:400">— read→seen→typing→send</span></label>
+                    <input type="number" name="human_delays[pattern_variation][weight_read_first]" value="<?php echo config_val('human_delays.pattern_variation.weight_read_first', '10'); ?>" placeholder="10">
+                </div>
+            </div>
+        </div>
+
+        <!-- B9: Ráfaga -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px">
+            <h3 style="margin:0 0 4px">⚡ Ráfaga — Detección de mensajes rápidos</h3>
+            <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:12px">
+                Si el usuario manda 3+ mensajes en poco tiempo, el bot acelera (está emocionado/impaciente).
+                <strong>Recomendado: ventana=30s, umbral=3 msg, factor=0.33.</strong>
+            </p>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Activado</label>
+                    <input type="hidden" name="human_delays[burst][enabled]" value="0">
+                    <input type="checkbox" name="human_delays[burst][enabled]" value="1" <?php echo checked(config_val('human_delays.burst.enabled', '1') === '1'); ?>>
+                </div>
+                <div class="form-group">
+                    <label>Ventana (seg) <span style="color:var(--text-muted);font-weight:400">— tiempo para contar mensajes</span></label>
+                    <input type="number" name="human_delays[burst][window_sec]" value="<?php echo config_val('human_delays.burst.window_sec', '30'); ?>" placeholder="30">
+                </div>
+                <div class="form-group">
+                    <label>Umbral (msgs) <span style="color:var(--text-muted);font-weight:400">— mínimo para activar</span></label>
+                    <input type="number" name="human_delays[burst][threshold_msgs]" value="<?php echo config_val('human_delays.burst.threshold_msgs', '3'); ?>" placeholder="3">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Factor ráfaga <span style="color:var(--text-muted);font-weight:400">— multiplicador (0.33 = ⅓ velocidad)</span></label>
+                    <input type="number" step="0.01" name="human_delays[burst][rapid_factor]" value="<?php echo config_val('human_delays.burst.rapid_factor', '0.33'); ?>" placeholder="0.33">
+                </div>
+            </div>
+        </div>
+
+        <!-- B10: Urgencia -->
+        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px">
+            <h3 style="margin:0 0 4px">🚨 Modo urgencia</h3>
+            <p style="color:var(--text-muted);font-size:.82rem;margin-bottom:12px">
+                Si el usuario dice "rápido", "date prisa", "contesta ya", etc., TODOS los delays se reducen drásticamente.
+                <strong>Recomendado: factor=0.25 (25% de los delays normales).</strong>
+            </p>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Activado</label>
+                    <input type="hidden" name="human_delays[urgent][enabled]" value="0">
+                    <input type="checkbox" name="human_delays[urgent][enabled]" value="1" <?php echo checked(config_val('human_delays.urgent.enabled', '1') === '1'); ?>>
+                </div>
+                <div class="form-group">
+                    <label>Factor urgencia <span style="color:var(--text-muted);font-weight:400">— 0.25 = 75% más rápido</span></label>
+                    <input type="number" step="0.01" name="human_delays[urgent][factor]" value="<?php echo config_val('human_delays.urgent.factor', '0.25'); ?>" placeholder="0.25">
                 </div>
             </div>
         </div>
@@ -2775,11 +2937,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="form-group">
                     <label>Formato</label>
                     <select id="estados-formato" onchange="saveEstadosConfig()">
-                        <option value="mix_aleatorio">🎲 Aleatorio (recomendado)</option>
-                        <option value="chicas_de_hoy">Todas las chicas, 1 foto</option>
-                        <option value="chica_del_dia">1 chica aleatoria, 2 fotos</option>
-                        <option value="duo_sexy">2 chicas, 1 foto c/u</option>
-                        <option value="catalogo_rapido">Solo nombres</option>
+                        <option value="mix_aleatorio">🎲 Mix aleatorio (recomendado)</option>
+                        <optgroup label="── Individual (1 chica) ──">
+                            <option value="chica_del_dia">🔥 Chica del día (1 + 2 fotos)</option>
+                            <option value="tentacion_del_dia">🍎 Tentación del día (1 + 2 fotos)</option>
+                            <option value="dulce_prohibido">🍭 Dulce prohibido (1 + 2 fotos)</option>
+                            <option value="ven_ya">⏳ Ven ya (1 urgente + 2 fotos)</option>
+                            <option value="susurro">🤫 Al oído (1 íntima + 2 fotos)</option>
+                            <option value="confesion">🌙 Confesión nocturna (1 + 2 fotos)</option>
+                            <option value="frase_del_dia">💬 Frase del día (1 + frase pícara)</option>
+                            <option value="solo_valientes">💪 Solo para valientes (1 + desafío)</option>
+                            <option value="cita_a_ciegas">🕶️ Cita a ciegas (1 + misterio, sin foto)</option>
+                            <option value="regalo_sorpresa">🎁 Regalo sorpresa (1 + tono regalo)</option>
+                            <option value="amiga_recomienda">🗣️ Amiga recomienda (1 + curiosidad)</option>
+                            <option value="la_nueva">🆕 Te está esperando (1 + directo)</option>
+                        </optgroup>
+                        <optgroup label="── Varias chicas ──">
+                            <option value="chicas_de_hoy">👯‍♀️ Chicas de hoy (todas + 1 foto c/u)</option>
+                            <option value="duo_sexy">💋 Dúo sexy (2 + 1 foto c/u)</option>
+                            <option value="estrella_grupo">⭐ Estrella + grupo (1 destacada + resto)</option>
+                            <option value="trio_tentador">👯 Triple tentación (3 + 1 foto c/u)</option>
+                            <option value="puertas_abiertas">🚪 Puertas abiertas (todas, bienvenida)</option>
+                            <option value="antojos">🍒 Antojos (todas, estilo menú)</option>
+                            <option value="el_equipo">💪 El equipazo (todas, alineación)</option>
+                            <option value="frescas">🌸 Recién llegaditas (todas, frescas)</option>
+                            <option value="catalogo_rapido">📋 Catálogo rápido (solo nombres)</option>
+                            <option value="juego_parejas">🎭 Juego de parejas (2 + química)</option>
+                            <option value="el_casting">🎬 El casting (todas + tú eres el juez)</option>
+                            <option value="modo_finde">🍾 Modo finde (todas + festivo)</option>
+                        </optgroup>
+                        <optgroup label="── Especial ──">
+                            <option value="oferta_flash">⚡ Ahora o nunca (1+ chicas + urgencia)</option>
+                        </optgroup>
                     </select>
                 </div>
             </div>
@@ -2945,7 +3134,7 @@ function openConversationModal(threadId) {
     document.getElementById('convModalPhone').textContent = threadId;
     document.getElementById('conversationContent').innerHTML = '<p style="color:var(--text-muted);text-align:center">Cargando conversación…</p>';
 
-    fetch(_convModalBaseUrl + '?action=get_thread_conversation&thread_id=' + encodeURIComponent(threadId))
+    fetch(_convModalBaseUrl + '?action=get_thread_conversation&thread_id=' + encodeURIComponent(threadId), {credentials: 'same-origin'})
         .then(function(r) { return r.json(); })
         .then(function(data) {
             var html = '';
@@ -2988,7 +3177,7 @@ function deleteMemoryLine(lineIndex, btnElement) {
     var formData = new FormData();
     formData.append('csrf_token', _convModalCsrf);
     formData.append('line_index', lineIndex);
-    fetch(_convModalBaseUrl + '?action=delete_memory_line_ajax', { method: 'POST', body: formData })
+    fetch(_convModalBaseUrl + '?action=delete_memory_line_ajax', { method: 'POST', body: formData, credentials: 'same-origin' })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.ok) {
@@ -3008,13 +3197,13 @@ function deleteMemoryLine(lineIndex, btnElement) {
             } else {
                 btnElement.disabled = false;
                 btnElement.textContent = '×';
-                alert('Error al eliminar el mensaje.');
+                showToast('❌ Error al eliminar el mensaje', 'error');
             }
         })
         .catch(function() {
             btnElement.disabled = false;
             btnElement.textContent = '×';
-            alert('Error de conexión al eliminar el mensaje.');
+            showToast('❌ Error de conexión al eliminar el mensaje', 'error');
         });
 }
 
@@ -3169,6 +3358,7 @@ document.getElementById('conversationModal').addEventListener('click', function(
                         <th>Usuario</th>
                         <th>Nombre</th>
                         <th>Rol</th>
+                        <th>Suscripción</th>
                         <th>Activo</th>
                         <th>Creado</th>
                         <th>Acciones</th>
@@ -3192,6 +3382,18 @@ document.getElementById('conversationModal').addEventListener('click', function(
                     $roleBadge = $urole === 'admin'
                         ? '<span style="background:var(--accent);color:#1a1206;padding:2px 8px;border-radius:4px;font-size:.75rem;font-weight:600">Admin</span>'
                         : '<span style="background:var(--input-bg);padding:2px 8px;border-radius:4px;font-size:.75rem">Usuario</span>';
+                    // Subscription badge
+                    $subStatus = (string) ($u['subscription_status'] ?? '');
+                    if ($subStatus === '' || ($u['role'] ?? '') === 'admin') $subStatus = 'unlimited';
+                    $subBadgeMap = [
+                        'unlimited' => ['🟢 Ilimitado', 'color:var(--ok);font-weight:600'],
+                        'demo'      => ['🔒 Demo', 'color:var(--info);font-weight:600'],
+                        'trial'     => ['🔵 Trial', 'color:var(--accent2);font-weight:600'],
+                        'active'    => ['🟢 Activo', 'color:var(--ok);font-weight:600'],
+                        'expired'   => ['🔴 Expirado', 'color:var(--danger);font-weight:600'],
+                    ];
+                    $subBadge = $subBadgeMap[$subStatus] ?? ['⚪ ' . h($subStatus), 'color:var(--text-muted)'];
+                    $subBadgeHtml = '<span style="' . $subBadge[1] . ';font-size:.75rem">' . $subBadge[0] . '</span>';
                     $activeBadge = $uactive
                         ? '<span style="color:var(--ok);font-weight:600">✅</span>'
                         : '<span style="color:var(--danger)">❌</span>';
@@ -3201,6 +3403,7 @@ document.getElementById('conversationModal').addEventListener('click', function(
                     <td><strong><?php echo $uname; ?></strong></td>
                     <td><?php echo $unameFull; ?></td>
                     <td><?php echo $roleBadge; ?></td>
+                    <td style="text-align:center"><?php echo $subBadgeHtml; ?></td>
                     <td style="text-align:center"><?php echo $activeBadge; ?></td>
                     <td class="mono" style="font-size:.75rem"><?php echo h($ucreatedDisp); ?></td>
                     <td style="white-space:nowrap">
@@ -3213,7 +3416,7 @@ document.getElementById('conversationModal').addEventListener('click', function(
                         <?php if ($uid !== 1): ?>
                         <!-- Editar / Eliminar -->
                         <button type="button" class="btn btn-sm btn-warning"
-                                onclick="editUser(<?php echo $uid; ?>, <?php echo htmlspecialchars(json_encode((string)($u['username'] ?? ''), JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>, <?php echo htmlspecialchars(json_encode((string)($u['name'] ?? ''), JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>, <?php echo htmlspecialchars(json_encode($urole), ENT_QUOTES, 'UTF-8'); ?>, <?php echo $uactive ? 'true' : 'false'; ?>)"
+                                onclick="editUser(<?php echo $uid; ?>, <?php echo htmlspecialchars(json_encode((string)($u['username'] ?? ''), JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>, <?php echo htmlspecialchars(json_encode((string)($u['name'] ?? ''), JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>, <?php echo htmlspecialchars(json_encode($urole), ENT_QUOTES, 'UTF-8'); ?>, <?php echo $uactive ? 'true' : 'false'; ?>, <?php echo htmlspecialchars(json_encode((string)($u['subscription_status'] ?? ''), JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>)"
                                 style="margin-right:4px">✏️</button>
                         <form method="post" action="<?php echo h($baseUrl); ?>?action=delete_user" style="display:inline" onsubmit="return confirm('¿Desactivar al usuario <?php echo $uname; ?>?')">
                             <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
@@ -3228,7 +3431,7 @@ document.getElementById('conversationModal').addEventListener('click', function(
                 </tr>
                 <?php endforeach; ?>
                 <?php if (empty($allUsers)): ?>
-                <tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted)">No hay usuarios registrados.</td></tr>
+                <tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted)">No hay usuarios registrados.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
@@ -3273,6 +3476,13 @@ document.getElementById('conversationModal').addEventListener('click', function(
                 </label>
             </div>
 
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="hidden" name="unlimited" value="0">
+                    <input type="checkbox" name="unlimited" id="user-form-unlimited" value="1"> Sin restricciones monetarias (acceso ilimitado, sin trial ni pagos)
+                </label>
+            </div>
+
             <div style="display:flex;gap:10px;margin-top:8px">
                 <button type="submit" class="btn btn-primary">💾 Guardar usuario</button>
                 <button type="button" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted)" onclick="resetUserForm()">Cancelar</button>
@@ -3283,13 +3493,14 @@ document.getElementById('conversationModal').addEventListener('click', function(
 
 <script>
 // ── User form helpers ──
-function editUser(id, username, name, role, active) {
+function editUser(id, username, name, role, active, subscriptionStatus) {
     document.getElementById('user-form-title').textContent = '✏️ Editar usuario';
     document.getElementById('user-form-id').value = id;
     document.getElementById('user-form-username').value = username;
     document.getElementById('user-form-name').value = name;
     document.getElementById('user-form-role').value = role;
     document.getElementById('user-form-active').checked = active;
+    document.getElementById('user-form-unlimited').checked = (subscriptionStatus === 'unlimited');
     document.getElementById('user-form-password').value = '';
     document.getElementById('user-form-password').placeholder = 'Dejar vacío para no cambiar';
     // Scroll to form
@@ -3302,6 +3513,7 @@ function resetUserForm() {
     document.getElementById('user-form-name').value = '';
     document.getElementById('user-form-role').value = 'user';
     document.getElementById('user-form-active').checked = true;
+    document.getElementById('user-form-unlimited').checked = false;
     document.getElementById('user-form-password').value = '';
     document.getElementById('user-form-password').placeholder = 'Nueva contraseña (opcional)';
 }
@@ -3483,7 +3695,7 @@ var _telefonosData = [];
 function loadTelefonosIntoSelector() {
     var sel = document.getElementById('telefonoSelector');
     if (!sel) return;
-    fetch('?action=get_telefonos_lines')
+    fetch('?action=get_telefonos_lines', {credentials: 'same-origin'})
         .then(function(r) { return r.json(); })
         .then(function(data) {
             _telefonosData = data.lines || [];
@@ -3506,7 +3718,7 @@ function loadTelefonosIntoSelector() {
 function addRoutingRowFromSelector() {
     var sel = document.getElementById('telefonoSelector');
     if (!sel || sel.value === '') {
-        alert('Selecciona primero una línea del desplegable.');
+        showToast('⚠️ Selecciona primero una línea del desplegable', 'warning');
         return;
     }
     var line = _telefonosData[parseInt(sel.value, 10)];
@@ -3548,7 +3760,7 @@ loadTelefonosIntoSelector();
 // ── WAHA status checker for routing lines ──
 var _wahaStatusTimeout = null;
 function loadWahaStatuses() {
-    fetch('?action=get_waha_statuses')
+    fetch('?action=get_waha_statuses', {credentials: 'same-origin'})
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (!data.ok || !data.status) return;
@@ -3629,7 +3841,7 @@ function forceLearn() {
     output.style.display = 'block'; output.textContent = '';
 
     // Step 1: Launch learning in background
-    fetch('?action=force_learn', { method: 'POST' })
+    fetch('?action=force_learn', { method: 'POST', credentials: 'same-origin' })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (!data.ok) {
@@ -3644,7 +3856,7 @@ function forceLearn() {
             // Step 2: Poll for completion
             var attempts = 0, maxAttempts = 75; // 75 * 2s = 2.5 min max
             function poll() {
-                fetch('?action=get_learn_status')
+                fetch('?action=get_learn_status', {credentials: 'same-origin'})
                     .then(function(r) { return r.json(); })
                     .then(function(s) {
                         attempts++;
@@ -3698,7 +3910,7 @@ function viewPlaybook() {
     var preview = document.getElementById('playbook-preview');
     if (preview.style.display === 'block') { preview.style.display = 'none'; return; }
     preview.style.display = 'block'; preview.textContent = 'Cargando...';
-    fetch('?action=get_playbook')
+    fetch('?action=get_playbook', {credentials: 'same-origin'})
         .then(function(r) { return r.json(); })
         .then(function(data) {
             preview.textContent = data.exists ? data.content : '(No hay playbook todavía. Usa "Forzar aprendizaje".)';
@@ -3710,7 +3922,7 @@ function loadOutcomes() {
     var tbody = document.getElementById('outcomes-tbody');
     var countEl = document.getElementById('outcomes-count');
     tbody.innerHTML = '<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--text-muted)">Cargando...</td></tr>';
-    fetch('?action=get_outcomes')
+    fetch('?action=get_outcomes', {credentials: 'same-origin'})
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (!data.ok || !data.outcomes) return;
@@ -3740,8 +3952,14 @@ function loadOutcomes() {
 function confirmOutcome(threadId, newOutcome) {
     fetch('?action=confirm_outcome', {
         method: 'POST',
-        body: JSON.stringify({thread_id: threadId, outcome: newOutcome})
-    }).then(function(r) { return r.json(); }).then(function(d) { if (d.ok) loadOutcomes(); });
+        body: JSON.stringify({thread_id: threadId, outcome: newOutcome}),
+        credentials: 'same-origin'
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+            loadOutcomes();
+            showToast('✅ Clasificación actualizada', 'success');
+        }
+    });
 }
 
 (function() {
@@ -3754,13 +3972,36 @@ function confirmOutcome(threadId, newOutcome) {
 <script>
 // ── Estados WhatsApp ──
 function loadEstadosConfig() {
-    fetch(apiUrl('api/estados.php?action=config')).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/estados.php?action=config'), {credentials: 'same-origin'}).then(r=>r.json()).then(d=>{
         if (!d.ok) return;
         var c = d.config;
         document.getElementById('estados-enabled').checked = !!c.enabled;
         document.getElementById('estados-freq-tipo').value = c.frecuencia_tipo || 'cada_x_horas';
         document.getElementById('estados-freq-valor').value = c.frecuencia_valor || 6;
-        document.getElementById('estados-formato').value = c.formato || 'mix_aleatorio';
+        // Populate format dropdown from API
+        if (c.format_options) {
+            var sel = document.getElementById('estados-formato');
+            var current = c.formato || 'mix_aleatorio';
+            sel.innerHTML = '<option value="mix_aleatorio">🎲 Mix aleatorio (recomendado)</option>';
+            // Group formats
+            var individuales = ['chica_del_dia','tentacion_del_dia','dulce_prohibido','ven_ya','susurro','confesion',
+                'frase_del_dia','solo_valientes','cita_a_ciegas','regalo_sorpresa','amiga_recomienda','la_nueva'];
+            var varias = ['chicas_de_hoy','duo_sexy','estrella_grupo','trio_tentador','puertas_abiertas',
+                'antojos','el_equipo','frescas','catalogo_rapido','juego_parejas','el_casting','modo_finde'];
+            var especial = ['oferta_flash'];
+            sel.innerHTML += '<optgroup label="── Individual (1 chica) ──"></optgroup>';
+            var og1 = sel.querySelector('optgroup:last-of-type');
+            individuales.forEach(function(f){ if(c.format_options[f]){ og1.innerHTML += '<option value="'+f+'">'+escHtml(c.format_options[f])+'</option>'; } });
+            sel.innerHTML += '<optgroup label="── Varias chicas ──"></optgroup>';
+            var og2 = sel.querySelector('optgroup:last-of-type');
+            varias.forEach(function(f){ if(c.format_options[f]){ og2.innerHTML += '<option value="'+f+'">'+escHtml(c.format_options[f])+'</option>'; } });
+            sel.innerHTML += '<optgroup label="── Especial ──"></optgroup>';
+            var og3 = sel.querySelector('optgroup:last-of-type');
+            especial.forEach(function(f){ if(c.format_options[f]){ og3.innerHTML += '<option value="'+f+'">'+escHtml(c.format_options[f])+'</option>'; } });
+            sel.value = current;
+        } else {
+            document.getElementById('estados-formato').value = c.formato || 'mix_aleatorio';
+        }
         document.getElementById('estados-hora-inicio').value = c.hora_inicio || '08:00';
         document.getElementById('estados-hora-fin').value = c.hora_fin || '23:00';
         var lcb = document.getElementById('estados-lines-checkboxes');
@@ -3781,33 +4022,33 @@ function saveEstadosConfig() {
     fd.append('hora_fin', document.getElementById('estados-hora-fin').value);
     var checks = document.querySelectorAll('#estados-lines-checkboxes input[type=checkbox]:checked');
     checks.forEach(function(c){ fd.append('lineas[]', c.value); });
-    fetch(apiUrl('api/estados.php?action=config'), {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-        document.getElementById('estados-status').textContent = d.ok ? '✅ Configuración guardada' : '❌ Error al guardar: '+(d.error||'desconocido');
-        setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 3000);
+    fetch(apiUrl('api/estados.php?action=config'), {method:'POST',body:fd,credentials:'same-origin'}).then(r=>r.json()).then(d=>{
+        if (d.ok) {
+            showToast('✅ Configuración guardada correctamente', 'success');
+        } else {
+            showToast('❌ Error al guardar: '+(d.error||'desconocido'), 'error');
+        }
     }).catch(function(e){
-        document.getElementById('estados-status').textContent = '❌ Error de red: '+(e.message||'sin conexión');
-        setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 4000);
+        showToast('❌ Error de red: '+(e.message||'sin conexión'), 'error');
     });
 }
 function publishEstado() {
-    document.getElementById('estados-status').textContent = '⏳ Publicando...';
+    showToast('⏳ Publicando estado...', 'info');
     var fd = new FormData(); fd.append('csrf_token', _csrf);
-    fetch(apiUrl('api/estados.php?action=publish'), {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/estados.php?action=publish'), {method:'POST',body:fd,credentials:'same-origin'}).then(r=>r.json()).then(d=>{
         if (d.ok) {
             var oks = d.results.filter(function(r){return r.ok;}).length;
-            document.getElementById('estados-status').textContent = '✅ Publicado en '+oks+'/'+d.results.length+' líneas';
+            showToast('✅ Publicado en '+oks+'/'+d.results.length+' líneas', 'success');
             loadEstadosHistory();
         } else {
-            document.getElementById('estados-status').textContent = '❌ '+(d.error||'Error');
+            showToast('❌ '+(d.error||'Error al publicar'), 'error');
         }
-        setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 5000);
     }).catch(function(e){
-        document.getElementById('estados-status').textContent = '❌ Error de red: '+(e.message||'sin conexión');
-        setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 4000);
+        showToast('❌ Error de red: '+(e.message||'sin conexión'), 'error');
     });
 }
 function loadEstadosHistory() {
-    fetch(apiUrl('api/estados.php?action=history')).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/estados.php?action=history'), {credentials: 'same-origin'}).then(r=>r.json()).then(d=>{
         if (!d.ok) return;
         var html = d.log.slice(0,10).map(function(e){
             var date = e.published_at ? new Date(e.published_at).toLocaleString('es-ES') : '?';
@@ -3817,6 +4058,27 @@ function loadEstadosHistory() {
     });
 }
 function escHtml(s) { var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// ── Toast Notification System ──
+function showToast(message, type) {
+    type = type || 'info';
+    var container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        document.body.appendChild(container);
+    }
+    var icons = {success:'✅', error:'❌', warning:'⚠️', info:'ℹ️', loading:'⏳'};
+    var toast = document.createElement('div');
+    toast.className = 'toast toast--' + type;
+    toast.innerHTML = '<span class="toast-icon">'+(icons[type]||icons.info)+'</span><span class="toast-message">'+escHtml(message)+'</span>';
+    container.appendChild(toast);
+    var duration = type === 'error' ? 6000 : 3500;
+    setTimeout(function(){
+        toast.classList.add('toast--removing');
+        setTimeout(function(){ if (toast.parentNode) toast.remove(); }, 300);
+    }, duration);
+}
 
 (function() {
     var btn = document.querySelector('.tab-nav button[data-tab="tab-estados"]');
@@ -3835,10 +4097,40 @@ var _apiToken = <?php echo json_encode(generateCsrfToken()); ?>;
 function apiUrl(url) {
     return url + (url.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(_apiToken);
 }
+// Keep all CSRF hidden inputs up-to-date (prevent 403 on form POSTs after long sessions)
+function updateAllCsrfInputs(token) {
+    var inputs = document.querySelectorAll('input[name="csrf_token"]');
+    for (var i = 0; i < inputs.length; i++) { inputs[i].value = token; }
+}
 var _csrf = <?php echo json_encode(generateCsrfToken()); ?>;
 var _isAdminPanel = true;
+// ── Keepalive de sesión + CSRF refresh: ping cada 5 min ──
+setInterval(function() {
+    fetch(apiUrl('api/csrf-token.php'), {credentials: 'same-origin'}).then(function(r) {
+        if (r.status === 401) { window.location.href = 'login'; return; }
+        return r.json();
+    }).then(function(d) {
+        if (d && d.ok && d.token) {
+            if (typeof _apiToken !== 'undefined') _apiToken = d.token;
+            if (typeof _csrf !== 'undefined') _csrf = d.token;
+            updateAllCsrfInputs(d.token);
+        }
+    }).catch(function(){});
+}, 300000);
 </script>
-<script src="assets/chat.js?v=20260610_1"></script>
+<script>
+// ── Detección global de sesión expirada (401) ──
+(function() {
+    var _origFetch = window.fetch;
+    window.fetch = function(url, init) {
+        return _origFetch.call(window, url, init).then(function(r) {
+            if (r.status === 401) { window.location.href = 'login'; }
+            return r;
+        });
+    };
+})();
+</script>
+<script src="assets/chat.js?v=20260614_1"></script>
 
 </body>
 </html>

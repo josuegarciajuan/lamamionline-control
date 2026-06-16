@@ -3,9 +3,17 @@
  * api/girls.php — CRUD de chicas para bot-casa multi-usuario.
  *
  * Almacena en data/users/{userId}/girls.json
- * Las fotos se almacenan como URLs (compartir.site).
+ * Las fotos se guardan en el directorio compartido de girlsconf
+ * y se sirven públicamente como URLs de compartir.site con
+ * meta OG (Open Graph) para previsualización en WhatsApp.
  */
 declare(strict_types=1);
+
+// ── Directorio y URL base de compartir.site ──
+const GIRLSCONF_IMGS_DIR  = '/var/www/html/wasapbot/landing/girlsconf/imgs';
+const GIRLSCONF_BASE_URL  = 'https://compartir.site/';
+const MAX_PHOTOS           = 4;
+const PHOTO_MAX_BYTES      = 5 * 1024 * 1024; // 5 MB
 
 define('WASAPBOT_ROOT', dirname(__DIR__, 2));
 spl_autoload_register(function (string $class): void {
@@ -24,6 +32,7 @@ if (empty($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['o
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $action = (string) ($_GET['action'] ?? 'list');
 $userId = (int) ($_SESSION['user_id'] ?? 0);
+$isDemo = (($_SESSION['username'] ?? '') === 'demo');
 if (($_SESSION['role']??'') === 'admin' && !empty($_SESSION['suplantar_user_id'])) {
     $userId = (int) $_SESSION['suplantar_user_id'];
 }
@@ -46,14 +55,144 @@ function requireValidCsrf(): void {
         @chmod($secretFile, 0600);
     }
     $realUserId = (int) ($_SESSION['user_id'] ?? 0);
-    $current = hash_hmac('sha256', $realUserId . '|' . date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
-    if (hash_equals($current, $token)) return;
-    $prevSlot = max(0, floor((int) date('i') / 10) - 1);
-    $previous = hash_hmac('sha256', $realUserId . '|' . date('Y-m-d-H') . $prevSlot, $secret);
-    if (hash_equals($previous, $token)) return;
+    $now = time();
+    for ($offset = 0; $offset <= 5; $offset++) {
+        $t = $now - ($offset * 600);
+        $expected = hash_hmac('sha256', $realUserId . '|' . date('Y-m-d-H', $t) . (int) floor((int) date('i', $t) / 10), $secret);
+        if (hash_equals($expected, $token)) return;
+    }
     http_response_code(403);
     echo json_encode(['ok'=>false,'error'=>'CSRF token invalid']);
     exit;
+}
+
+// ── Funciones auxiliares para compartir.site ──
+
+function random_alnum_lower(int $len = 5): string {
+    $chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    $max   = strlen($chars) - 1;
+    $out   = '';
+    for ($i = 0; $i < $len; $i++) {
+        $out .= $chars[random_int(0, $max)];
+    }
+    return $out;
+}
+
+function ensure_dir(string $dir): void {
+    if (!is_dir($dir)) {
+        if (!@mkdir($dir, 0755, true) && !is_dir($dir)) {
+            throw new RuntimeException("No se pudo crear el directorio: {$dir}");
+        }
+    }
+}
+
+function rrmdir(string $dir): void {
+    if (!is_dir($dir)) return;
+    $items = @scandir($dir);
+    if (!$items) return;
+    foreach ($items as $it) {
+        if ($it === '.' || $it === '..') continue;
+        $p = $dir . DIRECTORY_SEPARATOR . $it;
+        if (is_dir($p)) rrmdir($p);
+        else @unlink($p);
+    }
+    @rmdir($dir);
+}
+
+function next_img_folder(string $imgsDir): string {
+    ensure_dir($imgsDir);
+    for ($i = 0; $i < 200; $i++) {
+        $name = random_alnum_lower(5);
+        $path = $imgsDir . DIRECTORY_SEPARATOR . $name;
+        if (!is_dir($path)) return $name;
+    }
+    // Fallback ultra raro: aumentamos longitud
+    for ($i = 0; $i < 200; $i++) {
+        $name = random_alnum_lower(6);
+        $path = $imgsDir . DIRECTORY_SEPARATOR . $name;
+        if (!is_dir($path)) return $name;
+    }
+    throw new RuntimeException('No se pudo generar un nombre de carpeta único para la imagen.');
+}
+
+function pick_keywords_short(string $desc, int $maxWords = 4): string {
+    $s = mb_strtolower(trim($desc), 'UTF-8');
+    $s = preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $s);
+    $parts = preg_split('/\s+/u', $s, -1, PREG_SPLIT_NO_EMPTY);
+    if (!$parts) return '';
+    $stop = [
+        'de','la','el','los','las','y','o','u','a','en','con','sin','para','por','un','una','unos','unas',
+        'muy','mas','más','que','del','al','se','te','tu','tus','su','sus','lo','es','soy','eres','ser',
+        'mi','mis','yo','ella','él','si','sí','no','como','tiene','tengo','hacer','puede','puedo',
+        'ademas','además','tambien','también','ven','venir','anímate','animate'
+    ];
+    $out = [];
+    foreach ($parts as $w) {
+        $w = trim($w);
+        if ($w === '' || mb_strlen($w, 'UTF-8') < 3) continue;
+        if (in_array($w, $stop, true)) continue;
+        if (!in_array($w, $out, true)) $out[] = $w;
+        if (count($out) >= $maxWords) break;
+    }
+    if (!$out) {
+        $raw = preg_split('/\s+/u', trim($desc), -1, PREG_SPLIT_NO_EMPTY);
+        $raw = array_slice($raw ?: [], 0, $maxWords);
+        return trim(implode(' ', $raw));
+    }
+    $txt = implode(' ', $out);
+    $txt = mb_strtoupper(mb_substr($txt, 0, 1, 'UTF-8'), 'UTF-8') . mb_substr($txt, 1, null, 'UTF-8');
+    return $txt;
+}
+
+function build_og_index_php(string $girlName, string $descShortWords, string $publicFolderUrl, string $publicImageUrl, string $mime, int $w = 1200, int $h = 1200): string {
+    if (substr($publicFolderUrl, -1) !== '/') $publicFolderUrl .= '/';
+    $t    = htmlspecialchars($girlName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $d    = htmlspecialchars($descShortWords, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $folder = htmlspecialchars($publicFolderUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $img  = htmlspecialchars($publicImageUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $mime = htmlspecialchars($mime, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    return "<!doctype html>\n<html lang=\"es\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\n  <!-- Open Graph (WhatsApp) -->\n  <meta property=\"og:type\" content=\"website\">\n  <meta property=\"og:title\" content=\"{$t}\">\n  <meta property=\"og:description\" content=\"{$d}\">\n  <meta property=\"og:image\" content=\"{$img}\">\n  <meta property=\"og:image:secure_url\" content=\"{$img}\">\n  <meta property=\"og:image:type\" content=\"{$mime}\">\n  <meta property=\"og:image:width\" content=\"{$w}\">\n  <meta property=\"og:image:height\" content=\"{$h}\">\n  <meta property=\"og:url\" content=\"{$folder}\">\n\n  <meta name=\"twitter:card\" content=\"summary_large_image\">\n  <meta name=\"twitter:image\" content=\"{$img}\">\n\n  <title>Foto</title>\n</head>\n<body>\n  <img src=\"{$img}\" alt=\"Foto\" style=\"max-width:100%;height:auto\">\n</body>\n</html>\n";
+}
+
+function ext_from_mime(string $mime): string {
+    $map = [
+        'image/png'  => 'png',
+        'image/jpeg' => 'jpg',
+        'image/jpg'  => 'jpg',
+        'image/webp' => 'webp',
+    ];
+    return $map[$mime] ?? 'jpg';
+}
+
+function is_uploaded_image(array $file): bool {
+    if (!isset($file['error']) || $file['error'] !== UPLOAD_ERR_OK) return false;
+    if (!isset($file['tmp_name']) || !is_file($file['tmp_name'])) return false;
+    $finfo = @finfo_open(FILEINFO_MIME_TYPE);
+    $mime  = $finfo ? (string)@finfo_file($finfo, $file['tmp_name']) : '';
+    if ($finfo) @finfo_close($finfo);
+    return (strpos($mime, 'image/') === 0);
+}
+
+function folder_name_from_compartir_url(string $url): ?string {
+    $url = trim($url);
+    if ($url === '') return null;
+    $u = parse_url($url);
+    if (!is_array($u) || empty($u['path'])) return null;
+    if (!preg_match('~/([a-z0-9]{5,32})/?$~', (string)$u['path'], $m)) return null;
+    return $m[1];
+}
+
+function delete_compartir_folder(string $url): void {
+    $folderName = folder_name_from_compartir_url($url);
+    if (!$folderName) return;
+    $folderPath = GIRLSCONF_IMGS_DIR . DIRECTORY_SEPARATOR . $folderName;
+    if (!is_dir($folderPath)) return;
+    // Seguridad: verificar que está dentro de GIRLSCONF_IMGS_DIR
+    $realImgs  = realpath(GIRLSCONF_IMGS_DIR);
+    $realFolder = realpath($folderPath);
+    if ($realImgs === false || $realFolder === false) return;
+    if (strpos($realFolder, $realImgs) !== 0) return;
+    rrmdir($realFolder);
 }
 
 $girlsFile = WASAPBOT_ROOT . '/data/users/' . $userId . '/girls.json';
@@ -74,7 +213,10 @@ function saveGirls(array $data): void {
 header('Content-Type: application/json; charset=utf-8');
 
 // Validate CSRF for all POST requests
-if ($method === 'POST') requireValidCsrf();
+if ($method === 'POST') {
+    if ($isDemo) { http_response_code(403); echo json_encode(['ok'=>false,'error'=>'Modo demo: solo lectura']); exit; }
+    requireValidCsrf();
+}
 
 try {
     switch ($action) {
@@ -121,10 +263,7 @@ try {
                 ];
             }
 
-            // ── Process uploaded photos (multipart) ──
-            $photosDir = WASAPBOT_ROOT . '/data/users/' . $userId . '/imgs';
-            $allowedMime = ['image/jpeg', 'image/png', 'image/webp'];
-
+            // ── Process uploaded photos → compartir.site ──
             // Find the girl reference for adding photos
             $girlRef = null;
             foreach ($girls as &$gr) {
@@ -134,41 +273,59 @@ try {
 
             if ($girlRef !== null && !empty($_FILES['photos'])) {
                 $existingCount = count($girlRef['fotos'] ?? []);
-                $maxNew = max(0, 4 - $existingCount);
+                $maxNew = max(0, MAX_PHOTOS - $existingCount);
 
                 $files = $_FILES['photos'];
                 // Normalize: if single file, wrap in array structure
                 if (!is_array($files['name'])) {
                     $files = [
-                        'name' => [$files['name']],
-                        'type' => [$files['type']],
+                        'name'     => [$files['name']],
+                        'type'     => [$files['type']],
                         'tmp_name' => [$files['tmp_name']],
-                        'error' => [$files['error']],
-                        'size' => [$files['size']],
+                        'error'    => [$files['error']],
+                        'size'     => [$files['size']],
                     ];
                 }
+
+                $descWords = pick_keywords_short($desc, 4);
+                ensure_dir(GIRLSCONF_IMGS_DIR);
 
                 $finfo = finfo_open(FILEINFO_MIME_TYPE);
                 for ($i = 0; $i < count($files['name']) && $i < $maxNew; $i++) {
                     if ($files['error'][$i] !== UPLOAD_ERR_OK) continue;
-                    if ($files['size'][$i] > 5 * 1024 * 1024) continue;
+                    if ($files['size'][$i] > PHOTO_MAX_BYTES) continue;
 
                     $mime = @finfo_file($finfo, $files['tmp_name'][$i]);
-                    if (!in_array($mime, $allowedMime, true)) continue;
+                    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) continue;
 
-                    $chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-                    $folder = '';
-                    for ($j = 0; $j < 5; $j++) { $folder .= $chars[random_int(0, strlen($chars) - 1)]; }
-                    $imgDir = $photosDir . '/' . $folder;
-                    if (!is_dir($imgDir)) @mkdir($imgDir, 0755, true);
+                    // Carpeta aleatoria de 5 chars en el directorio de girlsconf
+                    $folderName  = next_img_folder(GIRLSCONF_IMGS_DIR);
+                    $folderLocal = GIRLSCONF_IMGS_DIR . DIRECTORY_SEPARATOR . $folderName;
+                    ensure_dir($folderLocal);
 
-                    $ext = $mime === 'image/png' ? 'png' : ($mime === 'image/webp' ? 'webp' : 'jpg');
-                    $destPath = $imgDir . '/' . $folder . '.' . $ext;
+                    $ext         = ext_from_mime($mime);
+                    $imgFileName = "{$folderName}.{$ext}";
+                    $imgLocalPath = $folderLocal . DIRECTORY_SEPARATOR . $imgFileName;
 
-                    if (@move_uploaded_file($files['tmp_name'][$i], $destPath)) {
-                        $photoUrl = '/api/image-proxy.php?uid=' . $userId . '&img=' . $folder . '/' . $folder . '.' . $ext;
-                        $girlRef['fotos'][] = $photoUrl;
+                    if (!@move_uploaded_file($files['tmp_name'][$i], $imgLocalPath)) {
+                        rrmdir($folderLocal);
+                        continue;
                     }
+
+                    // URLs públicas
+                    $publicFolderUrl = GIRLSCONF_BASE_URL . rawurlencode($folderName) . '/';
+                    $publicImageUrl  = GIRLSCONF_BASE_URL . rawurlencode($folderName) . '/' . rawurlencode($imgFileName);
+
+                    // Generar index.php con meta OG (previsualización WhatsApp)
+                    $indexContent = build_og_index_php($nombre, $descWords, $publicFolderUrl, $publicImageUrl, $mime);
+                    $indexPath    = $folderLocal . DIRECTORY_SEPARATOR . 'index.php';
+                    if (@file_put_contents($indexPath, $indexContent) === false) {
+                        rrmdir($folderLocal);
+                        continue;
+                    }
+
+                    // Guardar la URL pública de la carpeta (shortlink)
+                    $girlRef['fotos'][] = $publicFolderUrl;
                 }
                 finfo_close($finfo);
             }
@@ -183,6 +340,15 @@ try {
             if ($gid === '') { echo json_encode(['ok'=>false,'error'=>'ID requerido']); break; }
 
             $data = loadGirls();
+            // Limpiar carpetas de compartir.site antes de borrar la chica
+            foreach ($data['girls'] as $g) {
+                if (($g['id'] ?? '') === $gid) {
+                    foreach (($g['fotos'] ?? []) as $fu) {
+                        delete_compartir_folder((string) $fu);
+                    }
+                    break;
+                }
+            }
             $data['girls'] = array_values(array_filter($data['girls'], fn($g) => ($g['id']??'') !== $gid));
             saveGirls($data);
             echo json_encode(['ok' => true]);
@@ -217,6 +383,8 @@ try {
             foreach ($data['girls'] as &$g) {
                 if (($g['id'] ?? '') === $gid) {
                     if (isset($g['fotos'][$index])) {
+                        // Limpiar la carpeta de compartir.site de la foto eliminada
+                        delete_compartir_folder((string) $g['fotos'][$index]);
                         array_splice($g['fotos'], $index, 1);
                     }
                     break;
@@ -256,36 +424,54 @@ try {
             $mime = finfo_file($finfo, $file['tmp_name']);
             finfo_close($finfo);
             if (!in_array($mime, $allowed, true)) { echo json_encode(['ok'=>false,'error'=>'Formato no permitido. Usa JPG, PNG o WebP.']); break; }
-            if ($file['size'] > 5 * 1024 * 1024) { echo json_encode(['ok'=>false,'error'=>'Imagen demasiado grande (máx 5MB).']); break; }
+            if ($file['size'] > PHOTO_MAX_BYTES) { echo json_encode(['ok'=>false,'error'=>'Imagen demasiado grande (máx 5MB).']); break; }
 
-            // Create random folder name (like girlsconf)
-            $chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-            $folder = '';
-            for ($i = 0; $i < 5; $i++) { $folder .= $chars[random_int(0, strlen($chars)-1)]; }
-            $imgDir = WASAPBOT_ROOT . '/data/users/' . $userId . '/imgs/' . $folder;
-            if (!is_dir($imgDir)) @mkdir($imgDir, 0755, true);
-
-            $ext = $mime === 'image/png' ? 'png' : ($mime === 'image/webp' ? 'webp' : 'jpg');
-            $destPath = $imgDir . '/' . $folder . '.' . $ext;
-            if (!move_uploaded_file($file['tmp_name'], $destPath)) {
-                echo json_encode(['ok'=>false,'error'=>'Error al guardar la imagen.']); break;
-            }
-
-            // The image is served from the same domain via a public symlink or direct path
-            // Store relative URL: /api/image-proxy.php?uid={userId}&img={folder}/{folder}.{ext}
-            $photoUrl = '/api/image-proxy.php?uid=' . $userId . '&img=' . $folder . '/' . $folder . '.' . $ext;
-
+            // Guardar en compartir.site
             $data = loadGirls();
+            $girlName = '';
+            $girlDesc = '';
+            $girlRef = null;
             foreach ($data['girls'] as &$g) {
                 if (($g['id'] ?? '') === $gid) {
+                    $girlName = (string) ($g['nombre'] ?? '');
+                    $girlDesc = (string) ($g['descripcion_corta'] ?? '');
                     if (!isset($g['fotos']) || !is_array($g['fotos'])) $g['fotos'] = [];
-                    $g['fotos'][] = $photoUrl;
+                    $girlRef = &$g;
                     break;
                 }
             }
             unset($g);
+            if ($girlRef === null) { echo json_encode(['ok'=>false,'error'=>'Chica no encontrada']); break; }
+            if (count($girlRef['fotos']) >= MAX_PHOTOS) { echo json_encode(['ok'=>false,'error'=>'Máximo ' . MAX_PHOTOS . ' fotos alcanzado']); break; }
+
+            ensure_dir(GIRLSCONF_IMGS_DIR);
+            $folderName  = next_img_folder(GIRLSCONF_IMGS_DIR);
+            $folderLocal = GIRLSCONF_IMGS_DIR . DIRECTORY_SEPARATOR . $folderName;
+            ensure_dir($folderLocal);
+
+            $ext         = ext_from_mime($mime);
+            $imgFileName = "{$folderName}.{$ext}";
+            $imgLocalPath = $folderLocal . DIRECTORY_SEPARATOR . $imgFileName;
+
+            if (!move_uploaded_file($file['tmp_name'], $imgLocalPath)) {
+                rrmdir($folderLocal);
+                echo json_encode(['ok'=>false,'error'=>'Error al guardar la imagen.']); break;
+            }
+
+            $descWords       = pick_keywords_short($girlDesc, 4);
+            $publicFolderUrl = GIRLSCONF_BASE_URL . rawurlencode($folderName) . '/';
+            $publicImageUrl  = GIRLSCONF_BASE_URL . rawurlencode($folderName) . '/' . rawurlencode($imgFileName);
+
+            $indexContent = build_og_index_php($girlName, $descWords, $publicFolderUrl, $publicImageUrl, $mime);
+            $indexPath    = $folderLocal . DIRECTORY_SEPARATOR . 'index.php';
+            if (@file_put_contents($indexPath, $indexContent) === false) {
+                rrmdir($folderLocal);
+                echo json_encode(['ok'=>false,'error'=>'Error al generar el index de la imagen.']); break;
+            }
+
+            $girlRef['fotos'][] = $publicFolderUrl;
             saveGirls($data);
-            echo json_encode(['ok' => true, 'url' => $photoUrl]);
+            echo json_encode(['ok' => true, 'url' => $publicFolderUrl]);
             break;
 
         case 'reorder_photos':

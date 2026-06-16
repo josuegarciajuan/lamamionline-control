@@ -20,4 +20,6 @@ interface SessionMemoryInterface
     public function readThread(string $threadId): array;
     public function getLastNMessages(string $threadId, int $n): array;
     public function deleteThread(string $threadId): int;
+    /** @return list<string> */
+    public function listThreadIds(): array;
 }

@@ -16,6 +16,7 @@ if (empty($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['o
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $action = (string) ($_GET['action'] ?? 'config');
 $userId = (int) ($_SESSION['user_id'] ?? 0);
+$isDemo = (($_SESSION['username'] ?? '') === 'demo');
 if (($_SESSION['role']??'') === 'admin' && !empty($_SESSION['suplantar_user_id'])) {
     $userId = (int) $_SESSION['suplantar_user_id'];
 }
@@ -38,11 +39,12 @@ function requireValidCsrf(): void {
         @chmod($secretFile, 0600);
     }
     $realUserId = (int) ($_SESSION['user_id'] ?? 0);
-    $current = hash_hmac('sha256', $realUserId . '|' . date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
-    if (hash_equals($current, $token)) return;
-    $prevSlot = max(0, floor((int) date('i') / 10) - 1);
-    $previous = hash_hmac('sha256', $realUserId . '|' . date('Y-m-d-H') . $prevSlot, $secret);
-    if (hash_equals($previous, $token)) return;
+    $now = time();
+    for ($offset = 0; $offset <= 5; $offset++) {
+        $t = $now - ($offset * 600);
+        $expected = hash_hmac('sha256', $realUserId . '|' . date('Y-m-d-H', $t) . (int) floor((int) date('i', $t) / 10), $secret);
+        if (hash_equals($expected, $token)) return;
+    }
     http_response_code(403);
     echo json_encode(['ok'=>false,'error'=>'CSRF token invalid']);
     exit;
@@ -91,13 +93,9 @@ function getUserLines(int $uid): array {
     return is_array($d) ? $d : [];
 }
 
-$formatOptions = [
-    'chicas_de_hoy' => 'Todas las chicas, 1 foto cada una',
-    'chica_del_dia' => '1 chica aleatoria, 2 fotos',
-    'duo_sexy' => '2 chicas aleatorias, 1 foto cada una',
-    'catalogo_rapido' => 'Solo nombres, sin fotos',
-    'mix_aleatorio' => 'Formato aleatorio cada ciclo',
-];
+// Load shared format builders
+require_once __DIR__ . '/_estados_formats.php';
+$formatOptions = estados_format_options();
 $freqOptions = [
     'cada_x_horas' => 'Cada X horas',
     'x_veces_al_dia' => 'X veces al día',
@@ -106,7 +104,10 @@ $freqOptions = [
 header('Content-Type: application/json; charset=utf-8');
 
 // Validate CSRF for all POST requests
-if ($method === 'POST') requireValidCsrf();
+if ($method === 'POST') {
+    if ($isDemo) { http_response_code(403); echo json_encode(['ok'=>false,'error'=>'Modo demo: solo lectura']); exit; }
+    requireValidCsrf();
+}
 
 try {
     switch ($action) {
@@ -127,6 +128,7 @@ try {
             } else {
                 $cfg = loadEstados();
                 $cfg['available_lines'] = getUserLines($userId);
+                $cfg['format_options'] = $formatOptions;
                 echo json_encode(['ok' => true, 'config' => $cfg]);
             }
             break;
@@ -144,39 +146,15 @@ try {
             $selectedLines = array_filter($allLines, fn($l) => in_array((int)($l['id']??0), $lineIds));
             if (empty($selectedLines)) { echo json_encode(['ok'=>false,'error'=>'No hay líneas seleccionadas']); break; }
 
-            // Build status text
+            // Build status text using shared format builders
             $formato = $cfg['formato'];
-            // Resolve mix_aleatorio to a concrete format (exclude itself)
-            if ($formato === 'mix_aleatorio') {
-                $noMix = array_values(array_filter(
-                    array_keys($formatOptions),
-                    fn($f) => $f !== 'mix_aleatorio'
-                ));
-                $formato = $noMix[array_rand($noMix)];
-                $cfg['formato'] = $formato;
-            }
-            $txt = '';
-            $shuffled = $girls;
-            shuffle($shuffled);
+            $txt = estados_build_status_text($girls, $formato);
 
-            switch ($formato) {
-                case 'chicas_de_hoy':
-                    $nombres = array_map(fn($g) => $g['nombre'], $shuffled);
-                    $txt = '💋 ' . implode(' · ', $nombres) . ' 💋';
-                    break;
-                case 'chica_del_dia':
-                    $g = $shuffled[0];
-                    $foto = !empty($g['fotos'][0]) ? $g['fotos'][0] : '';
-                    $txt = '🔥 ' . $g['nombre'] . ' 🔥' . ($foto ? "\n" . $foto : '');
-                    break;
-                case 'duo_sexy':
-                    $duo = array_slice($shuffled, 0, 2);
-                    $txt = '👯 ' . implode(' & ', array_map(fn($g) => $g['nombre'], $duo)) . ' 👯';
-                    break;
-                case 'catalogo_rapido':
-                    $txt = '📋 ' . implode(', ', array_map(fn($g) => $g['nombre'], $shuffled));
-                    break;
-            }
+            // Resolve relative image URLs to absolute (needed for WhatsApp to fetch photos)
+            $host = (string) ($_SERVER['HTTP_HOST'] ?? 'admin.casawasap.com');
+            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $baseUrl = $scheme . '://' . $host;
+            $txt = estados_resolve_image_urls($txt, $baseUrl);
 
             // Safety net: don't publish empty text
             if (trim($txt) === '') {
@@ -208,17 +186,17 @@ try {
                 $results[] = ['line_id' => $line['id'], 'ok' => $ok, 'http_code' => $httpCode];
             }
 
-            // Log
+            // Log with actual format used (for mix_aleatorio it resolves to a real format)
             $cfg['log'][] = [
                 'published_at' => date('c'),
-                'formato' => $formato,
+                'formato' => $cfg['formato'],
                 'texto' => $txt,
                 'resultados' => $results,
             ];
             $cfg['last_scheduled_run_at'] = date('c');
             saveEstados($cfg);
 
-            echo json_encode(['ok' => true, 'results' => $results, 'text' => $txt]);
+            echo json_encode(['ok' => true, 'results' => $results, 'text' => $txt, 'formato_usado' => $formato]);
             break;
 
         case 'history':

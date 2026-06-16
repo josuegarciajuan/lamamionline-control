@@ -74,10 +74,12 @@ final class ConversationStateMachine
         }
 
         // First check for terminal states from context flags
-        if (!empty($ctx['__conversation_dead'])) {
+        if (!empty($ctx['__conversation_ended'])) {
             return 'DEAD';
         }
-        if (!empty($ctx['__conversation_ended'])) {
+        // Also check LLM-derived health field
+        $llmHealth = (string) ($ctx['__llm_conversation_health'] ?? '');
+        if ($llmHealth === 'dead') {
             return 'DEAD';
         }
 

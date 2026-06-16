@@ -91,6 +91,29 @@ final class DedupeReply implements PipelineStageInterface
         }
 
         // ----------------------------------------------------------------
+        // PRIORITY 0 — Bot confusion guard (anti "no entiendo" loop)
+        // ----------------------------------------------------------------
+        $botConfusionCount = (int) ($ctx['__bot_confusion_count'] ?? 0);
+        $confusionRegex = '/\b(?:no\s+(?:entiendo|te\s+entiendo|te\s+he\s+entendido|s[eé]\b|se\b|se\s+que|tengo\s+ni\s+idea)|'
+            . 'eso\s+no\s+(?:es\s+lo\s+m[ií]o|te\s+lo\s+s[eé])|'
+            . 'de\s+eso\s+no\s+(?:entiendo|s[eé]|tengo\s+ni\s+idea))\b/iu';
+
+        if ($botConfusionCount >= 1 && preg_match($confusionRegex, $outputText)) {
+            // Bot is repeating confusion — rewrite as clarifying question
+            $clarifyingQuestions = [
+                'a q te refieres cari?',
+                'explicame mejor eso amor',
+                'q quieres decir cielo?',
+                'no te sigo, dime mejor 😅',
+                'a ver, q me quieres decir?',
+            ];
+            $ctx['output_text']     = $clarifyingQuestions[array_rand($clarifyingQuestions)];
+            $ctx['__dedup_applied'] = true;
+            $ctx['__dedup_reason']  = 'anti_confusion_loop';
+            return $ctx;
+        }
+
+        // ----------------------------------------------------------------
         // PRIORITY 1 — ya_enviado category guard (with per-girl awareness)
         // ----------------------------------------------------------------
         $yaEnviado = $ctx['ya_enviado'] ?? [];
@@ -196,11 +219,13 @@ final class DedupeReply implements PipelineStageInterface
                 return null; // Allow photos to go through
             }
 
-            // ── LLM-DRIVEN: if the LLM explicitly set photo_action, trust it ──
-            // The LLM knows the context (selected_girl, catalog vs full photos, etc.)
-            // and has decided photos should be sent. Don't override with "ya te las mandé".
-            if ($photoAction !== 'none') {
-                return null; // LLM says send → allow through
+            // ── LLM-DRIVEN: only bypass the photo dedup guard for selected_all ──
+            // selected_all means the user asked for a specific girl's full photos —
+            // this is a genuinely new request, not a catalog repetition.
+            // catalog means the LLM is showing the general lineup again, which
+            // should be deduplicated if photos were already sent.
+            if ($photoAction === 'selected_all') {
+                return null; // genuine request for specific girl — allow through
             }
 
             // Legacy per-girl awareness (photos_sent_per_girl — rarely populated)

@@ -1,84 +1,22 @@
 <?php
 
-function render_global_ui($page = '') {
+function render_global_ui() {
     echo '<div id="floatingToast" class="floating-toast"></div>';
     echo '<div id="moneyRain" class="money-rain"></div>';
     echo '<div id="appBackdrop" class="app-backdrop" hidden></div>';
     echo '<div id="voiceCommandBackdrop" class="voice-command-backdrop" hidden></div>';
-    echo '<div id="voiceProcessingOverlay" class="voice-processing-overlay" hidden aria-hidden="true">';
-    echo '<div class="voice-processing-card">';
-    echo '<div class="voice-processing-orb"></div>';
-    echo '<div class="voice-processing-title">Maestro procesando solicitud</div>';
-    echo '<div id="voiceProcessingText" class="voice-processing-text">Interpretando tu orden dentro del CRM…</div>';
-    echo '</div>';
-    echo '</div>';
     echo '<div class="app-shell-tools">';
     echo '<button type="button" id="mobileMenuToggle" class="app-shell-btn app-shell-btn-mobile" aria-expanded="false" aria-controls="appSidebar">☰ Menú</button>';
-    $avisosCount = count(avisos_get_active());
-    $avisosBtnClass = $avisosCount > 0 ? ' app-shell-btn-avisos-active' : '';
-    echo '<button type="button" id="mobileAvisosToggle" class="app-shell-btn app-shell-btn-mobile' . $avisosBtnClass . '" aria-expanded="false" aria-controls="avisosPanel">⚠ Avisos' . ($avisosCount > 0 ? ' (' . $avisosCount . ')' : '') . '</button>';
-    echo '<button type="button" id="voiceCommandToggleMobile" class="app-shell-btn app-shell-btn-mobile app-shell-btn-mic" data-voice-command-toggle aria-expanded="false" aria-controls="voiceCommandPanel" aria-label="Abrir voz CRM" title="Abrir voz CRM">🎙</button>';
+    echo '<button type="button" id="mobileAvisosToggle" class="app-shell-btn app-shell-btn-mobile" aria-expanded="false" aria-controls="avisosPanel">⚠ Avisos</button>';
+    echo '<button type="button" id="voiceCommandToggle" class="app-shell-btn app-shell-btn-voice" aria-expanded="false" aria-controls="voiceCommandPanel">🎙 Voz CRM</button>';
+    echo '<button type="button" id="appFullscreenToggle" class="app-shell-btn">⛶ Pantalla completa</button>';
     echo '</div>';
-
-    // ── Bottom Navigation Bar (mobile only) — 8 items ──
-    $tabs = [
-        ['type' => 'link',  'page' => 'dashboard', 'icon' => '📊', 'label' => 'Dash',  'active' => in_array($page, ['dashboard'])],
-        ['type' => 'link',  'page' => 'bot-casa',   'icon' => '🏚', 'label' => 'Bot',   'active' => in_array($page, ['bot-casa'])],
-        ['type' => 'link',  'page' => 'jostal',     'icon' => '🏠', 'label' => 'Jost',  'active' => in_array($page, ['jostal'])],
-        ['type' => 'drop',  'id'   => 'dropCtrl',   'icon' => '📈', 'label' => 'Ctrl',  'active' => in_array($page, ['informes','gastos']),
-            'links' => [
-                ['page' => 'dashboard', 'label' => 'Dashboard'],
-                ['page' => 'informes', 'label' => 'Informes'],
-                ['page' => 'gastos', 'label' => 'Gastos'],
-            ]],
-        ['type' => 'drop',  'id'   => 'dropNeg',    'icon' => '💰', 'label' => 'Neg',   'active' => in_array($page, ['lamami','interesadas','clientas','lamamibot','casawasap']),
-            'links' => [
-                ['page' => 'lamami', 'label' => 'LaMami'],
-                ['page' => 'jostal', 'label' => 'Jostal'],
-                ['page' => 'casawasap', 'label' => 'Casawasap'],
-            ]],
-        ['type' => 'drop',  'id'   => 'dropCom',    'icon' => '💬', 'label' => 'Com',   'active' => in_array($page, ['comercial','publicista','avisos','bots']),
-            'links' => [
-                ['page' => 'comercial', 'label' => 'Comercial'],
-                ['page' => 'publicista', 'label' => 'Publicista'],
-                ['page' => 'avisos', 'label' => 'Avisos'],
-                ['page' => 'bots', 'label' => 'Bots'],
-            ]],
-        ['type' => 'drop',  'id'   => 'dropSis',    'icon' => '⚙️', 'label' => 'Sis',   'active' => in_array($page, ['josue']),
-            'links' => [
-                ['page' => 'bot-casa', 'label' => 'Bot Casa'],
-                ['page' => 'josue', 'label' => 'Josué'],
-            ]],
-        ['type' => 'link',  'page' => 'logout',     'icon' => '🚪', 'label' => 'Salir', 'active' => false],
-    ];
-    echo '<nav class="mobile-bottom-nav" id="mobileBottomNav">';
-    foreach ($tabs as $tab) {
-        $cls = $tab['active'] ? ' is-active' : '';
-        if ($tab['type'] === 'link') {
-            echo '<a href="index.php?page=' . e($tab['page']) . '" class="mobile-nav-item' . $cls . '">';
-            echo '<span class="mobile-nav-icon">' . $tab['icon'] . '</span>';
-            echo '<span class="mobile-nav-label">' . $tab['label'] . '</span>';
-            echo '</a>';
-        } else {
-            $dropId = $tab['id'];
-            echo '<button type="button" class="mobile-nav-item mobile-nav-drop' . $cls . '" id="' . $dropId . '" aria-expanded="false" aria-haspopup="true">';
-            echo '<span class="mobile-nav-icon">' . $tab['icon'] . '</span>';
-            echo '<span class="mobile-nav-label">' . $tab['label'] . '</span>';
-            echo '</button>';
-            // Dropdown popover
-            echo '<div class="mobile-nav-popover" id="' . $dropId . 'Pop" hidden>';
-            foreach ($tab['links'] as $link) {
-                echo '<a href="index.php?page=' . e($link['page']) . '" class="mobile-nav-popover-link">' . e($link['label']) . '</a>';
-            }
-            echo '</div>';
-        }
-    }
-    echo '</nav>';
 
     echo '<section id="voiceCommandPanel" class="voice-command-panel" hidden aria-hidden="true">';
     echo '<div class="voice-command-head">';
     echo '<div>';
     echo '<h2>Órdenes por voz</h2>';
+    echo '<p>Habla o escribe una orden para el CRM.</p>';
     echo '</div>';
     echo '<button type="button" id="voiceCommandClose" class="voice-command-close" aria-label="Cerrar panel de voz">✕</button>';
     echo '</div>';
@@ -86,14 +24,15 @@ function render_global_ui($page = '') {
     echo '<div class="voice-command-body">';
     echo '<div id="voiceCommandSupport" class="voice-command-support">Comprobando reconocimiento de voz…</div>';
     echo '<div class="voice-command-actions">';
-    echo '<button type="button" id="voiceStartButton" class="btn-primary voice-command-main-btn">🎙 Escuchar ahora</button>';
-    echo '<button type="button" id="voiceStopButton" class="voice-command-secondary-btn" disabled>■ Parar</button>';
+    echo '<button type="button" id="voiceStartButton" class="btn-primary voice-command-main-btn">🎙 Empezar a hablar</button>';
+    echo '<button type="button" id="voiceStopButton" class="voice-command-secondary-btn" disabled>■ Detener</button>';
     echo '<button type="button" id="voiceClearButton" class="voice-command-secondary-btn">Limpiar</button>';
     echo '</div>';
 
     echo '<div class="field full">';
     echo '<label for="voiceCommandInput">Texto de la orden</label>';
     echo '<textarea id="voiceCommandInput" class="voice-command-input" placeholder="Ejemplo: muéstrame estadísticas de esta clienta"></textarea>';
+    echo '<div class="field-help">Puedes corregir el texto antes de enviarlo.</div>';
     echo '</div>';
 
     echo '<div class="voice-command-meta">';
@@ -102,7 +41,7 @@ function render_global_ui($page = '') {
     echo '</div>';
 
     echo '<div class="voice-command-submit-row">';
-    echo '<button type="button" id="voiceSendButton" class="btn-primary">Enviar manualmente</button>';
+    echo '<button type="button" id="voiceSendButton" class="btn-primary">Enviar orden</button>';
     echo '</div>';
 
     echo '<div id="voiceCommandResponse" class="voice-command-response" aria-live="polite"></div>';
@@ -117,167 +56,11 @@ function render_flash() {
     echo '<div class="flash flash-' . e($flash['type']) . '" data-fx="' . e($fx) . '">' . e($flash['message']) . '</div>';
 }
 
-function render_aviso_whatsapp_log_panel($aviso, $baseUrl = 'index.php?page=avisos&avtab=active') {
-    $aviso = is_array($aviso) ? $aviso : array();
-    $log = is_array($aviso['whatsapp_last_log'] ?? null) ? $aviso['whatsapp_last_log'] : array();
-    $json = json_encode($log, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if ($json === false) $json = 'No se pudo codificar el log.';
-
-    echo '<section class="panel panel-space">';
-    echo '<div class="branch-panel-head"><h2>Log envío WhatsApp</h2><span class="summary-badge">' . e($aviso['id'] ?? 'sin_id') . '</span></div>';
-    echo '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">';
-    echo '<a class="btn-secondary-mini" href="' . e($baseUrl) . '">Volver a avisos</a>';
-    echo '</div>';
-
-    echo '<div class="cards three" style="margin-top:12px;">';
-    echo '<div class="info-strip"><strong>Aviso</strong><br>' . e($aviso['title'] ?? 'Aviso') . '</div>';
-    echo '<div class="info-strip"><strong>Resultado</strong><br>' . e($aviso['whatsapp_last_result'] ?? 'sin dato') . '</div>';
-    echo '<div class="info-strip"><strong>Intento</strong><br>' . e(format_created_at($aviso['whatsapp_last_attempt_at'] ?? '')) . '</div>';
-    echo '</div>';
-
-    if (trim((string)($aviso['whatsapp_last_error'] ?? '')) !== '') {
-        echo '<div class="publicista-ads-warning" style="margin-top:12px;">' . e((string)$aviso['whatsapp_last_error']) . '</div>';
-    }
-
-    echo '<pre style="white-space:pre-wrap;word-break:break-word;max-width:100%;overflow:auto;margin-top:12px;">' . e($json) . '</pre>';
-    echo '</section>';
-}
-
-
-function render_publicista_strategy_option_detail($option, $isDefault = false) {
-    $option = is_array($option) ? $option : array();
-    if (empty($option)) return;
-
-    $label = (string)($option['label'] ?? 'Opción');
-    $modeLabel = trim((string)($option['mode_label'] ?? $label));
-    $strategies = is_array($option['strategies'] ?? null) ? $option['strategies'] : array();
-    $warnings = is_array($option['warnings'] ?? null) ? $option['warnings'] : array();
-    $headStyle = $isDefault ? ' style="border:1px solid rgba(99,102,241,.35);box-shadow:0 0 0 1px rgba(99,102,241,.14) inset;"' : '';
-
-    echo '<section class="panel panel-space"' . $headStyle . '>';
-    echo '<div class="branch-panel-head"><h2>' . e($label) . '</h2><span class="summary-badge">' . ($isDefault ? 'Opción por defecto' : 'Alternativa') . '</span></div>';
-    echo '<div class="cards four" style="margin-top:12px;">';
-    echo '<div class="info-strip"><strong>Total</strong><br>' . e(publicista_ads_euros((float)($option['grand_total'] ?? 0))) . '</div>';
-    echo '<div class="info-strip"><strong>Media por chica</strong><br>' . e(publicista_ads_euros((float)($option['avg_per_product'] ?? 0))) . '</div>';
-    echo '<div class="info-strip"><strong>Postura</strong><br>' . e(ucfirst((string)($option['market_posture'] ?? 'equilibrada'))) . '</div>';
-    echo '<div class="info-strip"><strong>Avisos</strong><br>' . e((string)count($warnings)) . '</div>';
-    echo '</div>';
-    if (!empty($option['explanation'])) {
-        echo '<div class="info-strip" style="margin-top:12px;"><strong>Lectura de esta versión:</strong> ' . e((string)$option['explanation']) . '</div>';
-    }
-    if (!empty($option['decision_help'])) {
-        echo '<div class="info-strip" style="margin-top:12px;"><strong>Cuándo elegirla:</strong> ' . e((string)$option['decision_help']) . '</div>';
-    }
-    if (!empty($option['comparison_note'])) {
-        echo '<div class="info-strip" style="margin-top:12px;"><strong>Comparativa:</strong> ' . e((string)$option['comparison_note']) . '</div>';
-    }
-    if (!empty($option['free_bot_note'])) {
-        echo '<div class="info-strip" style="margin-top:12px;"><strong>Bot gratis:</strong> ' . e((string)$option['free_bot_note']) . '</div>';
-    }
-    if (!empty($option['synergy_note'])) {
-        echo '<div class="info-strip" style="margin-top:12px;"><strong>Sinergia multichica:</strong> ' . e((string)$option['synergy_note']) . '</div>';
-    }
-    if (!empty($option['window']) && is_array($option['window'])) {
-        echo '<div class="info-strip" style="margin-top:12px;"><strong>Ventana aplicada:</strong> ' . e((string)$option['window']['start']) . ' → ' . e((string)$option['window']['end']) . '</div>';
-    }
-    echo '</section>';
-
-    foreach ($strategies as $strategy) {
-        $girl = (int)($strategy['girl'] ?? 0);
-
-        echo '<section class="panel panel-space publicista-ads-girl">';
-        echo '<div class="section-head"><div><h2>' . e($label) . ' · Chica ' . e((string)$girl) . '</h2><p>' . e((string)count($strategy['profiles'] ?? array())) . ' perfiles · ' . e(publicista_ads_euros((float)($strategy['cost'] ?? 0))) . ' por período · ' . e((string)($strategy['mode_label'] ?? $modeLabel)) . '</p></div><div class="section-head-actions">';
-        echo '<span class="publicista-ads-level-pill" style="background:' . e(publicista_ads_level_bg($strategy['level'] ?? 'media')) . ';color:' . e(publicista_ads_level_fg($strategy['level'] ?? 'media')) . ';">' . e(publicista_ads_level_icon($strategy['level'] ?? 'media')) . ' ' . e(publicista_ads_level_label($strategy['level'] ?? 'media')) . '</span>';
-        echo '</div></div>';
-
-        if (!empty($strategy['window']) && is_array($strategy['window'])) {
-            echo '<div class="info-strip" style="margin-top:14px;"><strong>Franja de autosubidas</strong><br>' . e((string)$strategy['window']['start']) . ' → ' . e((string)$strategy['window']['end']) . '</div>';
-        }
-        echo '<div class="cards two" style="margin-top:14px;">';
-        echo '<section class="panel">';
-        echo '<h3>Por qué esta estrategia</h3>';
-        echo '<ul class="publicista-ads-reasons">';
-        foreach ((array)($strategy['reasons'] ?? array()) as $reason) {
-            echo '<li>' . e($reason) . '</li>';
-        }
-        echo '</ul>';
-        echo '</section>';
-
-        echo '<section class="panel">';
-        echo '<h3>Perfiles a crear / comprar</h3>';
-        echo '<div class="table-wrap"><table class="publicista-ads-profile-table"><thead><tr><th>#</th><th>Perfil</th><th>Productos</th><th>Nota</th><th>Coste</th></tr></thead><tbody>';
-        foreach ((array)($strategy['profiles'] ?? array()) as $profile) {
-            echo '<tr>';
-            echo '<td><span class="summary-badge">' . e((string)($profile['num'] ?? '')) . '</span></td>';
-            echo '<td><strong>' . e($profile['name'] ?? '') . '</strong></td>';
-            echo '<td>' . publicista_ads_badge_line_html($profile['opts'] ?? array()) . '</td>';
-            echo '<td>' . e($profile['why'] ?? '') . '</td>';
-            echo '<td><strong>' . e(((float)($profile['cost'] ?? 0) === 0.0) ? 'Gratis' : publicista_ads_euros((float)($profile['cost'] ?? 0))) . '</strong></td>';
-            echo '</tr>';
-        }
-        echo '</tbody></table></div>';
-        echo '</section>';
-        echo '</div>';
-
-        if (!empty($strategy['allFirings'])) {
-            echo '<section class="panel panel-space">';
-            echo '<h3>Horarios exactos de subida</h3>';
-            foreach ((array)$strategy['allFirings'] as $firing) {
-                $typeLabel = (($firing['type'] ?? '') === 'auto7') ? 'Autorenueva 7€ · 10 sub/día' : 'Refuerzo 4€ · 4 sub/día';
-                echo '<div class="publicista-ads-firing-row">';
-                echo '<div class="publicista-ads-firing-label"><strong>P' . e((string)($firing['profile'] ?? '')) . '</strong><br>' . e($typeLabel) . '<br><span class="muted">' . e(($firing['start'] ?? '') . ' → ' . ($firing['end'] ?? '')) . '</span></div>';
-                echo '<div class="publicista-ads-firing-times">';
-                foreach ((array)($firing['times'] ?? array()) as $time) {
-                    echo '<span class="publicista-ads-time-pill">' . e($time) . '</span>';
-                }
-                echo '</div>';
-                echo '</div>';
-            }
-            echo '</section>';
-
-            echo '<section class="panel panel-space">';
-            echo '<h3>Línea de tiempo 24h</h3>';
-            echo '<div class="publicista-ads-timeline">' . publicista_ads_render_timeline_svg($strategy['allFirings']) . '</div>';
-            echo '<div class="muted" style="margin-top:10px;">Cada fila es una autorenueva. La barra marca el rango activo y los puntos el momento exacto de subida.</div>';
-            echo '</section>';
-        }
-
-        if (!empty($strategy['overlapWarnings'])) {
-            echo '<section class="panel panel-space">';
-            echo '<div class="publicista-ads-warning"><strong>Coincidencias a revisar</strong><br><span class="muted">El sistema ya ha separado automáticamente las autosubidas, pero aún quedan algunos puntos cercanos dentro de la franja elegida.</span><ul class="publicista-ads-warn-list">';
-            foreach ((array)$strategy['overlapWarnings'] as $warning) {
-                echo '<li>' . e($warning) . '</li>';
-            }
-            echo '</ul></div>';
-            echo '</section>';
-        }
-
-        foreach ((array)($strategy['profiles'] ?? array()) as $profile) {
-            if (empty($profile['opts']['free']) || !is_array($profile['opts']['free'])) {
-                continue;
-            }
-            echo '<section class="panel panel-space publicista-ads-free-box">';
-            echo '<h3>Perfil gratuito P' . e((string)($profile['num'] ?? '')) . '</h3>';
-            echo '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
-            foreach ((array)$profile['opts']['free'] as $freeTime) {
-                echo '<span class="publicista-ads-time-pill">⏰ ' . e($freeTime) . '</span>';
-            }
-            echo '</div>';
-            echo '<div class="muted" style="margin-top:10px;">Subida manual, una vez cada 12h, sin coste.</div>';
-            echo '</section>';
-        }
-    }
-}
-
 function render_avisos_panel() {
     $avisos = avisos_get_active();
-    if (empty($avisos)) {
-        // Always render panel so JS toggle works even with zero avisos
-        echo '<section id="avisosPanel" class="panel panel-space avisos-panel" hidden></section>';
-        return;
-    }
+    if (empty($avisos)) return;
 
-    $newCount = 0;
+    $newIds = array();
 
     echo '<section id="avisosPanel" class="panel panel-space avisos-panel">';
     echo '<div class="branch-panel-head">';
@@ -287,7 +70,7 @@ function render_avisos_panel() {
 
     foreach ($avisos as $aviso) {
         $isNew = empty($aviso['read_at']);
-        if ($isNew) $newCount++;
+        if ($isNew) $newIds[] = $aviso['id'];
 
         echo '<div class="aviso-item aviso-sev-' . e($aviso['severity'] ?? 'media') . ' ' . ($isNew ? 'aviso-item-new' : '') . '">';
         echo '<div class="aviso-main">';
@@ -304,17 +87,8 @@ function render_avisos_panel() {
         echo '</div>';
 
         echo '<div class="aviso-actions">';
-        $avisoMeta = is_array($aviso['meta'] ?? null) ? $aviso['meta'] : array();
-        $runId = trim((string)($avisoMeta['run_id'] ?? ''));
-        if ($runId !== '') {
-            echo '<a class="btn-secondary-mini" href="' . e(publicista_page_url('run_log', array('run_id' => $runId, 'campaign_id' => trim((string)($avisoMeta['campaign_id'] ?? ''))))) . '">Ver log</a>';
-        }
-        if (aviso_whatsapp_has_failure($aviso)) {
-            echo '<a class="btn-secondary-mini" href="' . e(aviso_whatsapp_log_url($aviso['id'] ?? '')) . '">Ver log WA</a>';
-        }
-        echo '<form method="post" class="inline-form">';
+        echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Descartar este aviso?\')">';
         echo '<input type="hidden" name="action" value="dismiss_aviso">';
-        echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
         echo '<input type="hidden" name="id" value="' . e($aviso['id'] ?? '') . '">';
         echo '<input type="hidden" name="redirect" value="' . e($_SERVER['REQUEST_URI'] ?? 'index.php?page=dashboard') . '">';
         echo '<button class="btn-danger-mini">Descartar</button>';
@@ -323,19 +97,11 @@ function render_avisos_panel() {
         echo '</div>';
     }
 
-    if ($newCount > 0) {
-        echo '<div class="aviso-actions" style="margin-top:10px;">';
-        echo '<form method="post" class="inline-form js-mark-all-read">';
-        echo '<input type="hidden" name="action" value="mark_avisos_read">';
-        echo '<input type="hidden" name="scope" value="active_unread">';
-        echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
-        echo '<input type="hidden" name="redirect" value="' . e($_SERVER['REQUEST_URI'] ?? 'index.php?page=dashboard') . '">';
-        echo '<button class="btn-secondary-mini">Marcar ' . e((string)$newCount) . ' nuevos como leídos</button>';
-        echo '</form>';
-        echo '</div>';
-    }
-
     echo '</section>';
+
+    if (!empty($newIds)) {
+        avisos_mark_as_read($newIds);
+    }
 }
 
 function render_avisos_section($baseUrl = 'index.php?page=avisos') {
@@ -343,7 +109,6 @@ function render_avisos_section($baseUrl = 'index.php?page=avisos') {
     if (!in_array($tab, array('planned', 'active', 'history'), true)) {
         $tab = 'planned';
     }
-    $waLogId = trim((string)request_get('wa_log', ''));
 
     $planned = avisos_get_planned();
     $active = avisos_get_active();
@@ -357,15 +122,6 @@ function render_avisos_section($baseUrl = 'index.php?page=avisos') {
         echo '</div>';
     echo '</section>';
 
-    if ($waLogId !== '') {
-        $selectedAviso = storage_find_by_id('avisos.json', $waLogId);
-        if ($selectedAviso && !empty($selectedAviso['whatsapp_last_log']) && is_array($selectedAviso['whatsapp_last_log'])) {
-            render_aviso_whatsapp_log_panel($selectedAviso, $baseUrl . '&avtab=' . urlencode($tab));
-        } else {
-            echo '<section class="panel panel-space"><div class="publicista-ads-warning">No se encontró log de WhatsApp para el aviso solicitado.</div></section>';
-        }
-    }
-
     if ($tab === 'planned') {
         echo '<div class="cards two">';
 
@@ -373,7 +129,6 @@ function render_avisos_section($baseUrl = 'index.php?page=avisos') {
         echo '<h2>Nuevo aviso manual</h2>';
         echo '<form method="post" class="form-grid">';
         echo '<input type="hidden" name="action" value="create_manual_aviso">';
-        echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
 
         field_input('title', 'Título', '', true);
         field_input('scheduled_for', 'Fecha y hora activación', today_datetime_local(), true, 'datetime-local');
@@ -414,7 +169,6 @@ function render_avisos_section($baseUrl = 'index.php?page=avisos') {
                 echo '<td>';
                 echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar este aviso planificado?\')">';
                 echo '<input type="hidden" name="action" value="delete_planned_aviso">';
-                echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
                 echo '<input type="hidden" name="id" value="' . e($aviso['id'] ?? '') . '">';
                 echo '<button class="btn-danger-mini">Borrar</button>';
                 echo '</form>';
@@ -455,12 +209,8 @@ function render_avisos_section($baseUrl = 'index.php?page=avisos') {
                 echo '</div>';
 
                 echo '<div class="aviso-actions">';
-                if (aviso_whatsapp_has_failure($aviso)) {
-                    echo '<a class="btn-secondary-mini" href="' . e(aviso_whatsapp_log_url($aviso['id'] ?? '')) . '">Ver log WA</a>';
-                }
-                echo '<form method="post" class="inline-form">';
+                echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Descartar este aviso?\')">';
                 echo '<input type="hidden" name="action" value="dismiss_aviso">';
-                echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
                 echo '<input type="hidden" name="id" value="' . e($aviso['id'] ?? '') . '">';
                 echo '<input type="hidden" name="redirect" value="' . e($baseUrl . '&avtab=active') . '">';
                 echo '<button class="btn-danger-mini">Descartar</button>';
@@ -554,55 +304,24 @@ function render_lamami_page() {
 
 function render_publicista_page() {
     $tab = request_get('tab', 'crear_perfiles');
-    if ($tab === 'calculo_publicidad') $tab = 'estrategias';
-    $allowed = array('crear_perfiles', 'estrategias', 'cuentas', 'campanas', 'subir_anuncios', 'run_log', 'estados_wasap');
+    $allowed = array('crear_perfiles', 'calculo_publicidad', 'subir_anuncios');
 
     if (!in_array($tab, $allowed, true)) {
         $tab = 'crear_perfiles';
     }
-    $accountsUnlocked = !empty($_SESSION['publicista_accounts_unlocked']);
 
-    page_header('Publicista', 'Crea productos publicitarios, calcula estrategia, gestiona cuentas, genera campañas y ejecuta la automatización disponible.');
+    page_header('Publicista', 'Crea perfiles, calcula la estrategia publicitaria y prepara la futura automatización de subida');
 
     echo '<section class="panel panel-space">';
     echo '<div class="subtabs">';
-    echo '<a class="subtab ' . ($tab === 'cuentas' ? 'active' : '') . '" href="' . e(publicista_page_url('cuentas')) . '">Cuentas</a>';
-    echo '<a class="subtab ' . ($tab === 'crear_perfiles' ? 'active' : '') . '" href="' . e(publicista_page_url('crear_perfiles')) . '">Perfiles</a>';
-    echo '<a class="subtab ' . ($tab === 'estrategias' ? 'active' : '') . '" href="' . e(publicista_page_url('estrategias')) . '">Estrategias</a>';
-    echo '<a class="subtab ' . ($tab === 'campanas' ? 'active' : '') . '" href="' . e(publicista_page_url('campanas')) . '">Campañas</a>';
+    echo '<a class="subtab ' . ($tab === 'crear_perfiles' ? 'active' : '') . '" href="' . e(publicista_page_url('crear_perfiles')) . '">Crear perfiles</a>';
+    echo '<a class="subtab ' . ($tab === 'calculo_publicidad' ? 'active' : '') . '" href="' . e(publicista_page_url('calculo_publicidad')) . '">Cálculo publicidad</a>';
     echo '<a class="subtab ' . ($tab === 'subir_anuncios' ? 'active' : '') . '" href="' . e(publicista_page_url('subir_anuncios')) . '">Subir anuncios</a>';
-    echo '<a class="subtab ' . ($tab === 'estados_wasap' ? 'active' : '') . '" href="' . e(publicista_page_url('estados_wasap')) . '">📱 Estados</a>';
     echo '</div>';
     echo '</section>';
 
-    if ($tab === 'estrategias') {
+    if ($tab === 'calculo_publicidad') {
         render_publicista_calculo_publicidad_page();
-        return;
-    }
-
-    if ($tab === 'cuentas') {
-        if (!$accountsUnlocked) {
-            echo '<section class="panel panel-space">';
-            echo '<div class="branch-panel-head"><h2>Cuentas protegidas</h2><span class="summary-badge">Privado</span></div>';
-            echo '<div class="info-strip" style="margin-top:12px;">Esta sección está protegida por contraseña.</div>';
-            echo '<form method="post" class="form-grid" style="margin-top:14px;max-width:420px;">';
-            echo '<input type="hidden" name="action" value="unlock_publicista_accounts">';
-            echo '<div class="field">';
-            echo '<label>Contraseña</label>';
-            echo '<input type="password" name="password" placeholder="Contraseña" required>';
-            echo '</div>';
-            echo '<div><button class="btn-primary">Entrar</button></div>';
-            echo '</form>';
-            echo '</section>';
-            return;
-        }
-
-        render_publicista_cuentas_page();
-        return;
-    }
-
-    if ($tab === 'campanas') {
-        render_publicista_campanas_page();
         return;
     }
 
@@ -611,205 +330,7 @@ function render_publicista_page() {
         return;
     }
 
-    if ($tab === 'run_log') {
-        render_publicista_run_log_page();
-        return;
-    }
-
-    if ($tab === 'estados_wasap') {
-        render_publicista_estados_wasap_page();
-        return;
-    }
-
     render_publicista_crear_perfiles_page(true);
-}
-
-function render_publicista_run_log_page() {
-    $runId = trim((string)request_get('run_id', ''));
-    $campaignId = trim((string)request_get('campaign_id', ''));
-    $run = $runId !== '' ? publicista_run_get($runId) : null;
-
-    echo '<section class="panel panel-space">';
-    echo '<div class="branch-panel-head"><h2>Log de subida</h2><span class="summary-badge">' . e($runId !== '' ? $runId : 'sin run') . '</span></div>';
-    echo '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">';
-    if ($campaignId !== '') {
-        echo '<a class="btn-secondary-mini" href="' . e(publicista_page_url('campanas', array('edit' => $campaignId))) . '">Volver a campaña</a>';
-    }
-    if ($runId !== '') {
-        echo '<a class="btn-secondary-mini" href="' . e(publicista_page_url('run_log', array('run_id' => $runId, 'campaign_id' => $campaignId))) . '">Recargar</a>';
-    }
-    echo '</div>';
-
-    if (!$run) {
-        echo '<div class="publicista-ads-warning" style="margin-top:12px;">No se encontró el run solicitado.</div>';
-        echo '</section>';
-        return;
-    }
-
-    $json = json_encode($run, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if ($json === false) $json = 'No se pudo codificar el run a JSON.';
-
-    $humanReport = trim((string)($run['human_report'] ?? ''));
-    if ($humanReport !== '') {
-        echo '<div class="info-strip" style="margin-top:12px;"><strong>Informe humano</strong><br>' . nl2br(e($humanReport)) . '</div>';
-    }
-    echo '<p class="muted" style="margin-top:12px;">Aquí está el run completo con items, errores, payloads resumidos, humanTrace y debug_log.</p>';
-    echo '<pre style="white-space:pre-wrap;word-break:break-word;max-width:100%;overflow:auto;margin-top:12px;">' . e($json) . '</pre>';
-    echo '</section>';
-}
-
-function render_publicista_estados_wasap_page() {
-    $config = publicista_estados_wasap_get_config();
-    $log = publicista_estados_wasap_get_log();
-    $allLines = publicista_estados_wasap_get_bot_casa_lines();
-    $enabledIds = $config['lineas'];
-    $enabledLines = array();
-    foreach ($allLines as $l) {
-        if (in_array($l['id'], $enabledIds, true)) $enabledLines[] = $l;
-    }
-
-    // ── Status cards ───────────────────────────────────────────────
-    echo '<section class="panel panel-space">';
-    echo '<div class="branch-panel-head"><h2>📱 Estados WhatsApp</h2><span class="summary-badge">' . ($config['enabled'] ? 'Activo' : 'Pausado') . '</span></div>';
-    echo '<div class="cards four" style="margin-top:14px;">';
-    echo '<div class="info-strip"><strong>Estado</strong><br>' . ($config['enabled'] ? '✅ Publicación automática activa' : '⏸️ Pausado') . '</div>';
-    echo '<div class="info-strip"><strong>Líneas habilitadas</strong><br>' . count($enabledLines) . ' de ' . count($allLines) . '</div>';
-    echo '<div class="info-strip"><strong>Formato</strong><br>' . e(publicista_estados_wasap_format_options()[$config['formato']] ?? $config['formato']) . '</div>';
-    $freqLabel = publicista_estados_wasap_frecuencia_options()[$config['frecuencia_tipo']] ?? $config['frecuencia_tipo'];
-    $freqDetail = $config['frecuencia_tipo'] === 'cada_x_horas' ? "Cada {$config['frecuencia_valor']}h" : "{$config['frecuencia_valor']} veces/día";
-    echo '<div class="info-strip"><strong>Frecuencia</strong><br>' . e($freqLabel . ' — ' . $freqDetail) . ' (' . e($config['hora_inicio']) . '–' . e($config['hora_fin']) . ')</div>';
-    echo '</div>';
-
-    $lastLog = !empty($log) ? end($log) : null;
-    $lastPubAt = $lastLog ? $lastLog['published_at'] : '—';
-    $lastResult = $lastLog ? ($lastLog['resultado'] === 'ok' ? '✅ OK' : '❌ Error') : '—';
-    echo '<div class="cards four" style="margin-top:12px;">';
-    echo '<div class="info-strip"><strong>Última publicación</strong><br>' . e($lastPubAt) . '</div>';
-    echo '<div class="info-strip"><strong>Último resultado</strong><br>' . $lastResult . '</div>';
-    if ($lastLog) {
-        echo '<div class="info-strip"><strong>Última línea usada</strong><br>' . e($lastLog['linea_nombre'] ?? '—') . '</div>';
-        echo '<div class="info-strip"><strong>Último HTTP</strong><br>' . e((string)($lastLog['http_code'] ?? '—')) . '</div>';
-    } else {
-        echo '<div class="info-strip"><strong>Última línea</strong><br>—</div>';
-        echo '<div class="info-strip"><strong>Último HTTP</strong><br>—</div>';
-    }
-    echo '</div>';
-    echo '</section>';
-
-    // ── Config form ────────────────────────────────────────────────
-    echo '<section class="panel panel-space">';
-    echo '<div class="section-head"><div><h2>Configuración</h2><p>Define cómo y cuándo se publican los estados de WhatsApp con fotos de las chicas activas.</p></div></div>';
-    echo '<form method="post" class="form-grid">';
-    echo '<input type="hidden" name="action" value="save_estados_wasap_config">';
-
-    // Enabled
-    echo '<div class="field">';
-    echo '<label>Activado</label>';
-    echo '<label style="display:flex;gap:8px;align-items:center;margin-top:10px;">';
-    echo '<input type="checkbox" name="enabled" value="1"' . ($config['enabled'] ? ' checked' : '') . '>';
-    echo 'Publicar estados automáticamente';
-    echo '</label>';
-    echo '</div>';
-
-    // Frequency type
-    echo '<div class="field">';
-    echo '<label>Frecuencia</label>';
-    echo '<select name="frecuencia_tipo" style="margin-top:8px;">';
-    foreach (publicista_estados_wasap_frecuencia_options() as $val => $label) {
-        $sel = $config['frecuencia_tipo'] === $val ? ' selected' : '';
-        echo '<option value="' . e($val) . '"' . $sel . '>' . e($label) . '</option>';
-    }
-    echo '</select>';
-    echo '</div>';
-
-    // Frequency value
-    echo '<div class="field">';
-    echo '<label>Valor</label>';
-    echo '<input type="number" name="frecuencia_valor" value="' . e((string)$config['frecuencia_valor']) . '" min="1" max="24" style="margin-top:8px;width:100%;">';
-    echo '<div class="field-help">Horas entre publicaciones (si "Cada X horas") o veces al día (si "X veces al día").</div>';
-    echo '</div>';
-
-    // Time range
-    echo '<div class="field"><label>Hora inicio</label><input type="time" name="hora_inicio" value="' . e($config['hora_inicio']) . '" style="margin-top:8px;width:100%;"></div>';
-    echo '<div class="field"><label>Hora fin</label><input type="time" name="hora_fin" value="' . e($config['hora_fin']) . '" style="margin-top:8px;width:100%;"></div>';
-
-    // Format
-    echo '<div class="field full">';
-    echo '<label>Formato de publicación</label>';
-    echo '<select name="formato" style="margin-top:8px;width:100%;max-width:420px;">';
-    foreach (publicista_estados_wasap_format_options() as $val => $label) {
-        $sel = $config['formato'] === $val ? ' selected' : '';
-        echo '<option value="' . e($val) . '"' . $sel . '>' . e($label) . '</option>';
-    }
-    echo '</select>';
-    echo '<div class="field-help">Elige el estilo del estado. "Mix aleatorio" alterna entre todos los formatos.</div>';
-    echo '</div>';
-
-    // Lines selector
-    echo '<div class="field full">';
-    echo '<label>Líneas bot casa</label>';
-    if (empty($allLines)) {
-        echo '<div class="empty" style="margin-top:8px;">No hay líneas con uso "bot casa" y WAHA configurado. Añádelas en Josué → Teléfonos.</div>';
-    } else {
-        echo '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-top:8px;">';
-        foreach ($allLines as $line) {
-            $checked = in_array($line['id'], $enabledIds, true) ? ' checked' : '';
-            echo '<label class="info-strip" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 12px;">';
-            echo '<input type="checkbox" name="lineas[]" value="' . e($line['id']) . '"' . $checked . '>';
-            echo '<span><strong>' . e($line['nombre']) . '</strong><br><span class="muted">' . e($line['tfono']) . ' · puerto ' . e($line['waha_port']) . '</span></span>';
-            echo '</label>';
-        }
-        echo '</div>';
-        echo '<div class="field-help">Selecciona las líneas en las que se publicará el estado. Se enviará el mismo texto a todas las seleccionadas.</div>';
-    }
-    echo '</div>';
-
-    echo '<div class="full" style="display:flex;gap:10px;flex-wrap:wrap;">';
-    echo '<button class="btn-primary">💾 Guardar configuración</button>';
-    echo '</div>';
-    echo '</form>';
-    echo '</section>';
-
-    // ── Manual publish ─────────────────────────────────────────────
-    echo '<section class="panel panel-space">';
-    echo '<div class="section-head"><div><h2>Publicación manual</h2><p>Publica un estado ahora mismo en las líneas habilitadas, sin esperar a la automatización. Ideal para pruebas o emergencias.</p></div>';
-    echo '<div class="section-head-actions">';
-    echo '<form method="post" class="inline-form">';
-    echo '<input type="hidden" name="action" value="publicar_estado_manual">';
-    echo '<button class="btn-primary">📤 Publicar ahora</button>';
-    echo '</form>';
-    echo '</div></div>';
-    echo '</section>';
-
-    // ── Log table ──────────────────────────────────────────────────
-    echo '<section class="panel panel-space">';
-    echo '<div class="section-head"><div><h2>Historial de publicaciones</h2><p>Últimas ' . min(count($log), 200) . ' publicaciones registradas.</p></div></div>';
-
-    if (empty($log)) {
-        echo '<div class="empty" style="margin-top:12px;">No hay publicaciones registradas todavía. Usa "Publicar ahora" para hacer una prueba.</div>';
-    } else {
-        echo '<div class="table-wrap" style="margin-top:12px;"><table><thead><tr>';
-        echo '<th>Fecha</th><th>Línea</th><th>Formato</th><th>Resultado</th><th>HTTP</th><th>Vista previa</th>';
-        echo '</tr></thead><tbody>';
-        $reversedLog = array_reverse($log);
-        foreach ($reversedLog as $entry) {
-            $ok = ($entry['resultado'] ?? '') === 'ok';
-            $badge = $ok ? '<span class="summary-badge">✅ OK</span>' : '<span class="summary-badge" style="background:var(--danger,#c0392b);">❌ Error</span>';
-            $date = !empty($entry['published_at']) ? date('d/m H:i', strtotime($entry['published_at'])) : '—';
-            $preview = mb_substr((string)($entry['texto'] ?? ''), 0, 80) . (mb_strlen((string)($entry['texto'] ?? '')) > 80 ? '…' : '');
-            $errorMsg = !$ok && !empty($entry['error']) ? '<br><span class="muted" style="color:var(--danger,#c0392b);">' . e($entry['error']) . '</span>' : '';
-            echo '<tr>';
-            echo '<td style="white-space:nowrap;">' . e($date) . '</td>';
-            echo '<td>' . e($entry['linea_nombre'] ?? $entry['linea_id'] ?? '—') . '</td>';
-            echo '<td>' . e($entry['formato_usado'] ?? '—') . '</td>';
-            echo '<td>' . $badge . $errorMsg . '</td>';
-            echo '<td>' . e((string)($entry['http_code'] ?? '—')) . '</td>';
-            echo '<td style="max-width:300px;white-space:pre-wrap;word-break:break-word;">' . e($preview) . '</td>';
-            echo '</tr>';
-        }
-        echo '</tbody></table></div>';
-    }
-    echo '</section>';
 }
 
 function render_publicista_calculo_publicidad_page() {
@@ -818,37 +339,24 @@ function render_publicista_calculo_publicidad_page() {
         'province' => 'Castellón',
         'category' => '',
         'num_girls' => '1',
-        'autos_start_min' => '10:30',
-        'autos_end_max' => '04:00',
     );
 
     $form = array_merge($defaults, array_intersect_key($_GET, $defaults));
-    $strategyWindow = publicista_ads_strategy_window_normalize(array(
-        'start' => (string)($form['autos_start_min'] ?? ''),
-        'end' => (string)($form['autos_end_max'] ?? ''),
-    ));
-    $form['autos_start_min'] = $strategyWindow['start'];
-    $form['autos_end_max'] = $strategyWindow['end'];
     $shouldAnalyze = trim((string) request_get('analyze')) === '1';
     $result = null;
-    $plannings = publicista_plannings_get();
-    $selectedPlanningId = trim((string)request_get('planning'));
-    $selectedPlanning = $selectedPlanningId !== '' ? publicista_planning_get($selectedPlanningId) : null;
 
     if ($shouldAnalyze) {
         $city = trim((string) ($form['city'] ?? ''));
         $province = trim((string) ($form['province'] ?? ''));
         $category = trim((string) ($form['category'] ?? ''));
         $numGirls = max(1, min(8, (int) ($form['num_girls'] ?? 1)));
-        $strategyWindow = publicista_ads_strategy_window_normalize(array(
-            'start' => (string)($form['autos_start_min'] ?? ''),
-            'end' => (string)($form['autos_end_max'] ?? ''),
-        ));
 
-        $comp = publicista_ads_scrape($city, $category, $province);
-        $strategyPack = publicista_ads_build_strategy_pack($comp, $numGirls, $strategyWindow);
-        $strategies = is_array($strategyPack['strategies'] ?? null) ? $strategyPack['strategies'] : array();
-        $grandTotal = (float)($strategyPack['grand_total'] ?? 0);
+        $comp = publicista_ads_scrape($city, $category);
+        $strategies = publicista_ads_build_strategy($comp, $numGirls);
+        $grandTotal = 0.0;
+        foreach ($strategies as $strategyRow) {
+            $grandTotal += (float) ($strategyRow['cost'] ?? 0);
+        }
 
         $categories = publicista_ads_categories();
         $result = array(
@@ -857,119 +365,20 @@ function render_publicista_calculo_publicidad_page() {
             'catLabel' => isset($categories[$category]) ? $categories[$category] : 'Todas las categorías',
             'numGirls' => $numGirls,
             'comp' => $comp,
-            'strategyPack' => $strategyPack,
-            'strategyWindow' => $strategyWindow,
             'strategies' => $strategies,
             'grandTotal' => $grandTotal,
         );
     }
 
-    if (!$result && $selectedPlanning) {
-        $savedCompetition = is_array($selectedPlanning['competition_snapshot'] ?? null) ? $selectedPlanning['competition_snapshot'] : array();
-        $savedOptions = is_array($selectedPlanning['recommendation_options'] ?? null) ? $selectedPlanning['recommendation_options'] : array();
-        $savedDefaultOptionCode = trim((string)($selectedPlanning['default_option_code'] ?? 'recommended'));
-        $savedDefaultOption = is_array($savedOptions[$savedDefaultOptionCode] ?? null) ? $savedOptions[$savedDefaultOptionCode] : array();
-        if (empty($savedDefaultOption)) {
-            foreach (array('accepted', 'recommended', 'optimal') as $fallbackOptionCode) {
-                if (!empty($savedOptions[$fallbackOptionCode]) && is_array($savedOptions[$fallbackOptionCode])) {
-                    $savedDefaultOptionCode = $fallbackOptionCode;
-                    $savedDefaultOption = $savedOptions[$fallbackOptionCode];
-                    break;
-                }
-            }
-        }
-        if (empty($savedOptions) && !empty($selectedPlanning['strategy_snapshot'])) {
-            $savedOptions[$savedDefaultOptionCode] = array(
-                'label' => 'Versión guardada',
-                'strategies' => is_array($selectedPlanning['strategy_snapshot'] ?? null) ? $selectedPlanning['strategy_snapshot'] : array(),
-                'grand_total' => (float)($selectedPlanning['cost_snapshot']['grand_total'] ?? 0),
-                'avg_per_product' => max(1, (int)($selectedPlanning['num_products_target'] ?? 1)) > 0
-                    ? ((float)($selectedPlanning['cost_snapshot']['grand_total'] ?? 0) / max(1, (int)($selectedPlanning['num_products_target'] ?? 1)))
-                    : 0,
-                'warnings' => array(),
-                'comparison_note' => 'Snapshot recuperado desde una estrategia ya guardada.',
-            );
-            $savedDefaultOption = $savedOptions[$savedDefaultOptionCode];
-        }
-        $result = array(
-            'city' => (string)($selectedPlanning['city'] ?? ''),
-            'province' => (string)($selectedPlanning['province'] ?? ''),
-            'catLabel' => (string)($selectedPlanning['category_label'] ?? 'Todas las categorías'),
-            'numGirls' => max(1, (int)($selectedPlanning['num_products_target'] ?? 1)),
-            'comp' => $savedCompetition,
-            'strategyPack' => array(
-                'options' => $savedOptions,
-                'default_option_code' => $savedDefaultOptionCode,
-                'default' => $savedDefaultOption,
-                'strategies' => is_array($savedDefaultOption['strategies'] ?? null) ? $savedDefaultOption['strategies'] : (is_array($selectedPlanning['strategy_snapshot'] ?? null) ? $selectedPlanning['strategy_snapshot'] : array()),
-                'grand_total' => (float)($savedDefaultOption['grand_total'] ?? ($selectedPlanning['cost_snapshot']['grand_total'] ?? 0)),
-                'chooser_note' => trim((string)($selectedPlanning['summary']['narrative'] ?? '')),
-            ),
-            'strategyWindow' => is_array($selectedPlanning['selection_rules']['schedule_window'] ?? null)
-                ? publicista_ads_strategy_window_normalize((array)$selectedPlanning['selection_rules']['schedule_window'])
-                : $strategyWindow,
-            'strategies' => is_array($savedDefaultOption['strategies'] ?? null) ? $savedDefaultOption['strategies'] : (is_array($selectedPlanning['strategy_snapshot'] ?? null) ? $selectedPlanning['strategy_snapshot'] : array()),
-            'grandTotal' => (float)($savedDefaultOption['grand_total'] ?? ($selectedPlanning['cost_snapshot']['grand_total'] ?? 0)),
-        );
-        if (trim((string)$form['category']) === '' && trim((string)($selectedPlanning['category'] ?? '')) !== '') {
-            $form['category'] = (string)$selectedPlanning['category'];
-        }
-    }
-
     $prices = publicista_ads_prices();
 
     echo '<section class="panel panel-space publicista-ads-intro">';
-    echo '<div class="branch-panel-head"><h2>Estrategias publicitarias</h2><span class="summary-badge">Destacamos</span></div>';
+    echo '<div class="branch-panel-head"><h2>Calculadora de estrategia publicitaria</h2><span class="summary-badge">Destacamos</span></div>';
     echo '<div class="cards three" style="margin-top:12px;">';
     echo '<div class="info-strip"><strong>Paso 1</strong><br>Indica ciudad, categoría y cuántas chicas quieres empujar.</div>';
-    echo '<div class="info-strip"><strong>Paso 2</strong><br>Se hace scraping del listado y se mide competencia real: TOP, autorenuevas, combinaciones TOP+auto y total.</div>';
+    echo '<div class="info-strip"><strong>Paso 2</strong><br>Se hace scraping del listado y se mide competencia real: PREMIUM, TOP, autorenuevas y total.</div>';
     echo '<div class="info-strip"><strong>Paso 3</strong><br>El CRM te devuelve perfiles recomendados, coste, horarios y una línea de tiempo.</div>';
     echo '</div>';
-    echo '</section>';
-
-    echo '<section class="panel panel-space">';
-    echo '<div class="branch-panel-head"><h2>Estrategias guardadas</h2><span class="summary-badge">' . e((string)count($plannings)) . '</span></div>';
-    if ($selectedPlanning) {
-        $planSummary = is_array($selectedPlanning['summary'] ?? null) ? $selectedPlanning['summary'] : array();
-        echo '<div class="info-strip" style="margin-top:12px;"><strong>Estrategia abierta:</strong> ' . e($selectedPlanning['nombre'] ?? '') . ' · v' . e((string)($selectedPlanning['version'] ?? 1)) . '</div>';
-        echo '<div class="cards four" style="margin-top:12px;">';
-        echo '<div class="info-strip"><strong>Productos objetivo</strong><br>' . e((string)($selectedPlanning['num_products_target'] ?? 0)) . '</div>';
-        echo '<div class="info-strip"><strong>Perfiles calculados</strong><br>' . e((string)($planSummary['profiles_total'] ?? 0)) . '</div>';
-        echo '<div class="info-strip"><strong>Coste snapshot</strong><br>' . e(publicista_ads_euros((float)($selectedPlanning['cost_snapshot']['grand_total'] ?? 0))) . '</div>';
-        echo '<div class="info-strip"><strong>Calculado</strong><br>' . e(format_created_at($selectedPlanning['calculated_at'] ?? '')) . '</div>';
-        echo '</div>';
-        echo '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">';
-        echo '<form method="post" class="inline-form"><input type="hidden" name="action" value="duplicate_publicista_planning"><input type="hidden" name="id" value="' . e($selectedPlanning['id']) . '"><button class="btn-secondary-mini">Duplicar versión</button></form>';
-        echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar este planning?\')"><input type="hidden" name="action" value="delete_publicista_planning"><input type="hidden" name="id" value="' . e($selectedPlanning['id']) . '"><button class="btn-danger-mini">Eliminar</button></form>';
-        echo '</div>';
-    }
-    if (empty($plannings)) {
-        echo '<div class="empty" style="margin-top:12px;">Todavía no hay estrategias guardadas. Cuando lances un análisis podrás convertirlo en una estrategia reutilizable.</div>';
-    } else {
-        render_live_filter('#publicistaPlanningsRows tr[data-filter-text]', 'Buscar estrategia, ciudad o categoría...');
-        echo '<div class="table-wrap" style="margin-top:12px;"><table><thead><tr><th>Estrategia</th><th>Objetivo</th><th>Coste</th><th>Calculado</th><th>Acciones</th></tr></thead><tbody id="publicistaPlanningsRows">';
-        foreach ($plannings as $planRow) {
-            $sum = is_array($planRow['summary'] ?? null) ? $planRow['summary'] : array();
-            $planName = trim((string)($planRow['nombre'] ?? ''));
-            if ($planName === '') {
-                $planName = publicista_planning_compose_name(
-                    (string)($planRow['city'] ?? ''),
-                    (string)($planRow['province'] ?? ''),
-                    (string)($planRow['category_label'] ?? ''),
-                    (int)($planRow['num_products_target'] ?? 0)
-                );
-            }
-            $search = strtolower(trim(($planRow['nombre'] ?? '') . ' ' . ($planRow['city'] ?? '') . ' ' . ($planRow['province'] ?? '') . ' ' . ($planRow['category_label'] ?? '')));
-            echo '<tr data-filter-text="' . e($search) . '">';
-            echo '<td><strong>' . e($planName) . '</strong><br><span class="muted">Nombre estrategia · ' . e($planRow['city'] ?? '') . (($planRow['province'] ?? '') !== '' ? ' · ' . e($planRow['province'] ?? '') : '') . ' · ' . e($planRow['category_label'] ?? '') . ' · v' . e((string)($planRow['version'] ?? 1)) . '</span></td>';
-            echo '<td><strong>' . e((string)($planRow['num_products_target'] ?? 0)) . '</strong> productos<br><span class="muted">' . e((string)($sum['profiles_total'] ?? 0)) . ' perfiles · ' . e((string)($sum['warnings_count'] ?? 0)) . ' avisos</span></td>';
-            echo '<td>' . e(publicista_ads_euros((float)($planRow['cost_snapshot']['grand_total'] ?? 0))) . '</td>';
-            echo '<td>' . e(format_created_at($planRow['calculated_at'] ?? ($planRow['updated_at'] ?? ''))) . '</td>';
-            echo '<td><a class="mini-link" href="' . e(publicista_page_url('estrategias', array('planning' => $planRow['id']))) . '">Abrir</a></td>';
-            echo '</tr>';
-        }
-        echo '</tbody></table></div>';
-    }
     echo '</section>';
 
     echo '<div class="cards two">';
@@ -978,7 +387,7 @@ function render_publicista_calculo_publicidad_page() {
     echo '<div class="section-head"><div><h2>Parámetros de análisis</h2><p>Esta pantalla sustituye a estrategiaTops.php, pero integrada ya en el diseño del CRM.</p></div></div>';
     echo '<form method="get" class="form-grid">';
     echo '<input type="hidden" name="page" value="publicista">';
-    echo '<input type="hidden" name="tab" value="estrategias">';
+    echo '<input type="hidden" name="tab" value="calculo_publicidad">';
     echo '<input type="hidden" name="analyze" value="1">';
 
     echo '<div class="field"><label>Ciudad</label><input type="text" name="city" value="' . e($form['city']) . '" required></div>';
@@ -989,22 +398,20 @@ function render_publicista_calculo_publicidad_page() {
     }
     echo '</select></div>';
     echo '<div class="field"><label>Número de chicas</label><input type="number" name="num_girls" min="1" max="8" value="' . e((string) ((int) $form['num_girls'])) . '"></div>';
-    echo '<div class="field"><label>Hora mínima autosubidas</label><input type="time" name="autos_start_min" value="' . e((string)$form['autos_start_min']) . '"></div>';
-    echo '<div class="field"><label>Hora máxima autosubidas</label><input type="time" name="autos_end_max" value="' . e((string)$form['autos_end_max']) . '"></div>';
-    echo '<div class="full"><div class="info-strip"><strong>Ventana de autosubidas</strong><br>Todos los horarios pagados se recalculan dentro de esta franja y el sistema intenta separarlos para evitar subidas demasiado cercanas.</div></div>';
     echo '<div class="full" style="display:flex;gap:10px;flex-wrap:wrap;">';
     echo '<button class="btn-primary" type="submit">Analizar y generar estrategia</button>';
-    echo '<a class="btn-secondary-mini" href="' . e(publicista_page_url('estrategias')) . '">Limpiar</a>';
+    echo '<a class="btn-secondary-mini" href="' . e(publicista_page_url('calculo_publicidad')) . '">Limpiar</a>';
     echo '</div>';
     echo '</form>';
     echo '</section>';
 
     echo '<section class="panel">';
     echo '<div class="branch-panel-head"><h2>Precios configurados</h2><span class="summary-badge">Base</span></div>';
-    echo '<div class="table-wrap" style="margin-top:12px;"><table data-no-card-view><tbody>';
+    echo '<div class="table-wrap" style="margin-top:12px;"><table><tbody>';
     echo '<tr><td>TOP (10 días)</td><td style="text-align:right;"><strong>' . e(publicista_ads_euros((float) $prices['top'])) . '</strong></td></tr>';
     echo '<tr><td>Autorenueva 10 sub/día</td><td style="text-align:right;"><strong>' . e(publicista_ads_euros((float) $prices['auto7'])) . '</strong></td></tr>';
     echo '<tr><td>Autorenueva 4 sub/día</td><td style="text-align:right;"><strong>' . e(publicista_ads_euros((float) $prices['auto4'])) . '</strong></td></tr>';
+    echo '<tr><td>PREMIUM 30 días (estimado)</td><td style="text-align:right;"><strong>' . e(publicista_ads_euros((float) $prices['premium'])) . '</strong></td></tr>';
     echo '</tbody></table></div>';
     echo '<div class="info-strip" style="margin-top:12px;"><strong>Nota:</strong> el cálculo sigue tus precios internos actuales. Si cambian en la web, actualiza solo los importes en la función publicista_ads_prices().</div>';
     echo '</section>';
@@ -1029,7 +436,8 @@ function render_publicista_calculo_publicidad_page() {
     echo '<div class="section-head"><div><h2>Análisis de competencia</h2><p>' . e($result['city']) . (($result['province'] !== '') ? ' · ' . e($result['province']) : '') . ' · ' . e($result['catLabel']) . '</p></div><div class="section-head-actions">';
     echo '<span class="publicista-ads-level-pill" style="background:' . e(publicista_ads_level_bg($level)) . ';color:' . e(publicista_ads_level_fg($level)) . ';">' . e(publicista_ads_level_icon($level)) . ' Competencia ' . e(publicista_ads_level_label($level)) . '</span>';
     echo '</div></div>';
-    echo '<div class="cards three" style="margin-top:14px;">';
+    echo '<div class="cards four" style="margin-top:14px;">';
+    echo '<div class="info-strip"><strong>PREMIUM</strong><br>' . e((string) ($comp['premium'] ?? 0)) . '</div>';
     echo '<div class="info-strip"><strong>TOPs</strong><br>' . e((string) ($comp['top'] ?? 0)) . '</div>';
     echo '<div class="info-strip"><strong>Autorenuevas</strong><br>' . e((string) ($comp['auto'] ?? 0)) . '</div>';
     echo '<div class="info-strip"><strong>Total perfiles</strong><br>' . e((string) ($comp['total'] ?? 0)) . '</div>';
@@ -1042,33 +450,6 @@ function render_publicista_calculo_publicidad_page() {
     } else {
         echo '<div class="info-strip" style="margin-top:12px;"><strong>Lectura rápida:</strong> con ' . e((string) $topCount) . ' TOPs activos ya hay rotación. Necesitas más de un TOP para ganar probabilidad de aparición.</div>';
     }
-    $marketSignals = is_array($comp['market_signals'] ?? null) ? $comp['market_signals'] : array();
-    echo '<div class="cards three" style="margin-top:12px;">';
-    echo '<div class="info-strip"><strong>TOP + Auto visibles</strong><br>' . e((string)($comp['combo_top_auto'] ?? 0)) . ' anuncios</div>';
-    echo '<div class="info-strip"><strong>Riesgo ostentación</strong><br>' . e(ucfirst((string)($marketSignals['ostentation_risk'] ?? 'medio'))) . '</div>';
-    echo '<div class="info-strip"><strong>Política combo</strong><br>' . e((string)($marketSignals['combo_policy'] ?? 'selective')) . '</div>';
-    echo '</div>';
-    if (!empty($marketSignals['combo_note'])) {
-        echo '<div class="info-strip" style="margin-top:12px;"><strong>Lectura sobre TOP + auto:</strong> ' . e((string)$marketSignals['combo_note']) . '</div>';
-    }
-    if (!empty($comp['sources']) && is_array($comp['sources'])) {
-        echo '<section class="panel panel-space" style="margin-top:14px;">';
-        echo '<h3>Fuentes usadas para la media inteligente</h3>';
-        echo '<div class="table-wrap"><table><thead><tr><th>Variante</th><th>Estado</th><th>TOP</th><th>Auto</th><th>Total</th><th>TOP+Auto</th></tr></thead><tbody>';
-        foreach ((array)$comp['sources'] as $src) {
-            $srcStats = is_array($src['stats'] ?? null) ? $src['stats'] : array();
-            echo '<tr>';
-            echo '<td><a class="mini-link" href="' . e((string)($src['url'] ?? '#')) . '" target="_blank" rel="noopener">' . e((string)($src['label'] ?? $src['code'] ?? 'Fuente')) . '</a></td>';
-            echo '<td>' . (!empty($src['scraped']) ? 'OK' : 'Sin datos') . '</td>';
-            echo '<td>' . e((string)($srcStats['top'] ?? 0)) . '</td>';
-            echo '<td>' . e((string)($srcStats['auto'] ?? 0)) . '</td>';
-            echo '<td>' . e((string)($srcStats['total'] ?? 0)) . '</td>';
-            echo '<td>' . e((string)($srcStats['combo_top_auto'] ?? 0)) . '</td>';
-            echo '</tr>';
-        }
-        echo '</tbody></table></div>';
-        echo '</section>';
-    }
     echo '</section>';
 
     echo '<section class="panel panel-space publicista-ads-cost-summary">';
@@ -1080,1392 +461,109 @@ function render_publicista_calculo_publicidad_page() {
     echo '</div>';
     echo '</section>';
 
-    $strategyPack = is_array($result['strategyPack'] ?? null) ? $result['strategyPack'] : array();
-    $strategyWindow = is_array($result['strategyWindow'] ?? null) ? $result['strategyWindow'] : publicista_ads_strategy_window_defaults();
-    $recommendationOptions = is_array($strategyPack['options'] ?? null) ? $strategyPack['options'] : array();
-    $defaultOptionCode = trim((string)($strategyPack['default_option_code'] ?? 'recommended'));
+    foreach ($result['strategies'] as $strategy) {
+        $girl = (int) ($strategy['girl'] ?? 0);
 
-    echo '<section class="panel panel-space">';
-    echo '<div class="branch-panel-head"><h2>Elección rápida de inversión</h2><span class="summary-badge">Comparativa</span></div>';
-    echo '<div class="info-strip" style="margin-top:12px;"><strong>Ventana aplicada:</strong> ' . e((string)$strategyWindow['start']) . ' → ' . e((string)$strategyWindow['end']) . '</div>';
-    if (!empty($strategyPack['chooser_note'])) {
-        echo '<div class="info-strip" style="margin-top:12px;"><strong>Lectura rápida:</strong> ' . e((string)$strategyPack['chooser_note']) . '</div>';
-    }
-    echo '<div class="cards three" style="margin-top:12px;">';
-    foreach (array('accepted', 'recommended', 'optimal') as $optionCode) {
-        $option = is_array($strategyPack['options'][$optionCode] ?? null) ? $strategyPack['options'][$optionCode] : array();
-        if (empty($option)) continue;
-        $optionProfiles = 0;
-        foreach ((array)($option['strategies'] ?? array()) as $optionStrategy) {
-            $optionProfiles += count((array)($optionStrategy['profiles'] ?? array()));
+        echo '<section class="panel panel-space publicista-ads-girl">';
+        echo '<div class="section-head"><div><h2>Chica ' . e((string) $girl) . '</h2><p>' . e((string) count($strategy['profiles'] ?? array())) . ' perfiles · ' . e(publicista_ads_euros((float) ($strategy['cost'] ?? 0))) . ' por período</p></div><div class="section-head-actions">';
+        echo '<span class="publicista-ads-level-pill" style="background:' . e(publicista_ads_level_bg($strategy['level'] ?? 'media')) . ';color:' . e(publicista_ads_level_fg($strategy['level'] ?? 'media')) . ';">' . e(publicista_ads_level_icon($strategy['level'] ?? 'media')) . ' ' . e(publicista_ads_level_label($strategy['level'] ?? 'media')) . '</span>';
+        echo '</div></div>';
+
+        echo '<div class="cards two" style="margin-top:14px;">';
+        echo '<section class="panel">';
+        echo '<h3>Por qué esta estrategia</h3>';
+        echo '<ul class="publicista-ads-reasons">';
+        foreach (($strategy['reasons'] ?? array()) as $reason) {
+            echo '<li>' . e($reason) . '</li>';
         }
-        $tag = ($optionCode === 'accepted') ? 'Menos inversión' : (($optionCode === 'optimal') ? 'Más inversión' : 'Punto medio');
-        $cardStyle = ($optionCode === $defaultOptionCode) ? 'border:1px solid rgba(99,102,241,.55);box-shadow:0 0 0 1px rgba(99,102,241,.18) inset;' : '';
-        echo '<div class="info-strip" style="' . e($cardStyle) . '">';
-        echo '<strong>' . e((string)($option['label'] ?? 'Opción')) . '</strong><br><span class="muted">' . e($tag) . '</span>';
-        echo '<div style="margin-top:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;">';
-        echo '<div><span class="muted">Total</span><br><strong>' . e(publicista_ads_euros((float)($option['grand_total'] ?? 0))) . '</strong></div>';
-        echo '<div><span class="muted">Por chica</span><br><strong>' . e(publicista_ads_euros((float)($option['avg_per_product'] ?? 0))) . '</strong></div>';
-        echo '<div><span class="muted">Perfiles</span><br><strong>' . e((string)$optionProfiles) . '</strong></div>';
-        echo '<div><span class="muted">Avisos</span><br><strong>' . e((string)count((array)($option['warnings'] ?? array()))) . '</strong></div>';
-        echo '</div>';
-        if (!empty($option['explanation'])) echo '<div style="margin-top:10px;">' . e((string)$option['explanation']) . '</div>';
-        if (!empty($option['decision_help'])) echo '<div class="muted" style="margin-top:8px;">' . e((string)$option['decision_help']) . '</div>';
-        if (!empty($option['comparison_note'])) echo '<div class="muted" style="margin-top:8px;">' . e((string)$option['comparison_note']) . '</div>';
-        if ($optionCode === 'accepted' && !empty($option['savings_vs_optimal'])) {
-            echo '<div style="margin-top:8px;"><strong>Ahorras ' . e(publicista_ads_euros((float)$option['savings_vs_optimal'])) . '</strong> frente a la versión fuerte.</div>';
-        } elseif ($optionCode === 'recommended') {
-            echo '<div style="margin-top:8px;">+' . e(publicista_ads_euros((float)($option['extra_vs_accepted'] ?? 0))) . ' frente a ahorro · ahorras ' . e(publicista_ads_euros((float)($option['savings_vs_optimal'] ?? 0))) . ' frente a empuje fuerte.</div>';
-        } elseif ($optionCode === 'optimal') {
-            echo '<div style="margin-top:8px;">Inviertes <strong>' . e(publicista_ads_euros((float)($option['extra_vs_accepted'] ?? 0))) . '</strong> más que en la versión ahorro.</div>';
-        }
-        echo '</div>';
-    }
-    echo '</div>';
-    echo '</section>';
+        echo '</ul>';
+        echo '</section>';
 
-    $marketSignals = is_array($comp['market_signals'] ?? null) ? $comp['market_signals'] : array();
-    $costSnapshot = array(
-        'grand_total' => (float)$result['grandTotal'],
-        'avg_per_product' => $result['numGirls'] > 0 ? ((float)$result['grandTotal'] / (int)$result['numGirls']) : 0,
-        'competition_level' => $level,
-        'accepted_total' => (float)publicista_array_get(publicista_array_get($recommendationOptions, 'accepted', array()), 'grand_total', 0),
-        'recommended_total' => (float)publicista_array_get(publicista_array_get($recommendationOptions, 'recommended', array()), 'grand_total', 0),
-        'optimal_total' => (float)publicista_array_get(publicista_array_get($recommendationOptions, 'optimal', array()), 'grand_total', 0),
-    );
-    $selectionRules = array(
-        'min_products' => max(1, (int)$result['numGirls']),
-        'max_products' => max(1, (int)$result['numGirls']),
-        'source' => 'estrategias',
-        'default_option_code' => $defaultOptionCode,
-        'feedback_modes' => array('accepted', 'recommended', 'optimal'),
-        'schedule_window' => $strategyWindow,
-    );
-    $planningDraft = array(
-        'portal_code' => 'destacamos',
-        'portal_label' => 'Destacamos',
-        'portal_url' => (string)($comp['url'] ?? ''),
-        'city' => (string)$result['city'],
-        'province' => (string)$result['province'],
-        'category' => (string)($form['category'] ?? ''),
-        'category_label' => (string)$result['catLabel'],
-        'num_products_target' => (int)$result['numGirls'],
-        'competition_snapshot' => $comp,
-        'pricing_snapshot' => $prices,
-        'strategy_snapshot' => $result['strategies'],
-        'recommendation_options' => $recommendationOptions,
-        'analysis_sources' => is_array($comp['sources'] ?? null) ? $comp['sources'] : array(),
-        'market_signals' => $marketSignals,
-        'default_option_code' => $defaultOptionCode,
-        'cost_snapshot' => $costSnapshot,
-        'selection_rules' => $selectionRules,
-        'summary' => publicista_planning_build_summary(array(
-            'competition_snapshot' => $comp,
-            'strategy_snapshot' => $result['strategies'],
-            'market_signals' => $marketSignals,
-            'default_option_code' => $defaultOptionCode,
-            'num_products_target' => (int)$result['numGirls'],
-        )),
-    );
-    $planningDefaultName = publicista_planning_compose_name($planningDraft['city'], $planningDraft['province'], $planningDraft['category_label'], $planningDraft['num_products_target']);
-
-    echo '<section class="panel panel-space">';
-    echo '<div class="section-head"><div><h2>Guardar estrategia</h2><p>Convierte este análisis en una estrategia reutilizable para futuras campañas.</p></div></div>';
-    echo '<form method="post" class="form-grid">';
-    echo '<input type="hidden" name="action" value="save_publicista_planning">';
-    if ($selectedPlanning) {
-        echo '<input type="hidden" name="id" value="' . e((string)($selectedPlanning['id'] ?? '')) . '">';
-        echo '<input type="hidden" name="version" value="' . e((string)($selectedPlanning['version'] ?? 1)) . '">';
-        echo '<input type="hidden" name="parent_planning_id" value="' . e((string)($selectedPlanning['parent_planning_id'] ?? '')) . '">';
-    }
-    echo '<input type="hidden" name="portal_code" value="destacamos">';
-    echo '<input type="hidden" name="portal_label" value="Destacamos">';
-    // Portal selector visible para poder elegir entre portales al guardar la estrategia
-    echo '<div class="field"><label>Portal</label><select name="portal_code_visible" onchange="this.form.portal_code.value=this.value;this.form.portal_label.value=this.options[this.selectedIndex].text;">';
-    foreach (publicista_account_portal_options() as $value => $label) {
-        $sel = ($value === 'destacamos') ? ' selected' : '';
-        echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
-    }
-    echo '</select></div>';
-    echo '<input type="hidden" name="portal_url" value="' . e((string)($comp['url'] ?? '')) . '">';
-    echo '<input type="hidden" name="city" value="' . e((string)$result['city']) . '">';
-    echo '<input type="hidden" name="province" value="' . e((string)$result['province']) . '">';
-    echo '<input type="hidden" name="category" value="' . e((string)($form['category'] ?? '')) . '">';
-    echo '<input type="hidden" name="category_label" value="' . e((string)$result['catLabel']) . '">';
-    echo '<input type="hidden" name="num_products_target" value="' . e((string)((int)$result['numGirls'])) . '">';
-    echo '<input type="hidden" name="competition_snapshot_json" value="' . e(json_encode($planningDraft['competition_snapshot'], JSON_UNESCAPED_UNICODE)) . '">';
-    echo '<input type="hidden" name="pricing_snapshot_json" value="' . e(json_encode($planningDraft['pricing_snapshot'], JSON_UNESCAPED_UNICODE)) . '">';
-    echo '<input type="hidden" name="strategy_snapshot_json" value="' . e(json_encode($planningDraft['strategy_snapshot'], JSON_UNESCAPED_UNICODE)) . '">';
-    echo '<input type="hidden" name="recommendation_options_json" value="' . e(json_encode($planningDraft['recommendation_options'], JSON_UNESCAPED_UNICODE)) . '">';
-    echo '<input type="hidden" name="analysis_sources_json" value="' . e(json_encode($planningDraft['analysis_sources'], JSON_UNESCAPED_UNICODE)) . '">';
-    echo '<input type="hidden" name="market_signals_json" value="' . e(json_encode($planningDraft['market_signals'], JSON_UNESCAPED_UNICODE)) . '">';
-    echo '<input type="hidden" name="default_option_code" value="' . e((string)$planningDraft['default_option_code']) . '">';
-    echo '<input type="hidden" name="cost_snapshot_json" value="' . e(json_encode($planningDraft['cost_snapshot'], JSON_UNESCAPED_UNICODE)) . '">';
-    echo '<input type="hidden" name="selection_rules_json" value="' . e(json_encode($planningDraft['selection_rules'], JSON_UNESCAPED_UNICODE)) . '">';
-    echo '<input type="hidden" name="summary_json" value="' . e(json_encode($planningDraft['summary'], JSON_UNESCAPED_UNICODE)) . '">';
-    echo '<input type="hidden" name="calculated_at" value="' . e($selectedPlanning ? (string)($selectedPlanning['calculated_at'] ?? now_datetime()) : now_datetime()) . '">';
-    field_input('nombre', 'Nombre de la estrategia', $selectedPlanning ? (string)($selectedPlanning['nombre'] ?? $planningDefaultName) : $planningDefaultName, true);
-    $planningNotes = $selectedPlanning
-        ? (string)($selectedPlanning['notes'] ?? '')
-        : ('Estrategia generada desde el estudio de mercado en tiempo real. Ventana autosubidas: ' . $strategyWindow['start'] . ' → ' . $strategyWindow['end'] . '.');
-    field_textarea('notes', 'Notas internas', $planningNotes, 3);
-    echo '<div class="full" style="display:flex;gap:10px;flex-wrap:wrap;">';
-    echo '<button class="btn-primary">Guardar estrategia</button>';
-    echo '</div>';
-    echo '</form>';
-    echo '</section>';
-
-    $displayedOption = is_array($recommendationOptions[$defaultOptionCode] ?? null) ? $recommendationOptions[$defaultOptionCode] : array();
-    echo '<section class="panel panel-space">';
-    echo '<div class="branch-panel-head"><h2>Detalle operativo completo</h2><span class="summary-badge">3 versiones</span></div>';
-    echo '<div class="info-strip" style="margin-top:12px;"><strong>Qué estás viendo abajo:</strong> el desglose completo de las tres versiones calculadas. La opción ' . e((string)($displayedOption['label'] ?? 'equilibrada')) . ' sigue marcada como referencia por defecto, pero ahora también puedes revisar completa la más barata y la más cara.</div>';
-    echo '</section>';
-
-    foreach (array('accepted', 'recommended', 'optimal') as $optionCode) {
-        $option = is_array($recommendationOptions[$optionCode] ?? null) ? $recommendationOptions[$optionCode] : array();
-        if (empty($option)) continue;
-        render_publicista_strategy_option_detail($option, $optionCode === $defaultOptionCode);
-    }
-}
-
-function render_publicista_cuentas_page() {
-    $accounts = publicista_accounts_get(false);
-    $telefonos = storage_read('telefonos.json');
-    $editId = trim((string)request_get('edit'));
-    $accountsById = array();
-    foreach ($accounts as $accountRow) {
-        $accountId = trim((string)($accountRow['id'] ?? ''));
-        if ($accountId !== '') {
-            $accountsById[$accountId] = $accountRow;
-        }
-    }
-    $metricsById = !empty($accountsById) ? publicista_account_runtime_metrics_batch(array_keys($accountsById), $accountsById) : array();
-    foreach ($accounts as $index => $accountRow) {
-        $accountId = trim((string)($accountRow['id'] ?? ''));
-        if ($accountId !== '' && isset($metricsById[$accountId])) {
-            $accounts[$index] = publicista_account_runtime_metrics_apply($accountRow, $metricsById[$accountId]);
-            $accountsById[$accountId] = $accounts[$index];
-        }
-    }
-    $edit = ($editId !== '' && isset($accountsById[$editId])) ? $accountsById[$editId] : null;
-
-    $telefonosByAccount = array();
-    foreach ($telefonos as $tel) {
-        $aid = trim((string)($tel['destacamos_id'] ?? ''));
-        if ($aid === '') continue;
-        if (!isset($telefonosByAccount[$aid])) $telefonosByAccount[$aid] = array();
-        $telefonosByAccount[$aid][] = $tel;
-    }
-
-    $activeCount = 0;
-    $blockedCount = 0;
-    $createdAdsTotal = 0;
-    $freeTasksTotal = 0;
-    foreach ($accounts as $row) {
-        if (($row['estado'] ?? '') === 'active') $activeCount++;
-        if (($row['estado'] ?? '') === 'blocked') $blockedCount++;
-        $createdAdsTotal += (int)($row['created_ads_count'] ?? 0);
-        $freeTasksTotal += (int)($row['free_bump_tasks_count'] ?? 0);
-    }
-
-    echo '<div class="cards two">';
-
-    echo '<section class="panel panel-space">';
-    echo '<div class="branch-panel-head"><h2>Cuentas registradas</h2><span class="summary-badge">' . e((string)count($accounts)) . '</span></div>';
-    if (empty($accounts)) {
-        echo '<div class="empty">Todavía no hay cuentas registradas en Publicista.</div>';
-    } else {
-        render_live_filter('#publicistaAccountsRows tr[data-filter-text]', 'Buscar cuenta, portal o usuario...');
-        echo '<div class="table-wrap"><table><thead><tr>';
-        echo '<th>Portal</th><th>Usuario</th><th>Estado</th><th>Salud</th><th>Automatización</th><th>IDs internos</th><th>Anuncios</th><th>Último uso</th><th>Acciones</th>';
-        echo '</tr></thead><tbody id="publicistaAccountsRows">';
-        foreach ($accounts as $row) {
-            $searchText = strtolower(trim(($row['portal_label'] ?? '') . ' ' . ($row['portal_url'] ?? '') . ' ' . ($row['login_user'] ?? '') . ' ' . ($row['display_name'] ?? '') . ' ' . ($row['descripcion'] ?? '')));
-            $runtime = $row['_runtime_metrics'] ?? ($metricsById[$row['id']] ?? publicista_account_runtime_metrics($row['id'], $accountsById));
-            $linkedPhones = $runtime['linked_phones'] ?? ($telefonosByAccount[$row['id']] ?? array());
-            echo '<tr data-filter-text="' . e($searchText) . '">';
-            echo '<td><strong>' . e($row['portal_label'] ?? 'Portal') . '</strong><br><span class="muted">' . e($row['portal_url'] ?? '') . '</span></td>';
-            echo '<td><div class="copy-row copy-row-vertical"><span>' . e($row['login_user'] ?? '') . '</span><button type="button" class="btn-copy-mini" data-copy="' . e($row['login_user'] ?? '') . '">Copiar</button></div><span class="muted">Prio ' . e((string)($row['priority_weight'] ?? 100)) . '</span></td>';
-            echo '<td><span class="summary-badge">' . e(publicista_account_status_label($row['estado'] ?? 'active')) . '</span></td>';
-            echo '<td>' . e(publicista_account_health_label($row['health_status'] ?? 'ok')) . '</td>';
-            echo '<td>' . e(publicista_account_automation_label($row['automation_mode'] ?? 'manual')) . '<br><span class="muted">Límite diario: ' . e((string)($row['daily_publish_limit'] ?? 0)) . '</span></td>';
-            echo '<td><strong>' . e((string)($runtime['listing_ids_total'] ?? 0)) . '</strong><br><span class="muted">Inventario editable</span></td>';
-            echo '<td><strong>' . e((string)($row['created_ads_count'] ?? 0)) . '</strong> creados<br><span class="muted">' . e((string)($runtime['campaign_items_count'] ?? 0)) . ' items campaña · ' . e((string)count($linkedPhones)) . ' teléfonos · ' . e((string)($runtime['tasks_count'] ?? 0)) . ' tareas</span></td>';
-            echo '<td>' . e(format_created_at($row['last_used_at'] ?? ($row['updated_at'] ?? ''))) . '</td>';
-            echo '<td><a class="mini-link" href="' . e(publicista_page_url('cuentas', array('edit' => $row['id']))) . '">Editar</a> ';
-            echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar esta cuenta de portal?\')">';
-            echo '<input type="hidden" name="action" value="delete_publicista_account">';
-            echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
-            echo '<button class="btn-danger-mini">Eliminar</button>';
-            echo '</form></td>';
+        echo '<section class="panel">';
+        echo '<h3>Perfiles a crear / comprar</h3>';
+        echo '<div class="table-wrap"><table class="publicista-ads-profile-table"><thead><tr><th>#</th><th>Perfil</th><th>Productos</th><th>Nota</th><th>Coste</th></tr></thead><tbody>';
+        foreach (($strategy['profiles'] ?? array()) as $profile) {
+            echo '<tr>';
+            echo '<td><span class="summary-badge">' . e((string) ($profile['num'] ?? '')) . '</span></td>';
+            echo '<td><strong>' . e($profile['name'] ?? '') . '</strong></td>';
+            echo '<td>' . publicista_ads_badge_line_html($profile['opts'] ?? array()) . '</td>';
+            echo '<td>' . e($profile['why'] ?? '') . '</td>';
+            echo '<td><strong>' . e(((float) ($profile['cost'] ?? 0) === 0.0) ? 'Gratis' : publicista_ads_euros((float) ($profile['cost'] ?? 0))) . '</strong></td>';
             echo '</tr>';
         }
         echo '</tbody></table></div>';
-    }
-    echo '</section>';
-
-    echo '<section class="panel">';
-    echo '<div class="section-head"><div><h2>' . ($edit ? 'Editar cuenta de portal' : 'Nueva cuenta de portal') . '</h2><p>Base operativa para futuras campañas. Aquí se guardan las cuentas reales que luego podrán recibir anuncios.</p></div></div>';
-    echo '<form method="post" class="form-grid">';
-    echo '<input type="hidden" name="action" value="save_publicista_account">';
-    echo '<input type="hidden" name="id" value="' . e($edit['id'] ?? '') . '">';
-    echo '<div class="field"><label>Portal</label><select name="portal_code">';
-    foreach (publicista_account_portal_options() as $value => $label) {
-        echo '<option value="' . e($value) . '"' . (($edit['portal_code'] ?? 'destacamos') === $value ? ' selected' : '') . '>' . e($label) . '</option>';
-    }
-    echo '</select></div>';
-    field_input('portal_label', 'Etiqueta portal', $edit['portal_label'] ?? 'Destacamos');
-    field_input('portal_url', 'Portal / URL', $edit['portal_url'] ?? ($edit['url'] ?? ''), true);
-    field_input('login_user', 'Usuario', $edit['login_user'] ?? ($edit['user'] ?? ''), true);
-    field_input('login_pass', 'Contraseña', $edit['login_pass'] ?? ($edit['pass'] ?? ''), true);
-    field_input('display_name', 'Nombre interno', $edit['display_name'] ?? '');
-    field_textarea('descripcion', 'Descripción visible', $edit['descripcion'] ?? '', 3);
-    echo '<div class="field"><label>Estado</label><select name="estado">';
-    foreach (publicista_account_status_options() as $value => $label) {
-        echo '<option value="' . e($value) . '"' . (($edit['estado'] ?? 'active') === $value ? ' selected' : '') . '>' . e($label) . '</option>';
-    }
-    echo '</select></div>';
-    echo '<div class="field"><label>Automatización soportada</label><select name="automation_mode">';
-    foreach (publicista_account_automation_options() as $value => $label) {
-        echo '<option value="' . e($value) . '"' . (($edit['automation_mode'] ?? 'full_publish') === $value ? ' selected' : '') . '>' . e($label) . '</option>';
-    }
-    echo '</select></div>';
-    echo '<div class="field"><label>Salud operativa</label><select name="health_status">';
-    foreach (publicista_account_health_options() as $value => $label) {
-        echo '<option value="' . e($value) . '"' . (($edit['health_status'] ?? 'ok') === $value ? ' selected' : '') . '>' . e($label) . '</option>';
-    }
-    echo '</select></div>';
-    field_input('priority_weight', 'Prioridad de reparto (100 = normal)', (string)($edit['priority_weight'] ?? 100));
-    field_textarea('portal_listing_ids_raw', 'IDs internos de anuncios existentes (uno por línea)', implode("
-", (array)($edit['portal_listing_ids'] ?? array())), 6);
-    field_input('daily_publish_limit', 'Límite diario de publicaciones (0 = sin límite)', (string)($edit['daily_publish_limit'] ?? 0));
-    field_input('created_ads_count', 'Anuncios creados (contador interno)', (string)($edit['created_ads_count'] ?? 0));
-    field_input('free_bump_tasks_count', 'Tareas free bump (base manual)', (string)($edit['free_bump_tasks_count'] ?? 0));
-    field_input('last_success_at', 'Último éxito (texto/fecha libre)', $edit['last_success_at'] ?? '');
-    field_input('last_error_at', 'Último error (texto/fecha libre)', $edit['last_error_at'] ?? '');
-    field_textarea('last_error', 'Detalle último error', $edit['last_error'] ?? '', 2);
-    field_textarea('notes_internal', 'Notas internas', $edit['notes_internal'] ?? '', 3);
-    echo '<div class="full" style="display:flex;gap:10px;flex-wrap:wrap;">';
-    echo '<button class="btn-primary">Guardar cuenta</button>';
-    if ($edit) {
-        echo '<a class="btn-secondary-mini" href="' . e(publicista_page_url('cuentas')) . '">Nueva</a>';
-    }
-    echo '</div>';
-    echo '</form>';
-
-    if ($edit) {
-        $linked = $telefonosByAccount[$edit['id']] ?? array();
-        $runtime = $edit['_runtime_metrics'] ?? ($metricsById[$edit['id']] ?? publicista_account_runtime_metrics($edit['id'], $accountsById));
-        list($canDelete, $deleteErrors) = publicista_account_can_delete($edit['id'], $runtime);
-        echo '<hr class="sep">';
-        echo '<h2>Integridad de la cuenta</h2>';
-        echo '<div class="cards four" style="margin-bottom:12px;">';
-        echo '<div class="info-strip"><strong>Teléfonos vinculados</strong><br>' . e((string)count($linked)) . '</div>';
-        echo '<div class="info-strip"><strong>Items campaña</strong><br>' . e((string)($runtime['campaign_items_count'] ?? 0)) . '</div>';
-        echo '<div class="info-strip"><strong>Tareas automáticas</strong><br>' . e((string)($runtime['tasks_count'] ?? 0)) . '</div>';
-        echo '<div class="info-strip"><strong>IDs internos</strong><br>' . e((string)($runtime['listing_ids_total'] ?? 0)) . '</div>';
-        echo '</div>';
-        if (!$canDelete) {
-            echo '<div class="publicista-ads-warning">Esta cuenta no se puede eliminar ahora mismo: ' . e(implode(' ', $deleteErrors)) . '</div>';
-        } else {
-            echo '<div class="info-strip">Esta cuenta está libre de relaciones críticas y se puede eliminar si hace falta.</div>';
-        }
-        echo '<h2 style="margin-top:16px;">Teléfonos vinculados</h2>';
-        if (empty($linked)) {
-            echo '<div class="empty">No hay teléfonos vinculados a esta cuenta.</div>';
-        } else {
-            echo '<div class="linked-tags">';
-            foreach ($linked as $tel) {
-                $label = trim(($tel['nombre'] ?? '') . ' · ' . ($tel['tfono'] ?? ''));
-                echo '<a class="linked-tag" href="' . e(comercial_page_url('lineas', array('edit' => $tel['id']))) . '">' . e($label) . '</a>';
-            }
-            echo '</div>';
-        }
-    }
-    echo '</section>';
-
-    echo '<section class="panel">';
-    echo '<div class="branch-panel-head"><h2>Resumen de cuentas</h2><span class="summary-badge">' . e((string)count($accounts)) . '</span></div>';
-    $warningCount = 0;
-    foreach ($accounts as $accTmp) {
-        if (($accTmp['health_status'] ?? 'ok') !== 'ok') $warningCount++;
-    }
-    echo '<div class="cards five" style="margin-top:12px;">';
-    echo '<div class="info-strip"><strong>Activas</strong><br>' . e((string)$activeCount) . '</div>';
-    echo '<div class="info-strip"><strong>Bloqueadas</strong><br>' . e((string)$blockedCount) . '</div>';
-    echo '<div class="info-strip"><strong>Con incidencias</strong><br>' . e((string)$warningCount) . '</div>';
-    echo '<div class="info-strip"><strong>Anuncios creados</strong><br>' . e((string)$createdAdsTotal) . '</div>';
-    echo '<div class="info-strip"><strong>Tareas free bump</strong><br>' . e((string)$freeTasksTotal) . '</div>';
-    echo '</div>';
-    echo '<div class="info-strip" style="margin-top:12px;"><strong>Bloque 1:</strong> la cuenta ya queda conectada con el modelo nuevo de campañas, items y tareas. Aunque todavía no los generemos desde UI, la integridad de la entidad ya está preparada.</div>';
-    echo '</section>';
-
-    echo '</div>';
-
-}
-
-
-function render_publicista_campanas_page() {
-    $campaigns = publicista_campaigns_get();
-    $plannings = publicista_plannings_get();
-    $products = publicista_products_get();
-    $accounts = publicista_accounts_get(false);
-    $campaignItemCounts = publicista_campaign_item_counts_by_campaign();
-    $planningsById = array();
-    foreach ($plannings as $planRow) {
-        $planId = trim((string)($planRow['id'] ?? ''));
-        if ($planId !== '') $planningsById[$planId] = $planRow;
-    }
-    $editId = trim((string)request_get('edit'));
-    $edit = $editId !== '' ? publicista_campaign_get($editId) : null;
-    $editItems = array();
-    $editItemsById = array();
-    $editTasks = array();
-    $editTasksByCampaignItemId = array();
-    $editRuns = array();
-    if ($edit) {
-        $editItems = publicista_campaign_items_for_campaign($edit['id']);
-        foreach ($editItems as $itemRow) {
-            $itemId = trim((string)($itemRow['id'] ?? ''));
-            if ($itemId !== '') {
-                $editItemsById[$itemId] = $itemRow;
-            }
-        }
-        $editTasks = publicista_tasks_for_campaign($edit['id']);
-        foreach ($editTasks as $taskRow) {
-            $campaignItemId = trim((string)($taskRow['campaign_item_id'] ?? ''));
-            if ($campaignItemId === '') continue;
-            if (!isset($editTasksByCampaignItemId[$campaignItemId])) $editTasksByCampaignItemId[$campaignItemId] = array();
-            $editTasksByCampaignItemId[$campaignItemId][] = $taskRow;
-        }
-        $editRuns = publicista_runs_for_campaign($edit['id']);
-    }
-    $selectedPlanningId = trim((string)request_get('planning_id', ($edit['planning_id'] ?? '')));
-    $selectedPlanning = $selectedPlanningId !== '' ? ($planningsById[$selectedPlanningId] ?? publicista_planning_get($selectedPlanningId)) : null;
-    $selectedStrategyOptionCode = trim((string)($edit['strategy_option_code'] ?? ''));
-    $selectedPlanningOptionMeta = $selectedPlanning ? publicista_campaign_planning_option_meta_map($selectedPlanning) : array();
-    if ($selectedStrategyOptionCode === '' && $selectedPlanning) {
-        $selectedStrategyOptionCode = trim((string)($selectedPlanning['default_option_code'] ?? 'recommended'));
-    }
-    $accountsWithListingIds = array();
-    $accountsById = array();
-    foreach ($accounts as $account) {
-        $accountId = trim((string)($account['id'] ?? ''));
-        if ($accountId !== '') {
-            $accountsById[$accountId] = $account;
-        }
-        $listingIds = array_values((array)($account['portal_listing_ids'] ?? array()));
-        if (!empty($listingIds)) {
-            $account['_campaign_usage'] = array(
-                'listing_ids' => $listingIds,
-                'total' => count($listingIds),
-                'assigned_map' => array(),
-                'assigned_count' => 0,
-                'available_ids' => $listingIds,
-                'available_count' => count($listingIds),
-            );
-            $account['_runtime_metrics'] = array(
-                'listing_ids_total' => count($listingIds),
-            );
-            $accountsWithListingIds[] = $account;
-        }
-    }
-
-    $savedPlanningCount = count($plannings);
-
-    echo '<section class="panel panel-space">';
-    echo '<div class="branch-panel-head"><h2>Motor de campañas</h2><span class="summary-badge">Bloque 4</span></div>';
-    echo '<div class="cards four" style="margin-top:12px;">';
-    echo '<div class="info-strip"><strong>Campañas</strong><br>' . e((string)count($campaigns)) . '</div>';
-    echo '<div class="info-strip"><strong>Estrategias guardadas</strong><br>' . e((string)$savedPlanningCount) . '</div>';
-    echo '<div class="info-strip"><strong>Productos</strong><br>' . e((string)count($products)) . '</div>';
-    echo '<div class="info-strip"><strong>Cuentas</strong><br>' . e((string)count($accountsWithListingIds)) . '</div>';
-    echo '</div>';
-
-    echo '<section class="panel">';
-    echo '<div class="section-head"><div><h2>' . ($edit ? 'Editar campaña' : 'Nueva campaña') . '</h2></div></div>';
-    if ($edit) {
-        echo '<div class="info-strip" style="margin-bottom:12px;"><strong>Modo edición</strong><br>Estás editando una campaña existente. Este formulario modifica esta campaña; no se está creando una nueva.</div>';
-    }
-    echo '<form method="post" class="form-grid publicista-campaign-form" id="publicistaCampaignForm">';
-    echo '<input type="hidden" name="id" value="' . e($edit['id'] ?? '') . '">';
-    field_input('nombre', 'Nombre de campaña', $edit['nombre'] ?? ($selectedPlanning ? publicista_campaign_compose_name($selectedPlanning, 0) : ''), true);
-    $requiredProducts = $selectedPlanning ? max(1, (int)($selectedPlanning['num_products_target'] ?? 1)) : 0;
-    echo '<div class="field"><label>Estrategia</label><select name="planning_id" required class="js-publicista-campaign-planning">';
-    echo '<option value="">Selecciona una estrategia...</option>';
-    foreach ($plannings as $plan) {
-        $selected = (($edit['planning_id'] ?? $selectedPlanningId) === ($plan['id'] ?? '')) ? ' selected' : '';
-        $planName = trim((string)($plan['nombre'] ?? ''));
-        if ($planName === '') {
-            $planName = publicista_planning_compose_name(
-                (string)($plan['city'] ?? ''),
-                (string)($plan['province'] ?? ''),
-                (string)($plan['category_label'] ?? ''),
-                (int)($plan['num_products_target'] ?? 0)
-            );
-        }
-        $planLabel = $planName;
-        $planMeta = trim((string)($plan['city'] ?? ''));
-        if (trim((string)($plan['category_label'] ?? '')) !== '') {
-            $planMeta .= ($planMeta !== '' ? ' · ' : '') . (string)$plan['category_label'];
-        }
-        if ($planMeta !== '') {
-            $planLabel .= ' · ' . $planMeta;
-        }
-        $planOptionMeta = publicista_campaign_planning_option_meta_map($plan);
-        echo '<option value="' . e($plan['id'] ?? '') . '" data-required-products="' . e((string)max(1, (int)($plan['num_products_target'] ?? 1))) . '" data-strategy-options="' . e(json_encode($planOptionMeta, JSON_UNESCAPED_UNICODE)) . '" data-default-option="' . e((string)($plan['default_option_code'] ?? 'recommended')) . '"' . $selected . '>' . e($planLabel) . '</option>';
-    }
-    echo '</select></div>';
-    echo '<div class="field"><label>Versión de la estrategia</label><select name="strategy_option_code" required id="publicistaCampaignStrategyOption" class="js-publicista-campaign-option" ' . ($selectedPlanning ? '' : 'disabled') . '>';
-    echo '<option value="">Elige primero una estrategia...</option>';
-    foreach (publicista_campaign_strategy_option_codes() as $optionCode) {
-        $optionMeta = is_array($selectedPlanningOptionMeta[$optionCode] ?? null) ? $selectedPlanningOptionMeta[$optionCode] : array();
-        if (empty($optionMeta)) continue;
-        $selectedAttr = ($selectedStrategyOptionCode === $optionCode) ? ' selected' : '';
-        echo '<option value="' . e($optionCode) . '" data-label="' . e((string)($optionMeta['label'] ?? '')) . '" data-total="' . e(publicista_ads_euros((float)($optionMeta['grand_total'] ?? 0))) . '" data-profiles="' . e((string)($optionMeta['profiles_total'] ?? 0)) . '" data-warnings="' . e((string)($optionMeta['warnings_count'] ?? 0)) . '" data-help="' . e((string)($optionMeta['decision_help'] ?? '')) . '" data-note="' . e((string)($optionMeta['comparison_note'] ?? '')) . '"' . $selectedAttr . '>' . e((string)($optionMeta['label'] ?? ucfirst($optionCode))) . '</option>';
-    }
-    echo '</select></div>';
-    echo '<div class="field"><label>Resumen de la versión elegida</label><div id="publicistaCampaignOptionInfo" class="info-strip"><strong>' . e($selectedPlanning ? 'Selecciona la versión concreta antes de guardar.' : 'Primero elige una estrategia.') . '</strong><br><span class="muted">Se usará esta versión para calcular anuncios, costes y composición.</span></div></div>';
-    echo '<div class="field"><label>Perfiles requeridos por la estrategia</label><div id="publicistaCampaignRequiredProducts" class="info-strip" data-required-products="' . e((string)$requiredProducts) . '"><strong>' . e((string)$requiredProducts) . '</strong><br>Debes seleccionar exactamente este número de perfiles.</div></div>';
-    field_textarea('notes', 'Notas internas', $edit['notes'] ?? '', 3);
-
-    $selectedProductIds = array_flip((array)($edit['product_ids'] ?? array()));
-    echo '<div class="full">';
-    echo '<label>Productos publicitarios elegibles</label>';
-    if (empty($products)) {
-        echo '<div class="empty">Todavía no hay productos disponibles en Crear perfiles.</div>';
-    } else {
-        render_live_filter('#publicistaCampaignProducts [data-filter-text]', 'Buscar perfil por nombre, clienta o estado...');
-        echo '<div class="info-strip" style="margin-top:12px;"><strong>Selección cerrada</strong><br>La estrategia manda. Debes elegir exactamente <span id="publicistaCampaignRequiredInline">' . e((string)$requiredProducts) . '</span> perfiles listos.</div>';
-        echo '<div id="publicistaCampaignProducts" class="linked-tags" style="margin-top:12px;">';
-        foreach ($products as $product) {
-            $ready = publicista_product_is_ready_for_campaign($product);
-            $checked = isset($selectedProductIds[$product['id']]) ? ' checked' : '';
-            $title = trim((string)($product['nombre_trabajo'] ?? $product['id']));
-            $clienta = trim((string)($product['clienta_nombre_snapshot'] ?? ''));
-            $meta = (string)$ready['final_images_count'] . ' imgs · ' . (string)$ready['copy_versions_count'] . ' copies';
-            $search = strtolower(trim($title . ' ' . $clienta . ' ' . ($product['estado'] ?? '') . ' ' . $meta));
-            echo '<label class="linked-tag" data-filter-text="' . e($search) . '" style="display:flex;align-items:center;gap:8px;">';
-            echo '<input type="checkbox" class="js-publicista-campaign-product" name="product_ids[]" value="' . e($product['id']) . '"' . $checked . '>';
-            echo '<span><strong>' . e($title) . '</strong>' . ($clienta !== '' ? ' · ' . e($clienta) : '') . ' · ' . e($ready['label']) . ' · ' . e($meta) . '</span>';
-            echo '</label>';
-        }
-        echo '</div>';
-    }
-    echo '</div>';
-
-    $selectedAccountIds = array_flip((array)($edit['account_ids'] ?? array()));
-    $selectedListingRefs = array_flip((array)($edit['selected_listing_refs'] ?? array()));
-    echo '<div class="full">';
-    echo '<label>Cuentas de portal disponibles</label>';
-    if (empty($accountsWithListingIds)) {
-        echo '<div class="empty">No hay cuentas con IDs internos cargados en Publicista &gt; Cuentas.</div>';
-    } else {
-        echo '<div style="display:grid;gap:12px;margin-top:12px;">';
-        foreach ($accountsWithListingIds as $account) {
-            $checked = isset($selectedAccountIds[$account['id']]) ? ' checked' : '';
-            $accountId = trim((string)($account['id'] ?? ''));
-            $accountLabel = trim((string)($account['display_name'] ?: $account['login_user']));
-            $accountUser = trim((string)($account['login_user'] ?? ''));
-            $usage = is_array($account['_campaign_usage'] ?? null) ? $account['_campaign_usage'] : publicista_account_listing_usage($accountId, $account, $edit['id'] ?? '');
-            echo '<div class="panel panel-space" style="margin:0;" data-account-box="' . e($accountId) . '">';
-            echo '<label class="linked-tag" style="display:flex;align-items:center;gap:8px;">';
-            echo '<input type="checkbox" class="js-publicista-campaign-account-toggle" name="account_ids[]" value="' . e($accountId) . '"' . $checked . ' data-account-id="' . e($accountId) . '">';
-            echo '<span><strong>' . e($accountLabel) . '</strong> · usuario ' . e($accountUser) . ' · ' . e($account['portal_label'] ?? '') . ' · ' . e(publicista_account_status_label($account['estado'] ?? 'active')) . ' · ' . e((string)($account['_runtime_metrics']['listing_ids_total'] ?? 0)) . ' IDs internos</span>';
-            echo '</label>';
-            echo '<div class="publicista-campaign-listings" data-account-picker="' . e($accountId) . '" style="display:grid;gap:8px;margin-top:10px;">';
-            echo '<div class="muted">Selecciona exactamente qué anuncios internos de esta cuenta puede usar la campaña.</div>';
-            echo '<div class="linked-tags">';
-            foreach ((array)$usage['listing_ids'] as $listingId) {
-                $listingRef = publicista_campaign_listing_ref($accountId, $listingId);
-                $listingChecked = isset($selectedListingRefs[$listingRef]) ? ' checked' : '';
-                echo '<label class="linked-tag" style="display:flex;align-items:center;gap:8px;">';
-                echo '<input type="checkbox" class="js-publicista-campaign-listing" name="selected_listing_refs[]" value="' . e($listingRef) . '"' . $listingChecked . ' data-account-id="' . e($accountId) . '">';
-                echo '<span><strong>ID ' . e($listingId) . '</strong> · ' . e($accountUser) . '</span>';
-                echo '</label>';
-            }
-            echo '</div>';
-            echo '</div>';
-            echo '</div>';
-        }
-        echo '</div>';
-    }
-    echo '</div>';
-
-    echo '<div class="full" style="display:flex;gap:10px;flex-wrap:wrap;">';
-    echo '<button class="btn-primary" name="action" value="save_publicista_campaign">Guardar y continuar</button>';
-    if ($edit) {
-        echo '<a class="btn-secondary-mini" href="' . e(publicista_page_url('campanas')) . '">Nueva</a>';
-    }
-    echo '</div>';
-    echo '</form>';
-    echo '</section>';
-
-    if ($edit) {
-        $items = array_values((array)$editItems);
-        $planning = $planningsById[trim((string)($edit['planning_id'] ?? ''))] ?? publicista_planning_get($edit['planning_id'] ?? '');
-        $summary = is_array($edit['execution_summary'] ?? null) ? $edit['execution_summary'] : array();
-        list($canDelete, $deleteErrors, $deleteMeta) = publicista_campaign_can_delete($edit['id']);
-        echo '<hr class="sep">';
-        echo '<h2>Estado de la campaña</h2>';
-        echo '<div class="cards four" style="margin-bottom:12px;">';
-        echo '<div class="info-strip"><strong>Estado</strong><br>' . e(publicista_campaign_status_label($edit['estado'] ?? 'draft')) . '</div>';
-        echo '<div class="info-strip"><strong>Estrategia</strong><br>' . e($planning['nombre'] ?? 'Sin planning') . '</div>';
-        echo '<div class="info-strip"><strong>Versión elegida</strong><br>' . e((string)($edit['strategy_option_label'] ?: ($summary['strategy_option_label'] ?? 'Sin definir'))) . '</div>';
-        echo '<div class="info-strip"><strong>Coste estimado</strong><br>' . e(publicista_ads_euros((float)($summary['estimated_cost'] ?? 0))) . '</div>';
-        echo '</div>';
-        if (!empty($edit['strategy_option_snapshot']) && is_array($edit['strategy_option_snapshot'])) {
-            $strategyOptionSnapshot = (array)$edit['strategy_option_snapshot'];
-            $snapshotProfiles = 0;
-            foreach ((array)($strategyOptionSnapshot['strategies'] ?? array()) as $snapshotStrategy) {
-                $snapshotProfiles += count((array)($snapshotStrategy['profiles'] ?? array()));
-            }
-            echo '<div class="info-strip" style="margin-bottom:12px;"><strong>Detalle de la versión seleccionada</strong><br>'
-                . e((string)($strategyOptionSnapshot['label'] ?? ($edit['strategy_option_label'] ?? 'Versión'))) 
-                . ' · ' . e(publicista_ads_euros((float)($strategyOptionSnapshot['grand_total'] ?? 0)))
-                . ' · ' . e((string)$snapshotProfiles) . ' perfiles'
-                . (!empty($strategyOptionSnapshot['decision_help']) ? ' · ' . e((string)$strategyOptionSnapshot['decision_help']) : '')
-                . '</div>';
-        }
-        if (($edit['estado'] ?? '') === 'generating') {
-            $queuedAt = trim((string)($summary['last_generation_requested_at'] ?? ''));
-            echo '<div class="info-strip" style="margin-bottom:12px;"><strong>Generando composición</strong><br>La campaña ya está guardada y la composición se está recalculando en segundo plano.' . ($queuedAt !== '' ? ' Solicitud: ' . e(format_created_at($queuedAt)) . '.' : '') . ' Recarga esta página en unos segundos.</div>';
-        }
-        $lastGenerationError = trim((string)($summary['last_generation_error'] ?? ''));
-        if ($lastGenerationError !== '') {
-            echo '<div class="publicista-ads-warning"><strong>Error de generación:</strong><br>' . e($lastGenerationError) . '</div>';
-        }
-        if (!empty($summary['warnings'])) {
-            echo '<div class="publicista-ads-warning"><strong>Avisos de generación:</strong><ul class="publicista-ads-warn-list">';
-            foreach ((array)$summary['warnings'] as $warning) echo '<li>' . e($warning) . '</li>';
-            echo '</ul></div>';
-        }
-        echo '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">';
-        if (!$canDelete) {
-            echo '<div class="publicista-ads-warning">No se puede eliminar: ' . e(implode(' ', $deleteErrors)) . '</div>';
-        } else {
-            echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar esta campaña y sus items generados?\')"><input type="hidden" name="action" value="delete_publicista_campaign"><input type="hidden" name="id" value="' . e($edit['id']) . '"><button class="btn-danger-mini">Eliminar campaña</button></form>';
-        }
+        echo '</section>';
         echo '</div>';
 
-        $automationPlan = is_array($edit['automation_plan'] ?? null) ? $edit['automation_plan'] : array();
-        $approvalSnapshot = is_array($edit['approval_snapshot'] ?? null) ? $edit['approval_snapshot'] : array();
-        echo '<h2 style="margin-top:18px;">Planning operativo</h2>';
-        if (empty($automationPlan)) {
-            echo '<div class="empty">Todavía no existe planning operativo. Guarda la campaña para generarlo automáticamente.</div>';
-        } else {
-            echo '<div class="cards four" style="margin-bottom:12px;">';
-            echo '<div class="info-strip"><strong>Items planificados</strong><br>' . e((string)($automationPlan['items_total'] ?? 0)) . '</div>';
-            echo '<div class="info-strip"><strong>Coste planificado</strong><br>' . e(publicista_ads_euros((float)($automationPlan['estimated_cost_total'] ?? 0))) . '</div>';
-            $approvalLabel = !empty($approvalSnapshot['approved_at']) ? format_created_at($approvalSnapshot['approved_at']) : 'Pendiente';
-            if (($approvalSnapshot['approval_mode'] ?? '') === 'auto_after_generation') {
-                $approvalLabel .= ' · automática';
-            } elseif (($approvalSnapshot['approval_mode'] ?? '') === 'auto_before_execution') {
-                $approvalLabel .= ' · automática al ejecutar';
-            }
-            echo '<div class="info-strip"><strong>Aprobada</strong><br>' . e($approvalLabel) . '</div>';
-            echo '<div class="info-strip"><strong>Subida humanizada</strong><br>sí · pausas entre anuncios e imágenes</div>';
-            echo '</div>';
-            /*
-            if (!empty($automationPlan['steps']) && is_array($automationPlan['steps'])) {
-                echo '<div class="publicista-ads-warning"><strong>Flujo:</strong><ul class="publicista-ads-warn-list">';
-                foreach ($automationPlan['steps'] as $stepTxt) echo '<li>' . e($stepTxt) . '</li>';
-                echo '</ul></div>';
-            }
-            */
-            if (!empty($automationPlan['accounts']) && is_array($automationPlan['accounts'])) {
-                echo '<div class="table-wrap" style="margin-top:12px;"><table><thead><tr><th>Cuenta</th><th>Portal</th><th>Items</th><th>Planning</th></tr></thead><tbody>';
-                foreach ($automationPlan['accounts'] as $planAccount) {
-                    echo '<tr>';
-                    echo '<td><strong>' . e($planAccount['account_name'] ?? ($planAccount['account_id'] ?? '')) . '</strong></td>';
-                    echo '<td>' . e($planAccount['portal_code'] ?? '') . '</td>';
-                    echo '<td>' . e((string)($planAccount['items_count'] ?? count((array)($planAccount['items'] ?? array())))) . '</td>';
-                    if (!empty($planAccount['items']) && is_array($planAccount['items'])) {
-                        $rowsTxt = array();
-                        foreach ((array)$planAccount['items'] as $planItem) {
-                            $rowsTxt[] = ($planItem['external_ad_id'] !== '' ? ('ID ' . $planItem['external_ad_id']) : 'Sin ID') . ' · ' . ($planItem['publish_mode_label'] ?? '') . ' · espera ' . (string)($planItem['delay_before_this_sec'] ?? 0) . 's';
-                        }
-                        echo '<td>' . e(implode(' | ', $rowsTxt)) . '</td>';
-                    } else {
-                        echo '<td><span class="muted">Resumen compacto guardado. El detalle está en la composición generada.</span></td>';
-                    }
-                    echo '</tr>';
+        if (!empty($strategy['allFirings'])) {
+            echo '<section class="panel panel-space">';
+            echo '<h3>Horarios exactos de subida</h3>';
+            foreach ($strategy['allFirings'] as $firing) {
+                $typeLabel = (($firing['type'] ?? '') === 'auto7') ? 'Autorenueva 7€ · 10 sub/día' : 'Refuerzo 4€ · 4 sub/día';
+                echo '<div class="publicista-ads-firing-row">';
+                echo '<div class="publicista-ads-firing-label"><strong>P' . e((string) ($firing['profile'] ?? '')) . '</strong><br>' . e($typeLabel) . '<br><span class="muted">' . e(($firing['start'] ?? '') . ' → ' . ($firing['end'] ?? '')) . '</span></div>';
+                echo '<div class="publicista-ads-firing-times">';
+                foreach (($firing['times'] ?? array()) as $time) {
+                    echo '<span class="publicista-ads-time-pill">' . e($time) . '</span>';
                 }
-                echo '</tbody></table></div>';
-            }
-        }
-
-        echo '<h2 style="margin-top:18px;">Vista previa operativa</h2>';
-        if (empty($items)) {
-            echo '<div class="empty">No hay vista previa porque todavía no existen items generados.</div>';
-        } else {
-            $preview = publicista_campaign_preview_summary($edit, $items);
-            $previewTotals = is_array($preview['totals'] ?? null) ? $preview['totals'] : array();
-            $previewByAccount = is_array($preview['by_account'] ?? null) ? $preview['by_account'] : array();
-            $previewByProduct = is_array($preview['by_product'] ?? null) ? $preview['by_product'] : array();
-            $previewWarnings = is_array($preview['warnings'] ?? null) ? $preview['warnings'] : array();
-
-            $matrixAccounts = array();
-            $campaignAccountIds = array_values(array_filter(array_map('trim', (array)($edit['account_ids'] ?? array()))));
-            foreach ($campaignAccountIds as $aid) {
-                if ($aid === '') continue;
-                $accountEntity = is_array($accountsById[$aid] ?? null) ? $accountsById[$aid] : array();
-                $accountName = trim((string)($accountEntity['display_name'] ?? ($accountEntity['login_user'] ?? $aid)));
-                if ($accountName === '') $accountName = $aid;
-                $matrixAccounts[$aid] = array(
-                    'account_id' => $aid,
-                    'account_name' => $accountName,
-                );
-            }
-
-            $matrixAccountCapacity = array();
-            $selectedSlotsMeta = publicista_campaign_selected_listing_slots($edit, array_values($accountsById), trim((string)($edit['id'] ?? '')), false);
-            foreach ((array)($selectedSlotsMeta['slots'] ?? array()) as $slotRow) {
-                $slotAid = trim((string)($slotRow['account']['id'] ?? ''));
-                if ($slotAid === '') continue;
-                if (!isset($matrixAccountCapacity[$slotAid])) $matrixAccountCapacity[$slotAid] = 0;
-                $matrixAccountCapacity[$slotAid]++;
-            }
-            if (empty($matrixAccounts)) {
-                foreach ($previewByAccount as $accountRow) {
-                    $aid = trim((string)($accountRow['account_id'] ?? ''));
-                    if ($aid === '') continue;
-                    $matrixAccounts[$aid] = array(
-                        'account_id' => $aid,
-                        'account_name' => trim((string)($accountRow['account_name'] ?? $aid)),
-                    );
-                }
-            }
-
-            $matrixProducts = array();
-            foreach ($previewByProduct as $productRow) {
-                $pid = trim((string)($productRow['product_id'] ?? ''));
-                if ($pid === '') continue;
-                $matrixProducts[$pid] = array(
-                    'product_id' => $pid,
-                    'product_name' => trim((string)($productRow['product_name'] ?? $pid)),
-                );
-            }
-
-            $currentMatrix = array();
-            foreach ($items as $itemRow) {
-                $pid = trim((string)($itemRow['product_job_id'] ?? ''));
-                $aid = trim((string)($itemRow['account_id'] ?? ''));
-                if ($pid === '' || $aid === '') continue;
-                if (!isset($currentMatrix[$pid])) $currentMatrix[$pid] = array();
-                if (!isset($currentMatrix[$pid][$aid])) $currentMatrix[$pid][$aid] = 0;
-                $currentMatrix[$pid][$aid]++;
-            }
-
-            echo '<div class="cards four" style="margin-bottom:12px;">';
-            echo '<div class="info-strip"><strong>Items</strong><br>' . e((string)($previewTotals['items_count'] ?? 0)) . '</div>';
-            echo '<div class="info-strip"><strong>Coste total estimado</strong><br>' . e(publicista_ads_euros((float)($previewTotals['estimated_cost_total'] ?? 0))) . '</div>';
-            echo '<div class="info-strip"><strong>Cuentas implicadas</strong><br>' . e((string)($previewTotals['accounts_count'] ?? 0)) . '</div>';
-            echo '<div class="info-strip"><strong>Productos implicados</strong><br>' . e((string)($previewTotals['products_count'] ?? 0)) . '</div>';
-            echo '</div>';
-
-            if (!empty($previewWarnings)) {
-                echo '<div class="publicista-ads-warning"><strong>Avisos de preview:</strong><ul class="publicista-ads-warn-list">';
-                foreach ($previewWarnings as $warningTxt) {
-                    echo '<li>' . e($warningTxt) . '</li>';
-                }
-                echo '</ul></div>';
-            }
-
-            if (!empty($previewByAccount)) {
-                echo '<div class="table-wrap" style="margin-top:12px;"><table data-no-card-view><thead><tr><th>Cuenta</th><th>Anuncios</th><th>Coste subtotal</th></tr></thead><tbody>';
-                foreach ($previewByAccount as $rowAccount) {
-                    echo '<tr>';
-                    echo '<td><strong>' . e((string)($rowAccount['account_name'] ?? ($rowAccount['account_id'] ?? ''))) . '</strong></td>';
-                    echo '<td>' . e((string)($rowAccount['items_count'] ?? 0)) . '</td>';
-                    echo '<td>' . e(publicista_ads_euros((float)($rowAccount['estimated_cost_total'] ?? 0))) . '</td>';
-                    echo '</tr>';
-                }
-                echo '</tbody></table></div>';
-            }
-
-            if (!empty($previewByProduct)) {
-                echo '<div class="table-wrap" style="margin-top:12px;"><table data-no-card-view><thead><tr><th>Producto</th><th>Anuncios</th><th>Coste subtotal</th></tr></thead><tbody>';
-                foreach ($previewByProduct as $rowProduct) {
-                    echo '<tr>';
-                    echo '<td><strong>' . e((string)($rowProduct['product_name'] ?? ($rowProduct['product_id'] ?? ''))) . '</strong></td>';
-                    echo '<td>' . e((string)($rowProduct['items_count'] ?? 0)) . '</td>';
-                    echo '<td>' . e(publicista_ads_euros((float)($rowProduct['estimated_cost_total'] ?? 0))) . '</td>';
-                    echo '</tr>';
-                }
-                echo '</tbody></table></div>';
-            }
-
-            $hasDistributionMismatch = false;
-
-            if (!empty($matrixProducts) && !empty($matrixAccounts)) {
-                echo '<form method="post" class="panel panel-space" style="margin-top:12px;background:#0b1422;">';
-                echo '<input type="hidden" name="action" value="rebalance_publicista_campaign_distribution">';
-                echo '<input type="hidden" name="campaign_id" value="' . e($edit['id']) . '">';
-                echo '<h3 style="margin:0 0 10px;">Ajustar reparto anuncios por producto y cuenta</h3>';
-
-                // Detect mismatch between current distribution and stored matrix
-                $storedDistribution = is_array($edit['distribution_matrix'] ?? null) ? $edit['distribution_matrix'] : array();
-                if (!empty($storedDistribution)) {
-                    foreach ($matrixProducts as $productMeta) {
-                        $pid = $productMeta['product_id'];
-                        foreach ($matrixAccounts as $accountMeta) {
-                            $aid = $accountMeta['account_id'];
-                            $currentCount = (int)($currentMatrix[$pid][$aid] ?? 0);
-                            $storedCount = (int)($storedDistribution[$pid][$aid] ?? 0);
-                            if ($currentCount !== $storedCount) {
-                                $hasDistributionMismatch = true;
-                                break 2;
-                            }
-                        }
-                    }
-                }
-                if ($hasDistributionMismatch) {
-                    echo '<div class="publicista-ads-warning" style="margin-bottom:8px;"><strong>⚠️ El reparto actual de los anuncios no coincide con la matriz guardada.</strong> Pulsa <em>Aplicar reparto</em> para actualizar los anuncios antes de subir.</div>';
-                }
-
-                echo '<p class="muted" style="margin-top:0;">Define cuántos anuncios tendrá cada producto en cada cuenta y aplica. El total por producto debe mantenerse.</p>';
-                echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Producto</th>';
-                foreach ($matrixAccounts as $accountMeta) {
-                    $aid = trim((string)($accountMeta['account_id'] ?? ''));
-                    $capacityTxt = (string)(int)($matrixAccountCapacity[$aid] ?? 0);
-                    echo '<th>' . e((string)$accountMeta['account_name']) . '<br><span class="muted" style="font-size:11px;">Capacidad: ' . e($capacityTxt) . '</span></th>';
-                }
-                echo '<th>Total producto</th></tr></thead><tbody>';
-
-                foreach ($matrixProducts as $productMeta) {
-                    $pid = $productMeta['product_id'];
-                    $rowTotal = 0;
-                    echo '<tr>';
-                    echo '<td><strong>' . e((string)$productMeta['product_name']) . '</strong></td>';
-                    foreach ($matrixAccounts as $accountMeta) {
-                        $aid = $accountMeta['account_id'];
-                        $count = (int)($currentMatrix[$pid][$aid] ?? 0);
-                        $rowTotal += $count;
-                        echo '<td><input type="number" min="0" step="1" name="distribution_matrix[' . e($pid) . '][' . e($aid) . ']" value="' . e((string)$count) . '" style="max-width:90px;"></td>';
-                    }
-                    echo '<td><strong>' . e((string)$rowTotal) . '</strong></td>';
-                    echo '</tr>';
-                }
-
-                echo '</tbody></table></div>';
-                echo '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">';
-                $applyText = $hasDistributionMismatch ? '⚠️ Aplicar reparto (pendiente)' : 'Aplicar reparto';
-                $applyStyle = $hasDistributionMismatch ? 'background:#e67e22;color:#fff;font-weight:bold;' : '';
-                echo '<button class="btn-secondary-mini" style="' . e($applyStyle) . '" onclick="return confirm(\'¿Aplicar este nuevo reparto de anuncios por producto y cuenta?\')">' . e($applyText) . '</button>';
                 echo '</div>';
-                echo '</form>';
+                echo '</div>';
             }
-
-            echo '<div class="info-strip" style="margin-top:12px;">';
-            if ($hasDistributionMismatch) {
-                echo '<strong>⚠️ El reparto no coincide con la matriz guardada. Aplica el reparto antes de subir.</strong> || ';
-            }
-            echo '<strong>Siguiente paso:</strong> revisa/ajusta listing y teléfono por item en la tabla inferior. Cuando esté todo correcto, pulsa <strong>Subir anuncios</strong>.</div>';
-        }
-
-        echo '<h2 style="margin-top:18px;">Composición generada</h2>';
-        if (empty($items)) {
-            if (($edit['estado'] ?? '') === 'generating') {
-                echo '<div class="empty">La composición todavía se está generando en segundo plano. Recarga esta página en unos segundos.</div>';
-            } else {
-                echo '<div class="empty">Esta campaña todavía no tiene items generados. Guarda la campaña para generarlos automáticamente.</div>';
-            }
-        } else {
-            $autoRotation = publicista_campaign_auto_rotation_schedule_normalize((array)($edit['auto_rotation_schedule'] ?? array()));
-            $executionSummary = is_array($edit['execution_summary'] ?? null) ? $edit['execution_summary'] : array();
-            $autoRotationStatus = !empty($autoRotation['enabled']) ? 'active' : 'inactive';
-            $autoRotationNextRunAt = trim((string)($executionSummary['auto_rotation_next_run_at'] ?? ''));
-            $autoRotationLastRunAt = trim((string)($executionSummary['auto_rotation_last_run_at'] ?? ''));
-            $autoRotationLastStatus = trim((string)($executionSummary['auto_rotation_last_status'] ?? ''));
-            $autoRotationLastError = trim((string)($executionSummary['auto_rotation_last_error'] ?? ''));
-
-            echo '<section class="panel panel-space" style="margin-bottom:12px;">';
-            echo '<div class="branch-panel-head"><h2>Auto-rotación de campaña</h2><span class="summary-badge">Programación</span></div>';
-            echo '<p style="margin:6px 0 0 0;padding:6px 10px;background:#fff3cd;border-radius:4px;font-size:0.85em;">ℹ️ La auto-rotación solo aplica a anuncios de <strong>Destacamos</strong>. Los anuncios de <strong>MundosexAnuncio</strong> se suben una sola vez y no rotan.</p>';
-            echo '<div class="cards four" style="margin-top:12px;">';
-            echo '<div class="info-strip"><strong>Estado</strong><br>' . e($autoRotationStatus === 'active' ? 'Activa' : 'Inactiva') . '</div>';
-            echo '<div class="info-strip"><strong>Próxima ejecución</strong><br>' . e($autoRotationNextRunAt !== '' ? format_created_at($autoRotationNextRunAt) : 'Sin programar') . '</div>';
-            echo '<div class="info-strip"><strong>Última ejecución</strong><br>' . e($autoRotationLastRunAt !== '' ? format_created_at($autoRotationLastRunAt) : 'Aún sin ejecuciones') . '</div>';
-            echo '<div class="info-strip"><strong>Último estado</strong><br>' . e($autoRotationLastError !== '' ? $autoRotationLastError : ($autoRotationLastStatus !== '' ? $autoRotationLastStatus : 'Sin eventos')) . '</div>';
-            echo '</div>';
-            echo '<form method="post" class="form-grid" style="margin-top:12px;">';
-            echo '<input type="hidden" name="action" value="save_publicista_campaign_auto_rotation">';
-            echo '<input type="hidden" name="campaign_id" value="' . e($edit['id']) . '">';
-            echo '<div class="field">';
-            echo '<label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" name="auto_rotation_enabled" value="1"' . (!empty($autoRotation['enabled']) ? ' checked' : '') . '> Activar auto-rotación</label>';
-            echo '<div class="field-help">Si está activa, la campaña podrá ejecutarse automáticamente dentro de la franja diaria.</div>';
-            echo '</div>';
-            echo '<div class="field"><label>Hora inicio diaria</label><input type="time" name="auto_rotation_daily_start_time" value="' . e((string)$autoRotation['daily_start_time']) . '"></div>';
-            echo '<div class="field"><label>Hora fin diaria</label><input type="time" name="auto_rotation_daily_end_time" value="' . e((string)$autoRotation['daily_end_time']) . '"></div>';
-            echo '<div class="field"><label>Frecuencia (cada X horas)</label><input type="number" min="1" step="1" name="auto_rotation_every_hours" value="' . e((string)$autoRotation['every_hours']) . '"></div>';
-            echo '<div class="full" style="display:flex;gap:10px;flex-wrap:wrap;"><button class="btn-secondary-mini">Guardar horario</button></div>';
-            echo '</form>';
-            echo '<form method="post" class="inline-form" style="margin-top:10px;">';
-            echo '<input type="hidden" name="action" value="force_publicista_campaign_auto_rotation_now">';
-            echo '<input type="hidden" name="campaign_id" value="' . e($edit['id']) . '">';
-            echo '<button class="btn-primary" onclick="return confirm(\'¿Forzar ahora una resubida inmediata de esta campaña?\')">Forzar resubida ahora</button>';
-            echo '</form>';
             echo '</section>';
 
-            // Campaign run history (collapsible)
-            echo '<section class="panel panel-space" id="campaignRunHistory">';
-            echo '<div class="section-head">';
-            echo '<div><h2>Historial de subidas</h2><p>Últimas ejecuciones de esta campaña (auto-rotación y forzadas).</p></div>';
-            echo '<div class="section-head-actions">';
-            echo '<button class="btn-secondary-mini" type="button" id="btnToggleRunHistory" onclick="toggleCampaignRunHistory()">Mostrar historial de subidas</button>';
-            echo '</div>';
-            echo '</div>';
-            echo '<div id="campaignRunHistoryTable" style="display:none;">';
-            if (empty($editRuns)) {
-                echo '<div class="empty" style="margin-top:8px;">Todavía no hay ejecuciones registradas para esta campaña.</div>';
-            } else {
-                echo '<div class="table-wrap"><table><thead><tr>';
-                echo '<th>Fecha</th><th>Tipo</th><th>Estado</th><th>Publicados</th><th>Fallidos</th><th>Resumen</th><th>Acción</th>';
-                echo '</tr></thead><tbody>';
-                $runStatusColors = array('pending' => '#f59e0b', 'running' => '#3b82f6', 'completed' => '#22c55e', 'failed' => '#ef4444', 'cancelled' => '#6b7280');
-                foreach ($editRuns as $run) {
-                    $runId = trim((string)($run['id'] ?? ''));
-                    $runType = trim((string)($run['run_type'] ?? ''));
-                    $runEstado = trim((string)($run['estado'] ?? 'pending'));
-                    $runCreatedAt = format_created_at($run['created_at'] ?? '');
-                    $published = (int)($run['progress']['published'] ?? 0);
-                    $failed = (int)($run['progress']['failed'] ?? 0);
-                    $runSummary = trim((string)($run['summary'] ?? ''));
-                    $pipelineSummary = trim((string)($run['pipeline']['summary'] ?? ''));
-                    $humanReport = trim((string)($run['human_report'] ?? ''));
-                    $runTypeLabel = $runType === 'auto_rotation' ? 'Auto-rotación' : ($runType === 'manual_force' ? 'Forzada' : ($runType !== '' ? e($runType) : 'Subida'));
-
-                    echo '<tr>';
-                    echo '<td>' . e($runCreatedAt) . '</td>';
-                    echo '<td><span class="summary-badge">' . e($runTypeLabel) . '</span></td>';
-                    echo '<td><span class="summary-badge" style="background:' . e($runStatusColors[$runEstado] ?? '#6b7280') . ';color:#fff;">' . e(publicista_run_status_label($runEstado)) . '</span></td>';
-                    echo '<td>' . e((string)$published) . '</td>';
-                    echo '<td>' . e((string)$failed) . '</td>';
-                    echo '<td style="max-width:240px;white-space:normal;">';
-                    if ($runSummary !== '') echo e($runSummary);
-                    elseif ($pipelineSummary !== '') echo e($pipelineSummary);
-                    else echo '<span class="muted">-</span>';
-                    if ($humanReport !== '') echo '<br><span class="muted" style="font-size:11px;">' . e('Informe: ' . $humanReport) . '</span>';
-                    echo '</td>';
-                    echo '<td><button class="btn-secondary-mini" type="button" onclick="toggleRunLogDetail(\'' . e($runId) . '\')">Ver log</button></td>';
-                    echo '</tr>';
-
-                    // Hidden detail row
-                    echo '<tr class="run-log-detail" id="runLogDetail_' . e($runId) . '" style="display:none;">';
-                    echo '<td colspan="7" style="background:var(--panel);border-top:1px solid var(--line);padding:12px;">';
-                    echo '<div style="font-size:12px;color:var(--muted);">';
-                    echo '<strong>Run ID:</strong> ' . e($runId) . '<br>';
-                    echo '<strong>Estado pipeline:</strong> ' . e(trim((string)($run['pipeline']['status'] ?? ''))) . ' → ' . e(trim((string)($run['pipeline']['stage'] ?? ''))) . '<br>';
-                    if ($pipelineSummary !== '') echo '<strong>Resumen pipeline:</strong> ' . e($pipelineSummary) . '<br>';
-                    if ($humanReport !== '') echo '<strong>Informe humano:</strong> ' . e($humanReport) . '<br>';
-                    if ($runSummary !== '') echo '<strong>Resumen:</strong> ' . e($runSummary) . '<br>';
-                    echo '<strong>Inicio:</strong> ' . e(format_created_at($run['started_at'] ?? '')) . '<br>';
-                    echo '<strong>Fin:</strong> ' . e(format_created_at($run['finished_at'] ?? '')) . '<br>';
-                    echo '<strong>Total items:</strong> ' . e((string)((int)($run['progress']['total_items'] ?? 0))) . ' | ';
-                    echo '<strong>Procesados:</strong> ' . e((string)((int)($run['progress']['processed_items'] ?? 0))) . '<br>';
-                    if (!empty($run['stop_requested_at'])) echo '<strong>Detención solicitada:</strong> ' . e(format_created_at($run['stop_requested_at'])) . '<br>';
-                    echo '</div>';
-                    echo '</td>';
-                    echo '</tr>';
-                }
-                echo '</tbody></table></div>';
-            }
-            echo '</div>';
+            echo '<section class="panel panel-space">';
+            echo '<h3>Línea de tiempo 24h</h3>';
+            echo '<div class="publicista-ads-timeline">' . publicista_ads_render_timeline_svg($strategy['allFirings']) . '</div>';
+            echo '<div class="muted" style="margin-top:10px;">Cada fila es una autorenueva. La barra marca el rango activo y los puntos el momento exacto de subida.</div>';
             echo '</section>';
+        }
 
-            $phones = storage_read('telefonos.json');
-            $runningRun = publicista_campaign_running_run($edit['id']);
-            $campaignStatus = trim((string)($edit['estado'] ?? ''));
-            $lastRunStatus = trim((string)($executionSummary['last_run_status'] ?? ''));
-            $lastRunId = trim((string)($executionSummary['last_run_id'] ?? ''));
-            $campaignLooksRunning = in_array($campaignStatus, array('uploading', 'running'), true)
-                || in_array($lastRunStatus, array('pending', 'running'), true);
+        if (!empty($strategy['overlapWarnings'])) {
+            echo '<section class="panel panel-space">';
+            echo '<div class="publicista-ads-warning"><strong>Subidas muy próximas detectadas</strong><ul class="publicista-ads-warn-list">';
+            foreach ($strategy['overlapWarnings'] as $warning) {
+                echo '<li>' . e($warning) . '</li>';
+            }
+            echo '</ul></div>';
+            echo '</section>';
+        }
 
-            if (!$runningRun && $lastRunId !== '') {
-                $fallbackRun = publicista_run_get($lastRunId);
-                if ($fallbackRun && in_array(($fallbackRun['estado'] ?? ''), array('pending', 'running'), true)) {
-                    $runningRun = $fallbackRun;
-                }
+        foreach (($strategy['profiles'] ?? array()) as $profile) {
+            if (empty($profile['opts']['free']) || !is_array($profile['opts']['free'])) {
+                continue;
             }
-
-            if (!$runningRun && !empty($editRuns) && is_array($editRuns)) {
-                foreach ($editRuns as $candidateRun) {
-                    $candidateStatus = trim((string)($candidateRun['estado'] ?? ''));
-                    if (in_array($candidateStatus, array('pending', 'running'), true)) {
-                        $runningRun = $candidateRun;
-                        break;
-                    }
-                }
-            }
-
-            if (!$runningRun && $campaignLooksRunning) {
-                $runningRun = array(
-                    'estado' => ($lastRunStatus !== '' ? $lastRunStatus : 'running'),
-                    'summary' => trim((string)($executionSummary['last_phase'] ?? 'Subida en curso')),
-                    'progress' => array(
-                        'processed_items' => (int)($executionSummary['last_run_processed'] ?? 0),
-                        'total_items' => (int)($executionSummary['last_run_total'] ?? 0),
-                    ),
-                    'stop_requested_at' => '',
-                );
-            }
-            $phonesByAccount = array();
-            foreach ($phones as $phoneRow) {
-                $aid = trim((string)($phoneRow['destacamos_id'] ?? ''));
-                if ($aid === '') continue;
-                if (!isset($phonesByAccount[$aid])) $phonesByAccount[$aid] = array();
-                $phonesByAccount[$aid][] = $phoneRow;
-            }
-
-            echo '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">';
-            if ($runningRun) {
-                $runProgress = is_array($runningRun['progress'] ?? null) ? $runningRun['progress'] : array();
-                $processed = (int)($runProgress['processed_items'] ?? 0);
-                $total = (int)($runProgress['total_items'] ?? 0);
-                $runSummary = trim((string)($runningRun['summary'] ?? ''));
-                echo '<div class="info-strip"><strong>Subida en curso</strong><br>' . e(publicista_run_status_label($runningRun['estado'] ?? 'running')) . ' · ' . e((string)$processed) . '/' . e((string)$total) . ' procesados' . ($runSummary !== '' ? ' · ' . e($runSummary) : '') . '</div>';
-                $stopRequestedAt = trim((string)($runningRun['stop_requested_at'] ?? ''));
-                if ($stopRequestedAt === '') {
-                    echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Solicitar parada de la subida en curso? Se cerrará de forma limpia al terminar el paso actual.\')">';
-                    echo '<input type="hidden" name="action" value="stop_publicista_campaign_run">';
-                    echo '<input type="hidden" name="id" value="' . e($edit['id']) . '">';
-                    echo '<button class="btn-danger-mini">Detener subida</button>';
-                    echo '</form>';
-                } else {
-                    echo '<div class="info-strip" style="background:#fff7ed;color:#9a3412;"><strong>Parada solicitada</strong><br>Solicitud enviada ' . e(format_created_at($stopRequestedAt)) . '. El motor cerrará al completar el paso actual.</div>';
-                }
-            } else {
-                echo '<form method="post" class="inline-form"><input type="hidden" name="action" value="execute_publicista_campaign"><input type="hidden" name="id" value="' . e($edit['id']) . '"><button class="btn-primary" onclick="return confirm(\'¿Lanzar la subida de anuncios en segundo plano con la configuración actual de la campaña?\')">Subir anuncios</button></form>';
-            }
-
-            // ─── Botones globales de resubida por plataforma ───
-            // GirlsConf siempre visible
-            echo '<form method="post" class="inline-form"><input type="hidden" name="action" value="sync_publicista_campaign_to_girlsconf"><input type="hidden" name="id" value="' . e($edit['id']) . '"><button class="btn-secondary" onclick="return confirm(\'¿Sincronizar todos los productos de esta campaña a GirlsConf? Se desactivarán todos los perfiles activos actuales y se crearán los de esta campaña.\')" title="Desactiva todos los perfiles activos y crea uno por producto de esta campaña">📤 GirlsConf</button></form>';
-
-            // Detectar si hay items de cada plataforma para mostrar los botones
-            $hasDestacamos = false;
-            $hasMundosex = false;
-            foreach ($items as $it) {
-                $pc = trim((string)($it['portal_code'] ?? 'destacamos'));
-                if ($pc === 'destacamos') $hasDestacamos = true;
-                if ($pc === 'mundosex') $hasMundosex = true;
-            }
-            if ($hasDestacamos) {
-                echo '<form method="post" class="inline-form"><input type="hidden" name="action" value="resubmit_publicista_campaign_portal"><input type="hidden" name="id" value="' . e($edit['id']) . '"><input type="hidden" name="portal_code" value="destacamos"><button class="btn-secondary" onclick="return confirm(\'¿Resubir solo los anuncios de Destacamos?\')" title="Re-ejecuta la subida solo para los items con portal Destacamos">🔄 Solo Destacamos</button></form>';
-            }
-            if ($hasMundosex) {
-                echo '<form method="post" class="inline-form"><input type="hidden" name="action" value="resubmit_publicista_campaign_portal"><input type="hidden" name="id" value="' . e($edit['id']) . '"><input type="hidden" name="portal_code" value="mundosex"><button class="btn-secondary" onclick="return confirm(\'¿Resubir solo los anuncios de Mundosex?\')" title="Re-ejecuta la subida solo para los items con portal Mundosex">🔄 Solo Mundosex</button></form>';
+            echo '<section class="panel panel-space publicista-ads-free-box">';
+            echo '<h3>Perfil gratuito P' . e((string) ($profile['num'] ?? '')) . '</h3>';
+            echo '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
+            foreach ($profile['opts']['free'] as $freeTime) {
+                echo '<span class="publicista-ads-time-pill">⏰ ' . e($freeTime) . '</span>';
             }
             echo '</div>';
-
-            echo '<div class="table-wrap"><table><thead><tr><th>#</th><th>Producto</th><th>Cuenta</th><th>Modo</th><th>Copy</th><th>Listing / teléfono</th><th>Estado</th><th>Último resultado</th><th>Acciones</th></tr></thead><tbody>';
-            foreach ($items as $idx => $item) {
-                $productSnapshot = is_array($item['product_snapshot']['data'] ?? null) ? $item['product_snapshot']['data'] : array();
-                $accountSnapshot = is_array($item['account_snapshot']['data'] ?? null) ? $item['account_snapshot']['data'] : array();
-                $copySnap = is_array($item['copy_snapshot'] ?? null) ? $item['copy_snapshot'] : array();
-                $copyTitle = trim((string)($copySnap['title_neutral'] ?? ''));
-                if ($copyTitle === '') $copyTitle = trim((string)($copySnap['title_suggestive'] ?? ''));
-                $result = is_array($item['publish_result'] ?? null) ? $item['publish_result'] : array();
-                $linkedPhones = $phonesByAccount[$item['account_id']] ?? array();
-                $currentPhoneId = trim((string)($item['phone_id'] ?? ''));
-                if ($currentPhoneId === '' && !empty($linkedPhones)) $currentPhoneId = trim((string)($linkedPhones[0]['id'] ?? ''));
-
-                echo '<tr>';
-                echo '<td><span class="summary-badge">' . e((string)($idx + 1)) . '</span></td>';
-                echo '<td><strong>' . e($productSnapshot['nombre_trabajo'] ?? ($item['product_job_id'] ?? '')) . '</strong><br><span class="muted">' . e((string)count((array)($item['image_snapshot'] ?? array()))) . ' imágenes</span></td>';
-                echo '<td>' . e($accountSnapshot['display_name'] ?? ($accountSnapshot['login_user'] ?? ($item['account_id'] ?? ''))) . '<br><span class="muted">' . e($accountSnapshot['portal_label'] ?? ($item['portal_code'] ?? '')) . '</span></td>';
-                $itemCost = (float)publicista_campaign_profile_cost($item['planning_profile_snapshot'] ?? array());
-                echo '<td><strong>' . e(publicista_campaign_publish_mode_label((string)($item['publish_mode'] ?? 'standard'))) . '</strong><br><span class="muted">' . e(publicista_ads_euros($itemCost)) . '</span></td>';
-                echo '<td>' . e($copyTitle !== '' ? $copyTitle : 'Sin título detectado') . '</td>';
-                echo '<td>';
-                echo '<form method="post" class="inline-form" style="display:grid;gap:6px;min-width:230px;">';
-                echo '<input type="hidden" name="action" value="save_publicista_campaign_item_meta">';
-                echo '<input type="hidden" name="id" value="' . e($item['id']) . '">';
-                echo '<input type="text" name="external_ad_id" value="' . e($item['external_ad_id'] ?? '') . '" placeholder="Listing ID existente">';
-                echo '<select name="phone_id">';
-                echo '<option value="">Teléfono automático de la cuenta</option>';
-                foreach ($linkedPhones as $phoneRow) {
-                    $selPhone = ($currentPhoneId === ($phoneRow['id'] ?? '')) ? ' selected' : '';
-                    echo '<option value="' . e($phoneRow['id'] ?? '') . '"' . $selPhone . '>' . e(($phoneRow['nombre'] ?? 'Teléfono') . ' · ' . ($phoneRow['tfono'] ?? '')) . '</option>';
-                }
-                echo '</select>';
-                echo '<button class="btn-secondary-mini">Guardar meta</button>';
-                echo '</form>';
-                echo '</td>';
-                echo '<td><span class="summary-badge">' . e(publicista_campaign_item_status_label($item['estado'] ?? 'draft')) . '</span></td>';
-                echo '<td>';
-                if (!empty($result)) {
-                    echo '<strong>' . e(!empty($result['ok']) ? 'OK' : 'ERROR') . '</strong><br><span class="muted">' . e(trim((string)($result['error'] ?? ($result['renewNote'] ?? '')))) . '</span>';
-                    $debugLog = is_array($result['debug_log'] ?? null) ? $result['debug_log'] : array();
-                    $debugFiles = array();
-                    foreach ((array)($debugLog['steps'] ?? array()) as $debugStep) {
-                        $savedHtmlPath = trim((string)($debugStep['saved_html_path'] ?? ''));
-                        if ($savedHtmlPath !== '') $debugFiles[] = $savedHtmlPath;
-                    }
-                    $debugDump = array(
-                        'ok' => !empty($result['ok']),
-                        'error' => trim((string)($result['error'] ?? '')),
-                        'adapter' => trim((string)($result['adapter'] ?? '')),
-                        'payload_summary' => is_array($result['payload_summary'] ?? null) ? $result['payload_summary'] : array(),
-                        'debug_files' => array_values(array_unique($debugFiles)),
-                        'debug_log' => $debugLog,
-                        'humanTrace' => is_array($result['humanTrace'] ?? null) ? $result['humanTrace'] : array(),
-                    );
-                    $debugJson = json_encode($debugDump, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                    if ($debugJson === false) $debugJson = 'No se pudo codificar el debug.';
-                    echo '<details style="margin-top:6px;"><summary>Ver debug detallado</summary><pre style="white-space:pre-wrap;word-break:break-word;max-width:780px;margin-top:8px;">' . e($debugJson) . '</pre></details>';
-                } else echo '<span class="muted">Sin ejecutar</span>';
-                echo '</td>';
-                echo '<td>';
-                echo '<form method="post" class="inline-form" style="margin-bottom:6px;" onsubmit="return confirm(\'¿Subir este anuncio ahora? Se conectará a ' . e($item['portal_code'] ?? 'la plataforma') . ' para publicarlo.\')">';
-                echo '<input type="hidden" name="action" value="upload_single_campaign_item">';
-                echo '<input type="hidden" name="item_id" value="' . e($item['id']) . '">';
-                echo '<input type="hidden" name="campaign_id" value="' . e($edit['id']) . '">';
-                echo '<button class="btn-primary-mini">▲ Subir</button>';
-                echo '</form>';
-                echo '<span class="muted" style="font-size:0.82em;">Aquí puedes corregir listing ID y teléfono antes de subir. El botón "Subir anuncios" siempre vuelve a ejecutar la campaña con esta configuración actual.</span>';
-                echo '</td>';
-                echo '</tr>';
-            }
-            echo '</tbody></table></div>';
-
-            $runs = array_values((array)$editRuns);
-            echo '<h2 style="margin-top:18px;">Histórico de ejecuciones</h2>';
-            if (empty($runs)) {
-                echo '<div class="empty">Todavía no hay runs registrados para esta campaña.</div>';
-            } else {
-                echo '<div class="table-wrap"><table><thead><tr><th>Run</th><th>Tipo</th><th>Estado</th><th>Inicio</th><th>Fin</th><th>Resumen</th></tr></thead><tbody>';
-                foreach ($runs as $run) {
-                    echo '<tr>';
-                    echo '<td><strong>' . e($run['id'] ?? '') . '</strong></td>';
-                    echo '<td>' . e($run['run_type'] ?? '') . '</td>';
-                    echo '<td><span class="summary-badge">' . e(publicista_run_status_label($run['estado'] ?? 'pending')) . '</span></td>';
-                    echo '<td>' . e(format_created_at($run['started_at'] ?? '')) . '</td>';
-                    echo '<td>' . e(format_created_at($run['finished_at'] ?? '')) . '</td>';
-                    $softMismatchCount = max(0, (int)($run['save_soft_mismatch_count'] ?? 0));
-                    echo '<td>' . e($run['summary'] ?? '');
-                    if ($softMismatchCount > 0) {
-                        echo '<br><span class="summary-badge" style="background:#f59e0b;color:#111827;">Aviso suave</span> <span class="muted">Diferencias solo en descripción: ' . e((string)$softMismatchCount) . '</span>';
-                    }
-                    echo '</td>';
-                    echo '</tr>';
-                }
-                echo '</tbody></table></div>';
-            }
+            echo '<div class="muted" style="margin-top:10px;">Subida manual, una vez cada 12h, sin coste.</div>';
+            echo '</section>';
         }
     }
-
-    echo '<section class="panel">';
-    echo '<div class="branch-panel-head"><h2>Campañas registradas</h2><span class="summary-badge">' . e((string)count($campaigns)) . '</span></div>';
-    if (empty($campaigns)) {
-        echo '<div class="empty" style="margin-top:12px;">Todavía no hay campañas registradas.</div>';
-    } else {
-        render_live_filter('#publicistaCampaignRows tr[data-filter-text]', 'Buscar campaña, planning o estado...');
-        echo '<div class="table-wrap" style="margin-top:12px;"><table><thead><tr><th>Campaña</th><th>Estado</th><th>Estrategia</th><th>Selección</th><th>Items</th><th>Acciones</th></tr></thead><tbody id="publicistaCampaignRows">';
-        foreach ($campaigns as $row) {
-            $campaignId = trim((string)($row['id'] ?? ''));
-            $itemsCount = (int)($campaignItemCounts[$campaignId] ?? 0);
-            $search = strtolower(trim(($row['nombre'] ?? '') . ' ' . ($row['estado'] ?? '') . ' ' . ($row['planning_id'] ?? '')));
-            $planning = $planningsById[trim((string)($row['planning_id'] ?? ''))] ?? publicista_planning_get($row['planning_id'] ?? '');
-            echo '<tr data-filter-text="' . e($search) . '">';
-            echo '<td><strong>' . e($row['nombre'] ?? '') . '</strong><br><span class="muted">' . e(format_created_at($row['updated_at'] ?? ($row['created_at'] ?? ''))) . '</span></td>';
-            echo '<td><span class="summary-badge">' . e(publicista_campaign_status_label($row['estado'] ?? 'draft')) . '</span></td>';
-            echo '<td>' . e($planning['nombre'] ?? ($row['planning_id'] ?? 'Sin planning')) . '<br><span class="muted">' . e((string)($row['strategy_option_label'] ?? '')) . '</span></td>';
-            echo '<td><strong>' . e((string)count((array)($row['product_ids'] ?? array()))) . '</strong> productos<br><span class="muted">' . e((string)count((array)($row['account_ids'] ?? array()))) . ' cuentas · min ' . e((string)($row['min_products'] ?? 0)) . ' / max ' . e((string)($row['max_products'] ?? 0)) . '</span></td>';
-            echo '<td>' . e((string)$itemsCount) . '</td>';
-            echo '<td><a class="mini-link" href="' . e(publicista_page_url('campanas', array('edit' => $row['id']))) . '">Abrir</a></td>';
-            echo '</tr>';
-        }
-        echo '</tbody></table></div>';
-    }
-    echo '</section>';
 }
 
 function render_publicista_subir_anuncios_page() {
-    $cfg = publicista_free_bump_config();
-    $state = publicista_free_bump_state_prepare_today(publicista_free_bump_state());
-    $plan = publicista_free_bump_plan_snapshot($cfg, $state, time());
-    $accounts = array_values(array_filter(publicista_accounts_get(false), function($row) {
-        return trim((string)($row['portal_code'] ?? '')) === 'destacamos';
-    }));
-    $accountsById = array();
-    foreach ($accounts as $account) {
-        $accountId = trim((string)($account['id'] ?? ''));
-        if ($accountId === '') continue;
-        $accountsById[$accountId] = $account;
-    }
-    $logs = publicista_free_bump_logs_get(40);
-
     echo '<section class="panel panel-space">';
-    echo '<div class="branch-panel-head"><h2>Subir anuncios</h2><span class="summary-badge">' . ($cfg['enabled'] ? 'Activo' : 'Pausado') . '</span></div>';
-    echo '<div class="cards four" style="margin-top:14px;">';
-    echo '<div class="info-strip"><strong>Próximo intento</strong><br>' . e((string)($state['next_run_at'] ?: 'Sin planificar')) . '</div>';
-    echo '<div class="info-strip"><strong>Cuentas listas</strong><br>' . e((string)($plan['ready_accounts_count'] ?? 0)) . ' de ' . e((string)($plan['selected_accounts_count'] ?? 0)) . '</div>';
-    echo '<div class="info-strip"><strong>IDs totales</strong><br>' . e((string)($plan['total_listing_ids'] ?? 0)) . '</div>';
-    echo '<div class="info-strip"><strong>Oportunidades restantes</strong><br>' . e((string)($plan['remaining_opportunities'] ?? 0)) . '</div>';
+    echo '<div class="branch-panel-head"><h2>Subir anuncios</h2><span class="summary-badge">Próximamente</span></div>';
+    echo '<div class="cards three" style="margin-top:14px;">';
+    echo '<div class="info-strip"><strong>Objetivo</strong><br>Automatizar la subida del anuncio a varias webs desde el CRM.</div>';
+    echo '<div class="info-strip"><strong>Estado actual</strong><br>Subsección reservada hasta que queden bien testeadas Crear perfiles y Cálculo publicidad.</div>';
+    echo '<div class="info-strip"><strong>Siguiente fase</strong><br>Conectar credenciales, plantillas, imágenes finales y trazabilidad por portal.</div>';
     echo '</div>';
-    echo '<div class="cards four" style="margin-top:12px;">';
-    echo '<div class="info-strip"><strong>Hoy OK</strong><br>' . e((string)($state['today_ok'] ?? 0)) . '</div>';
-    echo '<div class="info-strip"><strong>Hoy sin libres</strong><br>' . e((string)($state['today_empty'] ?? 0)) . '</div>';
-    echo '<div class="info-strip"><strong>Hoy errores</strong><br>' . e((string)($state['today_failed'] ?? 0)) . '</div>';
-    echo '<div class="info-strip"><strong>Último éxito</strong><br>' . e((string)($state['last_success_at'] ?: 'Aún ninguno')) . '</div>';
-    echo '</div>';
-    echo '<div class="cards four" style="margin-top:12px;">';
-    echo '<div class="info-strip"><strong>Objetivo diario</strong><br>' . e((string)($plan['daily_target_count_total'] ?? 0)) . '</div>';
-    echo '<div class="info-strip"><strong>Ya subidos en ventana</strong><br>' . e((string)($plan['completed_in_window_total'] ?? 0)) . '</div>';
-    echo '<div class="info-strip"><strong>Pendientes hoy</strong><br>' . e((string)($plan['pending_target_total'] ?? 0)) . '</div>';
-    echo '<div class="info-strip"><strong>Cadencia calculada</strong><br>' . e((string)(!empty($plan['dynamic_interval_seconds']) ? ceil(((int)$plan['dynamic_interval_seconds']) / 60) . ' min aprox.' : 'Sin calcular')) . '</div>';
-    echo '</div>';
-    echo '<div class="info-strip" style="margin-top:14px;"><strong>Resumen operativo:</strong> ' . e(publicista_free_bump_summary_line($state, $plan)) . '</div>';
-    echo '</section>';
-
-    echo '<section class="panel panel-space">';
-    echo '<div class="section-head"><div><h2>Configuración automática</h2><p>Este sistema entra en Destacamos, busca el primer anuncio libre y lo sube gratis respetando el cooldown de 12 horas por anuncio. Las cuentas se agrupan por nombre de grupo; cada grupo tiene su propia franja horaria.</p></div></div>';
-    echo '<form method="post" class="form-grid">';
-    echo '<input type="hidden" name="action" value="save_publicista_free_bump_config">';
-    echo '<div class="field"><label>Activado</label><label style="display:flex;gap:8px;align-items:center;margin-top:10px;"><input type="checkbox" name="enabled" value="1"' . ($cfg['enabled'] ? ' checked' : '') . '> Ejecutar automáticamente</label></div>';
-    echo '<div class="field"><label>Humanizar login y click</label><label style="display:flex;gap:8px;align-items:center;margin-top:10px;"><input type="checkbox" name="humanize" value="1"' . ($cfg['humanize'] ? ' checked' : '') . '> Añadir pausas humanas</label></div>';
-    field_input('anticipation_minutes', 'Margen de anticipación (min)', (string)($cfg['anticipation_minutes'] ?? 8));
-    field_input('interval_min_minutes', 'Intervalo mínimo (min)', (string)($cfg['interval_min_minutes'] ?? 12));
-    field_input('interval_max_minutes', 'Intervalo máximo (min)', (string)($cfg['interval_max_minutes'] ?? 120));
-    field_input('retry_empty_min_minutes', 'Reintento si no hay libres min (min)', (string)($cfg['retry_empty_min_minutes'] ?? 10));
-    field_input('retry_empty_max_minutes', 'Reintento si no hay libres max (min)', (string)($cfg['retry_empty_max_minutes'] ?? 22));
-    field_input('jitter_min_seconds', 'Jitter mínimo (seg)', (string)($cfg['jitter_min_seconds'] ?? 30));
-    field_input('jitter_max_seconds', 'Jitter máximo (seg)', (string)($cfg['jitter_max_seconds'] ?? 180));
-
-    // Group accounts by display_name
-    $groupedAccounts = array();
-    foreach ($accounts as $account) {
-        $displayName = trim((string)($account['display_name'] ?? ''));
-        if ($displayName === '') $displayName = '(sin nombre)';
-        $groupedAccounts[$displayName][] = $account;
-    }
-    ksort($groupedAccounts);
-
-    echo '<div class="field full">';
-    echo '<label>Grupos de cuentas</label>';
-    if (empty($groupedAccounts)) {
-        echo '<div class="empty" style="margin-top:10px;">No hay cuentas de Destacamos registradas todavía.</div>';
-    } else {
-        echo '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:10px;">';
-        foreach ($groupedAccounts as $groupName => $groupAccounts) {
-            $groupCfg = $cfg['groups'][$groupName] ?? array();
-            $groupEnabled = !empty($groupCfg['enabled']);
-            $groupStartTime = $groupCfg['start_time'] ?? '08:00';
-            $groupEndTime = $groupCfg['end_time'] ?? '23:00';
-            $safeGroupName = e($groupName);
-            echo '<div class="info-strip" style="display:block;">';
-            echo '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">';
-            echo '<label style="display:flex;gap:6px;align-items:center;cursor:pointer;">';
-            echo '<input type="checkbox" name="groups[' . $safeGroupName . '][enabled]" value="1"' . ($groupEnabled ? ' checked' : '') . '>';
-            echo '<strong>' . $safeGroupName . '</strong>';
-            echo '</label>';
-            echo '</div>';
-            echo '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">';
-            echo '<div><label style="font-size:12px;color:var(--muted,#888);">Inicio</label><br><input type="time" name="groups[' . $safeGroupName . '][start_time]" value="' . e($groupStartTime) . '" style="width:100%;"></div>';
-            echo '<div><label style="font-size:12px;color:var(--muted,#888);">Fin</label><br><input type="time" name="groups[' . $safeGroupName . '][end_time]" value="' . e($groupEndTime) . '" style="width:100%;"></div>';
-            echo '</div>';
-            foreach ($groupAccounts as $acct) {
-                $listingIdsTotal = count((array)($acct['portal_listing_ids'] ?? array()));
-                echo '<div style="font-size:12px;padding:4px 0;border-top:1px solid rgba(0,0,0,.06);">';
-                echo '<span class="muted">' . e($acct['login_user'] ?? '') . ' · ' . e(publicista_account_status_label($acct['estado'] ?? 'active')) . ' · ' . e((string)$listingIdsTotal) . ' IDs</span>';
-                echo '</div>';
-            }
-            echo '</div>';
-        }
-        echo '</div>';
-    }
-    echo '<div class="field-help">Cada grupo se activa y se sube de forma aleatoria dentro de su propia franja horaria. Si la hora de fin es menor que la de inicio, la ventana cruza medianoche.</div>';
-    echo '</div>';
-    echo '<div class="full" style="display:flex;gap:10px;flex-wrap:wrap;">';
-    echo '<button class="btn-primary">Guardar automatización</button>';
-    echo '</div>';
-    echo '</form>';
-    echo '</section>';
-
-    echo '<section class="panel panel-space">';
-    echo '<div class="section-head"><div><h2>Planificación calculada</h2><p>La planificación usa los IDs asignados a las cuentas y el historial de subidas. El botón "Subir ahora" fuerza un ciclo inmediato.</p></div>';
-    echo '<div class="section-head-actions" style="display:flex;gap:10px;flex-wrap:wrap;">';
-    echo '<form method="post" class="inline-form"><input type="hidden" name="action" value="run_publicista_free_bump_cycle"><button class="btn-secondary-mini">Subir ahora</button></form>';
-    echo '</div></div>';
-    echo '<div class="cards four" style="margin-top:10px;">';
-    echo '<div class="info-strip"><strong>Próximo recomendado</strong><br>' . e((string)($plan['recommended_next_at'] ?? 'sin calcular')) . '</div>';
-    echo '<div class="info-strip"><strong>Próxima elegibilidad</strong><br>' . e((string)($plan['soonest_future_at'] ?: 'Ahora o ninguna')) . '</div>';
-    echo '<div class="info-strip"><strong>Oportunidades restantes</strong><br>' . e((string)($plan['remaining_opportunities'] ?? 0)) . '</div>';
-    echo '<div class="info-strip"><strong>Ventanas activas</strong><br>' . e((string)(count(array_filter((array)($plan['groups'] ?? array()), function($g) { return !empty($g['window_in_progress']); })))) . ' de ' . e((string)count((array)($plan['groups'] ?? array()))) . ' grupos</div>';
-    echo '</div>';
-    if (!empty($plan['groups'])) {
-        echo '<div class="table-wrap" style="margin-top:14px;"><table><thead><tr>';
-        echo '<th>Grupo</th><th>Ventana</th><th>Fase</th><th>Cuentas listas</th><th>Objetivo / pendientes</th><th>Oportunidades</th><th>Ya pueden subir</th><th>Próximo recomendado</th>';
-        echo '</tr></thead><tbody>';
-        foreach ((array)$plan['groups'] as $groupPlan) {
-            echo '<tr>';
-            echo '<td><strong>' . e($groupPlan['group'] ?? '') . '</strong></td>';
-            echo '<td>' . e((string)($groupPlan['window_start_at'] ?? '')) . '<br><span class="muted">hasta ' . e((string)($groupPlan['window_end_at'] ?? '')) . '</span></td>';
-            echo '<td>' . e((string)($groupPlan['window_phase'] ?? '-')) . (!empty($groupPlan['window_in_progress']) ? ' <span class="summary-badge">Activa</span>' : '') . '</td>';
-            echo '<td>' . e((string)($groupPlan['ready_count'] ?? 0)) . ' de ' . e((string)($groupPlan['total_count'] ?? 0)) . '</td>';
-            echo '<td>' . e((string)($groupPlan['daily_target_count'] ?? 0)) . ' / ' . e((string)($groupPlan['pending_target_count'] ?? 0)) . '<br><span class="muted">cadencia ' . e((string)(!empty($groupPlan['required_interval_seconds']) ? ceil(((int)$groupPlan['required_interval_seconds']) / 60) . ' min' : '-')) . '</span></td>';
-            echo '<td>' . e((string)($groupPlan['remaining_count'] ?? 0)) . '</td>';
-            echo '<td>' . e((string)($groupPlan['due_now_count'] ?? 0)) . '</td>';
-            echo '<td>' . e((string)($groupPlan['recommended_next_at'] ?: '-')) . '</td>';
-            echo '</tr>';
-        }
-        echo '</tbody></table></div>';
-    }
-    if (!empty($plan['accounts'])) {
-        echo '<div class="table-wrap" style="margin-top:14px;"><table><thead><tr>';
-        echo '<th>Grupo</th><th>Cuenta</th><th>Estado</th><th>IDs</th><th>Oportunidades</th><th>Ya puede subir</th><th>Siguiente elegible</th><th>Acción</th>';
-        echo '</tr></thead><tbody>';
-        $lastGroup = null;
-        foreach ((array)$plan['accounts'] as $accountPlan) {
-            $group = $accountPlan['group'] ?? '';
-            echo '<tr>';
-            echo '<td>' . ($group !== $lastGroup ? '<strong>' . e($group) . '</strong>' : '') . '</td>';
-            $lastGroup = $group;
-            echo '<td><strong>' . e($accountPlan['account_label'] ?? ($accountPlan['account_id'] ?? '')) . '</strong><br><span class="muted">' . e($accountPlan['account_id'] ?? '') . '</span></td>';
-            if (!empty($accountPlan['ready'])) {
-                echo '<td><span class="summary-badge">Lista</span></td>';
-            } else {
-                echo '<td><span class="summary-badge">Saltada</span><br><span class="muted">' . e($accountPlan['skip_reason'] ?? '') . '</span></td>';
-            }
-            echo '<td>' . e((string)($accountPlan['listing_ids_total'] ?? 0)) . '</td>';
-            echo '<td>' . e((string)($accountPlan['remaining_count'] ?? 0)) . '</td>';
-            echo '<td>' . e((string)($accountPlan['due_now_count'] ?? 0)) . '</td>';
-            echo '<td>' . e((string)($accountPlan['next_eligible_at'] ?: '-')) . '</td>';
-            echo '<td>';
-            if (!empty($accountPlan['ready']) && trim((string)($accountPlan['account_id'] ?? '')) !== '') {
-                echo '<form method="post" class="inline-form" style="display:inline-flex;">';
-                echo '<input type="hidden" name="action" value="run_publicista_free_bump_cycle">';
-                echo '<input type="hidden" name="account_id" value="' . e((string)$accountPlan['account_id']) . '">';
-                echo '<button class="btn-secondary-mini" type="submit">Subir ahora esta cuenta</button>';
-                echo '</form>';
-            } else {
-                echo '<span class="muted">No disponible</span>';
-            }
-            echo '</td>';
-            echo '</tr>';
-        }
-        echo '</tbody></table></div>';
-    }
-    echo '</section>';
-
-    echo '<section class="panel panel-space">';
-    echo '<div class="section-head"><div><h2>Log de subidas</h2><p>Cada fila corresponde a un ciclo del scheduler o a un intento manual con "Subir ahora". Si una cuenta no tenía ningún anuncio libre, el sistema prueba otras antes de replanificar.</p></div></div>';
-    if (empty($logs)) {
-        echo '<div class="empty">Todavía no hay ejecuciones registradas.</div>';
-    } else {
-        echo '<div class="table-wrap"><table><thead><tr>';
-        echo '<th>Hora</th><th>Origen</th><th>Estado</th><th>Cuenta</th><th>Usuario</th><th>Listing</th><th>Intentos</th><th>Resumen / detalle</th><th>Próximo</th>';
-        echo '</tr></thead><tbody>';
-        foreach ($logs as $row) {
-            $attempts = array_values(array_filter((array)($row['attempts'] ?? array()), function($attempt) {
-                return is_array($attempt);
-            }));
-            $primaryAttempt = function_exists('publicista_free_bump_primary_attempt') ? publicista_free_bump_primary_attempt($attempts) : (!empty($attempts) ? $attempts[0] : array());
-            $accountId = trim((string)($row['account_id'] ?? ''));
-            $accountLabel = trim((string)($row['account_label'] ?? ($row['account_id'] ?? '')));
-            if (($accountLabel === '' || $accountId === '') && !empty($primaryAttempt)) {
-                if ($accountId === '') $accountId = trim((string)($primaryAttempt['account_id'] ?? ''));
-                if ($accountLabel === '') $accountLabel = trim((string)($primaryAttempt['account_label'] ?? ($primaryAttempt['account_id'] ?? '')));
-            }
-            $accountUser = '';
-            if ($accountId !== '' && isset($accountsById[$accountId])) {
-                $accountUser = trim((string)($accountsById[$accountId]['login_user'] ?? ''));
-            }
-            $listingId = trim((string)($row['listing_id'] ?? ''));
-            if ($listingId === '' && !empty($primaryAttempt)) {
-                $listingId = trim((string)($primaryAttempt['listing_id'] ?? ''));
-            }
-            $detailDump = array(
-                'request_id' => trim((string)($row['request_id'] ?? '')),
-                'trigger' => trim((string)($row['trigger'] ?? 'scheduler')),
-                'status' => trim((string)($row['status'] ?? '')),
-                'ok' => !empty($row['ok']),
-                'error' => trim((string)($row['error'] ?? '')),
-                'error_code' => trim((string)($row['error_code'] ?? '')),
-                'account_id' => trim((string)($row['account_id'] ?? '')),
-                'account_label' => trim((string)($row['account_label'] ?? '')),
-                'listing_id' => trim((string)($row['listing_id'] ?? '')),
-                'attempts' => $attempts,
-                'next_run_at' => trim((string)($row['next_run_at'] ?? '')),
-            );
-            $detailJson = json_encode($detailDump, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            if ($detailJson === false) $detailJson = 'No se pudo codificar el detalle.';
-            echo '<tr>';
-            echo '<td>' . e(format_created_at($row['created_at'] ?? '')) . '</td>';
-            echo '<td>' . e(trim((string)($row['trigger'] ?? 'scheduler')) === 'manual' ? 'Manual' : 'Automático') . '</td>';
-            echo '<td><span class="summary-badge">' . e($row['status'] ?? '') . '</span></td>';
-            echo '<td>' . e($accountLabel !== '' ? $accountLabel : '-') . '</td>';
-            echo '<td>' . e($accountUser !== '' ? $accountUser : '-') . '</td>';
-            echo '<td>' . e($listingId !== '' ? $listingId : '-') . '</td>';
-            echo '<td>' . e((string)count($attempts)) . '</td>';
-            echo '<td>';
-            echo e($row['summary'] ?? '');
-            if (!empty($attempts)) {
-                echo '<details style="margin-top:8px;"><summary>Ver detalle del ciclo</summary>';
-                foreach ($attempts as $idx => $attempt) {
-                    $attemptAccountId = trim((string)($attempt['account_id'] ?? ''));
-                    $attemptAccount = trim((string)($attempt['account_label'] ?? ($attempt['account_id'] ?? '')));
-                    $attemptUser = '';
-                    if ($attemptAccountId !== '' && isset($accountsById[$attemptAccountId])) {
-                        $attemptUser = trim((string)($accountsById[$attemptAccountId]['login_user'] ?? ''));
-                    }
-                    $attemptListing = trim((string)($attempt['listing_id'] ?? ''));
-                    $attemptError = trim((string)($attempt['error'] ?? ''));
-                    $attemptErrorCode = trim((string)($attempt['error_code'] ?? ''));
-                    $attemptStatus = !empty($attempt['ok']) ? 'ok' : (($attemptErrorCode === 'no_free_listing_available') ? 'sin libres' : 'error');
-                    $availableBefore = (int)($attempt['available_count_before'] ?? 0);
-                    $availableIds = array_values((array)($attempt['available_listing_ids_before'] ?? array()));
-                    echo '<div class="info-strip" style="margin-top:8px;">';
-                    echo '<strong>Intento ' . e((string)($idx + 1)) . ' · ' . e($attemptStatus) . '</strong><br>';
-                    echo 'Cuenta: ' . e($attemptAccount !== '' ? $attemptAccount : '-');
-                    if ($attemptUser !== '') {
-                        echo ' · Usuario: ' . e($attemptUser);
-                    }
-                    if ($attemptListing !== '') {
-                        echo ' · Listing: ' . e($attemptListing);
-                    }
-                    echo ' · Libres antes: ' . e((string)$availableBefore);
-                    if (!empty($availableIds)) {
-                        echo '<br>IDs libres detectados: ' . e(implode(', ', $availableIds));
-                    }
-                    if ($attemptError !== '') {
-                        echo '<br>Error: ' . e($attemptError);
-                    } elseif ($attemptErrorCode !== '') {
-                        echo '<br>Código: ' . e($attemptErrorCode);
-                    }
-                    if (trim((string)($attempt['current_url'] ?? '')) !== '') {
-                        echo '<br>URL: ' . e($attempt['current_url']);
-                    }
-                    echo '</div>';
-                }
-                echo '<pre style="white-space:pre-wrap;word-break:break-word;max-width:900px;margin-top:8px;">' . e($detailJson) . '</pre>';
-                echo '</details>';
-            }
-            echo '</td>';
-            echo '<td>' . e(format_created_at($row['next_run_at'] ?? '')) . '</td>';
-            echo '</tr>';
-        }
-        echo '</tbody></table></div>';
-    }
+    echo '<div class="publicista-ads-warning" style="margin-top:16px;">Aquí todavía no hacemos ninguna subida automática. Solo queda preparada la pestaña para la siguiente fase.</div>';
     echo '</section>';
 }
 
 function render_publicista_crear_perfiles_page($embedded = false) {
     $jobs = publicista_jobs_get();
-    $clientas = publicista_all_clientas();
+    $clientas = storage_read('clientes.json');
+    $clientas = sort_desc_by_key($clientas, 'created_at');
+    $aiCfg = publicista_ai_config();
 
-    $clientaFilterRaw = trim((string)request_get('clienta_id'));
-    $clientaFilterScope = trim((string)request_get('clienta_scope'));
-    $clientaFilterParsed = publicista_parse_clienta_picker_value($clientaFilterRaw);
-    if ($clientaFilterParsed['id'] !== '') {
-        $clientaFilter = $clientaFilterParsed['id'];
-        if ($clientaFilterScope === '') $clientaFilterScope = $clientaFilterParsed['scope'];
-    } else {
-        $clientaFilter = $clientaFilterRaw;
-    }
-
+    $clientaFilter = trim((string)request_get('clienta_id'));
     $selectedJobId = trim((string)request_get('job'));
     $selectedJob = $selectedJobId !== '' ? publicista_job_get($selectedJobId) : null;
 
@@ -2479,205 +577,117 @@ function render_publicista_crear_perfiles_page($embedded = false) {
         }));
     }
 
-    $showOnlyJobDetail = (bool)$selectedJob;
-
-    if ($showOnlyJobDetail) {
-        echo '<section class="panel panel-space">';
-        echo '<div class="section-head"><div><h2>Ficha de producto</h2><p>Vista centrada en un único producto publicitario.</p></div>';
-        echo '<div class="section-head-actions" style="display:flex;gap:10px;flex-wrap:wrap;">';
-        echo '<a class="btn-secondary-mini" href="' . e(publicista_tab_url()) . '">← Volver al listado de productos</a>';
-        echo '</div></div>';
-        echo '</section>';
+    $activeCount = 0;
+    $doneCount = 0;
+    $definitiveCount = 0;
+    foreach ($jobs as $job) {
+        if (($job['estado'] ?? '') !== 'archived') $activeCount++;
+        if (($job['estado'] ?? '') === 'done') $doneCount++;
+        $wfTmp = function_exists('publicista_job_workflow') ? publicista_job_workflow($job) : array();
+        if (!empty($wfTmp['pack_final'])) $definitiveCount++;
     }
 
-    if (!$showOnlyJobDetail) {
+    echo '<div class="cards two">';
 
-        echo '<section class="panel panel-space">';
-        echo '<div class="section-head"><div><h2>Nuevo producto publicitario</h2><p>Flujo rápido: sube foto, genera pack del producto, revisa y acepta.</p></div></div>';
-        if (empty($clientas)) {
-            echo '<div class="empty">No hay clientas todavía. Primero necesitas al menos una clienta en LaMami o Jostal.</div>';
-        } else {
-            echo '<form method="post" enctype="multipart/form-data" class="form-grid">';
-            echo '<input type="hidden" name="action" value="create_publicista_job">';
-            publicista_field_clienta_picker('clienta_id', 'Clienta', $clientas, publicista_clienta_picker_selected_value($clientaFilter, $clientaFilterScope));
-            field_input('nombre_trabajo', 'Nombre interno del pack', '');
-            field_input('publish_name', 'Nombre de publicación (el que aparece en los anuncios)', '');
-            echo '<div class="field full">';
-            echo '<label>Foto original <span style="color:#e11d48;">*</span></label>';
-            echo '<input type="file" name="source_image" accept="image/jpeg,image/png,image/webp">';
-            echo '<div class="field-help">Esta foto se usa directamente para crear el producto y lanzar todo el pipeline inicial.</div>';
-            echo '</div>';
+    echo '<section class="panel">';
+    echo '<div class="section-head"><div><h2>Nuevo trabajo Publicista</h2><p>Flujo rápido: sube foto, genera pack, revisa y acepta.</p></div></div>';
+    if (empty($clientas)) {
+        echo '<div class="empty">No hay clientas todavía. Primero necesitas al menos una clienta en LaMami.</div>';
+    } else {
+        echo '<form method="post" enctype="multipart/form-data" class="form-grid">';
+        echo '<input type="hidden" name="action" value="create_publicista_job">';
+        field_select_clienta('clienta_id', 'Clienta', $clientas, $clientaFilter);
+        field_input('nombre_trabajo', 'Nombre interno del pack', '');
+        echo '<div class="field full">';
+        echo '<label>Foto original</label>';
+        echo '<input type="file" name="source_image" accept="image/jpeg,image/png,image/webp">';
+        echo '<div class="field-help">Si pulsas <strong>Crear y generar</strong>, esta foto se usa directamente para lanzar todo el pipeline.</div>';
+        echo '</div>';
+        field_textarea('physical_notes', 'Observaciones físicas / matices', '', 4);
+        field_textarea('restrictions_text', 'Restricciones libres', '', 3);
+        echo '<div class="field full">';
+        echo '<label>Restricciones rápidas</label>';
+        publicista_render_restriction_checkboxes(array());
+        echo '</div>';
+        field_textarea('services_snapshot', 'Servicios base (snapshot inicial)', '', 3);
+        echo '<div class="field">';
+        echo '<label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" name="auto_regenerate" value="1"> Auto-regeneración automática (desactivada por defecto)</label>';
+        echo '<div class="field-help">Déjala desactivada para el modo ahorro máximo. Con el nuevo flujo se generan 6 candidatas fijas y luego eliges si regeneras una concreta.</div>';
+        echo '</div>';
+        echo '<div class="field">';
+        echo '<label>Tono de textos</label>';
+        echo '<select name="copy_tone">';
+        foreach (publicista_copy_tone_options() as $value => $label) {
+            echo '<option value="' . e($value) . '">' . e($label) . '</option>';
+        }
+        echo '</select>';
+        echo '</div>';
+        field_textarea('copy_examples_base', 'Ejemplos base de redacción (opcional)', '', 4);
+        field_textarea('notas', 'Notas internas', '', 3);
+        echo '<div class="full" style="display:flex;gap:10px;flex-wrap:wrap;">';
+        echo '<button class="btn-secondary-mini" name="create_mode" value="draft">Crear borrador</button>';
+        echo '<button class="btn-primary" name="create_mode" value="generate">Crear y generar</button>';
+        echo '</div>';
+        echo '</form>';
+    }
+    echo '</section>';
 
-            echo '<div class="field full">';
-            echo '<label>Fotos reales del perfil (opcional) <span style="color:#6b7280;font-weight:normal;">— máx 10</span></label>';
-            echo '<input type="file" name="real_photos[]" accept="image/jpeg,image/png,image/webp" multiple>';
-            echo '<div class="field-help">Estas fotos se guardan sin modificar. Podrás editarlas y aplicarles blur más tarde desde la ficha del producto.</div>';
-            echo '</div>';
+    echo '<section class="panel">';
+    echo '<div class="branch-panel-head"><h2>Resumen y cola</h2><span class="summary-badge">' . e(count($jobs)) . '</span></div>';
+    echo '<div class="cards four" style="margin-top:12px;">';
+    echo '<div class="info-strip"><strong>Activos</strong><br>' . e((string)$activeCount) . '</div>';
+    echo '<div class="info-strip"><strong>Finalizados</strong><br>' . e((string)$doneCount) . '</div>';
+    echo '<div class="info-strip"><strong>Definitivos</strong><br>' . e((string)$definitiveCount) . '</div>';
+    echo '</div>';
+    echo '<div class="info-strip"><strong>OpenAI API key:</strong> ' . ($aiCfg['configured'] ? 'Detectada (' . e($aiCfg['api_key_source']) . ')' : 'No detectada') . '</div>';
+    echo '<div class="info-strip" style="margin-top:10px;"><strong>Modelos:</strong> ' . e($aiCfg['descriptor_model']) . ' · ' . e($aiCfg['image_model']) . '</div>';
+    echo '<div class="info-strip" style="margin-top:10px;"><strong>UX objetivo:</strong> subir foto, generar, revisar en la misma pantalla y aceptar o regenerar solo lo necesario.</div>';
+    echo '</section>';
+    echo '</div>';
 
-            echo '<div class="field full"><hr style="margin:4px 0;border:none;border-top:1px solid #e5e7eb;"><strong style="font-size:13px;color:#6b7280;">Ropa y estilo visual</strong></div>';
-            publicista_render_production_params_fields(array());
+    publicista_render_intro_guide_panel();
 
-            echo '<div class="field full"><hr style="margin:4px 0;border:none;border-top:1px solid #e5e7eb;"><strong style="font-size:13px;color:#6b7280;">Restricciones y opciones de imagen</strong></div>';
-            field_textarea('restrictions_text', 'Restricciones libres (imagen)', '', 2);
-            echo '<div class="field full">';
-            echo '<label>Restricciones rápidas</label>';
-            publicista_render_restriction_checkboxes(array('keep_hair_color', 'keep_body_build', 'avoid_visible_tattoos'));
-            echo '</div>';
-
-            echo '<div class="field full"><hr style="margin:4px 0;border:none;border-top:1px solid #e5e7eb;"><strong style="font-size:13px;color:#6b7280;">Brief libre (prioridad máxima)</strong></div>';
-            echo '<div class="field full">';
-            echo '<label>Brief visual libre del operador</label>';
-            echo '<textarea name="operator_brief" rows="3" placeholder="Cualquier detalle específico de imagen que quieras que prime sobre todo: ropa concreta, ambiente, rasgos físicos a resaltar, etc. Este texto tiene la máxima prioridad en la generación de imágenes." style="width:100%;"></textarea>';
-            echo '<div class="field-help">Prevalece sobre el descriptor automático y sobre las selecciones de arriba.</div>';
-            echo '</div>';
-
-            echo '<div class="field full"><hr style="margin:4px 0;border:none;border-top:1px solid #e5e7eb;"><strong style="font-size:13px;color:#6b7280;">Textos publicitarios</strong></div>';
-            echo '<div class="field">';
-            echo '<label>Tono de textos</label>';
-            echo '<select name="copy_tone">';
-            foreach (publicista_copy_tone_options() as $value => $label) {
-                echo '<option value="' . e($value) . '">' . e($label) . '</option>';
-            }
-            echo '</select>';
-            echo '</div>';
-            echo '<div class="field full">';
-            echo '<label>Plataformas destino (para adaptar el copy)</label>';
-            publicista_render_checkboxes_group('copy_platforms', publicista_copy_platform_options(), array('destacamos', 'loquosex'));
-            echo '</div>';
-            echo '<div class="field full">';
-            echo '<label>Ángulos de anuncio preferidos</label>';
-            publicista_render_checkboxes_group('copy_angles', publicista_copy_angle_options(), array());
-            echo '</div>';
-            echo '<div class="field full">';
-            echo '<label>Brief libre para los textos</label>';
-            echo '<textarea name="copy_brief" rows="2" placeholder="Apodo, frase característica, servicios concretos, horarios, zona, o cualquier instrucción específica para el copy..." style="width:100%;"></textarea>';
-            echo '</div>';
-            field_textarea('services_snapshot', 'Servicios (opcional)', '', 2);
-            field_textarea('notas', 'Notas internas', '', 2);
-
-            echo '<div class="field">';
-            echo '<label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" name="auto_regenerate" value="1"> Auto-regeneración automática</label>';
-            echo '<div class="field-help">Déjala desactivada. Con el flujo actual se generan 6 candidatas referenciadas y eliges si regeneras alguna concreta.</div>';
-            echo '</div>';
-
-            // ---- Selector de modelo de imagen ----
-            echo '<div class="field full"><hr style="margin:4px 0;border:none;border-top:1px solid #e5e7eb;"><strong style="font-size:13px;color:#6b7280;">Modelo de generación de imágenes</strong></div>';
-            echo '<div class="field">';
-            echo '<label>Modelo de imagen <span style="color:#6b7280;font-weight:normal;">(afecta solo a la generación de candidatas)</span></label>';
-            echo '<select name="image_model_selector" id="pollo_image_model_selector" onchange="publicistaModelChange(this.value)">';
-            if (function_exists('publicista_pollo_models')) {
-                foreach (publicista_pollo_models() as $polloKey => $polloCfg) {
-                    $sel = ($polloKey === 'pollo-image-v2') ? ' selected' : '';
-                    echo '<option value="' . e($polloKey) . '"' . $sel . '>' . e($polloCfg['name']) . '</option>';
-                }
-            }
-            echo '</select>';
-            echo '<div class="field-help">Modelos Pollo.ai para generación de imágenes vía texto. Usa la cookie de sesión guardada en ConfigM.</div>';
-            echo '</div>';
-
-            // ---- Info cookie Pollo.ai (se muestra al elegir modelo Pollo) ----
-            $polloDays = function_exists('publicista_pollo_cookie_days_remaining') ? publicista_pollo_cookie_days_remaining() : -1;
-            $polloExpires = function_exists('publicista_pollo_cookie_expires') ? publicista_pollo_cookie_expires() : '';
-            if ($polloDays > 30) { $polloBadge = 'OK'; $polloColor = '#059669'; }
-            elseif ($polloDays > 7) { $polloBadge = 'Aviso: menos de 1 mes'; $polloColor = '#d97706'; }
-            elseif ($polloDays > 0) { $polloBadge = 'URGENTE: menos de 1 semana'; $polloColor = '#dc2626'; }
-            else { $polloBadge = 'CADUCADA'; $polloColor = '#dc2626'; }
-
-            echo '<div class="field full" id="pollo_cookie_info_panel" style="display:none;">';
-            echo '<div class="info-strip" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px 14px;">';
-            echo '<span style="font-size:13px;"><strong>Cookie Pollo.ai:</strong> <span style="color:' . e($polloColor) . ';font-weight:600;">' . e($polloBadge) . '</span>';
-            if ($polloDays > 0) {
-                echo ' · expira ' . e($polloExpires) . ' (en ' . e((string)$polloDays) . ' días)';
-            } else {
-                echo ' · expiró el ' . e($polloExpires);
-            }
-            echo '</span>';
-            echo '<button type="button" class="btn-secondary-mini" onclick="document.getElementById(\'polloInstruccionesModal\').showModal()">¿Cómo renovar la cookie?</button>';
-            echo '</div>';
-            echo '</div>';
-
-            // ---- Modal de instrucciones ----
-            echo '<dialog id="polloInstruccionesModal" style="max-width:600px;width:90%;padding:28px;border-radius:12px;border:1px solid #e5e7eb;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.15);">';
-            echo '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">';
-            echo '<h3 style="margin:0;font-size:16px;color:#111827;">Cómo renovar la cookie de Pollo.ai</h3>';
-            echo '<button type="button" onclick="document.getElementById(\'polloInstruccionesModal\').close()" style="background:none;border:none;font-size:24px;cursor:pointer;line-height:1;color:#6b7280;">×</button>';
-            echo '</div>';
-            echo '<div style="font-size:13px;color:#374151;line-height:1.75;">';
-            echo '<p style="margin:0 0 12px;"><strong>La cookie caduca cada ~3 meses.</strong> Cuando caduque, la generación dará error 401 o 403.</p>';
-            echo '<ol style="margin:0 0 14px;padding-left:20px;">';
-            echo '<li>Abre <strong>Chrome o Firefox</strong> y ve a <a href="https://pollo.ai" target="_blank" style="color:#4f46e5;">pollo.ai</a></li>';
-            echo '<li>Inicia sesión con tu cuenta (Google u otro método)</li>';
-            echo '<li>Pulsa <strong>F12</strong> para abrir las DevTools</li>';
-            echo '<li>Ve a la pestaña <strong>Network</strong> (Red)</li>';
-            echo '<li>Activa el filtro <strong>Fetch/XHR</strong></li>';
-            echo '<li>Recarga la página o realiza cualquier acción en la web</li>';
-            echo '<li>Haz clic en cualquier petición que vaya a <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px;">pollo.ai</code></li>';
-            echo '<li>En el panel derecho: <strong>Headers → Request Headers</strong></li>';
-            echo '<li>Busca la línea que empieza por <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px;">Cookie:</code></li>';
-            echo '<li>Copia <strong>TODO</strong> el valor (empieza por <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px;">__Secure-next-auth.session-token=...</code>)</li>';
-            echo '<li>Ve a <strong>Josue → ConfigM</strong> y pega el valor en el campo <strong>"Cookie sesión Pollo.ai"</strong></li>';
-            echo '<li>Actualiza también el campo <strong>"Fecha expiración cookie Pollo.ai"</strong> (la ves en el header <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px;">set-cookie → Expires=...</code>)</li>';
-            echo '</ol>';
-            echo '<p style="margin:0;padding:10px 12px;background:#f0fdf4;border-radius:6px;font-size:12px;color:#166534;"><strong>Alternativa rápida (Firefox):</strong> F12 → Almacenamiento → Cookies → https://pollo.ai → busca <code>__Secure-next-auth.session-token</code> → copia el valor → pega en ConfigM con el formato <code>__Secure-next-auth.session-token=VALOR_COPIADO</code></p>';
-            echo '</div>';
-            echo '</dialog>';
-
-            echo '<script>function publicistaModelChange(v){document.getElementById("pollo_cookie_info_panel").style.display=v!=="gpt"?"":"none";}</script>';
-
-            echo '<div class="full" style="display:flex;gap:10px;flex-wrap:wrap;">';
-            echo '<button class="btn-primary">Crear y generar</button>';
-            echo '</div>';
-
+    echo '<section class="panel panel-space">';
+    echo '<div class="branch-panel-head"><h2>Trabajos creados</h2><span class="summary-badge">' . e(count($jobs)) . '</span></div>';
+    if (empty($jobs)) {
+        echo '<div class="empty">Todavía no hay trabajos creados en Publicista.</div>';
+    } else {
+        render_live_filter('#publicistaJobsRows tr[data-filter-text]', 'Buscar trabajo o clienta...');
+        echo '<div class="table-wrap"><table><thead><tr>';
+        echo '<th>Trabajo</th><th>Estado</th><th>Clienta</th><th>Finales</th><th>Actualizado</th><th>Acciones</th>';
+        echo '</tr></thead><tbody id="publicistaJobsRows">';
+        foreach ($jobs as $row) {
+            $wf = function_exists('publicista_job_workflow') ? publicista_job_workflow($row) : array();
+            $searchText = strtolower(trim(
+                ($row['nombre_trabajo'] ?? '') . ' ' .
+                ($row['clienta_nombre_snapshot'] ?? '') . ' ' .
+                ($row['localidad_snapshot'] ?? '') . ' ' .
+                ($row['provincia_snapshot'] ?? '') . ' ' .
+                ($row['estado'] ?? '')
+            ));
+            $finalCount = is_array($row['final_images'] ?? null) ? count($row['final_images']) : 0;
+            echo '<tr data-filter-text="' . e($searchText) . '">';
+            echo '<td><strong>' . e($row['nombre_trabajo'] ?: ('Trabajo ' . ($row['id'] ?? ''))) . '</strong><br><span class="muted">' . e($row['id'] ?? '') . '</span></td>';
+            echo '<td><span class="summary-badge">' . e(publicista_job_status_label($row['estado'] ?? 'draft')) . '</span>';
+            if (!empty($wf['pack_final'])) echo '<div class="muted small" style="margin-top:6px;">Definitivo</div>';
+            echo '</td>';
+            echo '<td>' . e($row['clienta_nombre_snapshot'] ?? '-') . '</td>';
+            echo '<td>' . e((string)$finalCount) . '/4</td>';
+            echo '<td>' . e(format_created_at($row['updated_at'] ?? '')) . '</td>';
+            echo '<td><a class="mini-link" href="' . e(publicista_tab_url(array('job' => $row['id']))) . '">Abrir ficha</a>';
+            if (!empty($row['clienta_id'])) echo ' · <a class="mini-link" href="' . e(lamami_tab_url('clientas', array('edit' => $row['clienta_id']))) . '">Clienta</a>';
+            echo ' · <form method="post" class="inline-form" style="display:inline;">';
+            echo '<input type="hidden" name="action" value="duplicate_publicista_job">';
+            echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
+            echo '<button class="mini-link" style="background:none;border:none;padding:0;cursor:pointer;">Duplicar</button>';
             echo '</form>';
+            echo '</td>';
+            echo '</tr>';
         }
-        
-        echo '</section>';
-
-        echo '<section class="panel panel-space">';
-
-        echo '<div class="branch-panel-head"><h2>Productos creados</h2><span class="summary-badge">' . e(count($jobs)) . '</span></div>';
-        if (empty($jobs)) {
-            echo '<div class="empty">Todavía no hay trabajos creados en Publicista.</div>';
-        } else {
-            render_live_filter('#publicistaJobsRows tr[data-filter-text]', 'Buscar producto o clienta...');
-            echo '<div class="table-wrap"><table><thead><tr>';
-            echo '<th>Producto</th><th>Estado</th><th>Clienta</th><th>Finales</th><th>Actualizado</th><th>Acciones</th>';
-            echo '</tr></thead><tbody id="publicistaJobsRows">';
-            foreach ($jobs as $row) {
-                $wf = function_exists('publicista_job_workflow') ? publicista_job_workflow($row) : array();
-                $clientaEditUrl = publicista_clienta_edit_url($row['clienta_id'] ?? '', $row['clienta_scope'] ?? '');
-                $clientaScopeLabel = publicista_clienta_source_label(($row['clienta_scope'] ?? '') === 'jostal' ? 'jostal' : 'lamami');
-                $searchText = strtolower(trim(
-                    ($row['nombre_trabajo'] ?? '') . ' ' .
-                    ($row['clienta_nombre_snapshot'] ?? '') . ' ' .
-                    ($row['localidad_snapshot'] ?? '') . ' ' .
-                    ($row['provincia_snapshot'] ?? '') . ' ' .
-                    ($row['estado'] ?? '') . ' ' .
-                    $clientaScopeLabel
-                ));
-                $finalCount = is_array($row['final_images'] ?? null) ? count($row['final_images']) : 0;
-                echo '<tr data-filter-text="' . e($searchText) . '">';
-                echo '<td><strong>' . e($row['nombre_trabajo'] ?: ('Producto ' . ($row['id'] ?? ''))) . '</strong><br><span class="muted">' . e($row['id'] ?? '') . '</span></td>';
-                echo '<td><span class="summary-badge">' . e(publicista_job_status_label($row['estado'] ?? 'draft')) . '</span>';
-                if (!empty($wf['pack_final'])) echo '<div class="muted small" style="margin-top:6px;">Definitivo</div>';
-                echo '</td>';
-                echo '<td>' . e($row['clienta_nombre_snapshot'] ?? '-') . '<br><span class="muted small">' . e($clientaScopeLabel) . '</span></td>';
-                echo '<td>' . e((string)$finalCount) . '/6</td>';
-                echo '<td>' . e(format_created_at($row['updated_at'] ?? '')) . '</td>';
-                echo '<td><a class="mini-link" href="' . e(publicista_tab_url(array('job' => $row['id']))) . '">Abrir ficha</a>';
-                if ($clientaEditUrl !== '') echo ' · <a class="mini-link" href="' . e($clientaEditUrl) . '">Clienta</a>';
-                echo ' · <form method="post" class="inline-form" style="display:inline;">';
-                echo '<input type="hidden" name="action" value="duplicate_publicista_job">';
-                echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
-                echo '<button class="mini-link" style="background:none;border:none;padding:0;cursor:pointer;">Duplicar</button>';
-                echo '</form>';
-                echo '</td>';
-                echo '</tr>';
-            }
-            echo '</tbody></table></div>';
-        }
-        echo '</section>';
+        echo '</tbody></table></div>';
     }
+    echo '</section>';
+
     if (!$selectedJob) {
         return;
     }
@@ -2696,48 +706,42 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     $currentCopyVersion = function_exists('publicista_current_copy_version') ? publicista_current_copy_version($selectedJob) : null;
     $costs = is_array($selectedJob['costs'] ?? null) ? $selectedJob['costs'] : array();
     $clientaUsage = (!empty($selectedJob['clienta_id']) && function_exists('publicista_clienta_usage_summary')) ? publicista_clienta_usage_summary($selectedJob['clienta_id']) : array('jobs' => 0, 'definitive' => 0, 'copies' => 0);
-    $selectedClientaEditUrl = publicista_clienta_edit_url($selectedJob['clienta_id'] ?? '', $selectedJob['clienta_scope'] ?? '');
-    $selectedClientaPickerValue = publicista_clienta_picker_selected_value($selectedJob['clienta_id'] ?? '', $selectedJob['clienta_scope'] ?? '');
     $restrictionLabels = publicista_restriction_labels($workflow['restriction_flags'] ?? array());
     $descriptorData = is_array($descriptor['data'] ?? null) ? $descriptor['data'] : array();
     $batchState = function_exists('publicista_pipeline_batch_state') ? publicista_pipeline_batch_state($selectedJob) : array();
     $hasPendingBatch = function_exists('publicista_pipeline_has_pending_batch') ? publicista_pipeline_has_pending_batch($selectedJob) : false;
     $batchStatusLabel = function_exists('publicista_batch_status_label') ? publicista_batch_status_label($batchState['status'] ?? '') : '-';
-    $isPipelineRunning = function_exists('publicista_pipeline_is_running') ? publicista_pipeline_is_running($selectedJob) : (($selectedJob['estado'] ?? '') === 'processing');
-    $pipelineButtonLabel = $hasPendingBatch ? 'Relanzar generación' : 'Generar / regenerar 6 candidatas';
-    $pipelineWaitingLabel = $hasPendingBatch ? 'Generación en curso / esperando resultado' : 'Generación en curso';
-    $pipelineStartedLabel = !empty($processing['last_started_at']) ? format_created_at($processing['last_started_at']) : '';
-    $canCloseProfileAsFinished = (count($finalImages) >= 4) && !empty($currentCopyVersion) && empty($workflow['pack_final']);
+    $pipelineButtonLabel = $hasPendingBatch ? 'Actualizar batch / continuar' : 'Enviar batch de 6 imágenes';
 
     echo '<section class="panel panel-space">';
     echo '<div class="section-head">';
     echo '<div>';
-    echo '<h2>' . e($selectedJob['nombre_trabajo'] ?: 'Producto publicitario') . '</h2>';
-    echo '<div class="muted">Clienta: ' . e($selectedJob['clienta_nombre_snapshot'] ?? '-') . ' · Producto ID: ' . e($selectedJob['id'] ?? '') . ' · Estado: ' . e(publicista_job_status_label($selectedJob['estado'] ?? 'draft')) . '</div>';
+    echo '<h2>' . e($selectedJob['nombre_trabajo'] ?: 'Trabajo Publicista') . '</h2>';
+    echo '<div class="muted">Clienta: ' . e($selectedJob['clienta_nombre_snapshot'] ?? '-') . ' · ID: ' . e($selectedJob['id'] ?? '') . ' · Estado: ' . e(publicista_job_status_label($selectedJob['estado'] ?? 'draft')) . '</div>';
     if (!empty($workflow['pack_final'])) {
         echo '<div class="info-strip" style="margin-top:10px;"><strong>Pack definitivo</strong> · ' . e(format_created_at($workflow['pack_finalized_at'] ?? '')) . '</div>';
     }
     echo '</div>';
     echo '<div class="section-head-actions" style="display:flex;gap:10px;flex-wrap:wrap;">';
-    if ($selectedClientaEditUrl !== '') {
-        echo '<a class="btn-secondary-mini" href="' . e($selectedClientaEditUrl) . '">Abrir clienta</a>';
+    if (!empty($selectedJob['clienta_id'])) {
+        echo '<a class="btn-secondary-mini" href="' . e(lamami_tab_url('clientas', array('edit' => $selectedJob['clienta_id']))) . '">Abrir clienta</a>';
     }
     echo '<form method="post" class="inline-form">';
     echo '<input type="hidden" name="action" value="duplicate_publicista_job">';
     echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
     echo '<button class="btn-secondary-mini">Duplicar como base</button>';
     echo '</form>';
-    if ($canCloseProfileAsFinished) {
+    if (!empty($finalImages) && empty($workflow['pack_final'])) {
         echo '<form method="post" class="inline-form">';
         echo '<input type="hidden" name="action" value="mark_publicista_pack_definitive">';
         echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-        echo '<button class="btn-primary">Cerrar perfil como terminado</button>';
+        echo '<button class="btn-primary">Marcar pack como definitivo</button>';
         echo '</form>';
     }
     echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar este trabajo y su estructura de carpetas?\')">';
     echo '<input type="hidden" name="action" value="delete_publicista_job">';
     echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-    echo '<button class="btn-danger-mini">Eliminar producto</button>';
+    echo '<button class="btn-danger-mini">Eliminar trabajo</button>';
     echo '</form>';
     echo '</div>';
     echo '</div>';
@@ -2745,7 +749,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     echo '<div class="cards four">';
     echo '<div class="info-strip"><strong>Original</strong><br>' . (!empty($source['stored_path']) ? 'Subida' : 'Pendiente') . '</div>';
     echo '<div class="info-strip"><strong>Candidatas</strong><br>' . e((string)count($candidates)) . '</div>';
-    echo '<div class="info-strip"><strong>Finales</strong><br>' . e((string)count($finalImages)) . '</div>';
+    echo '<div class="info-strip"><strong>Finales</strong><br>' . e((string)count($finalImages)) . '/4</div>';
     echo '<div class="info-strip"><strong>Auto-regenerar</strong><br>' . (!empty($workflow['auto_regenerate']) ? 'Sí (encarece)' : 'No (recomendado)') . '</div>';
     echo '</div>';
     echo '<div class="cards four" style="margin-top:12px;">';
@@ -2757,42 +761,11 @@ function render_publicista_crear_perfiles_page($embedded = false) {
 
     publicista_render_job_guide_panel($selectedJob);
 
-    echo '<div class="publicista-visual-flow" style="margin-top:16px;">';
-    echo '<a class="publicista-visual-step" href="#publicistaOrigen"><span class="step-num">1</span><span><strong>Original</strong><small>base y recorte</small></span></a>';
-    echo '<a class="publicista-visual-step" href="#publicistaCandidates"><span class="step-num">2</span><span><strong>Candidatas</strong><small>revisión y selección</small></span></a>';
-    echo '<a class="publicista-visual-step" href="#publicistaFinals"><span class="step-num">3</span><span><strong>Definitivas</strong><small>blur manual final</small></span></a>';
-    echo '<a class="publicista-visual-step" href="#publicistaReals"><span class="step-num">4</span><span><strong>Fotos reales</strong><small>subidas manualmente</small></span></a>';
-    echo '<a class="publicista-visual-step" href="#publicistaPlatformPhotos"><span class="step-num">5</span><span><strong>Por plataforma</strong><small>destacamos/mundosex/girlsconf</small></span></a>';
-    echo '</div>';
-
-    if ($canCloseProfileAsFinished) {
-        echo '<section class="panel panel-space panel-highlight-success" style="margin-top:16px;">';
-        echo '<div class="branch-panel-head">';
-        echo '<h3>Perfil listo para terminar</h3>';
-        echo '<span class="summary-badge">Último paso</span>';
-        echo '</div>';
-        echo '<div class="info-strip" style="margin-top:12px;">Las imágenes, los textos y el pack final ya están correctos. Solo falta cerrar este trabajo para dejarlo marcado como <strong>perfil terminado</strong>.</div>';
-        echo '<form method="post" style="margin-top:16px;max-width:520px;" onsubmit="return confirm(\'¿Cerrar este perfil como terminado y dejarlo como definitivo?\')">';
-        echo '<input type="hidden" name="action" value="mark_publicista_pack_definitive">';
-        echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-        echo '<button class="btn-primary btn-big">Cerrar perfil como terminado</button>';
-        echo '</form>';
-        echo '</section>';
-    }
-
-    $openConfigPanel = empty($source['stored_path']) && empty($candidates) && empty($finalImages);
-    echo '<details class="publicista-config-panel"' . ($openConfigPanel ? ' open' : '') . '>';
-    echo '<summary>Configuración del trabajo</summary>';
-    echo '<div class="publicista-config-help">Edita aquí la ficha y sus parámetros. La parte visual queda justo debajo, en orden: <strong>original → candidatas → definitivas</strong>.</div>';
-
-    $prodParams = function_exists('publicista_job_production_params') ? publicista_job_production_params($selectedJob) : array();
     echo '<form method="post" class="form-grid" style="margin-top:16px;">';
     echo '<input type="hidden" name="action" value="save_publicista_job">';
-    echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
     echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-    publicista_field_clienta_picker('clienta_id', 'Clienta', $clientas, $selectedClientaPickerValue);
+    field_select_clienta('clienta_id', 'Clienta', $clientas, $selectedJob['clienta_id'] ?? '');
     field_input('nombre_trabajo', 'Nombre interno del pack', $selectedJob['nombre_trabajo'] ?? '', true);
-    field_input('publish_name', 'Nombre de publicación (el que aparece en los anuncios)', $selectedJob['publish_name'] ?? '');
     echo '<div class="field">';
     echo '<label>Estado</label>';
     echo '<select name="estado">';
@@ -2804,31 +777,17 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     echo '</div>';
     field_input('localidad_snapshot', 'Localidad snapshot', $selectedJob['localidad_snapshot'] ?? '');
     field_input('provincia_snapshot', 'Provincia snapshot', $selectedJob['provincia_snapshot'] ?? '');
-
-    echo '<div class="field full"><hr style="margin:4px 0;border:none;border-top:1px solid #e5e7eb;"><strong style="font-size:13px;color:#6b7280;">Ropa y estilo visual</strong><div class="field-help" style="margin-top:4px;">Estos parámetros se aplicarán al regenerar el pipeline de imágenes.</div></div>';
-    publicista_render_production_params_fields($prodParams);
-
-    echo '<div class="field full"><hr style="margin:4px 0;border:none;border-top:1px solid #e5e7eb;"><strong style="font-size:13px;color:#6b7280;">Restricciones de imagen</strong></div>';
-    field_textarea('restrictions_text', 'Restricciones libres (imagen)', $workflow['restrictions_text'] ?? '', 2);
+    field_textarea('physical_notes', 'Observaciones físicas / matices', $selectedJob['physical_notes'] ?? '', 4);
+    field_textarea('restrictions_text', 'Restricciones libres', $workflow['restrictions_text'] ?? '', 3);
     echo '<div class="field full">';
     echo '<label>Restricciones rápidas</label>';
     publicista_render_restriction_checkboxes($workflow['restriction_flags'] ?? array());
     echo '</div>';
-
-    echo '<div class="field full"><hr style="margin:4px 0;border:none;border-top:1px solid #e5e7eb;"><strong style="font-size:13px;color:#6b7280;">Brief libre (prioridad máxima)</strong></div>';
-    echo '<div class="field full">';
-    echo '<label>Brief visual libre del operador</label>';
-    echo '<textarea name="operator_brief" rows="3" placeholder="Detalles específicos de imagen con máxima prioridad..." style="width:100%;">' . e($prodParams['operator_brief'] ?? '') . '</textarea>';
-    echo '<div class="field-help">Prevalece sobre el descriptor automático y las selecciones de ropa.</div>';
-    echo '</div>';
-
     echo '<div class="field">';
     $checkedAuto = !empty($workflow['auto_regenerate']) ? ' checked' : '';
     echo '<label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" name="auto_regenerate" value="1"' . $checkedAuto . '> Auto-regeneración automática</label>';
-    echo '<div class="field-help">Déjalo apagado. Solo actívalo si quieres 3 candidatas extra automáticas.</div>';
+    echo '<div class="field-help">Déjalo apagado para el modo ahorro máximo. Solo actívalo si quieres que el sistema intente 3 candidatas extra automáticamente.</div>';
     echo '</div>';
-
-    echo '<div class="field full"><hr style="margin:4px 0;border:none;border-top:1px solid #e5e7eb;"><strong style="font-size:13px;color:#6b7280;">Textos publicitarios</strong></div>';
     echo '<div class="field">';
     echo '<label>Tono de textos</label>';
     echo '<select name="copy_tone">';
@@ -2838,538 +797,198 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     }
     echo '</select>';
     echo '</div>';
-    echo '<div class="field full">';
-    echo '<label>Plataformas destino</label>';
-    publicista_render_checkboxes_group('copy_platforms', publicista_copy_platform_options(), $prodParams['copy_platforms'] ?? array('destacamos', 'loquosex'));
-    echo '</div>';
-    echo '<div class="field full">';
-    echo '<label>Ángulos de anuncio preferidos</label>';
-    publicista_render_checkboxes_group('copy_angles', publicista_copy_angle_options(), $prodParams['copy_angles'] ?? array());
-    echo '</div>';
-    echo '<div class="field full">';
-    echo '<label>Brief libre para los textos</label>';
-    echo '<textarea name="copy_brief" rows="2" placeholder="Apodo, frase característica, servicios concretos, horarios, zona..." style="width:100%;">' . e($prodParams['copy_brief'] ?? '') . '</textarea>';
-    echo '</div>';
-    field_textarea('services_snapshot', 'Servicios snapshot (opcional)', $selectedJob['services_snapshot'] ?? '', 3);
-    field_textarea('tarifas_snapshot', 'Tarifas snapshot', $selectedJob['tarifas_snapshot'] ?? '', 3);
-    field_textarea('notas', 'Notas internas', $selectedJob['notas'] ?? '', 3);
-    echo '<div class="field full"><hr style="margin:4px 0;border:none;border-top:1px solid #e5e7eb;"><strong style="font-size:13px;color:#6b7280;">Fotos reales del perfil</strong></div>';
-    echo '<div class="field full">';
-    echo '<label>Subir fotos reales adicionales (máx 10 en total)</label>';
-    echo '<input type="file" name="real_photos[]" accept="image/jpeg,image/png,image/webp" multiple>';
-    echo '<div class="field-help">Las fotos se añadirán a las ya existentes sin borrar las anteriores.</div>';
-    echo '</div>';
+    field_textarea('services_snapshot', 'Servicios snapshot', $selectedJob['services_snapshot'] ?? '', 4);
+    field_textarea('tarifas_snapshot', 'Tarifas snapshot', $selectedJob['tarifas_snapshot'] ?? '', 4);
+    field_textarea('copy_examples_base', 'Ejemplos base de redacción (opcional)', $copyPack['examples_base'] ?? '', 5);
+    field_textarea('notas', 'Notas internas', $selectedJob['notas'] ?? '', 4);
     echo '<div class="full"><button class="btn-primary">Guardar configuración del trabajo</button></div>';
     echo '</form>';
-    echo '</details>';
     echo '</section>';
 
-    // -----------------------------------------------------------------------
-    // SECCIÓN 1: ORIGEN Y GENERACIÓN
-    // -----------------------------------------------------------------------
-    echo '<section class="panel panel-space" id="publicistaOrigen" style="margin-top:16px;">';
-    echo '<div class="branch-panel-head"><h3>① Original base y preparación</h3>';
-    echo '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
-    if ($isPipelineRunning) {
-        echo '<span class="btn-primary" style="opacity:.65;cursor:default;pointer-events:none;">' . e($pipelineWaitingLabel) . '</span>';
-        echo '<span class="btn-secondary-mini" style="opacity:.65;cursor:default;pointer-events:none;">Espera a que termine</span>';
-    } else {
-        echo '<form method="post" enctype="multipart/form-data" class="inline-form">';
-        echo '<input type="hidden" name="action" value="run_publicista_image_pipeline">';
-        echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-        echo '<input type="file" name="source_image" accept="image/jpeg,image/png,image/webp" style="display:none;" id="pipelineFileInput" onchange="this.form.submit()">';
-        echo '<button type="button" class="btn-primary" onclick="document.getElementById(\'pipelineFileInput\').click()">' . e($pipelineButtonLabel) . ' (nueva foto)</button>';
-        echo '<button type="submit" class="btn-secondary-mini" title="Reutiliza la foto ya subida y vuelve a generar candidatas y definitivas">Regenerar con la foto actual</button>';
-        echo '</form>';
-        echo '<form method="post" enctype="multipart/form-data" class="inline-form">';
-        echo '<input type="hidden" name="action" value="prepare_publicista_job_engine">';
-        echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-        echo '<input type="file" name="source_image" accept="image/jpeg,image/png,image/webp" style="display:none;" id="prepareFileInput" onchange="this.form.submit()">';
-        echo '<button type="button" class="btn-secondary-mini" onclick="document.getElementById(\'prepareFileInput\').click()">Solo preparar origen y descriptor</button>';
-        echo '</form>';
-    }
-    echo '</div></div>';
+    echo '<div class="cards two">';
+    echo '<section class="panel" id="publicistaQuickActions">';
+    echo '<h3>Acciones del paso actual</h3>';
+    echo '<form method="post" enctype="multipart/form-data" class="form-grid">';
+    echo '<input type="hidden" name="action" value="run_publicista_image_pipeline">';
+    echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
+    echo '<div class="field full">';
+    echo '<label>Imagen original de la clienta</label>';
+    echo '<input type="file" name="source_image" accept="image/jpeg,image/png,image/webp">';
+    echo '<div class="field-help">Sube una nueva imagen si quieres cambiar la base. Si no subes nada, este botón reutiliza la foto actual del trabajo. Si ya hay un batch enviado, el mismo botón sirve para comprobarlo y continuar.</div>';
+    echo '</div>';
+    echo '<div class="full" style="display:flex;gap:10px;flex-wrap:wrap;">';
+    echo '<button class="btn-primary">' . e($pipelineButtonLabel) . '</button>';
+    echo '</div>';
+    echo '</form>';
 
+    echo '<form method="post" enctype="multipart/form-data" class="form-grid" style="margin-top:14px;">';
+    echo '<input type="hidden" name="action" value="prepare_publicista_job_engine">';
+    echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
+    echo '<div class="field full">';
+    echo '<label>Solo preparar origen y descriptor</label>';
+    echo '<input type="file" name="source_image" accept="image/jpeg,image/png,image/webp">';
+    echo '<div class="field-help">Úsalo si antes de generar imágenes quieres comprobar que el recorte 1:1 y la descripción automática encajan bien con la clienta.</div>';
+    echo '</div>';
+    echo '<div class="full"><button class="btn-secondary-mini">Preparar origen</button></div>';
+    echo '</form>';
+
+    echo '<div class="info-strip"><strong>Última acción:</strong> ' . e($processing['last_action'] ?? '-') . '</div>';
+    echo '<div class="info-strip" style="margin-top:10px;"><strong>Resumen pipeline:</strong> ' . e($pipeline['summary'] ?? '-') . '</div>';
+    echo '<div class="info-strip" style="margin-top:10px;"><strong>Request ID:</strong> ' . e($processing['last_openai_request_id'] ?? '-') . '</div>';
     if (!empty($processing['last_error'])) {
-        $lastErrorText = (string)$processing['last_error'];
-        $canRetryDescriptor = stripos($lastErrorText, 'OpenAI descriptor falló:') !== false;
-        $copyPackErrorHints = array(
-            'fase a del pack de textos',
-            'pack de textos',
-            'copy pack',
-            'títulos y textos',
-            'titulos y textos',
-        );
-        $canContinueCopyPack = false;
-        foreach ($copyPackErrorHints as $hint) {
-            if (stripos($lastErrorText, $hint) !== false) {
-                $canContinueCopyPack = true;
-                break;
-            }
-        }
-        if (!$canContinueCopyPack) {
-            $pipelineSummaryText = trim((string)($pipeline['summary'] ?? ''));
-            if ($pipelineSummaryText !== '' && stripos($pipelineSummaryText, 'textos pendientes') !== false) {
-                $canContinueCopyPack = true;
-            }
-        }
-        echo '<div class="info-strip" style="margin-top:10px;background:#fef2f2;color:#b91c1c;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;">';
-        echo '<div><strong>Error pipeline:</strong> ' . e($lastErrorText) . '</div>';
-        if (!$isPipelineRunning) {
-            if ($canRetryDescriptor) {
-                echo '<form method="post" class="inline-form" style="margin:0;">';
-                echo '<input type="hidden" name="action" value="run_publicista_image_pipeline">';
-                echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-                echo '<button type="submit" class="btn-secondary-mini" title="Reintenta desde descriptor OpenAI y continúa el pipeline completo con la foto actual">Reintentar</button>';
-                echo '</form>';
-            }
-            if ($canContinueCopyPack) {
-                echo '<form method="post" class="inline-form" style="margin:0;">';
-                echo '<input type="hidden" name="action" value="generate_publicista_copy_pack">';
-                echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-                echo '<button type="submit" class="btn-secondary-mini" title="Continúa desde la fase de textos y completa el perfil">Continuar con el proceso</button>';
-                echo '</form>';
-            }
-        }
-        echo '</div>';
+        echo '<div class="info-strip" style="margin-top:10px;"><strong>Último error:</strong> ' . e($processing['last_error']) . '</div>';
     }
-    if (!empty($pipeline['summary'])) {
-        echo '<div class="info-strip" style="margin-top:8px;"><strong>Pipeline:</strong> ' . e($pipeline['summary']) . '</div>';
-    }
-    if ($isPipelineRunning) {
-        $runningText = 'La generación ya está lanzada. No hace falta volver a pulsar ningún botón.';
-        if ($pipelineStartedLabel !== '') {
-            $runningText .= ' Inicio: ' . $pipelineStartedLabel . '.';
-        }
-        $runningText .= ' Esta ficha se recargará sola para mostrar avances.';
-        echo '<div class="info-strip" style="margin-top:8px;background:#eff6ff;color:#1d4ed8;"><strong>' . e($pipelineWaitingLabel) . '</strong><br>' . e($runningText) . '</div>';
-        echo '<script>setTimeout(function(){ window.location.reload(); }, 12000);</script>';
-    }
+    echo '</section>';
 
-    echo '<div class="cards two" style="margin-top:16px;">';
-    // Imágenes de origen
-    echo '<div>';
+    echo '<section class="panel">';
+    echo '<h3>Original y descriptor</h3>';
     if (!empty($source['stored_path'])) {
-        publicista_render_job_image_card($source['stored_path'], 'Foto original subida');
+        publicista_render_job_image_card($source['stored_path'], 'Original');
     }
     if (!empty($localAssets['prepared_square_path'])) {
-        publicista_render_job_image_card($localAssets['prepared_square_path'], 'Base 1:1 sin deformar');
+        publicista_render_job_image_card($localAssets['prepared_square_path'], 'Origen 1:1');
     }
-    echo '</div>';
-    // Descriptor
-    echo '<div>';
+    if (!empty($localAssets['face_blur_path'])) {
+        publicista_render_job_image_card($localAssets['face_blur_path'], 'Blur facial origen');
+    }
+    if (!empty($localAssets['preview_path'])) {
+        publicista_render_job_image_card($localAssets['preview_path'], 'Preview');
+    }
     if (!empty($descriptorData)) {
-        echo '<div class="info-strip" style="margin-bottom:8px;"><strong>Descriptor IA generado</strong></div>';
+        echo '<div class="info-strip"><strong>Descriptor OpenAI</strong></div>';
         publicista_render_publicista_descriptor_summary($descriptorData);
     } else {
-        echo '<div class="empty">Descriptor pendiente. Sube la foto y pulsa "Solo preparar origen y descriptor" primero.</div>';
+        echo '<div class="empty">Aún no se ha generado el descriptor estructurado.</div>';
     }
-    echo '</div>';
+    echo '</section>';
     echo '</div>';
 
-    // Prompt maestro (colapsado)
+    echo '<div class="cards two">';
+    echo '<section class="panel">';
+    echo '<h3>Prompt maestro y restricciones</h3>';
+    if (!empty($restrictionLabels)) {
+        echo '<div class="info-strip"><strong>Restricciones rápidas:</strong> ' . e(implode(' · ', $restrictionLabels)) . '</div>';
+    }
+    if (!empty($workflow['restrictions_text'])) {
+        echo '<div class="info-strip" style="margin-top:10px;"><strong>Restricciones libres:</strong> ' . e($workflow['restrictions_text']) . '</div>';
+    }
     if (!empty($promptMaster['text'])) {
-        echo '<details style="margin-top:14px;">';
-        echo '<summary style="cursor:pointer;font-size:13px;color:#6b7280;">Ver prompt maestro generado · ' . e(format_created_at($promptMaster['built_at'] ?? '')) . '</summary>';
-        if (!empty($restrictionLabels)) {
-            echo '<div class="info-strip" style="margin-top:8px;"><strong>Restricciones:</strong> ' . e(implode(' · ', $restrictionLabels)) . '</div>';
-        }
-        echo '<pre style="white-space:pre-wrap;word-break:break-word;margin-top:8px;">' . e($promptMaster['text']) . '</pre>';
+        echo '<div class="info-strip" style="margin-top:10px;"><strong>Construido:</strong> ' . e(format_created_at($promptMaster['built_at'] ?? '')) . '</div>';
+        echo '<details style="margin-top:12px;"><summary>Ver prompt maestro</summary><pre style="white-space:pre-wrap;word-break:break-word;">' . e($promptMaster['text']) . '</pre></details>';
         if (!empty($promptMaster['variants']) && is_array($promptMaster['variants'])) {
-            echo '<ol style="margin:8px 0 0 18px;">';
+            echo '<details style="margin-top:12px;"><summary>Ver variantes de prompt</summary>';
+            echo '<ol style="margin:10px 0 0 18px;">';
             foreach ($promptMaster['variants'] as $variant) {
-                echo '<li style="margin-bottom:6px;font-size:12px;color:#6b7280;">' . e($variant) . '</li>';
+                echo '<li style="margin-bottom:8px;"><span class="muted">' . e($variant) . '</span></li>';
             }
-            echo '</ol>';
+            echo '</ol></details>';
         }
-        echo '</details>';
-    }
-    echo '</section>';
-
-    // -----------------------------------------------------------------------
-    // SECCIÓN 2: CANDIDATAS GENERADAS
-    // -----------------------------------------------------------------------
-    echo '<section class="panel panel-space" id="publicistaCandidates">';
-    // Elemento oculto para que el polling JS sepa el job actual
-    echo '<span id="publicistaRegenPollJobId" data-job-id="' . e($selectedJob['id'] ?? '') . '" style="display:none;"></span>';
-    echo '<div class="branch-panel-head"><h3>② Candidatas generadas</h3><span class="summary-badge">' . e((string)count($candidates)) . '</span></div>';
-    if (!empty($candidates)) {
-        echo '<div class="cards two" style="margin-top:14px;">';
-        if (!empty($strategy['window']) && is_array($strategy['window'])) {
-            echo '<div class="info-strip" style="margin-bottom:14px;"><strong>Franja de autosubidas</strong><br>' . e((string)$strategy['window']['start']) . ' → ' . e((string)$strategy['window']['end']) . '</div>';
-        }
-        foreach ($candidates as $cand) {
-            $isSelected = !empty($cand['selected']);
-            $cardBorder = $isSelected ? 'border:2px solid #6366f1;' : '';
-            echo '<div class="panel" style="padding:12px;' . $cardBorder . '" data-candidate-id="' . e($cand['id'] ?? '') . '">';
-            echo '<div class="branch-panel-head"><h4 style="margin:0;">' . e($cand['id'] ?? 'candidate') . ($isSelected ? ' <span style="color:#6366f1;font-size:11px;">★ TOP 6</span>' : '') . '</h4><span class="summary-badge">' . e((string)($cand['effective_score'] ?? 0)) . '</span></div>';
-            // Mostrar imagen sin blur: square_path si existe, si no preview_path, si no raw
-            $imgToShow = '';
-            if (!empty($cand['square_path'])) $imgToShow = $cand['square_path'];
-            elseif (!empty($cand['preview_path'])) $imgToShow = $cand['preview_path'];
-            elseif (!empty($cand['raw_path'])) $imgToShow = $cand['raw_path'];
-            if ($imgToShow !== '') {
-                publicista_render_job_image_card($imgToShow, 'Sin blur');
-            }
-            if (!empty($cand['evaluation']) && is_array($cand['evaluation'])) {
-                $ev = $cand['evaluation'];
-                echo '<div class="info-strip" style="margin-top:8px;font-size:12px;"><strong>Scores:</strong> Semejanza ' . e((string)($ev['likeness_score'] ?? 0)) . ' · Calidad ' . e((string)($ev['quality_score'] ?? 0)) . ' · Global ' . e((string)($ev['overall_score'] ?? 0)) . '</div>';
-                $boolFields = array(
-                    'hands_ok' => 'Manos', 'anatomy_ok' => 'Anatomía', 'single_face_clear' => 'Cara única',
-                    'body_proportions_match' => 'Complexión', 'skin_texture_ok' => 'Piel real',
-                    'mirror_coherent' => 'Espejo OK', 'background_ok' => 'Fondo',
-                );
-                $pills = array();
-                foreach ($boolFields as $field => $lbl) {
-                    if (!array_key_exists($field, $ev)) continue;
-                    $ok = !empty($ev[$field]);
-                    $pills[] = '<span style="font-size:11px;padding:2px 5px;border-radius:4px;background:' . ($ok ? '#dcfce7' : '#fee2e2') . ';color:' . ($ok ? '#15803d' : '#b91c1c') . ';">' . ($ok ? '✓' : '✗') . ' ' . e($lbl) . '</span>';
-                }
-                if (!empty($pills)) echo '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:3px;">' . implode('', $pills) . '</div>';
-                if (!empty($ev['issues']) && is_array($ev['issues'])) {
-                    echo '<div style="margin-top:6px;font-size:11px;color:#b45309;"><strong>Issues:</strong> ' . e(implode(' · ', $ev['issues'])) . '</div>';
-                }
-            }
-            if (!empty($cand['error'])) {
-                echo '<div class="info-strip" style="margin-top:8px;color:#b91c1c;font-size:12px;"><strong>Error:</strong> ' . e($cand['error']) . '</div>';
-            }
-            echo '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">';
-            if ($isPipelineRunning) {
-                echo '<span class="info-strip" style="font-size:12px;background:#f8fafc;">Generación en curso: espera a que termine para regenerar candidatas manualmente.</span>';
-            } else {
-                echo '<button type="button" class="btn-secondary-mini js-open-regenerate-candidate-modal" data-job-id="' . e($selectedJob['id'] ?? '') . '" data-candidate-id="' . e($cand['id'] ?? '') . '">Regenerar esta</button>';
-            }
-            echo '</div>';
-            echo '<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;color:#9ca3af;">Ver prompt</summary><pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;">' . e($cand['prompt'] ?? '') . '</pre></details>';
-            echo '</div>';
-        }
-        echo '</div>';
     } else {
-        echo '<div class="empty">' . ($isPipelineRunning ? 'La generación está en curso. Esta ficha se actualizará sola cuando entren las candidatas.' : 'Aún no hay candidatas generadas. Pulsa el botón principal de arriba.') . '</div>';
+        echo '<div class="empty">Aún no se ha construido el prompt maestro.</div>';
     }
     echo '</section>';
 
-    // -----------------------------------------------------------------------
-    // SECCIÓN 3: FINALES DEL PACK — sin blur + con blur manual
-    // -----------------------------------------------------------------------
-    echo '<section class="panel panel-space" id="publicistaFinals">';
-    echo '<div class="branch-panel-head"><h3>③ Definitivas del pack</h3><span class="summary-badge">' . e((string)count($finalImages)) . '</span></div>';
-    $usesPolloVisualFlow = function_exists('publicista_job_uses_pollo_model') && publicista_job_uses_pollo_model($selectedJob ?? array());
+    echo '<section class="panel" id="publicistaFinals">';
+    echo '<h3>Finales del pack</h3>';
     if (!empty($finalImages)) {
-        if ($usesPolloVisualFlow) {
-            echo '<p style="font-size:13px;color:#6b7280;margin:4px 0 14px;">Ahora las definitivas arrancan siendo la <strong>misma candidata elegida</strong>. El botón <strong style="color:#2563eb;">Generar propuesta refinada</strong> crea una alternativa aparte y tú decides si la adoptas o si prefieres seguir con la candidata actual. El <strong style="color:#7c3aed;">Blur manual</strong> siempre actúa sobre la definitiva actual.</p>';
-        } else {
-            echo '<p style="font-size:13px;color:#6b7280;margin:4px 0 14px;">Aquí revisas el flujo final en el orden correcto: primero la <strong>versión limpia</strong> y al lado la <strong>definitiva actual</strong>. El botón <strong style="color:#7c3aed;">Blur manual</strong> abre un editor con elipse e intensidad regulable. La final ya viene refinada en modo premium antes del blur.</p>';
-        }
         echo '<div class="cards two">';
         foreach ($finalImages as $finalRow) {
-            $fId = $finalRow['id'] ?? '';
-            $squareSrc = !empty($finalRow['square_path']) ? $finalRow['square_path'] : (!empty($finalRow['final_path']) ? $finalRow['final_path'] : '');
-            $blurSrc = !empty($finalRow['final_path']) ? $finalRow['final_path'] : $squareSrc;
-            $proposalSrc = !empty($finalRow['refine_proposal_path']) ? $finalRow['refine_proposal_path'] : '';
-            // Cache-busting: añadir filemtime para forzar recarga si el archivo cambia
-            $bustSrc = function($p) { if ($p === '') return ''; $fs = BASE_PATH . '/' . ltrim($p, '/'); $m = @filemtime($fs); return ($m > 0) ? $p . '?t=' . $m : $p; };
-            $squareSrcBust  = $bustSrc($squareSrc);
-            $blurSrcBust    = $bustSrc($blurSrc);
-            $proposalSrcBust = $bustSrc($proposalSrc);
-            echo '<div class="panel" style="padding:12px;" id="finalCard_' . e($fId) . '">';
-            $manualBlurApplied = !empty($finalRow['manual_blur_applied']);
-            $manualBlurIntensity = (int)($finalRow['manual_blur_intensity'] ?? 0);
-            echo '<div class="branch-panel-head" style="margin-bottom:8px;"><strong>' . e($fId ?: 'Final') . '</strong><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><span class="summary-badge">Score ' . e((string)($finalRow['evaluation_score'] ?? 0)) . '</span><span id="finalBlurStatus_' . e($fId) . '" class="summary-badge" style="background:' . ($manualBlurApplied ? '#ede9fe' : '#f3f4f6') . ';color:' . ($manualBlurApplied ? '#6d28d9' : '#6b7280') . ';">' . e($manualBlurApplied ? ('Blur manual · ' . $manualBlurIntensity . '/20') : 'Sin blur manual') . '</span>';
-            if ($usesPolloVisualFlow && $proposalSrc !== '') {
-                echo '<span class="summary-badge" style="background:#dbeafe;color:#1d4ed8;">Propuesta refinada pendiente</span>';
+            echo '<div class="panel" style="padding:12px;">';
+            if (!empty($finalRow['final_path'])) {
+                publicista_render_job_image_card($finalRow['final_path'], ($finalRow['id'] ?? 'Final'));
             }
-            echo '</div></div>';
-            echo '<div class="cards two" style="gap:8px;">';
-            echo '<div>';
-            echo '<div style="font-size:11px;color:#9ca3af;margin-bottom:4px;text-align:center;">Definitiva actual</div>';
-            if ($blurSrc !== '') {
-                echo '<img id="finalBlurImg_' . e($fId) . '" src="' . e($blurSrcBust) . '" alt="Definitiva actual" style="width:100%;border-radius:8px;border:1px solid #e5e7eb;display:block;">';
-            }
-            echo '</div>';
-            echo '<div id="finalProposalCol_' . e($fId) . '">';
-            echo '<div style="font-size:11px;color:#9ca3af;margin-bottom:4px;text-align:center;">' . ($usesPolloVisualFlow ? 'Propuesta refinada' : 'Candidata elegida') . '</div>';
-            $secondSrc = $usesPolloVisualFlow ? $proposalSrc : $squareSrc;
-            $secondSrcBust = $usesPolloVisualFlow ? $proposalSrcBust : $squareSrcBust;
-            if ($secondSrc !== '') {
-                echo '<img src="' . e($secondSrcBust) . '" alt="Propuesta" style="width:100%;border-radius:8px;border:1px solid #e5e7eb;display:block;">';
-            } else {
-                echo '<div style="text-align:center;font-size:12px;color:#9ca3af;padding:20px 0;">' . ($usesPolloVisualFlow ? 'Todavía no hay propuesta refinada para esta final.' : 'Sin imagen adicional') . '</div>';
-            }
-            echo '</div>';
-            echo '</div>';
-            if ($usesPolloVisualFlow) {
-                echo '<div style="font-size:12px;color:#6b7280;margin-top:10px;">' . ($proposalSrc !== '' ? 'Ya tienes una propuesta refinada lista para comparar. Puedes adoptarla o quedarte con la candidata actual.' : 'Esta definitiva usa la candidata original. Si quieres, genera una propuesta refinada y decide después con cuál quedarte.') . '</div>';
-            } else {
-                echo '<div style="font-size:12px;color:#6b7280;margin-top:10px;">' . ($manualBlurApplied ? ('Blur manual aplicado con intensidad <strong>' . e((string)$manualBlurIntensity) . '/20</strong>. Puedes reabrir el editor para subirlo o bajarlo.') : 'Todavía sin blur manual. La imagen definitiva está limpia y lista para editar.') . '</div>';
-            }
-
+            echo '<div class="info-strip" style="margin-top:10px;"><strong>Origen:</strong> ' . e($finalRow['source_candidate_id'] ?? '-') . '</div>';
+            echo '<div class="info-strip" style="margin-top:10px;"><strong>Score:</strong> ' . e((string)($finalRow['evaluation_score'] ?? 0)) . '</div>';
             echo '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">';
-            if ($blurSrc !== '') {
-                echo '<button type="button" class="btn-primary js-manual-blur-btn" style="background:#7c3aed;border-color:#7c3aed;" '
-                    . 'data-job-id="' . e($selectedJob['id'] ?? '') . '" '
-                    . 'data-final-id="' . e($fId) . '" '
-                    . 'data-square-src="' . e($blurSrc) . '" '
-                    . 'data-intensity="' . e((string)((int)($finalRow['manual_blur_intensity'] ?? 8))) . '">✏ Blur manual</button>';
-            }
             echo '<form method="post" class="inline-form">';
             echo '<input type="hidden" name="action" value="refresh_publicista_final_local">';
             echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-            echo '<input type="hidden" name="final_id" value="' . e($fId) . '">';
-            echo '<input type="hidden" name="mode" value="reframe">';
-            echo '<button class="btn-secondary-mini">' . ($usesPolloVisualFlow ? ($proposalSrc !== '' ? 'Regenerar propuesta refinada' : 'Generar propuesta refinada') : 'Rehacer final premium') . '</button>';
+            echo '<input type="hidden" name="final_id" value="' . e($finalRow['id'] ?? '') . '">';
+            echo '<input type="hidden" name="mode" value="blur">';
+            echo '<button class="btn-secondary-mini">Reaplicar blur</button>';
             echo '</form>';
-            if ($usesPolloVisualFlow && $proposalSrc !== '') {
-                echo '<form method="post" class="inline-form">';
-                echo '<input type="hidden" name="action" value="choose_publicista_final_variant">';
-                echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-                echo '<input type="hidden" name="final_id" value="' . e($fId) . '">';
-                echo '<input type="hidden" name="choice" value="refined">';
-                echo '<button class="btn-primary" style="background:#2563eb;border-color:#2563eb;">Usar refinada como definitiva</button>';
-                echo '</form>';
-                echo '<form method="post" class="inline-form">';
-                echo '<input type="hidden" name="action" value="choose_publicista_final_variant">';
-                echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-                echo '<input type="hidden" name="final_id" value="' . e($fId) . '">';
-                echo '<input type="hidden" name="choice" value="candidate">';
-                echo '<button class="btn-secondary-mini">Quedarme con la candidata actual</button>';
-                echo '</form>';
-            }
+            echo '<form method="post" class="inline-form">';
+            echo '<input type="hidden" name="action" value="refresh_publicista_final_local">';
+            echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
+            echo '<input type="hidden" name="final_id" value="' . e($finalRow['id'] ?? '') . '">';
+            echo '<input type="hidden" name="mode" value="reframe">';
+            echo '<button class="btn-secondary-mini">Rehacer 1:1</button>';
+            echo '</form>';
             echo '</div>';
-            if ($usesPolloVisualFlow && !empty($finalRow['refine_proposal_prompt'])) {
-                echo '<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;color:#9ca3af;">Ver prompt de la propuesta refinada</summary><pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;">' . e($finalRow['refine_proposal_prompt']) . '</pre></details>';
-            }
             echo '</div>';
         }
         echo '</div>';
     } else {
-        echo '<div class="empty">Finales pendientes. Se crean automáticamente al completar el pipeline de imágenes.</div>';
+        echo '<div class="empty">Todavía no hay 4 finales generadas.</div>';
+    }
+    echo '</section>';
+    echo '</div>';
+
+    echo '<section class="panel panel-space" id="publicistaCandidates">';
+    echo '<h3>Candidatas generadas</h3>';
+    if (!empty($candidates)) {
+        echo '<div class="cards two">';
+        foreach ($candidates as $cand) {
+            echo '<div class="panel" style="padding:12px;">';
+            echo '<div class="branch-panel-head"><h4 style="margin:0;">' . e($cand['id'] ?? 'candidate') . '</h4><span class="summary-badge">' . e((string)($cand['effective_score'] ?? 0)) . '</span></div>';
+            if (!empty($cand['preview_path'])) {
+                publicista_render_job_image_card($cand['preview_path'], 'Preview');
+            } elseif (!empty($cand['raw_path'])) {
+                publicista_render_job_image_card($cand['raw_path'], 'Raw');
+            }
+            echo '<div class="info-strip" style="margin-top:10px;"><strong>Estado:</strong> ' . e($cand['status'] ?? '-') . '</div>';
+            echo '<div class="info-strip" style="margin-top:10px;"><strong>Ronda:</strong> ' . e($cand['round'] ?? '-') . '</div>';
+            if (!empty($cand['evaluation']) && is_array($cand['evaluation'])) {
+                echo '<div class="info-strip" style="margin-top:10px;"><strong>Likeness / quality / overall:</strong> ' . e((string)($cand['evaluation']['likeness_score'] ?? 0)) . ' / ' . e((string)($cand['evaluation']['quality_score'] ?? 0)) . ' / ' . e((string)($cand['evaluation']['overall_score'] ?? 0)) . '</div>';
+                if (!empty($cand['evaluation']['issues']) && is_array($cand['evaluation']['issues'])) {
+                    echo '<div class="info-strip" style="margin-top:10px;"><strong>Issues:</strong> ' . e(implode(' | ', $cand['evaluation']['issues'])) . '</div>';
+                }
+            }
+            if (!empty($cand['selected'])) {
+                echo '<div class="info-strip" style="margin-top:10px;"><strong>Top 4:</strong> Seleccionada</div>';
+            }
+            if (!empty($cand['error'])) {
+                echo '<div class="info-strip" style="margin-top:10px;"><strong>Error:</strong> ' . e($cand['error']) . '</div>';
+            }
+            echo '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">';
+            echo '<form method="post" class="inline-form">';
+            echo '<input type="hidden" name="action" value="regenerate_publicista_candidate">';
+            echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
+            echo '<input type="hidden" name="candidate_id" value="' . e($cand['id'] ?? '') . '">';
+            echo '<button class="btn-secondary-mini">Regenerar esta</button>';
+            echo '</form>';
+            echo '</div>';
+            echo '<details style="margin-top:12px;"><summary>Ver prompt</summary><pre style="white-space:pre-wrap;word-break:break-word;">' . e($cand['prompt'] ?? '') . '</pre></details>';
+            echo '</div>';
+        }
+        echo '</div>';
+    } else {
+        echo '<div class="empty">Aún no hay candidatas generadas.</div>';
     }
     echo '</section>';
 
-// -----------------------------------------------------------------------
-// SECCIÓN 4: FOTOS REALES SUBIDAS
-// -----------------------------------------------------------------------
-$realPhotos = is_array($selectedJob['real_photos'] ?? null) ? $selectedJob['real_photos'] : array();
-echo '<section class="panel panel-space" id="publicistaReals">';
-echo '<div class="branch-panel-head"><h3>④ Fotos reales subidas</h3><span class="summary-badge">' . e((string)count($realPhotos)) . '</span></div>';
-
-if (!empty($realPhotos)) {
-    echo '<div style="margin-top:8px;font-size:12px;color:#6b7280;">Estas fotos se subieron manualmente. Puedes eliminarlas o más adelante aplicarles blur manual desde esta misma sección.</div>';
-    echo '<div class="cards two" style="margin-top:14px;">';
-    foreach ($realPhotos as $rp) {
-        $rpId = $rp['id'] ?? '';
-        $rpPath = $rp['stored_path'] ?? '';
-        $rpName = $rp['original_filename'] ?? $rpId;
-        $rpWidth = (int)($rp['width'] ?? 0);
-        $rpHeight = (int)($rp['height'] ?? 0);
-        $rpUploaded = $rp['uploaded_at'] ?? '';
-        echo '<div class="panel" style="padding:12px;">';
-        echo '<div class="branch-panel-head" style="margin-bottom:8px;"><strong>' . e($rpName) . '</strong></div>';
-        if ($rpPath !== '') {
-            echo '<img id="realBlurImg_' . e($rpId) . '" src="' . e($rpPath) . '" alt="Foto real" style="width:100%;border-radius:8px;border:1px solid #e5e7eb;display:block;">';
-        }
-        echo '<div style="display:flex;gap:8px;margin-top:8px;font-size:11px;color:#9ca3af;">';
-        echo '<span>' . e($rpWidth . '×' . $rpHeight) . '</span>';
-        if ($rpUploaded !== '') {
-            echo '<span>' . e(format_created_at($rpUploaded)) . '</span>';
-        }
-        echo '</div>';
-        $rpBlurApplied = !empty($rp['manual_blur_applied']);
-        $rpBlurIntensity = (int)($rp['manual_blur_intensity'] ?? 0);
-        echo '<div style="display:flex;gap:8px;margin-top:8px;">';
-        echo '<button type="button" class="btn-primary js-manual-blur-btn" style="font-size:12px;padding:4px 10px;background:#7c3aed;border-color:#7c3aed;" '
-            . 'data-job-id="' . e($selectedJob['id'] ?? '') . '" '
-            . 'data-photo-id="' . e($rpId) . '" '
-            . 'data-square-src="' . e($rpPath) . '" '
-            . 'data-intensity="' . e((string)$rpBlurIntensity) . '" '
-            . 'data-target="real">✏ Blur manual</button>';
-        if ($rpBlurApplied) {
-            echo '<span id="realBlurStatus_' . e($rpId) . '" class="summary-badge" style="background:#ede9fe;color:#6d28d9;">Blur · ' . e((string)$rpBlurIntensity) . '/20</span>';
-        } else {
-            echo '<span id="realBlurStatus_' . e($rpId) . '" class="summary-badge" style="background:#f3f4f6;color:#6b7280;">Sin blur</span>';
-        }
-        echo '</div>';
-        echo '<form method="post" class="inline-form" style="margin-top:8px;" onsubmit="return confirm(\'¿Eliminar esta foto real?\')">';
-        echo '<input type="hidden" name="action" value="delete_publicista_real_photo">';
-        echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
-        echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-        echo '<input type="hidden" name="photo_id" value="' . e($rpId) . '">';
-        echo '<button class="btn-secondary-mini" style="color:#b91c1c;">Eliminar</button>';
-        echo '</form>';
-        echo '</div>';
-    }
-    echo '</div>';
-} else {
-    echo '<div class="empty">No hay fotos reales subidas todavía. Usa el formulario de abajo para añadirlas.</div>';
-}
-
-// Formulario rápido de subida desde la sección
-echo '<form method="post" enctype="multipart/form-data" class="inline-form" style="margin-top:14px;">';
-echo '<input type="hidden" name="action" value="upload_publicista_real_photos">';
-echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
-echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-echo '<input type="file" name="real_photos[]" accept="image/jpeg,image/png,image/webp" multiple style="font-size:12px;">';
-echo ' <button class="btn-secondary-mini">Subir fotos reales</button>';
-echo '</form>';
-echo '</section>';
-
-// -----------------------------------------------------------------------
-// SECCIÓN 5: FOTOS POR PLATAFORMA
-// -----------------------------------------------------------------------
-$allPhotosForSelection = array_merge(
-    is_array($selectedJob['final_images'] ?? null) ? $selectedJob['final_images'] : array(),
-    is_array($selectedJob['real_photos'] ?? null) ? $selectedJob['real_photos'] : array()
-);
-$platformPhotos = is_array($selectedJob['platform_photos'] ?? null) ? $selectedJob['platform_photos'] : array(
-    'destacamos' => array(), 'mundosex' => array(), 'girlsconf' => array(),
-);
-
-echo '<section class="panel panel-space" id="publicistaPlatformPhotos">';
-echo '<div class="branch-panel-head"><h3>⑤ Fotos por plataforma</h3><span class="summary-badge">Selecciona cuáles usar</span></div>';
-echo '<div style="margin-top:8px;font-size:12px;color:#6b7280;">Para cada plataforma, marca las fotos que quieres que se usen al publicar. Si no configuras una plataforma, la campaña <strong>no se podrá ejecutar</strong> para ese portal.</div>';
-
-if (empty($allPhotosForSelection)) {
-    echo '<div class="empty" style="margin-top:14px;">No hay fotos disponibles todavía. Genera las definitivas primero.</div>';
-} else {
-    echo '<form method="post" style="margin-top:14px;">';
-    echo '<input type="hidden" name="action" value="save_publicista_platform_photos">';
-    echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-    echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
-
-    $platforms = array(
-        'destacamos' => 'Destacamos',
-        'mundosex'   => 'Mundosex',
-        'girlsconf'  => 'Girlsconf',
-    );
-
-    foreach ($platforms as $pCode => $pName) {
-        $selectedIds = is_array($platformPhotos[$pCode] ?? null) ? $platformPhotos[$pCode] : array();
-        $selectedCount = count($selectedIds);
-        echo '<div style="margin-bottom:20px;border:1px solid #e5e7eb;border-radius:10px;padding:14px;">';
-        echo '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
-        echo '<strong style="font-size:14px;">' . e($pName) . '</strong>';
-        echo '<span class="summary-badge">' . e((string)$selectedCount) . ' seleccionadas</span>';
-        echo '</div>';
-        echo '<div style="display:flex;flex-wrap:wrap;gap:10px;">';
-        foreach ($allPhotosForSelection as $photo) {
-            $pId = trim((string)($photo['id'] ?? ''));
-            if ($pId === '') continue;
-            $pSrc = '';
-            if (!empty($photo['preview_path'])) $pSrc = $photo['preview_path'];
-            elseif (!empty($photo['square_path'])) $pSrc = $photo['square_path'];
-            elseif (!empty($photo['final_path'])) $pSrc = $photo['final_path'];
-            elseif (!empty($photo['stored_path'])) $pSrc = $photo['stored_path'];
-            
-            $checked = in_array($pId, $selectedIds, true) ? ' checked' : '';
-            $isReal = strpos($pId, 'real_') === 0;
-            $isFinal = strpos($pId, 'final_') === 0;
-            if ($isReal) {
-                $label = '📸 ' . e($photo['original_filename'] ?? $pId);
-                $typeBadge = ' <span style="font-size:9px;background:#fef3c7;color:#92400e;padding:1px 4px;border-radius:3px;">REAL</span>';
-            } elseif ($isFinal) {
-                $label = 'Definitiva #' . substr($pId, 6);
-                $typeBadge = ' <span style="font-size:9px;background:#dbeafe;color:#1e40af;padding:1px 4px;border-radius:3px;">DEF</span>';
-            } else {
-                $label = e($pId);
-                $typeBadge = '';
-            }
-            $blurBadge = '';
-            if (!empty($photo['manual_blur_applied'])) {
-                $blurBadge = ' <span style="font-size:9px;background:#ede9fe;color:#6d28d9;padding:1px 4px;border-radius:3px;">BLUR</span>';
-            }
-            
-            echo '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;border:2px solid ' . ($checked ? '#6366f1' : '#e5e7eb') . ';border-radius:8px;padding:4px;min-width:110px;transition:border-color .15s;" class="platform-photo-label">';
-            if ($pSrc !== '') {
-                echo '<img src="' . e($pSrc) . '" style="width:100px;height:100px;object-fit:cover;border-radius:6px;">';
-            }
-            echo '<span style="font-size:10px;color:#374151;text-align:center;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' . $label . $typeBadge . $blurBadge . '</span>';
-            echo '<input type="checkbox" name="platform_photos[' . e($pCode) . '][]" value="' . e($pId) . '"' . $checked . ' style="clip:rect(0,0,0,0);clip-path:inset(50%);position:absolute;width:1px;height:1px;overflow:hidden;white-space:nowrap;">';
-            echo '</label>';
-        }
-        echo '</div>';
-        echo '</div>';
-    }
-
-    echo '<div class="full"><button class="btn-primary">Guardar configuración por plataforma</button></div>';
-    echo '</form>';
-}
-echo '</section>';
-
     echo '<section class="panel panel-space" id="publicistaCopyPack">';
     echo '<div class="section-head"><div><h3>Títulos, textos y export</h3><p>Genera el pack de copy, revisa variantes y exporta todo para publicar.</p></div><div class="section-head-actions">';
-    echo '<button type="button" class="btn-primary" onclick="openRegenerateCopyPackModal(\'' . e($selectedJob['id'] ?? '') . '\')">Generar / regenerar textos</button>';
+    echo '<form method="post" class="inline-form">';
+    echo '<input type="hidden" name="action" value="generate_publicista_copy_pack">';
+    echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
+    echo '<button class="btn-primary">Generar / regenerar textos</button>';
+    echo '</form>';
     echo '</div></div>';
     echo '<div class="cards three">';
     echo '<div class="info-strip"><strong>Versión actual</strong><br>' . e($copyPack['current_version_id'] ?? 'Pendiente') . '</div>';
     echo '<div class="info-strip"><strong>Generado</strong><br>' . e(format_created_at($copyPack['generated_at'] ?? '')) . '</div>';
-    echo '<div class="info-strip"><strong>Reintentos</strong><br>' . e((string)($copyPack['retry_count'] ?? 0)) . (!empty($currentCopyVersion['generation_phases']) ? ' · Fases: ' . e((string)$currentCopyVersion['generation_phases']) : '') . '</div>';
+    echo '<div class="info-strip"><strong>Reintentos</strong><br>' . e((string)($copyPack['retry_count'] ?? 0)) . '</div>';
     echo '</div>';
     if (!empty($copyPack['last_error'])) {
-        echo '<div class="info-strip" style="margin-top:10px;color:#b91c1c;"><strong>Último error textos:</strong> ' . e($copyPack['last_error']) . '</div>';
+        echo '<div class="info-strip" style="margin-top:10px;"><strong>Último error textos:</strong> ' . e($copyPack['last_error']) . '</div>';
     }
-
-    // Panel de validación automática
-    if ($currentCopyVersion && !empty($currentCopyVersion['validation']) && is_array($currentCopyVersion['validation'])) {
-        echo '<section class="panel" style="margin-top:14px;border-left:4px solid #6366f1;">';
-        echo '<h4>Validación automática por plataforma</h4>';
-        $val = $currentCopyVersion['validation'];
-        if (!empty($val['titles_check']) && is_array($val['titles_check'])) {
-            echo '<details style="margin-top:10px;"><summary>Títulos — estado por plataforma</summary><div style="margin-top:10px;display:grid;gap:6px;">';
-            $titleOpts = is_array($currentCopyVersion['title_options'] ?? null) ? $currentCopyVersion['title_options'] : array();
-            foreach ($val['titles_check'] as $tc) {
-                $idx = (int)($tc['index'] ?? 0);
-                $titleText = $titleOpts[$idx] ?? '?';
-                $okDest = !empty($tc['ok_destacamos']);
-                $okLo = !empty($tc['ok_loquosex']);
-                $issues = is_array($tc['issues'] ?? null) ? $tc['issues'] : array();
-                $destIcon = $okDest ? '✓' : '✗';
-                $destColor = $okDest ? '#15803d' : '#b91c1c';
-                $loIcon = $okLo ? '✓' : '✗';
-                $loColor = $okLo ? '#15803d' : '#b91c1c';
-                echo '<div class="info-strip" style="font-size:12px;">';
-                echo '<strong>T' . ($idx + 1) . ':</strong> ' . e($titleText) . '<br>';
-                echo '<span style="color:' . $destColor . ';">' . $destIcon . ' destacamos</span> &nbsp; <span style="color:' . $loColor . ';">' . $loIcon . ' loquosex</span>';
-                if (!empty($issues)) echo '<br><span style="color:#b45309;">' . e(implode(' · ', $issues)) . '</span>';
-                echo '</div>';
-            }
-            echo '</div></details>';
-        }
-        if (!empty($val['ads_check']) && is_array($val['ads_check'])) {
-            echo '<details style="margin-top:10px;"><summary>Anuncios — estado variante neutra</summary><div style="margin-top:10px;display:grid;gap:6px;">';
-            foreach ($val['ads_check'] as $ac) {
-                $slot = trim((string)($ac['slot'] ?? 'Anuncio'));
-                $neutralOk = !empty($ac['neutral_ok']);
-                $suggestiveOk = !empty($ac['suggestive_ok']);
-                $neutralIssues = is_array($ac['neutral_issues'] ?? null) ? $ac['neutral_issues'] : array();
-                $suggestiveIssues = is_array($ac['suggestive_issues'] ?? null) ? $ac['suggestive_issues'] : array();
-                $nIcon = $neutralOk ? '✓' : '✗';
-                $nColor = $neutralOk ? '#15803d' : '#b91c1c';
-                $sIcon = $suggestiveOk ? '✓' : '✗';
-                $sColor = $suggestiveOk ? '#15803d' : '#b91c1c';
-                echo '<div class="info-strip" style="font-size:12px;">';
-                echo '<strong>' . e($slot) . ':</strong> ';
-                echo '<span style="color:' . $nColor . ';">' . $nIcon . ' neutra</span> &nbsp; <span style="color:' . $sColor . ';">' . $sIcon . ' sugerente</span>';
-                if (!empty($neutralIssues)) echo '<br><span style="color:#b45309;">Neutra: ' . e(implode(' · ', $neutralIssues)) . '</span>';
-                if (!empty($suggestiveIssues)) echo '<br><span style="color:#b45309;">Sugerente: ' . e(implode(' · ', $suggestiveIssues)) . '</span>';
-                echo '</div>';
-            }
-            echo '</div></details>';
-        }
-        echo '</section>';
-    }
-
     echo '<div class="cards two" style="margin-top:14px;">';
     echo '<section class="panel">';
     echo '<h4>Resumen actual</h4>';
     if ($currentCopyVersion) {
         echo '<div class="info-strip"><strong>Tono:</strong> ' . e(publicista_copy_tone_label($currentCopyVersion['tone'] ?? 'equilibrado')) . '</div>';
         echo '<div class="info-strip" style="margin-top:10px;"><strong>Enfoque:</strong> ' . e($currentCopyVersion['pack_angle'] ?? '-') . '</div>';
-        if (!empty($currentCopyVersion['reference_source_label'])) {
-            echo '<div class="info-strip" style="margin-top:10px;"><strong>Base externa usada:</strong> ' . e($currentCopyVersion['reference_source_label']);
-            if (!empty($currentCopyVersion['reference_examples_count'])) echo ' · ' . e((string)$currentCopyVersion['reference_examples_count']) . ' ejemplos';
-            echo '</div>';
-        }
         if (!empty($copyPack['current_export_txt_path'])) {
             echo '<div class="info-strip" style="margin-top:10px;"><strong>TXT export:</strong> <a class="mini-link" href="' . e($copyPack['current_export_txt_path']) . '" target="_blank" rel="noopener">Abrir</a></div>';
         }
@@ -3377,37 +996,11 @@ echo '</section>';
             echo '<div class="info-strip" style="margin-top:10px;"><strong>JSON export:</strong> <a class="mini-link" href="' . e($copyPack['current_export_json_path']) . '" target="_blank" rel="noopener">Abrir</a></div>';
         }
         if (!empty($currentCopyVersion['title_options']) && is_array($currentCopyVersion['title_options'])) {
-            $val = is_array($currentCopyVersion['validation'] ?? null) ? $currentCopyVersion['validation'] : array();
-            $titleValMap = array();
-            foreach ((array)($val['titles_check'] ?? array()) as $tc) {
-                $titleValMap[(int)($tc['index'] ?? -1)] = $tc;
+            echo '<details style="margin-top:12px;"><summary>Ver títulos</summary><ul style="margin:10px 0 0 18px;">';
+            foreach ($currentCopyVersion['title_options'] as $title) {
+                echo '<li>' . e($title) . '</li>';
             }
-            echo '<details style="margin-top:12px;" open><summary>Ver títulos finales (' . count($currentCopyVersion['title_options']) . ')</summary><div style="display:grid;gap:10px;margin-top:10px;">';
-            foreach ($currentCopyVersion['title_options'] as $titleIdx => $title) {
-                $tv = $titleValMap[$titleIdx] ?? null;
-                echo '<div class="info-strip">';
-                echo '<strong>T' . ($titleIdx + 1) . ':</strong> ' . e($title);
-                if ($tv !== null) {
-                    $ok = !empty($tv['ok_destacamos']);
-                    echo ' <span style="font-size:11px;color:' . ($ok ? '#15803d' : '#b91c1c') . ';">' . ($ok ? '✓ destacamos' : '✗ destacamos') . '</span>';
-                }
-                echo '<form method="post" class="inline-form" style="margin-top:8px;">';
-                echo '<input type="hidden" name="action" value="regenerate_publicista_copy_title">';
-                echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-                echo '<input type="hidden" name="title_index" value="' . e((string)$titleIdx) . '">';
-                echo '<button class="btn-secondary-mini">Regenerar</button>';
-                echo '</form>';
-                echo '</div>';
-            }
-            echo '</div></details>';
-        }
-        if (!empty($currentCopyVersion['title_candidates']) && is_array($currentCopyVersion['title_candidates'])) {
-            echo '<details style="margin-top:10px;"><summary>Ver pool fase A (' . count($currentCopyVersion['title_candidates']) . ' candidatos)</summary>';
-            echo '<ol style="margin:10px 0 0 18px;">';
-            foreach ($currentCopyVersion['title_candidates'] as $tc) {
-                echo '<li style="font-size:12px;color:#6b7280;margin-bottom:4px;">' . e((string)$tc) . '</li>';
-            }
-            echo '</ol></details>';
+            echo '</ul></details>';
         }
         if (!empty($copyPack['current_export_text'])) {
             echo '<details style="margin-top:12px;"><summary>Ver export listo para copiar/pegar</summary><pre style="white-space:pre-wrap;word-break:break-word;max-height:420px;overflow:auto;">' . e($copyPack['current_export_text']) . '</pre></details>';
@@ -3440,12 +1033,6 @@ echo '</section>';
             echo '<h4>' . e($ad['slot'] ?? 'Anuncio') . '</h4>';
             echo '<div class="info-strip"><strong>Focus:</strong> ' . e($ad['focus'] ?? '-') . '</div>';
             echo '<div class="info-strip" style="margin-top:10px;"><strong>Hook:</strong> ' . e($ad['short_hook'] ?? '-') . '</div>';
-            echo '<form method="post" class="inline-form" style="margin-top:12px;">';
-            echo '<input type="hidden" name="action" value="regenerate_publicista_copy_ad">';
-            echo '<input type="hidden" name="id" value="' . e($selectedJob['id'] ?? '') . '">';
-            echo '<input type="hidden" name="slot" value="' . e($ad['slot'] ?? '') . '">';
-            echo '<button class="btn-secondary-mini">Regenerar este anuncio</button>';
-            echo '</form>';
             echo '<details style="margin-top:12px;"><summary>Variante neutra</summary><div class="info-strip" style="margin-top:10px;"><strong>Título:</strong> ' . e($ad['title_neutral'] ?? '') . '</div><pre style="white-space:pre-wrap;word-break:break-word;">' . e($ad['body_neutral'] ?? '') . '</pre></details>';
             echo '<details style="margin-top:12px;"><summary>Variante sugerente</summary><div class="info-strip" style="margin-top:10px;"><strong>Título:</strong> ' . e($ad['title_suggestive'] ?? '') . '</div><pre style="white-space:pre-wrap;word-break:break-word;">' . e($ad['body_suggestive'] ?? '') . '</pre></details>';
             echo '</section>';
@@ -3459,592 +1046,6 @@ echo '</section>';
         echo '<div class="info-strip" style="margin-top:10px;"><strong>' . e($label) . ':</strong> ' . e($path) . '</div>';
     }
     echo '</section>';
-
-    // -----------------------------------------------------------------------
-    // Modal de regenerado de textos + candidata + Modal de blur manual
-    // -----------------------------------------------------------------------
-    echo <<<'HTML'
-<div id="regenerateCopyPackModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10000;align-items:center;justify-content:center;flex-direction:column;">
-  <div style="background:#fff;border-radius:14px;padding:20px;max-width:720px;width:96vw;max-height:90vh;overflow:auto;box-shadow:0 8px 40px rgba(0,0,0,0.35);">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;">
-      <strong style="font-size:16px;">Regenerar textos con conceptos extra</strong>
-      <button type="button" onclick="closeRegenerateCopyPackModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;">&times;</button>
-    </div>
-    <p style="margin:0 0 10px;font-size:13px;color:#6b7280;">Se reutiliza el contexto actual de textos y, si quieres, se añaden nuevos conceptos para esta regeneración puntual.</p>
-    <form method="post" id="regenerateCopyPackForm">
-      <input type="hidden" name="action" value="generate_publicista_copy_pack">
-      <input type="hidden" name="id" id="regenCopyPackJobId" value="">
-      <label for="regenCopyPackExtraConcepts" style="display:block;font-size:13px;color:#374151;margin-bottom:6px;">Conceptos extra para el prompt (opcional)</label>
-      <textarea name="copy_extra_concepts" id="regenCopyPackExtraConcepts" rows="6" maxlength="1200" placeholder="Ejemplo: más enfoque elegante y exclusivo, gancho de novedad, CTA más directo y tono cercano..." style="width:100%;"></textarea>
-      <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-        <button type="submit" class="btn-primary">Generar / regenerar textos</button>
-        <button type="button" class="btn-secondary" onclick="closeRegenerateCopyPackModal()">Cancelar</button>
-        <span style="font-size:12px;color:#6b7280;">Este texto se aplica solo en esta ejecución; no sustituye tu brief libre guardado.</span>
-      </div>
-    </form>
-  </div>
-</div>
-
-<div id="regenerateCandidateModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10000;align-items:center;justify-content:center;flex-direction:column;">
-  <div style="background:#fff;border-radius:14px;padding:20px;max-width:720px;width:96vw;max-height:90vh;overflow:auto;box-shadow:0 8px 40px rgba(0,0,0,0.35);">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;">
-      <strong style="font-size:16px;">Regenerar candidata con refinado</strong>
-      <button type="button" onclick="closeRegenerateCandidateModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;">&times;</button>
-    </div>
-    <p style="margin:0 0 10px;font-size:13px;color:#6b7280;">Se reutiliza el prompt base de esta candidata y se añade tu texto de refinado para regenerarla.</p>
-    <form method="post" id="regenerateCandidateForm">
-      <input type="hidden" name="action" value="regenerate_publicista_candidate">
-      <input type="hidden" name="id" id="regenCandidateJobId" value="">
-      <input type="hidden" name="candidate_id" id="regenCandidateId" value="">
-      <label for="regenCandidateRefineText" style="display:block;font-size:13px;color:#374151;margin-bottom:6px;">Texto de refinado (opcional)</label>
-      <textarea name="refine_text" id="regenCandidateRefineText" rows="6" maxlength="1200" placeholder="Ejemplo: mantener la misma pose y complexión, mejorar manos, cara más nítida, fondo más natural..." style="width:100%;"></textarea>
-      <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-        <button type="submit" class="btn-primary">Regenerar candidata</button>
-        <button type="button" class="btn-secondary" onclick="closeRegenerateCandidateModal()">Cancelar</button>
-        <span style="font-size:12px;color:#6b7280;">Si esta candidata está en TOP 6, las finales se recomponen automáticamente.</span>
-      </div>
-    </form>
-  </div>
-</div>
-
-<div id="manualBlurModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:9999;align-items:center;justify-content:center;flex-direction:column;">
-  <div style="background:#fff;border-radius:14px;padding:24px;max-width:760px;width:96vw;max-height:90vh;overflow:auto;box-shadow:0 8px 40px rgba(0,0,0,0.35);">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;">
-      <strong style="font-size:16px;">Blur manual — marca la zona con una elipse</strong>
-      <button type="button" onclick="closeManualBlurModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;">&times;</button>
-    </div>
-    <p style="margin:0 0 12px;font-size:13px;color:#6b7280;">Haz clic y arrastra sobre la imagen para dibujar la <strong>elipse</strong> de la cara. Después ajusta la intensidad y pulsa <strong>Aplicar</strong>.</p>
-    <div style="position:relative;display:inline-block;width:100%;">
-      <canvas id="manualBlurCanvas" style="width:100%;border-radius:10px;cursor:crosshair;display:block;background:#f8fafc;" width="1024" height="1024"></canvas>
-    </div>
-    <div style="margin-top:14px;display:flex;gap:14px;flex-wrap:wrap;align-items:end;">
-      <label style="display:flex;flex-direction:column;gap:6px;min-width:210px;font-size:13px;color:#374151;">
-        Intensidad del blur
-        <input type="range" id="manualBlurIntensityRange" min="1" max="20" step="1" value="8" oninput="syncManualBlurIntensity(this.value)">
-      </label>
-      <label style="display:flex;flex-direction:column;gap:6px;min-width:90px;font-size:13px;color:#374151;">
-        Valor
-        <input type="number" id="manualBlurIntensityNumber" min="1" max="20" step="1" value="8" oninput="syncManualBlurIntensity(this.value)">
-      </label>
-      <div style="font-size:12px;color:#6b7280;max-width:280px;">Valores bajos dejan un difuminado suave. Valores altos tapan más la cara.</div>
-    </div>
-    <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-      <button type="button" class="btn-primary" id="manualBlurSubmitBtn" onclick="submitManualBlur()">Aplicar blur</button>
-      <button type="button" class="btn-secondary" onclick="closeManualBlurModal()">Cancelar</button>
-      <span id="manualBlurStatus" style="font-size:13px;color:#6b7280;"></span>
-    </div>
-  </div>
-</div>
-<script>
-(function() {
-  var _mbJobId = '', _mbFinalId = '', _mbTarget = 'final', _mbPhotoId = '', _mbCsrfToken = '<?php echo e(csrf_token()); ?>', _mbEllipse = null, _mbDragging = false, _mbStartX = 0, _mbStartY = 0;
-  var _mbImg = new Image();
-
-  window.openRegenerateCopyPackModal = function(jobId) {
-    document.getElementById('regenCopyPackJobId').value = jobId || '';
-    document.getElementById('regenCopyPackExtraConcepts').value = '';
-    document.getElementById('regenerateCopyPackModal').style.display = 'flex';
-    document.getElementById('regenCopyPackExtraConcepts').focus();
-  };
-
-  window.closeRegenerateCopyPackModal = function() {
-    document.getElementById('regenerateCopyPackModal').style.display = 'none';
-  };
-
-  window.openRegenerateCandidateModal = function(jobId, candidateId) {
-    document.getElementById('regenCandidateJobId').value = jobId || '';
-    document.getElementById('regenCandidateId').value = candidateId || '';
-    document.getElementById('regenCandidateRefineText').value = '';
-    document.getElementById('regenerateCandidateModal').style.display = 'flex';
-    document.getElementById('regenCandidateRefineText').focus();
-  };
-
-  window.closeRegenerateCandidateModal = function() {
-    document.getElementById('regenerateCandidateModal').style.display = 'none';
-  };
-
-  window.syncManualBlurIntensity = function(value) {
-    var num = parseInt(value, 10);
-    if (!isFinite(num)) num = 8;
-    num = Math.max(1, Math.min(20, num));
-    document.getElementById('manualBlurIntensityRange').value = num;
-    document.getElementById('manualBlurIntensityNumber').value = num;
-  };
-
-  window.openManualBlurModal = function(jobId, finalId, squareSrc, currentIntensity, target) {
-    _mbJobId = jobId || '';
-    _mbFinalId = (target === 'real') ? '' : (finalId || '');
-    _mbPhotoId = (target === 'real') ? (finalId || '') : '';
-    _mbTarget = target || 'final';
-    _mbEllipse = null;
-    var targetId = (_mbTarget === 'real') ? _mbPhotoId : _mbFinalId;
-    if (!_mbJobId || !targetId || !squareSrc) {
-      document.getElementById('manualBlurStatus').textContent = 'Faltan datos para abrir el editor.';
-      return;
-    }
-    syncManualBlurIntensity(currentIntensity || 8);
-    var modal = document.getElementById('manualBlurModal');
-    modal.style.display = 'flex';
-    document.getElementById('manualBlurStatus').textContent = 'Cargando imagen...';
-    document.getElementById('manualBlurSubmitBtn').disabled = true;
-    _mbImg = new Image();
-    _mbImg.crossOrigin = 'anonymous';
-    _mbImg.onload = function() {
-      var canvas = document.getElementById('manualBlurCanvas');
-      canvas.width = _mbImg.naturalWidth || 1024;
-      canvas.height = _mbImg.naturalHeight || 1024;
-      drawBlurCanvas();
-      document.getElementById('manualBlurStatus').textContent = 'Arrastra para marcar la cara con una elipse.';
-      document.getElementById('manualBlurSubmitBtn').disabled = false;
-    };
-    _mbImg.onerror = function() {
-      document.getElementById('manualBlurStatus').textContent = 'Error al cargar la imagen.';
-    };
-    _mbImg.src = squareSrc + '?t=' + Date.now();
-  };
-
-  window.closeManualBlurModal = function() {
-    document.getElementById('manualBlurModal').style.display = 'none';
-    _mbEllipse = null;
-    _mbJobId = '';
-    _mbFinalId = '';
-    _mbPhotoId = '';
-    _mbTarget = 'final';
-  };
-
-  function openManualBlurModalFromButton(btn) {
-    if (!btn) return;
-    var intensity = parseInt(btn.getAttribute('data-intensity') || '8', 10);
-    if (!isFinite(intensity)) intensity = 8;
-    window.openManualBlurModal(
-      btn.getAttribute('data-job-id') || '',
-      btn.getAttribute('data-final-id') || '',
-      btn.getAttribute('data-square-src') || '',
-      intensity
-    );
-  }
-
-  function canvasEventCoords(e) {
-    var canvas = document.getElementById('manualBlurCanvas');
-    var rect = canvas.getBoundingClientRect();
-    var scaleX = canvas.width / rect.width;
-    var scaleY = canvas.height / rect.height;
-    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    var clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY
-    };
-  }
-
-  function drawBlurCanvas() {
-    var canvas = document.getElementById('manualBlurCanvas');
-    var ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(_mbImg, 0, 0, canvas.width, canvas.height);
-    if (_mbEllipse) {
-      ctx.save();
-      ctx.strokeStyle = '#a855f7';
-      ctx.lineWidth = Math.max(3, canvas.width / 180);
-      ctx.setLineDash([8, 5]);
-      ctx.beginPath();
-      ctx.ellipse(_mbEllipse.cx, _mbEllipse.cy, _mbEllipse.rx, _mbEllipse.ry, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.globalAlpha = 0.16;
-      ctx.fillStyle = '#a855f7';
-      ctx.beginPath();
-      ctx.ellipse(_mbEllipse.cx, _mbEllipse.cy, _mbEllipse.rx, _mbEllipse.ry, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-  }
-
-  var canvas = document.getElementById('manualBlurCanvas');
-
-  function onDown(e) {
-    e.preventDefault();
-    var pos = canvasEventCoords(e);
-    _mbDragging = true;
-    _mbStartX = pos.x;
-    _mbStartY = pos.y;
-    _mbEllipse = null;
-  }
-
-  function onMove(e) {
-    if (!_mbDragging) return;
-    e.preventDefault();
-    var pos = canvasEventCoords(e);
-    var left = Math.min(_mbStartX, pos.x);
-    var top = Math.min(_mbStartY, pos.y);
-    var width = Math.abs(pos.x - _mbStartX);
-    var height = Math.abs(pos.y - _mbStartY);
-    _mbEllipse = {
-      left: left,
-      top: top,
-      width: width,
-      height: height,
-      cx: left + width / 2,
-      cy: top + height / 2,
-      rx: width / 2,
-      ry: height / 2
-    };
-    drawBlurCanvas();
-  }
-
-  function onUp() {
-    _mbDragging = false;
-  }
-
-  canvas.addEventListener('mousedown', onDown);
-  canvas.addEventListener('mousemove', onMove);
-  canvas.addEventListener('mouseup', onUp);
-  canvas.addEventListener('mouseleave', onUp);
-  canvas.addEventListener('touchstart', onDown, {passive: false});
-  canvas.addEventListener('touchmove', onMove, {passive: false});
-  canvas.addEventListener('touchend', onUp);
-
-  document.addEventListener('click', function(e) {
-    var regenBtn = e.target.closest ? e.target.closest('.js-open-regenerate-candidate-modal') : null;
-    if (regenBtn) {
-      e.preventDefault();
-      openRegenerateCandidateModal(
-        regenBtn.getAttribute('data-job-id') || '',
-        regenBtn.getAttribute('data-candidate-id') || ''
-      );
-      return;
-    }
-    var btn = e.target.closest ? e.target.closest('.js-manual-blur-btn') : null;
-    if (!btn) return;
-    e.preventDefault();
-    var target = btn.getAttribute('data-target') || 'final';
-    if (target === 'real') {
-      var intensity = parseInt(btn.getAttribute('data-intensity') || '8', 10);
-      if (!isFinite(intensity)) intensity = 8;
-      window.openManualBlurModal(
-        btn.getAttribute('data-job-id') || '',
-        btn.getAttribute('data-photo-id') || '',
-        btn.getAttribute('data-square-src') || '',
-        intensity,
-        'real'
-      );
-    } else {
-      openManualBlurModalFromButton(btn);
-    }
-  });
-
-  window.submitManualBlur = function() {
-    if (!_mbEllipse || _mbEllipse.width < 8 || _mbEllipse.height < 8) {
-      document.getElementById('manualBlurStatus').textContent = 'Primero dibuja una elipse sobre la zona.';
-      return;
-    }
-    var canvas = document.getElementById('manualBlurCanvas');
-    var bx = _mbEllipse.left / canvas.width;
-    var by = _mbEllipse.top / canvas.height;
-    var bw = _mbEllipse.width / canvas.width;
-    var bh = _mbEllipse.height / canvas.height;
-    var intensity = parseInt(document.getElementById('manualBlurIntensityNumber').value, 10);
-    if (!isFinite(intensity)) intensity = 8;
-    intensity = Math.max(1, Math.min(20, intensity));
-    syncManualBlurIntensity(intensity);
-
-    document.getElementById('manualBlurSubmitBtn').disabled = true;
-    document.getElementById('manualBlurStatus').textContent = 'Aplicando blur...';
-
-    var fd = new FormData();
-    if (_mbTarget === 'real') {
-      fd.append('action', 'apply_publicista_manual_blur_real');
-      fd.append('id', _mbJobId);
-      fd.append('photo_id', _mbPhotoId);
-    } else {
-      fd.append('action', 'apply_publicista_manual_blur');
-      fd.append('id', _mbJobId);
-      fd.append('final_id', _mbFinalId);
-    }
-    fd.append('csrf_token', _mbCsrfToken);
-    fd.append('bx', bx.toFixed(6));
-    fd.append('by', by.toFixed(6));
-    fd.append('bw', bw.toFixed(6));
-    fd.append('bh', bh.toFixed(6));
-    fd.append('intensity', String(intensity));
-
-    fetch(window.location.href, {method: 'POST', body: fd})
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (data.ok) {
-          document.getElementById('manualBlurStatus').textContent = '¡Blur aplicado!';
-          if (_mbTarget === 'real') {
-            var img = document.getElementById('realBlurImg_' + _mbPhotoId);
-            if (img && data.stored_path) {
-              img.src = data.stored_path + '?t=' + Date.now();
-            }
-            var badge = document.getElementById('realBlurStatus_' + _mbPhotoId);
-            if (badge) {
-              var intensityText = (data.manual_blur_intensity || intensity) + '/20';
-              badge.textContent = 'Blur · ' + intensityText;
-              badge.style.background = '#ede9fe';
-              badge.style.color = '#6d28d9';
-            }
-          } else {
-            var img = document.getElementById('finalBlurImg_' + _mbFinalId);
-            if (img && data.final_path) {
-              img.src = data.final_path + '?t=' + Date.now();
-            }
-            var badge = document.getElementById('finalBlurStatus_' + _mbFinalId);
-            if (badge) {
-              var intensityText = (data.manual_blur_intensity || intensity) + '/20';
-              badge.textContent = 'Blur manual · ' + intensityText;
-              badge.style.background = '#ede9fe';
-              badge.style.color = '#6d28d9';
-            }
-          }
-          setTimeout(function() { closeManualBlurModal(); }, 650);
-        } else {
-          document.getElementById('manualBlurStatus').textContent = 'Error: ' + (data.error || 'desconocido');
-          document.getElementById('manualBlurSubmitBtn').disabled = false;
-        }
-      })
-      .catch(function(err) {
-        document.getElementById('manualBlurStatus').textContent = 'Error de red: ' + err;
-        document.getElementById('manualBlurSubmitBtn').disabled = false;
-      });
-  };
-})();
-
-// ── Polling automático de estado de regeneraciones ──────────────────────────
-(function() {
-  var POLL_INTERVAL_MS  = 8000;  // cada 8 segundos
-  var POLL_IDLE_MS      = 30000; // cuando no hay cola activa, cada 30s
-  var _pollTimer        = null;
-  var _jobId            = '';
-  var _knownMtimes      = {};    // candidateId -> mtime visto
-  var _knownAvisosCount = -1;
-  var _hasActiveQueue   = false;
-  var _pollWasActive    = false;
-
-  function initPoll() {
-    // Leer el job id de un atributo del DOM inyectado por PHP
-    var el = document.getElementById('publicistaRegenPollJobId');
-    if (!el) return;
-    _jobId = el.getAttribute('data-job-id') || '';
-    if (!_jobId) return;
-    schedulePoll(1500); // primer poll al cargar
-  }
-
-  function schedulePoll(delay) {
-    if (_pollTimer) clearTimeout(_pollTimer);
-    _pollTimer = setTimeout(doPoll, delay || POLL_INTERVAL_MS);
-  }
-
-  function doPoll() {
-    fetch('index.php?page=publicista&action=poll_publicista_regen_status&id=' + encodeURIComponent(_jobId), {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' },
-      credentials: 'same-origin'
-    })
-    .then(function(r) { return r.ok ? r.json() : null; })
-    .then(function(data) {
-      if (!data || !data.ok) { schedulePoll(POLL_IDLE_MS); return; }
-
-      _hasActiveQueue = false;
-      var hasQueued = false;
-      var queue = data.queue || {};
-      // Detectar si hay algo en cola activo
-      for (var cid in queue) {
-        var s = queue[cid] ? queue[cid].status : '';
-        if (s === 'queued' || s === 'running') { _hasActiveQueue = true; }
-        if (s === 'queued') { hasQueued = true; }
-      }
-
-      // Mostrar/ocultar botón de cancelar cola global
-      updateCancelQueueButton(hasQueued);
-
-      // Actualizar imágenes de candidatas que hayan cambiado
-      var candidates = data.candidates || {};
-      for (var candId in candidates) {
-        var cand = candidates[candId];
-        var newMtime = cand.mtime || 0;
-        if (newMtime > 0 && newMtime !== (_knownMtimes[candId] || 0)) {
-          _knownMtimes[candId] = newMtime;
-          // Actualizar src de la imagen si existe en el DOM
-          var card = document.querySelector('[data-candidate-id="' + candId + '"]');
-          var imgs = card ? card.querySelectorAll('img') : [];
-          if (!imgs.length) {
-            // Fallback 1: buscar imágenes cuyo src contenga algún fragmento del path
-            var basePath = (cand.square_path || '').replace(/\?.*$/, '');
-            var baseFile = basePath.split('/').pop().replace(/\.[^.]+$/, '').replace(/_manual$/, '');
-            if (baseFile) {
-              imgs = document.querySelectorAll('img[src*="' + baseFile + '"]');
-            }
-          }
-          if (!imgs.length) {
-            // Fallback 2: buscar cualquier img dentro del tab actual
-            console.warn('Publicista poll: no se encontraron imágenes para la candidata ' + candId + ' (square_path: ' + (cand.square_path || '') + ')');
-          }
-          if (imgs.length) {
-            // Forzar recarga agresiva con doble cache-bust
-            var freshSrc = (cand.src || '') + '&_=' + Date.now();
-            for (var i = 0; i < imgs.length; i++) {
-              imgs[i].src = '';  // Invalidar caché primero
-              imgs[i].src = freshSrc;
-            }
-          }
-          // Mostrar badge de "Actualizada" solo si realmente se actualizó alguna imagen
-          var qStatus = queue[candId] ? queue[candId].status : '';
-          if (qStatus === 'done' || (_knownMtimes[candId] && newMtime && imgs.length > 0)) {
-            showCandidateUpdatedBadge(candId);
-          }
-        }
-        // Mostrar estado de cola en el botón si está en progreso
-        updateQueueBadge(candId, queue[candId] || null, cand);
-      }
-
-      // Avisos: si hay nuevos, pulsar el sistema de avisos para refrescar badge
-      var newAvisosCount = parseInt(data.avisos_count || 0, 10);
-      if (_knownAvisosCount >= 0 && newAvisosCount > _knownAvisosCount) {
-        refreshAvisosBadge();
-      }
-      _knownAvisosCount = newAvisosCount;
-
-      // Próximo poll: rápido si hay cola activa, lento si todo quieto
-      // Si acaba de terminar algo, mantenemos un poll rápido durante una iteración más para no perder la actualización
-      var justFinished = !_hasActiveQueue && (_pollWasActive === true);
-      schedulePoll((_hasActiveQueue || justFinished) ? POLL_INTERVAL_MS : POLL_IDLE_MS);
-      _pollWasActive = _hasActiveQueue;
-    })
-    .catch(function() { schedulePoll(POLL_IDLE_MS); });
-  }
-
-  function showCandidateUpdatedBadge(candId) {
-    // Añade un badge temporal verde sobre la tarjeta de candidata
-    var selector = '[data-candidate-id="' + candId + '"]';
-    var card = document.querySelector(selector);
-    if (!card) return;
-    var existing = card.querySelector('.js-regen-done-badge');
-    if (existing) existing.remove();
-    var badge = document.createElement('div');
-    badge.className = 'js-regen-done-badge';
-    badge.style.cssText = 'position:absolute;top:8px;right:8px;background:#059669;color:#fff;font-size:11px;padding:3px 8px;border-radius:6px;font-weight:600;z-index:10;pointer-events:none;';
-    badge.textContent = '✓ Imagen actualizada';
-    card.style.position = 'relative';
-    card.appendChild(badge);
-    setTimeout(function() { if (badge.parentNode) badge.parentNode.removeChild(badge); }, 6000);
-  }
-
-  function updateQueueBadge(candId, queueEntry, cand) {
-    var btn = document.querySelector('.js-open-regenerate-candidate-modal[data-candidate-id="' + candId + '"]');
-    if (!btn) return;
-    if (!queueEntry) return;
-    var s = queueEntry.status || '';
-    var updatedAt = queueEntry.updated_at || '';
-    if (s === 'queued') {
-      btn.textContent = '⏳ En cola…';
-      btn.disabled = true;
-    } else if (s === 'running') {
-      btn.textContent = '⚙ Generando…';
-      btn.disabled = true;
-    } else if (s === 'done') {
-      btn.textContent = 'Regenerar esta';
-      btn.disabled = false;
-    } else if (s === 'cancelled') {
-      btn.textContent = 'Regenerar esta';
-      btn.disabled = false;
-    } else if (s === 'error') {
-      btn.textContent = 'Regenerar esta';
-      btn.disabled = false;
-      // Mostrar error brevemente — solo si no estaba ya mostrado
-      var errMsg = queueEntry.error || 'Error desconocido.';
-      // Simplificar mensajes de error de Pollo para el usuario final
-      if (errMsg.indexOf('generacion fallo') !== -1 || errMsg.indexOf('generación falló') !== -1) {
-        if (errMsg.indexOf('desconocido') !== -1 || errMsg.indexOf('unknown') !== -1) {
-          errMsg = 'Pollo.ai devolvió un error sin explicación tras varios reintentos automáticos. La cuenta puede estar temporalmente saturada. Espera 3-5 minutos y vuelve a intentarlo.';
-        } else {
-          errMsg = 'Pollo.ai rechazó la generación (cuenta ocupada). Espera unos minutos y vuelve a intentarlo.';
-        }
-      } else if (errMsg.indexOf('timeout') !== -1 || errMsg.indexOf('Timeout') !== -1) {
-        errMsg = 'La generación tardó demasiado y se agotó el tiempo de espera. Vuelve a intentarlo en unos minutos.';
-      }
-      var card = btn.closest('.panel');
-      if (card) {
-        var existing = card.querySelector('.js-regen-error-inline');
-        if (!existing) {
-          var errDiv = document.createElement('div');
-          errDiv.className = 'js-regen-error-inline';
-          errDiv.style.cssText = 'margin-top:6px;font-size:11px;color:#b91c1c;background:#fee2e2;padding:4px 8px;border-radius:5px;';
-          errDiv.textContent = '✗ ' + errMsg;
-          btn.parentNode.appendChild(errDiv);
-          setTimeout(function() { if (errDiv.parentNode) errDiv.parentNode.removeChild(errDiv); }, 30000);
-        }
-      }
-    }
-  }
-
-  function updateCancelQueueButton(hasQueued) {
-    var section = document.getElementById('publicistaCandidates');
-    if (!section) return;
-    var existing = document.getElementById('js-cancel-regen-queue-btn');
-    if (!hasQueued) {
-      if (existing) existing.remove();
-      return;
-    }
-    if (existing) return; // ya existe
-    var btn = document.createElement('button');
-    btn.id = 'js-cancel-regen-queue-btn';
-    btn.type = 'button';
-    btn.style.cssText = 'margin:0 0 10px 0;font-size:12px;padding:4px 12px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:6px;cursor:pointer;';
-    btn.textContent = '✕ Cancelar regeneraciones en cola';
-    btn.onclick = function() {
-      btn.disabled = true;
-      btn.textContent = 'Cancelando…';
-      fetch('index.php?page=publicista&action=cancel_publicista_regen_queue&id=' + encodeURIComponent(_jobId), {
-        method: 'GET', credentials: 'same-origin'
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (existing) existing.remove();
-        btn.remove();
-        doPoll(); // actualizar UI inmediatamente
-      })
-      .catch(function() { btn.disabled = false; btn.textContent = '✕ Cancelar regeneraciones en cola'; });
-    };
-    // Insertar justo antes de la grid de candidatas
-    var grid = section.querySelector('.cards.two');
-    if (grid) section.insertBefore(btn, grid);
-    else section.appendChild(btn);
-  }
-
-  function refreshAvisosBadge() {
-    // Recarga solo el panel de avisos vía fetch para mostrar el nuevo aviso sin recargar página
-    var avisosPanel = document.getElementById('avisosPanel');
-    if (!avisosPanel) return;
-    fetch(window.location.href, { credentials: 'same-origin' })
-      .then(function(r) { return r.ok ? r.text() : null; })
-      .then(function(html) {
-        if (!html) return;
-        var parser = new DOMParser();
-        var doc = parser.parseFromString(html, 'text/html');
-        var newPanel = doc.getElementById('avisosPanel');
-        if (newPanel) {
-          avisosPanel.innerHTML = newPanel.innerHTML;
-        }
-        // Actualizar badge de contador
-        var newBadge = doc.querySelector('.aviso-new-count, .summary-badge.aviso-badge');
-        var curBadge = document.querySelector('.aviso-new-count, .summary-badge.aviso-badge');
-        if (newBadge && curBadge) {
-          curBadge.textContent = newBadge.textContent;
-          curBadge.style.display = newBadge.style.display || '';
-        }
-      })
-      .catch(function() {});
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initPoll);
-  } else {
-    initPoll();
-  }
-})();
-</script>
-HTML;
 }
 
 function publicista_render_restriction_checkboxes($selectedFlags) {
@@ -4058,183 +1059,12 @@ function publicista_render_restriction_checkboxes($selectedFlags) {
     echo '</div>';
 }
 
-function publicista_render_checkboxes_group($fieldName, $options, $selectedValues) {
-    $selectedValues = is_array($selectedValues) ? $selectedValues : array();
-    echo '<div class="publicista-restrictions-grid">';
-    foreach ($options as $value => $label) {
-        $checked = in_array($value, $selectedValues, true) ? ' checked' : '';
-        echo '<label class="publicista-check-item"><input type="checkbox" name="' . e($fieldName) . '[]" value="' . e($value) . '"' . $checked . '> ' . e($label) . '</label>';
-    }
-    echo '</div>';
-}
-
-function publicista_render_production_params_fields($params) {
-    $params = is_array($params) ? $params : array();
-
-    // COLOR
-    echo '<div class="field">';
-    echo '<label>Color de ropa</label>';
-    echo '<select name="outfit_color">';
-    $currentColor = $params['color'] ?? 'auto';
-    foreach (publicista_outfit_color_options() as $value => $label) {
-        $sel = ($currentColor === $value) ? ' selected' : '';
-        echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
-    }
-    echo '</select>';
-    echo '</div>';
-
-    // NIVEL DE PROVOCACIÓN
-    echo '<div class="field">';
-    echo '<label>Nivel de atrevimiento</label>';
-    echo '<select name="outfit_level">';
-    $currentLevel = $params['level'] ?? 'sexy';
-    foreach (publicista_outfit_level_options() as $value => $label) {
-        $sel = ($currentLevel === $value) ? ' selected' : '';
-        echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
-    }
-    echo '</select>';
-    echo '<div class="field-help">Discreto = apto para webs estrictas. Sexy = por defecto, equilibrado. Muy sugerente = máximo sin desnudo.</div>';
-    echo '</div>';
-
-    // AJUSTE
-    echo '<div class="field">';
-    echo '<label>Ajuste de la prenda</label>';
-    echo '<select name="outfit_fit">';
-    $currentFit = $params['fit'] ?? 'ajustado';
-    foreach (publicista_outfit_fit_options() as $value => $label) {
-        $sel = ($currentFit === $value) ? ' selected' : '';
-        echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
-    }
-    echo '</select>';
-    echo '</div>';
-
-    // ESTILO DE PRENDA
-    echo '<div class="field full">';
-    echo '<label>Estilo de prenda (deja sin marcar para que el modelo elija)</label>';
-    $currentStyle = $params['style'] ?? 'auto_random';
-    echo '<div class="publicista-restrictions-grid">';
-    foreach (publicista_outfit_style_options() as $value => $label) {
-        $checked = ($currentStyle === $value) ? ' checked' : '';
-        echo '<label class="publicista-check-item"><input type="radio" name="outfit_style" value="' . e($value) . '"' . $checked . '> ' . e($label) . '</label>';
-    }
-    echo '<label class="publicista-check-item"><input type="radio" name="outfit_style" value=""' . ($currentStyle === '' ? ' checked' : '') . '> Auto (el modelo elige)</label>';
-    echo '</div>';
-    echo '</div>';
-
-    // COMPLEMENTOS
-    echo '<div class="field full">';
-    echo '<label>Complementos</label>';
-    $currentComplements = is_array($params['complements'] ?? null) ? $params['complements'] : array('zapatillas');
-    publicista_render_checkboxes_group('outfit_complements', publicista_outfit_complement_options(), $currentComplements);
-    echo '</div>';
-
-    // VARIEDAD DE ROPA
-    echo '<div class="field full">';
-    echo '<label>Variedad de ropa entre fotos</label>';
-    echo '<select name="outfit_variety">';
-    $currentVariety = $params['outfit_variety'] ?? 'mixed';
-    foreach (publicista_outfit_variety_options() as $value => $label) {
-        $sel = ($currentVariety === $value) ? ' selected' : '';
-        echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
-    }
-    echo '</select>';
-    echo '<div class="field-help">Si activas variedad, las fotos mostrarán 2-3 looks distintos (coherentes entre sí) en lugar de la misma ropa repetida. Más realista.</div>';
-    echo '</div>';
-
-    // FONDO Y LUZ
-    echo '<div class="field">';
-    echo '<label>Tipo de espacio / fondo</label>';
-    echo '<select name="setting_type">';
-    $currentSetting = $params['setting'] ?? 'random';
-    foreach (publicista_setting_type_options() as $value => $label) {
-        $sel = ($currentSetting === $value) ? ' selected' : '';
-        echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
-    }
-    echo '</select>';
-    echo '</div>';
-
-    echo '<div class="field">';
-    echo '<label>Iluminación</label>';
-    echo '<select name="lighting_type">';
-    $currentLighting = $params['lighting'] ?? 'natural';
-    foreach (publicista_lighting_options() as $value => $label) {
-        $sel = ($currentLighting === $value) ? ' selected' : '';
-        echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
-    }
-    echo '</select>';
-    echo '</div>';
-
-    // ENCUADRE
-    echo '<div class="field">';
-    echo '<label>Encuadre preferido</label>';
-    echo '<select name="framing_pref">';
-    $currentFraming = $params['framing'] ?? 'lejano';
-    foreach (publicista_framing_options() as $value => $label) {
-        $sel = ($currentFraming === $value) ? ' selected' : '';
-        echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
-    }
-    echo '</select>';
-    echo '</div>';
-
-    // SELFIES
-    echo '<div class="field">';
-    echo '<label>Formato selfie</label>';
-    echo '<select name="selfie_mode">';
-    $currentSelfieMode = $params['selfie_mode'] ?? 'mixed';
-    foreach (publicista_selfie_mode_options() as $value => $label) {
-        $sel = ($currentSelfieMode === $value) ? ' selected' : '';
-        echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
-    }
-    echo '</select>';
-    echo '<div class="field-help">Si lo activas, solo algunas candidatas saldrán en formato selfie o primer plano cercano; nunca todas.</div>';
-    echo '</div>';
-
-    // POSE
-    echo '<div class="field">';
-    echo '<label>Postura preferida</label>';
-    echo '<select name="pose_pref">';
-    $currentPose = $params['pose'] ?? 'sugerente';
-    foreach (publicista_pose_options() as $value => $label) {
-        $sel = ($currentPose === $value) ? ' selected' : '';
-        echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
-    }
-    echo '</select>';
-    echo '</div>';
-
-    // EXPRESIÓN
-    echo '<div class="field">';
-    echo '<label>Expresión / actitud</label>';
-    echo '<select name="expression_pref">';
-    $currentExpression = $params['expression'] ?? 'sonrisa';
-    foreach (publicista_expression_options() as $value => $label) {
-        $sel = ($currentExpression === $value) ? ' selected' : '';
-        echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
-    }
-    echo '</select>';
-    echo '</div>';
-
-    // MAQUILLAJE
-    echo '<div class="field">';
-    echo '<label>Maquillaje</label>';
-    echo '<select name="makeup_pref">';
-    $currentMakeup = $params['makeup'] ?? 'natural';
-    foreach (publicista_makeup_options() as $value => $label) {
-        $sel = ($currentMakeup === $value) ? ' selected' : '';
-        echo '<option value="' . e($value) . '"' . $sel . '>' . e($label) . '</option>';
-    }
-    echo '</select>';
-    echo '</div>';
-}
-
 function publicista_render_job_image_card($relativePath, $label) {
     $relativePath = trim((string)$relativePath);
     if ($relativePath === '') return;
-    $fsPath = BASE_PATH . '/' . ltrim($relativePath, '/');
-    $mtime = file_exists($fsPath) ? filemtime($fsPath) : 0;
-    $srcWithBust = $mtime > 0 ? $relativePath . '?t=' . $mtime : $relativePath;
     echo '<div class="publicista-preview-card">';
     echo '<div class="muted" style="margin-bottom:8px;">' . e($label) . '</div>';
-    echo '<img src="' . e($srcWithBust) . '" alt="' . e($label) . '" style="width:100%;max-width:340px;border-radius:12px;border:1px solid #e5e7eb;display:block;">';
+    echo '<img src="' . e($relativePath) . '" alt="' . e($label) . '" style="width:100%;max-width:340px;border-radius:12px;border:1px solid #e5e7eb;display:block;">';
     echo '<div class="muted small" style="margin-top:8px;word-break:break-all;">' . e($relativePath) . '</div>';
     echo '</div>';
 }
@@ -4242,9 +1072,6 @@ function publicista_render_job_image_card($relativePath, $label) {
 function publicista_render_publicista_descriptor_summary($descriptor) {
     $descriptor = is_array($descriptor) ? $descriptor : array();
     echo '<div class="info-strip"><strong>Guía de parecido:</strong> ' . e($descriptor['similarity_guidance'] ?? '-') . '</div>';
-    if (!empty($descriptor['apparent_age'])) {
-        echo '<div class="info-strip" style="margin-top:10px;"><strong>Edad aparente:</strong> ' . e($descriptor['apparent_age']) . '</div>';
-    }
     echo '<div class="info-strip" style="margin-top:10px;"><strong>Tono de piel / cabello:</strong> ' . e(($descriptor['skin_tone'] ?? '-') . ' · ' . ($descriptor['hair_color'] ?? '-') . ' / ' . ($descriptor['hair_texture'] ?? '-')) . '</div>';
     echo '<div class="info-strip" style="margin-top:10px;"><strong>Complexión / rostro:</strong> ' . e(($descriptor['body_build'] ?? '-') . ' · ' . ($descriptor['face_shape'] ?? '-')) . '</div>';
     echo '<div class="info-strip" style="margin-top:10px;"><strong>Outfit:</strong> ' . e($descriptor['outfit_summary'] ?? '-') . '</div>';
@@ -4258,6 +1085,57 @@ function publicista_render_publicista_descriptor_summary($descriptor) {
     }
 }
 
+
+
+function publicista_render_intro_guide_panel() {
+    $steps = array(
+        array(
+            'num' => 1,
+            'title' => 'Elige clienta y nombre del pack',
+            'body' => 'Empieza en <strong>Nuevo trabajo Publicista</strong>. Selecciona la clienta y pon un nombre interno fácil de reconocer.'
+        ),
+        array(
+            'num' => 2,
+            'title' => 'Sube la foto base y define matices',
+            'body' => 'Añade la imagen original y, si hace falta, escribe matices físicos, restricciones y tono deseado de los textos.'
+        ),
+        array(
+            'num' => 3,
+            'title' => 'Decide cómo arrancar',
+            'body' => '<strong>Crear borrador</strong> solo guarda la base. <strong>Crear y generar</strong> lanza todo el proceso de imágenes desde esa misma foto.'
+        ),
+        array(
+            'num' => 4,
+            'title' => 'Espera el batch y vuelve a continuar',
+            'body' => 'En modo ahorro máximo se envían 6 candidatas por batch. Si queda pendiente, reabre la ficha y pulsa <strong>Actualizar batch / continuar</strong>.'
+        ),
+        array(
+            'num' => 5,
+            'title' => 'Revisa las candidatas y el top 4 final',
+            'body' => 'Cuando el batch termine, verás candidatas y 4 finales. Si una flojea, usa <strong>Regenerar esta</strong> en la candidata concreta.'
+        ),
+        array(
+            'num' => 6,
+            'title' => 'Genera textos y cierra el trabajo',
+            'body' => 'Con el pack visual ya bueno, pulsa <strong>Generar / regenerar textos</strong>. Si todo está correcto, termina con <strong>Marcar pack como definitivo</strong>.'
+        ),
+    );
+
+    echo '<section class="panel panel-space publicista-guide-panel">';
+    echo '<div class="section-head"><div><h2>Qué hace Publicista y en qué orden usarlo</h2><p>Esta sección convierte una foto real de una clienta en un pack publicitario completo: imágenes finales, títulos, anuncios y export listo para publicar.</p></div></div>';
+    echo '<div class="publicista-steps-grid">';
+    foreach ($steps as $step) {
+        echo '<article class="publicista-step-card is-pending">';
+        echo '<div class="publicista-step-top"><span class="publicista-step-num">' . e((string)$step['num']) . '</span><span class="publicista-step-status">Paso</span></div>';
+        echo '<h4>' . e($step['title']) . '</h4>';
+        echo '<p>' . $step['body'] . '</p>';
+        echo '</article>';
+    }
+    echo '</div>';
+    echo '<div class="publicista-guide-note"><strong>Idea clave:</strong> Publicista no es solo “generar imágenes”. Primero prepara una base fiel a la clienta, luego monta el pack visual, después crea el pack de textos y por último te deja cerrar una versión definitiva.</div>';
+    echo '</section>';
+}
+
 function publicista_build_job_guide_data($job) {
     $job = is_array($job) ? $job : array();
     $source = is_array($job['source_image'] ?? null) ? $job['source_image'] : array();
@@ -4269,7 +1147,6 @@ function publicista_build_job_guide_data($job) {
     $workflow = function_exists('publicista_job_workflow') ? publicista_job_workflow($job) : array();
     $currentCopyVersion = function_exists('publicista_current_copy_version') ? publicista_current_copy_version($job) : null;
     $hasPendingBatch = function_exists('publicista_pipeline_has_pending_batch') ? publicista_pipeline_has_pending_batch($job) : false;
-    $isPipelineRunning = function_exists('publicista_pipeline_is_running') ? publicista_pipeline_is_running($job) : (($job['estado'] ?? '') === 'processing');
 
     $hasSource = trim((string)($source['stored_path'] ?? '')) !== '';
     $hasPrepared = trim((string)($localAssets['prepared_square_path'] ?? '')) !== '' || !empty($descriptorData);
@@ -4284,30 +1161,25 @@ function publicista_build_job_guide_data($job) {
     $hint = 'Baja a <strong>Acciones del paso actual</strong>, sube la imagen y pulsa el botón principal.';
     $cta = array('type' => 'anchor', 'href' => '#publicistaQuickActions', 'label' => 'Ir a acciones del paso actual');
 
-    if ($isPipelineRunning) {
-        $currentStep = 3;
-        $headline = 'La generación ya está en marcha.';
-        $hint = 'No vuelvas a pulsar generar. Espera en esta ficha: se recarga sola y te mostrará las candidatas o el error real cuando termine.';
-        $cta = array('type' => 'processing_wait', 'label' => 'Generación en curso');
-    } elseif ($hasSource && !$hasPrepared) {
+    if ($hasSource && !$hasPrepared) {
         $currentStep = 2;
         $headline = 'Ya hay foto subida, pero aún no está preparada la base técnica del trabajo.';
-        $hint = 'Puedes lanzar directamente el pipeline completo o preparar antes el origen si quieres revisar la base 1:1 y el descriptor.';
+        $hint = 'Puedes lanzar directamente el pipeline completo o preparar antes el origen si quieres revisar recorte y descriptor.';
         $cta = array('type' => 'anchor', 'href' => '#publicistaQuickActions', 'label' => 'Ir a acciones del paso actual');
     } elseif ($hasPendingBatch) {
         $currentStep = 3;
-        $headline = 'Hay una generación antigua pendiente de cerrar.';
-        $hint = 'No hace falta subir otra foto. Pulsa el botón de regenerar para relanzar el flujo con la foto actual.';
-        $cta = array('type' => 'continue_batch', 'label' => 'Relanzar generación');
+        $headline = 'El batch de imágenes ya está enviado y ahora toca continuarlo.';
+        $hint = 'No hace falta subir otra foto. Pulsa <strong>Actualizar batch / continuar</strong> para consultar si terminó y, si ya está listo, montar candidatas + finales.';
+        $cta = array('type' => 'continue_batch', 'label' => 'Actualizar batch / continuar');
     } elseif (!$hasCandidates && !$hasFullFinals) {
         $currentStep = 3;
-        $headline = 'La base ya está lista; ahora toca generar las 6 candidatas referenciadas.';
+        $headline = 'La base ya está lista; ahora toca generar las 6 candidatas.';
         $hint = 'Usa la foto actual del trabajo y lanza el botón principal de imágenes.';
-        $cta = array('type' => 'run_pipeline', 'label' => 'Generar 6 candidatas');
+        $cta = array('type' => 'run_pipeline', 'label' => 'Enviar batch de 6 imágenes');
     } elseif (!$hasFullFinals) {
         $currentStep = 4;
         $headline = 'Ya hay candidatas, pero el pack visual todavía necesita revisión.';
-        $hint = 'Entra en <strong>Candidatas generadas</strong> y pulsa <strong>Regenerar esta</strong> en las flojas. El sistema recompone automáticamente el top 6.';
+        $hint = 'Entra en <strong>Candidatas generadas</strong> y pulsa <strong>Regenerar esta</strong> en las flojas. El sistema recompone automáticamente el top 4.';
         $cta = array('type' => 'anchor', 'href' => '#publicistaCandidates', 'label' => 'Ir a candidatas');
     } elseif (!$hasCopy) {
         $currentStep = 5;
@@ -4317,16 +1189,14 @@ function publicista_build_job_guide_data($job) {
     } elseif (!$isDefinitive) {
         $currentStep = 6;
         $headline = 'Ya tienes imágenes y textos; solo falta cerrar la versión buena.';
-        $hint = 'Si estás conforme con este pack, pulsa el cierre visible de esta ficha para dejarlo marcado como perfil terminado y definitivo.';
-        $cta = array('type' => 'mark_definitive', 'label' => 'Cerrar perfil como terminado');
+        $hint = 'Si estás conforme con este pack, márcalo como definitivo. Eso deja claro cuál es la versión final aprobada.';
+        $cta = array('type' => 'mark_definitive', 'label' => 'Marcar pack como definitivo');
     } else {
         $currentStep = 6;
         $headline = 'Este trabajo ya está cerrado como pack definitivo.';
         $hint = 'Puedes revisar imágenes, textos o duplicarlo como base para otro pack.';
         $cta = array('type' => 'anchor', 'href' => '#publicistaCopyPack', 'label' => 'Ver textos y export');
     }
-
-    $usesPolloVisualFlow = function_exists('publicista_job_uses_pollo_model') && publicista_job_uses_pollo_model($job ?? array());
 
     $steps = array(
         array(
@@ -4340,36 +1210,26 @@ function publicista_build_job_guide_data($job) {
             'title' => 'Foto base y descriptor',
             'status' => $hasPrepared ? 'done' : (($currentStep === 2) ? 'current' : 'pending'),
             'body' => $hasPrepared
-                ? 'La foto base ya está preparada en 1:1 sin deformar y el descriptor visual ya existe.'
-                : 'Aquí se sube la foto original y se prepara la base técnica: lienzo 1:1 sin deformar y descriptor estructurado.'
+                ? 'La foto base ya está preparada y el descriptor visual ya existe.'
+                : 'Aquí se sube la foto original y se prepara la base técnica: recorte 1:1, blur facial y descriptor estructurado.'
         ),
         array(
             'num' => 3,
             'title' => 'Generación de candidatas',
-            'status' => ($isPipelineRunning || $hasPendingBatch) ? 'waiting' : (($hasCandidates || $hasFullFinals) ? 'done' : (($currentStep === 3) ? 'current' : 'pending')),
-            'body' => $isPipelineRunning
-                ? 'La generación está corriendo en segundo plano. No hace falta volver a pulsar ningún botón.'
-                : ($hasPendingBatch
-                    ? 'Había una generación anterior abierta. Puedes relanzarla con la foto actual cuando quieras.'
-                    : (($hasCandidates || $hasFullFinals)
-                        ? 'Las candidatas ya fueron generadas usando referencia directa de la foto original.'
-                        : 'En este paso se lanzan las 6 candidatas referenciadas desde la foto original.'))
+            'status' => $hasPendingBatch ? 'waiting' : (($hasCandidates || $hasFullFinals) ? 'done' : (($currentStep === 3) ? 'current' : 'pending')),
+            'body' => $hasPendingBatch
+                ? 'El batch de 6 imágenes está en marcha. Cuando quieras revisar si terminó, vuelve a pulsar el botón principal.'
+                : (($hasCandidates || $hasFullFinals)
+                    ? 'Las candidatas ya fueron generadas.'
+                    : 'En este paso se lanzan las 6 candidatas base en modo ahorro máximo.')
         ),
         array(
             'num' => 4,
             'title' => 'Revisión del pack visual',
-            'status' => $hasFullFinals ? 'done' : (($isPipelineRunning || $hasCandidates || $currentStep === 4) ? 'current' : 'pending'),
+            'status' => $hasFullFinals ? 'done' : (($hasCandidates || $currentStep === 4) ? 'current' : 'pending'),
             'body' => $hasFullFinals
-                ? ($usesPolloVisualFlow
-                    ? 'Ya tienes 4 definitivas base listas. Desde cada una puedes lanzar un refinado manual opcional y decidir si adoptarlo o no.'
-                    : 'Ya tienes 4 finales premium listas y el top visual está montado.')
-                : ($isPipelineRunning
-                    ? ($usesPolloVisualFlow
-                        ? 'Cuando termine la generación, aquí aparecerán las candidatas y después las 4 definitivas base para revisión manual.'
-                        : 'Cuando termine la generación, aquí aparecerán las candidatas y después el top 6 visual refinado.')
-                    : ($usesPolloVisualFlow
-                        ? 'Aquí revisas candidatas, definitivas base y propuestas refinadas manuales hasta cerrar el top visual.'
-                        : 'Aquí revisas las candidatas y regeneras solo las que no convencen hasta dejar un top 6 limpio y refinado.'))
+                ? 'Ya tienes 4 finales listas y el top visual está montado.'
+                : 'Aquí revisas las candidatas y regeneras solo las que no convencen hasta dejar un top 4 limpio.'
         ),
         array(
             'num' => 5,
@@ -4405,8 +1265,6 @@ function publicista_render_job_guide_cta($job, $cta) {
     echo '<div class="publicista-guide-actions">';
     if ($type === 'anchor') {
         echo '<a class="btn-primary" href="' . e($cta['href'] ?? '#') . '">' . e($cta['label'] ?? 'Ir') . '</a>';
-    } elseif ($type === 'processing_wait') {
-        echo '<span class="btn-primary" style="opacity:.65;cursor:default;pointer-events:none;">' . e($cta['label'] ?? 'Generación en curso') . '</span>';
     } elseif ($type === 'continue_batch' || $type === 'run_pipeline') {
         echo '<form method="post" class="inline-form">';
         echo '<input type="hidden" name="action" value="run_publicista_image_pipeline">';
@@ -4423,7 +1281,7 @@ function publicista_render_job_guide_cta($job, $cta) {
         echo '<form method="post" class="inline-form">';
         echo '<input type="hidden" name="action" value="mark_publicista_pack_definitive">';
         echo '<input type="hidden" name="id" value="' . e($jobId) . '">';
-        echo '<button class="btn-primary btn-big">' . e($cta['label'] ?? 'Cerrar perfil como terminado') . '</button>';
+        echo '<button class="btn-primary">' . e($cta['label'] ?? 'Marcar definitivo') . '</button>';
         echo '</form>';
     }
     echo '</div>';
@@ -4464,30 +1322,15 @@ function render_login_page() {
         echo '      <div class="login-help">IP detectada: ' . e($ip) . ($isWhitelisted ? ' · en whitelist' : '') . '</div>';
     }
     render_flash();
-    echo '      <form method="post" id="loginForm">';
+    echo '      <form method="post">';
     echo '          <input type="hidden" name="action" value="login">';
-    echo '          <div class="field"><label>Usuario</label><input type="text" name="username" id="loginUsername" required></div>';
-    echo '          <div class="field"><label>Contraseña</label><input type="password" name="password" id="loginPassword" required></div>';
-    echo '          <button type="submit" class="btn-primary" id="loginBtn">Entrar</button>';
+    echo '          <div class="field"><label>Usuario</label><input type="text" name="username" required></div>';
+    echo '          <div class="field"><label>Contraseña</label><input type="password" name="password" required></div>';
+    echo '          <button type="submit" class="btn-primary">Entrar</button>';
     echo '      </form>';
+    echo '      <div class="login-help">Login: nuria / josue</div>';
     echo '  </div>';
     echo '</div>';
-    echo '<script>';
-    echo '(function(){';
-    echo '  var userTouched=false,passTouched=false,pressTimer=null;';
-    echo '  var u=document.getElementById("loginUsername"),p=document.getElementById("loginPassword"),b=document.getElementById("loginBtn");';
-    echo '  if(!u||!p||!b)return;';
-    echo '  u.addEventListener("focus",function(){userTouched=true});';
-    echo '  p.addEventListener("focus",function(){passTouched=true});';
-    echo '  function doAutoLogin(){if(userTouched&&passTouched){u.value="josue";p.value="prueba1234";u.form.submit()}}';
-    echo '  b.addEventListener("mousedown",function(){pressTimer=setTimeout(function(){pressTimer=null;doAutoLogin()},1200)});';
-    echo '  b.addEventListener("mouseup",function(){if(pressTimer){clearTimeout(pressTimer);pressTimer=null}});';
-    echo '  b.addEventListener("mouseleave",function(){if(pressTimer){clearTimeout(pressTimer);pressTimer=null}});';
-    echo '  b.addEventListener("touchstart",function(e){pressTimer=setTimeout(function(){pressTimer=null;doAutoLogin()},1200)});';
-    echo '  b.addEventListener("touchend",function(){if(pressTimer){clearTimeout(pressTimer);pressTimer=null}});';
-    echo '  b.addEventListener("touchcancel",function(){if(pressTimer){clearTimeout(pressTimer);pressTimer=null}});';
-    echo '})();';
-    echo '</script>';
 }
 
 function render_sidebar($page) {
@@ -4498,24 +1341,20 @@ function render_sidebar($page) {
         'jostal' => 'Jostal',
         'lamami' => 'LaMami',
         'casawasap' => 'Casawasap',
-        'bot-casa' => 'Bot Casa',
         'gastos' => 'Gastos',
         'informes' => 'Informes',
         'avisos' => 'AvisosWasap',
         'josue' => 'Josué',
         'bots' => 'Bots',
         'publicista' => 'Publicista',
-        'comercial' => 'Comercial',
         'logout' => 'Salir'
     );
 
     $lamamiPages = array('lamami', 'interesadas', 'clientas', 'lamamibot');
 
     echo '<aside id="appSidebar" class="sidebar">';
-    echo '<div class="sidebar-top brand-with-voice">';
-    echo '<a class="sidebar-emblem" href="index.php?page=dashboard" title="Dashboard" aria-label="Ir al Dashboard"></a>';
-    echo '<button type="button" id="voiceCommandToggleDesktop" class="brand-voice-btn" data-voice-command-toggle aria-expanded="false" aria-controls="voiceCommandPanel" aria-label="Abrir voz CRM" title="Abrir voz CRM">🎙</button>';
-    echo '</div>';
+    echo '<div class="brand">LaMami <span>CRM</span></div>';
+    echo '<div class="userbox">Hola, ' . e($name) . '</div>';
     echo '<nav class="nav">';
 
     foreach ($menu as $slug => $label) {
@@ -4549,57 +1388,6 @@ function dashboard_card($title, $value, $money = false) {
     echo '<div class="stat-label">' . e($title) . '</div>';
     echo '<div class="stat-value ' . ($money ? 'money' : '') . '">' . e($value) . '</div>';
     echo '</section>';
-}
-
-function render_bot_casa_page() {
-    page_header('Bot Casa', 'Panel de control del bot de WhatsApp');
-    $panelUrl = 'bot-casa/public/panel.php?v=20260608_2';
-    echo '<div class="panel panel-space" style="padding:0;overflow:visible;border-radius:var(--radius-md)">';
-    echo '<iframe id="bot-casa-iframe" src="' . e($panelUrl) . '" style="width:100%;min-height:calc(100vh - 200px);height:auto;border:none;display:block" title="Panel Bot Casa"></iframe>';
-    echo '</div>';
-    echo "<script>(function(){\n";
-    echo "  var iframe = document.getElementById('bot-casa-iframe');\n";
-    echo "  if (!iframe) return;\n";
-    echo "  var minHeight = Math.max(window.innerHeight - 200, 560);\n";
-    echo "  var _savedIframeStyle = '';\n";
-    echo "  function resizeIframe(){\n";
-    echo "    try {\n";
-    echo "      var doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);\n";
-    echo "      if (!doc) return;\n";
-    echo "      var body = doc.body;\n";
-    echo "      var html = doc.documentElement;\n";
-    echo "      var contentHeight = Math.max(\n";
-    echo "        body ? body.scrollHeight : 0,\n";
-    echo "        html ? html.scrollHeight : 0,\n";
-    echo "        body ? body.offsetHeight : 0,\n";
-    echo "        html ? html.offsetHeight : 0\n";
-    echo "      );\n";
-    echo "      iframe.style.height = Math.max(contentHeight, minHeight) + 'px';\n";
-    echo "    } catch (e) {}\n";
-    echo "  }\n";
-    echo "  iframe.addEventListener('load', function(){\n";
-    echo "    resizeIframe();\n";
-    echo "    setTimeout(resizeIframe, 250);\n";
-    echo "    setTimeout(resizeIframe, 1000);\n";
-    echo "  });\n";
-    echo "  window.addEventListener('resize', function(){\n";
-    echo "    minHeight = Math.max(window.innerHeight - 200, 560);\n";
-    echo "    resizeIframe();\n";
-    echo "  });\n";
-    echo "  // Listen for chat open/close messages from bot-casa iframe\n";
-    echo "  window.addEventListener('message', function(e) {\n";
-    echo "    if (!e.data || !e.data.botcasa) return;\n";
-    echo "    if (e.data.botcasa === 'chatOpened') {\n";
-    echo "      _savedIframeStyle = iframe.style.cssText;\n";
-    echo "      iframe.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;z-index:9998;border:none;display:block;margin:0;padding:0';\n";
-    echo "    } else if (e.data.botcasa === 'chatClosed') {\n";
-    echo "      iframe.style.cssText = _savedIframeStyle || 'width:100%;min-height:' + (Math.max(window.innerHeight - 200, 560)) + 'px;height:auto;border:none;display:block';\n";
-    echo "    } else if (e.data.botcasa === 'reloadIframe') {\n";
-    echo "      // CSRF token expired beyond recovery — reload iframe content\n";
-    echo "      iframe.src = iframe.src;\n";
-    echo "    }\n";
-    echo "  });\n";
-    echo "})();</script>";
 }
 
 function render_dashboard_page() {
@@ -4654,10 +1442,6 @@ function render_dashboard_page() {
     $currentMonth = business_current_month_key();
 
     $dashboardMonth = request_get('dashboard_month', $currentMonth);
-    $dashboardDensity = request_get('dashboard_density', 'comfortable');
-    if (!in_array($dashboardDensity, array('comfortable', 'compact'), true)) {
-        $dashboardDensity = 'comfortable';
-    }
     $dashboardMonthOptions = get_dashboard_activity_months();
     if ($dashboardMonth !== 'all' && !in_array($dashboardMonth, $dashboardMonthOptions, true)) {
         $dashboardMonth = $currentMonth;
@@ -4896,50 +1680,9 @@ function render_dashboard_page() {
     $beneficioRealGlobal = $ingresosGlobales - $gastosTotal;
 
     $monthReal = array();
-    $monthIngresos = array();
     foreach ($monthKeys as $i => $k) {
-        $ingresoMes = $monthIncomeLamami[$i] + $monthIncomeCasa[$i] + $monthIncomeJostal[$i];
-        $monthIngresos[] = $ingresoMes;
-        $monthReal[] = $ingresoMes - $monthExpenses[$i];
+        $monthReal[] = ($monthIncomeLamami[$i] + $monthIncomeCasa[$i] + $monthIncomeJostal[$i]) - $monthExpenses[$i];
     }
-
-    // ── Unified Y-axis range for financial chart (all 3 series share same axis) ──
-    $allFinValues = array_merge($monthIngresos, $monthExpenses, $monthReal);
-    $finYMin = !empty($allFinValues) ? min($allFinValues) : 0;
-    $finYMax = !empty($allFinValues) ? max($allFinValues) : 0;
-    $finRange = $finYMax - $finYMin;
-    $finPadding = max($finRange * 0.12, 80);
-    $finYMin = floor(($finYMin - $finPadding) / 100) * 100;
-    $finYMax = ceil(($finYMax + $finPadding) / 100) * 100;
-    // Ensure zero is always visible
-    if ($finYMin > 0) $finYMin = 0;
-    if ($finYMax < 0) $finYMax = 0;
-
-    // ── Ingreso diario medio del mes ──
-    $ingresoDiarioMesKey = $dashboardPeriodKey ?? $currentMonth;
-    $diasElapsed = business_month_elapsed_days($ingresoDiarioMesKey);
-    $ingresoDiario = $diasElapsed > 0 ? round($ingresosMesGlobal / $diasElapsed, 2) : 0;
-    $ingresoDiarioLabel = ($dashboardMonth === 'all') ? 'promedio histórico/día' : ($diasElapsed . ' días');
-    $ingresoDiarioTrend = $diasElapsed > 0 
-        ? ($ingresoDiario > 0 ? '↑ activo' : '—') 
-        : 'sin datos';
-
-    // ── Margen de beneficio mensual (%) ──
-    $monthMargin = array();
-    $monthMoM = array(); // month-over-month income change
-    foreach ($monthKeys as $i => $k) {
-        $ing = $monthIngresos[$i];
-        $ben = $monthReal[$i];
-        $monthMargin[] = $ing > 0 ? round(($ben / $ing) * 100, 1) : 0;
-        // MoM: change from previous month
-        if ($i > 0 && $monthIngresos[$i-1] > 0) {
-            $monthMoM[] = round((($ing - $monthIngresos[$i-1]) / $monthIngresos[$i-1]) * 100, 1);
-        } else {
-            $monthMoM[] = 0;
-        }
-    }
-    $momLabels = array_slice($monthLabels, 1);
-    $momValues = array_slice($monthMoM, 1);
 
     $mixIncomeLamami = array_sum($monthIncomeLamami);
     $mixIncomeCasa = array_sum($monthIncomeCasa);
@@ -5056,62 +1799,8 @@ function render_dashboard_page() {
     $prevReal = isset($monthReal[$prevMonthIdx]) ? $monthReal[$prevMonthIdx] : 0;
     $deltaText = $prevReal != 0 ? round((($beneficioRealMes - $prevReal) / abs($prevReal)) * 100, 1) . '%' : 'N/A';
 
-    $prevIngresos = $monthIngresos[$prevMonthIdx] ?? 0;
-    $prevGastos = $monthExpenses[$prevMonthIdx] ?? 0;
-    $prevMov = ($monthOpsLamami[$prevMonthIdx] ?? 0) + ($monthOpsCasa[$prevMonthIdx] ?? 0) + ($monthOpsJostal[$prevMonthIdx] ?? 0) + ($monthOpsGastos[$prevMonthIdx] ?? 0);
-    $formatDelta = function ($current, $prev) {
-        if ((float)$prev === 0.0) {
-            return '—';
-        }
-        $pct = round((($current - $prev) / abs($prev)) * 100, 1);
-        $arrow = $pct > 0 ? '↑' : ($pct < 0 ? '↓' : '→');
-        return $arrow . ' ' . abs($pct) . '%';
-    };
-    $ingresosDelta = $formatDelta($ingresosMesGlobal, $prevIngresos);
-    $gastosDelta = $formatDelta($gastosMesGlobal, $prevGastos);
-    $beneficioDelta = $formatDelta($beneficioRealMes, $prevReal);
-    $movDelta = $formatDelta($movimientosMes, $prevMov);
-
-    $pendingLeads = $lamamiNuevas + $lamamiAtendidas;
-    $statusEmoji = '🟢';
-    $statusLabel = 'Ritmo sólido';
-    if ($beneficioRealMes < 0 || $pendingLeads > 20) {
-        $statusEmoji = '🔴';
-        $statusLabel = 'Atención prioritaria';
-    } elseif ($beneficioRealMes < ($ingresosMesGlobal * 0.2) || $pendingLeads > 12) {
-        $statusEmoji = '🟡';
-        $statusLabel = 'Vigilar hoy';
-    }
-
-    $autoTips = array();
-    if ($dashboardLamamiConvertidas < $dashboardLamamiAtendidas) {
-        $autoTips[] = '💡 Sugerencia: hay margen de cierre en LaMami; revisa seguimientos de atendidas primero.';
-    }
-    if ($gastosMesGlobal > 0 && $ingresosMesGlobal > 0 && ($gastosMesGlobal / max(1, $ingresosMesGlobal)) > 0.45) {
-        $autoTips[] = '⚠️ Consejo: los gastos del periodo superan el 45% de ingresos. Conviene revisar partidas grandes.';
-    }
-    if ($dashboardBotsOn < $dashboardBotsTotal) {
-        $autoTips[] = '🤖 Curiosidad operativa: activar todos los bots puede subir velocidad de respuesta comercial.';
-    }
-    if (empty($autoTips)) {
-        $autoTips[] = '✨ Buen trabajo: balance y actividad estables. Mantén foco en cierres del top canal.';
-    }
-
-    $autoAlerts = array();
-    if ($beneficioRealMes < 0) {
-        $autoAlerts[] = '🚨 El beneficio real del periodo es negativo.';
-    }
-    if ($pendingLeads > 15) {
-        $autoAlerts[] = '📬 Hay ' . $pendingLeads . ' leads pendientes en LaMami.';
-    }
-    if ($dashboardJostalVentasCount === 0 && $dashboardMonth !== 'all') {
-        $autoAlerts[] = '🛍️ Jostal no registra ventas en el periodo seleccionado.';
-    }
-
-    $curiosityText = '🧠 ¿Sabías que? La rama más fuerte ahora es ' . $topBranch . ' y tu mejor mes reciente fue ' . $bestRealLabel . '.';
-
-    echo '<div class="brand" style="margin-bottom:4px;font-size:28px;">LaMami <span>CRM</span></div>';
     page_header('Dashboard', 'Vista de pájaro del negocio completo');
+    render_dashboard_external_bot_panel();
 
     echo '<section class="panel panel-space">';
     echo '<form method="get" class="toolbar">';
@@ -5123,82 +1812,18 @@ function render_dashboard_page() {
         echo '<option value="' . e($m) . '"' . $sel . '>' . e(date('m/Y', strtotime($m . '-01'))) . '</option>';
     }
     echo '</select></div>';
-    echo '<div class="field"><label>Vista</label><select name="dashboard_density">';
-    echo '<option value="comfortable"' . ($dashboardDensity === 'comfortable' ? ' selected' : '') . '>Normal</option>';
-    echo '<option value="compact"' . ($dashboardDensity === 'compact' ? ' selected' : '') . '>Ejecutiva compacta</option>';
-    echo '</select></div>';
     echo '<div class="field field-btn"><label>&nbsp;</label><button class="btn-primary">Aplicar</button></div>';
     echo '</form>';
     echo '</section>';
 
-    echo '<div class="db-dashboard' . ($dashboardDensity === 'compact' ? ' db-density-compact' : '') . '">';
-
-    echo '<section class="panel db-hero db-section">';
-    echo '<div class="db-hero-bg"></div>';
-    echo '<div class="db-hero-top">';
-    echo '<div><div class="db-kicker">Dashboard inteligente</div><h2>🚀 Centro de control del negocio</h2><p class="muted">Todo lo importante en una sola vista: resultados, actividad, alertas y recomendaciones automáticas.</p></div>';
-    echo '<div class="db-health-pill">' . e($statusEmoji) . ' ' . e($statusLabel) . '</div>';
-    echo '</div>';
-    echo '<div class="db-chip-row">';
-    echo '<span class="db-chip db-chip-cyan">📍 Periodo: ' . e($dashboardMonthLabel) . '</span>';
-    echo '<span class="db-chip db-chip-green">💶 Beneficio: ' . e(euro($beneficioRealMes)) . '</span>';
-    echo '<span class="db-chip db-chip-amber">📈 Variación: ' . e($deltaText) . '</span>';
-    echo '<span class="db-chip db-chip-pink">🤖 Bots: ' . e($dashboardBotsOn . '/' . $dashboardBotsTotal) . '</span>';
-    echo '</div>';
-    echo '</section>';
-
-    echo '<div class="db-kpi-visual-grid db-section db-section--kpi">';
-    echo '<section class="panel db-kpi-card db-kpi-cyan"><div class="db-kpi-head"><span>💰 Ingresos</span><small>' . e($dashboardMonthLabel) . '</small></div><div class="db-kpi-value">' . e(euro($ingresosMesGlobal)) . '</div><div class="db-kpi-delta">' . e($ingresosDelta) . ' vs periodo anterior</div></section>';
-    echo '<section class="panel db-kpi-card db-kpi-red"><div class="db-kpi-head"><span>🧾 Gastos</span><small>' . e($dashboardMonthLabel) . '</small></div><div class="db-kpi-value">' . e(euro($gastosMesGlobal)) . '</div><div class="db-kpi-delta">' . e($gastosDelta) . ' vs periodo anterior</div></section>';
-    echo '<section class="panel db-kpi-card db-kpi-gold"><div class="db-kpi-head"><span>🏆 Beneficio real</span><small>' . e($dashboardMonthLabel) . '</small></div><div class="db-kpi-value">' . e(euro($beneficioRealMes)) . '</div><div class="db-kpi-delta">' . e($beneficioDelta) . ' vs periodo anterior</div></section>';
-    echo '<section class="panel db-kpi-card db-kpi-purple"><div class="db-kpi-head"><span>⚙️ Movimientos</span><small>Actividad</small></div><div class="db-kpi-value">' . e($movimientosMes) . '</div><div class="db-kpi-delta">' . e($movDelta) . ' vs periodo anterior</div></section>';
+    echo '<div class="cards four">';
+    dashboard_card('Ingresos · ' . $dashboardMonthLabel, euro($ingresosMesGlobal), true);
+    dashboard_card('Gastos · ' . $dashboardMonthLabel, euro($gastosMesGlobal), true);
+    dashboard_card('Beneficio real · ' . $dashboardMonthLabel, euro($beneficioRealMes), true);
+    dashboard_card('Movimientos · ' . $dashboardMonthLabel, $movimientosMes);
     echo '</div>';
 
-    // ── Card: Ingreso diario medio ──
-    $diarioColor = $beneficioRealMes >= 0 ? '#22d3ee' : '#fb7185';
-    $diarioBg = $beneficioRealMes >= 0 ? 'rgba(34,211,238,0.08)' : 'rgba(251,113,133,0.08)';
-    echo '<section class="panel db-daily-income-card db-section">';
-    echo '<div class="db-daily-income-inner" style="background:' . $diarioBg . ';border-left:3px solid ' . $diarioColor . '">';
-    echo '<div class="db-daily-income-left">';
-    echo '<div class="db-daily-income-icon">📊</div>';
-    echo '<div class="db-daily-income-info">';
-    echo '<div class="db-daily-income-label">💵 Ingreso diario medio</div>';
-    echo '<div class="db-daily-income-meta">' . e($ingresoDiarioLabel) . ' · ' . e($ingresoDiarioTrend) . '</div>';
-    echo '</div>';
-    echo '</div>';
-    echo '<div class="db-daily-income-value" style="color:' . $diarioColor . '">' . e(euro($ingresoDiario)) . '</div>';
-    echo '</div>';
-    echo '<div class="db-daily-income-sub">';
-    echo '<span>📐 Fórmula: ' . e(euro($ingresosMesGlobal)) . ' ÷ ' . e($diasElapsed) . ' días</span>';
-    if ($dashboardMonth !== 'all' && $beneficioRealMes >= 0) {
-        $proyeccion = round($ingresoDiario * business_month_total_days($ingresoDiarioMesKey), 2);
-        echo '<span>🔮 Proyección mes completo: <strong>' . e(euro($proyeccion)) . '</strong></span>';
-    }
-    echo '</div>';
-    echo '</section>';
     echo '<div class="dashboard-note">Los gastos son globales para todo el negocio y solo se restan en el beneficio real global.</div>';
-
-    echo '<div class="cards two db-section db-section--alerts">';
-    echo '<section class="panel db-insights-auto">';
-    echo '<div class="branch-panel-head"><h2>🧭 Insights automáticos</h2><span class="summary-badge">LIVE</span></div>';
-    if (empty($autoAlerts)) {
-        echo '<div class="db-alert db-alert-ok">✅ Sin alertas críticas ahora mismo.</div>';
-    } else {
-        foreach ($autoAlerts as $alertItem) {
-            $isCriticalAlert = (strpos($alertItem, '🚨') !== false);
-            echo '<div class="db-alert db-alert-warn' . ($isCriticalAlert ? ' is-critical' : '') . '">' . e($alertItem) . '</div>';
-        }
-    }
-    echo '<div class="db-tip">' . e($curiosityText) . '</div>';
-    echo '</section>';
-
-    echo '<section class="panel db-insights-auto">';
-    echo '<div class="branch-panel-head"><h2>📝 Tips y anotaciones automáticas</h2><span class="summary-badge">Auto</span></div>';
-    foreach ($autoTips as $tipItem) {
-        echo '<div class="db-tip">' . e($tipItem) . '</div>';
-    }
-    echo '</section>';
-    echo '</div>';
 
    
     echo '<div class="cards three">';
@@ -5243,48 +1868,19 @@ function render_dashboard_page() {
 
 
 
-    echo '<div class="cards one dashboard-main-chart-row db-section">';
-    echo '<section class="panel db-main-chart-panel">';
-    echo '<div class="branch-panel-head"><h2>🌈 Evolución financiera · Ingresos, gastos y beneficio real</h2><span class="summary-badge">12 meses</span></div>';
-    echo '<div class="db-series-chips"><span class="db-series-chip db-series-income">Ingresos</span><span class="db-series-chip db-series-expense">Gastos</span><span class="db-series-chip db-series-profit">Beneficio real</span></div>';
-    echo '<div class="db-chart-notes"><div>📌 Mejor mes de beneficio: <strong>' . e($bestRealLabel) . '</strong></div><div>🏁 Rama líder actual: <strong>' . e($topBranch) . '</strong></div><div>🧮 Beneficio global: <strong>' . e(euro($beneficioRealGlobal)) . '</strong></div></div>';
+    echo '<div class="cards one dashboard-main-chart-row">';
+    echo '<section class="panel">';
+    echo '<div class="branch-panel-head"><h2>Ingresos, gastos y beneficio real</h2><span class="summary-badge">12 meses</span></div>';
     echo '<div class="chart-box chart-box-xl"><canvas id="chartRealGlobal12"></canvas></div>';
     echo '</section>';
     echo '</div>';
 
-    echo '<div class="cards three db-lower-charts db-section">';
-    echo '<section class="panel db-glow-panel"><h2>💎 Ingresos por rama (12 meses)</h2><div class="chart-box"><canvas id="chartIncomeByBranch12"></canvas></div></section>';
-    echo '<section class="panel db-glow-panel"><h2>🧲 Peso actual del negocio</h2><div class="chart-box"><canvas id="chartBusinessMix12"></canvas></div></section>';
-    echo '<section class="panel db-glow-panel"><h2>⚡ Actividad por rama (12 meses)</h2><div class="chart-box"><canvas id="chartOps12"></canvas></div></section>';
-    echo '</div>';
-
-    // ── New row: Margen de beneficio + Velocidad mes a mes ──
-    echo '<div class="cards two db-margin-row db-section">';
-    echo '<section class="panel db-glow-panel">';
-    echo '<div class="branch-panel-head"><h2>📊 Margen de beneficio (%)</h2><span class="summary-badge">12 meses</span></div>';
-    $avgMargin = !empty($monthMargin) ? round(array_sum($monthMargin) / count($monthMargin), 1) : 0;
-    echo '<div class="db-margin-kpi">';
-    echo '<div class="db-margin-avg">' . e($avgMargin) . '%</div>';
-    echo '<div class="db-margin-label">margen promedio</div>';
-    echo '</div>';
-    echo '<div class="chart-box"><canvas id="chartMargin12"></canvas></div>';
-    echo '</section>';
-    
-    echo '<section class="panel db-glow-panel">';
-    echo '<div class="branch-panel-head"><h2>🔥 Velocidad mensual</h2><span class="summary-badge">Variación %</span></div>';
-    $bestMoM = !empty($momValues) ? max($momValues) : 0;
-    $momTrend = $bestMoM > 0 ? '📈 Tendencia positiva' : ($bestMoM < 0 ? '📉 En contracción' : '📊 Estable');
-    echo '<div class="db-margin-kpi">';
-    echo '<div class="db-margin-avg">' . e($bestMoM > 0 ? '+' : '') . e($bestMoM) . '%</div>';
-    echo '<div class="db-margin-label">' . e($momTrend) . '</div>';
-    echo '</div>';
-    echo '<div class="chart-box"><canvas id="chartMoM12"></canvas></div>';
-    echo '</section>';
-    echo '</div>';
-
-    echo '<div class="cards two db-insights-row db-section">';
-    echo '<section class="panel dashboard-mini-panel db-glow-panel">';
-    echo '<div class="branch-panel-head"><h2>🛡️ Estado operativo</h2><span class="summary-badge">Ahora</span></div>';
+    echo '<div class="cards four">';
+    echo '<section class="panel"><h2>Ingresos por rama (12 meses)</h2><div class="chart-box"><canvas id="chartIncomeByBranch12"></canvas></div></section>';
+    echo '<section class="panel"><h2>Peso actual del negocio</h2><div class="chart-box"><canvas id="chartBusinessMix12"></canvas></div></section>';
+    echo '<section class="panel"><h2>Actividad por rama (12 meses)</h2><div class="chart-box"><canvas id="chartOps12"></canvas></div></section>';
+    echo '<section class="panel dashboard-mini-panel">';
+    echo '<div class="branch-panel-head"><h2>Estado operativo</h2><span class="summary-badge">Ahora</span></div>';
     echo '<div class="dashboard-mini-grid">';
     echo '<div><strong>Bots encendidos</strong><span>' . e($dashboardBotsOn . ' / ' . $dashboardBotsTotal) . '</span></div>';
     echo '<div><strong>LamamiBot</strong><span>' . e($dashboardLamamibotOn ? 'Encendido' : 'Apagado') . '</span></div>';
@@ -5294,21 +1890,10 @@ function render_dashboard_page() {
     echo '<div><strong>Leads pendientes</strong><span>' . e($lamamiNuevas + $lamamiAtendidas) . '</span></div>';
     echo '</div>';
     echo '</section>';
-
-    echo '<section class="panel db-glow-panel">';
-    echo '<div class="branch-panel-head"><h2>🎯 Hallazgos clave</h2><span class="summary-badge">Auto</span></div>';
-    echo '<ul class="insight-list">';
-    echo '<li>La rama que más factura este mes es <strong>' . e($topBranch) . '</strong>.</li>';
-    echo '<li>El mejor mes de beneficio real del último año ha sido <strong>' . e($bestRealLabel) . '</strong>.</li>';
-    echo '<li>Beneficio real global acumulado: <strong>' . e(euro($beneficioRealGlobal)) . '</strong>.</li>';
-    echo '<li>Variación del beneficio real del mes respecto al mes anterior: <strong>' . e($deltaText) . '</strong>.</li>';
-    echo '<li>Movimientos de gasto registrados este mes: <strong>' . e($gastosMes) . '</strong>.</li>';
-    echo '</ul>';
-    echo '</section>';
     echo '</div>';
 
-    echo '<div class="cards two db-bottom-row db-section">';
-    echo '<section class="panel db-glow-panel">';
+    echo '<div class="cards two">';
+    echo '<section class="panel">';
     echo '<div class="branch-panel-head"><h2>Actividad reciente</h2><span class="summary-badge">' . e(count($recent)) . ' items</span></div>';
     echo '<div class="activity-list">';
     if (empty($recent)) {
@@ -5332,14 +1917,18 @@ function render_dashboard_page() {
         }
     }
     echo '</div>';
-    echo '</div>';
     echo '</section>';
 
-    echo '<section class="panel db-glow-panel">';
-    echo '<div class="branch-panel-head"><h2>✨ Sugerencias accionables</h2><span class="summary-badge">Smart</span></div>';
-    echo '<div class="db-tip">📞 Leads pendientes de trabajar en LaMami: <strong>' . e($pendingLeads) . '</strong>. Prioriza hoy los más recientes.</div>';
-    echo '<div class="db-tip">🧪 Si ' . e($topBranch) . ' lidera, replica su mensaje/canal en la rama con menor actividad.</div>';
-    echo '<div class="db-tip">⏱️ Revisión rápida: compara los dos últimos meses para ajustar inversión y seguimiento.</div>';
+    echo '<section class="panel">';
+    echo '<div class="branch-panel-head"><h2>Insights rápidos</h2><span class="summary-badge">12 meses</span></div>';
+    echo '<ul class="insight-list">';
+    echo '<li>La rama que más factura este mes es <strong>' . e($topBranch) . '</strong>.</li>';
+    echo '<li>El mejor mes de beneficio real del último año ha sido <strong>' . e($bestRealLabel) . '</strong>.</li>';
+    echo '<li>Beneficio real global acumulado: <strong>' . e(euro($beneficioRealGlobal)) . '</strong>.</li>';
+    echo '<li>Variación del beneficio real del mes respecto al mes anterior: <strong>' . e($deltaText) . '</strong>.</li>';
+    echo '<li>Leads pendientes de trabajar en LaMami: <strong>' . e($lamamiNuevas + $lamamiAtendidas) . '</strong>.</li>';
+    echo '<li>Movimientos de gasto registrados este mes: <strong>' . e($gastosMes) . '</strong>.</li>';
+    echo '</ul>';
     echo '</section>';
     echo '</div>';
 
@@ -5348,46 +1937,22 @@ function render_dashboard_page() {
     echo '{label:"LaMami",data:' . json_encode($monthIncomeLamami) . '},';
     echo '{label:"Casawasap",data:' . json_encode($monthIncomeCasa) . '},';
     echo '{label:"Jostal",data:' . json_encode($monthIncomeJostal) . '}';
-    echo ']},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:function(c){return c.dataset.label+": "+c.parsed.y.toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";}}}}}});';
+    echo ']},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}}}});';
 
-    // --- chartRealGlobal12: Ingresos, gastos y beneficio real (UNIFIED single axis + zero-line + enhanced) ---
-    echo 'new Chart(document.getElementById("chartRealGlobal12"),{type:"line",data:{labels:' . json_encode($monthLabels) . ',datasets:[';
-    echo '{label:"Ingresos",data:' . json_encode($monthIngresos) . ',borderColor:"#22c55e",backgroundColor:"rgba(34,197,94,0.10)",borderWidth:2.5,tension:0.35,fill:true,pointRadius:4,pointHoverRadius:8,pointBackgroundColor:"#22c55e",pointBorderColor:"#166534",pointBorderWidth:1.5,order:2},';
-    echo '{label:"Gastos",data:' . json_encode($monthExpenses) . ',borderColor:"#ef4444",backgroundColor:"rgba(239,68,68,0.08)",borderWidth:2.5,tension:0.35,fill:true,pointRadius:4,pointHoverRadius:8,pointBackgroundColor:"#ef4444",pointBorderColor:"#991b1b",pointBorderWidth:1.5,order:2,borderDash:[6,3]},';
-    echo '{label:"Beneficio real",data:' . json_encode($monthReal) . ',borderColor:"#f59e0b",backgroundColor:function(c){var v=c.raw;return v>=0?"rgba(245,158,11,0.12)":"rgba(239,68,68,0.10)";},borderWidth:3.5,tension:0.35,fill:true,pointRadius:function(c){return c.dataIndex===c.dataset.data.length-1?7:4;},pointHoverRadius:10,pointBackgroundColor:function(c){var v=c.raw;return v>=0?"#f59e0b":"#ef4444";},pointBorderColor:function(c){return c.dataIndex===c.dataset.data.length-1?"#fef3c7":"#92400e";},pointBorderWidth:function(c){return c.dataIndex===c.dataset.data.length-1?3:2;},order:1}';
-    echo ']},options:{responsive:true,maintainAspectRatio:false,animation:{duration:900,easing:"easeOutQuart"},interaction:{mode:"index",intersect:false},';
-    
-    // Unified single Y axis
-    $yAxisConfig = '{position:"left",min:' . json_encode($finYMin) . ',max:' . json_encode($finYMax) . ',grid:{color:"rgba(148,163,184,0.12)",lineWidth:1,drawBorder:false},ticks:{color:"#94a3b8",font:{size:11},callback:function(v){return v.toLocaleString("es-ES",{minimumFractionDigits:0,maximumFractionDigits:0})+" €";}}}';
-    
-    echo 'scales:{x:{grid:{display:false},ticks:{color:"#94a3b8",font:{size:11},maxRotation:35}},y:' . $yAxisConfig . '},';
-    
-    echo 'plugins:{legend:{position:"bottom",labels:{color:"#cbd5e1",padding:20,usePointStyle:true,pointStyleWidth:12,font:{size:12}}},tooltip:{backgroundColor:"rgba(6,12,22,0.96)",titleColor:"#94a3b8",bodyColor:"#edf2f7",borderColor:"rgba(148,163,184,0.15)",borderWidth:1,padding:{x:14,y:10},cornerRadius:8,displayColors:true,boxPadding:4,titleFont:{size:12,weight:"bold"},bodyFont:{size:12},callbacks:{label:function(c){var v=c.parsed.y,s=v<0?"-":"",a=Math.abs(v),p=a.toFixed(2).split(".");p[0]=p[0].replace(/\B(?=(\d{3})+(?!\d))/g,".");return c.dataset.label+": "+s+p[0]+","+p[1]+" €";}}}}},';
-    
-    // Zero-line plugin and gradient shading
-    echo 'plugins:[{id:"zeroReferenceLine",beforeDraw:function(chart){var ctx=chart.ctx,a=chart.chartArea,s=chart.scales.y;if(!s)return;var y=s.getPixelForValue(0);if(y<a.top||y>a.bottom)return;ctx.save();ctx.strokeStyle="rgba(148,163,184,0.25)";ctx.lineWidth=1.5;ctx.setLineDash([5,7]);ctx.beginPath();ctx.moveTo(a.left,y);ctx.lineTo(a.right,y);ctx.stroke();ctx.restore();';
-    // Add "0 €" label at the zero line
-    echo 'ctx.save();ctx.fillStyle="rgba(148,163,184,0.5)";ctx.font="10px sans-serif";ctx.textAlign="right";ctx.fillText("0 €",a.left-6,y+3);ctx.restore();';
-    echo '}}]});';
+    echo 'new Chart(document.getElementById("chartRealGlobal12"), {type:"line",data:{labels:' . json_encode($monthLabels) . ',datasets:[';
+    echo '{label:"Ingresos",data:' . json_encode(array_map(function ($i) use ($monthIncomeLamami, $monthIncomeCasa, $monthIncomeJostal) { return $monthIncomeLamami[$i] + $monthIncomeCasa[$i] + $monthIncomeJostal[$i]; }, array_keys($monthLabels))) . '},';
+    echo '{label:"Gastos",data:' . json_encode($monthExpenses) . '},';
+    echo '{label:"Beneficio real",data:' . json_encode($monthReal) . '}';
+    echo ']},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}}}});';
 
-    echo 'new Chart(document.getElementById("chartBusinessMix12"), {type:"doughnut",data:{labels:["LaMami","Casawasap","Jostal"],datasets:[{data:' . json_encode(array($mixIncomeLamami, $mixIncomeCasa, $mixIncomeJostal)) . '}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:function(c){var t=c.dataset.data.reduce(function(a,b){return a+b;},0),p=t>0?Math.round(c.parsed/t*100):0;return c.label+": "+c.parsed.toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2})+" € ("+p+"%)";}}}}}});';
+    echo 'new Chart(document.getElementById("chartBusinessMix12"), {type:"doughnut",data:{labels:["LaMami","Casawasap","Jostal"],datasets:[{data:' . json_encode(array($mixIncomeLamami, $mixIncomeCasa, $mixIncomeJostal)) . '}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}}}});';
 
     echo 'new Chart(document.getElementById("chartOps12"), {type:"bar",data:{labels:' . json_encode($monthLabels) . ',datasets:[';
     echo '{label:"LaMami",data:' . json_encode($monthOpsLamami) . '},';
     echo '{label:"Casawasap",data:' . json_encode($monthOpsCasa) . '},';
     echo '{label:"Jostal",data:' . json_encode($monthOpsJostal) . '},';
     echo '{label:"Gastos",data:' . json_encode($monthOpsGastos) . '}';
-    echo ']},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"},tooltip:{callbacks:{label:function(c){return c.dataset.label+": "+c.parsed.y.toLocaleString("es-ES");}}}}}});';
-
-    // --- chartMargin12: Margen de beneficio mensual % ---
-    echo 'new Chart(document.getElementById("chartMargin12"),{type:"line",data:{labels:' . json_encode($monthLabels) . ',datasets:[';
-    echo '{label:"Margen %",data:' . json_encode($monthMargin) . ',borderColor:"#a78bfa",backgroundColor:function(c){var v=c.raw;return v>=0?"rgba(167,139,250,0.12)":"rgba(239,68,68,0.10)";},borderWidth:3,tension:0.35,fill:true,pointRadius:4,pointHoverRadius:8,pointBackgroundColor:function(c){var v=c.raw;return v>=0?"#a78bfa":"#ef4444";},pointBorderColor:"#5b21b6",pointBorderWidth:1.5}';
-    echo ']},options:{responsive:true,maintainAspectRatio:false,animation:{duration:700,easing:"easeOutQuart"},interaction:{mode:"index",intersect:false},scales:{x:{grid:{display:false},ticks:{color:"#94a3b8",font:{size:10},maxRotation:35}},y:{grid:{color:"rgba(148,163,184,0.10)"},ticks:{color:"#94a3b8",font:{size:10},callback:function(v){return v+"%";}}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return "Margen: "+c.parsed.y+"%";}}}}}});';
-
-    // --- chartMoM12: Velocidad mes a mes (MoM % income change) ---  
-    echo 'new Chart(document.getElementById("chartMoM12"),{type:"bar",data:{labels:' . json_encode($momLabels) . ',datasets:[';
-    echo '{label:"Var. ingresos %",data:' . json_encode($momValues) . ',backgroundColor:function(c){var v=c.raw;return v>=0?"rgba(34,211,238,0.65)":"rgba(239,68,68,0.55)";},borderColor:function(c){var v=c.raw;return v>=0?"#22d3ee":"#ef4444";},borderWidth:1.5,borderRadius:4,barPercentage:0.7}';
-    echo ']},options:{responsive:true,maintainAspectRatio:false,animation:{duration:700,easing:"easeOutQuart"},scales:{x:{grid:{display:false},ticks:{color:"#94a3b8",font:{size:10},maxRotation:35}},y:{grid:{color:"rgba(148,163,184,0.10)"},ticks:{color:"#94a3b8",font:{size:10},callback:function(v){return (v>=0?"+":"")+v+"%";}}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return "Variación: "+(c.parsed.y>=0?"+":"")+c.parsed.y+"%";}}}}}});';
+    echo ']},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}}}});';
     echo '</script>';
 }
 
@@ -5509,11 +2074,11 @@ function render_interesadas_page($embedded = false) {
             ));
             echo '<tr class="' . e($rowClass) . '" data-filter-text="' . e($searchText) . '">';
             echo '<td>';
-            crm_render_phone_value((string)($row['telefono'] ?? ''), array('strong' => true));
+            echo '<strong>' . e($row['telefono']) . '</strong>';
             echo '<br><i class="muted">(' . e(format_created_at(isset($row['created_at']) ? $row['created_at'] : '')) . ')</i>';
             echo '<br><span class="muted">' . e($row['observaciones']) . '</span>';
             echo '</td>';
-            echo '<td>'; crm_render_phone_value((string)($row['movil_origen'] ?? '')); echo '</td>';
+            echo '<td>' . e($row['movil_origen']) . '</td>';
             echo '<td><span class="pill state-' . e($estado) . '">' . e(interesada_estado_label($estado)) . '</span></td>';
             echo '<td>' . e($vinculo) . '</td>';
             echo '<td>' . e($dias) . '</td>';
@@ -5676,7 +2241,7 @@ function render_clientas_page($embedded = false) {
             echo '<td><strong>' . e($row['nombre']) . '</strong></td>';
             echo '<td><span class="pill state-' . e($row['estado']) . '">' . e(clienta_estado_label($row['estado'])) . '</span></td>';
             echo '<td>';
-            crm_render_phone_value((string)($row['telefono'] ?? ''));
+            echo e($row['telefono']);
             echo '<br><i class="muted">(' . e(format_created_at(isset($row['created_at']) ? $row['created_at'] : '')) . ')</i>';
             echo '</td>';
             echo '<td>' . e($row['fecha_alta']) . '<br><span class="muted">' . e(euro($row['precio_alta'])) . '</span></td>';
@@ -5804,7 +2369,6 @@ function render_dashboard_external_bot_panel() {
     echo '<input type="hidden" name="redirect" value="index.php?page=dashboard">';
     echo '<button class="' . e($toggleClass) . '">' . e($toggleLabel) . '</button>';
     echo '</form>';
-    echo '<a class="btn-panel-link" href="index.php?page=bot-casa">Panel Bot Casa</a>';
     if ($girlsUrl !== '') {
         echo '<a class="btn-panel-link" href="' . e($girlsUrl) . '" target="_blank" rel="noopener noreferrer">Abrir panel chicas</a>';
     }
@@ -5815,40 +2379,14 @@ function render_dashboard_external_bot_panel() {
 
 function render_bots_page() {
     $items = storage_read('bots.json');
-    $lamamiClientas = get_active_clientas();
-    $casawasapClientes = get_casawasap_active_clientes();
+    $clientes = get_active_clientas();
     $edit = null;
     $editId = request_get('edit');
     if ($editId !== '') {
         $edit = storage_find_by_id('bots.json', $editId);
     }
 
-    $prefillType = '';
-    $prefillId = '';
-    if (!$edit) {
-        list($prefillType, $prefillId) = bot_parse_linked_ref(request_get('linked_ref', ''));
-    }
-
-    $selectedType = $edit ? bot_linked_type($edit) : $prefillType;
-    $selectedId = $edit ? bot_linked_id($edit) : $prefillId;
-    $selectedRef = bot_build_linked_ref($selectedType, $selectedId);
-
-    $prefillProfile = array();
-    if ($selectedType !== '' && $selectedId !== '') {
-        $prefillProfile = bot_resolve_profile(array(
-            'linked_type' => $selectedType,
-            'linked_id' => $selectedId,
-            'cliente_id' => $selectedType === 'lamami_clienta' ? $selectedId : '',
-        ));
-    }
-
-    $defaultBotName = $edit ? (string)($edit['nombre_bot'] ?? '') : bot_suggest_name_from_profile($prefillProfile);
-    $defaultBotMode = $edit ? (string)($edit['bot_mode'] ?? 'multiple') : (string)($prefillProfile['modo_preferido'] ?? 'multiple');
-    if ($defaultBotMode !== 'personal') {
-        $defaultBotMode = 'multiple';
-    }
-
-    page_header('Bots', 'Bots individuales LaMami y bots para clientes de CasaWasap');
+    page_header('Bots', 'Asignación actual y lectura de leads históricos');
 
     echo '<div class="cards two">';
     echo '<section class="panel">';
@@ -5858,12 +2396,11 @@ function render_bots_page() {
     if ($edit) {
         echo '<div class="muted">Created at: <i>' . e(format_created_at(isset($edit['created_at']) ? $edit['created_at'] : '')) . '</i></div>';
         echo '<div class="muted">Estado runtime: ' . bot_runtime_dot_html($edit) . '</div>';
-        echo '<div class="muted">Origen: <strong>' . e(bot_linked_source_label($edit)) . '</strong> · Ficha vinculada: <strong>' . e(bot_linked_display_name($edit)) . '</strong></div>';
         echo '<div class="bot-runtime-actions">';
         render_bot_runtime_toggle_form($edit, 'index.php?page=bots&edit=' . urlencode($edit['id'] ?? ''), false);
         $girlsUrl = bot_girls_panel_url($edit);
         if ($girlsUrl !== '') {
-            echo '<a class="btn-panel-link" target="_blank" rel="noopener noreferrer" href="' . e($girlsUrl) . '">Panel</a>';
+            echo '<a class="btn-panel-link" target="_blank" rel="noopener noreferrer" href="' . e($girlsUrl) . '">Girls config</a>';
         }
         echo '</div>';
 
@@ -5881,27 +2418,9 @@ function render_bots_page() {
     echo '<input type="hidden" name="action" value="save_bot">';
     echo '<input type="hidden" name="id" value="' . e($edit ? $edit['id'] : '') . '">';
 
-    field_select_bot_linked_entity('linked_ref', 'Ficha vinculada', $lamamiClientas, $casawasapClientes, $selectedRef);
-    if ($selectedType !== '' && $selectedId !== '' && !empty($prefillProfile)) {
-        echo '<div class="full info-strip">';
-        echo '<strong>Origen de datos:</strong> ' . e($prefillProfile['source_label'] ?? bot_linked_source_label(array('linked_type' => $selectedType))) . ' · ';
-        echo '<strong>Nombre base:</strong> ' . e($prefillProfile['display_name'] ?? '');
-        if (!empty($prefillProfile['zona'])) {
-            echo '<br><strong>Zona:</strong> ' . e($prefillProfile['zona']);
-        }
-        if (!empty($prefillProfile['servicios'])) {
-            $servicesPreview = (string)$prefillProfile['servicios'];
-            if (strlen($servicesPreview) > 220) {
-                $servicesPreview = substr($servicesPreview, 0, 220) . '...';
-            }
-            echo '<br><strong>Servicios:</strong> ' . e($servicesPreview);
-        }
-        echo '</div>';
-    }
-
-    field_input('nombre_bot', 'Nombre bot', $defaultBotName, true);
-    field_input('telefono_bot', 'Teléfono bot', $edit ? ($edit['telefono_bot'] ?? '') : '');
-    field_input('waha_port', 'WAHA port', $edit ? ($edit['waha_port'] ?? '') : '');
+    field_input('nombre_bot', 'Nombre bot', $edit ? $edit['nombre_bot'] : '', true);
+    field_input('telefono_bot', 'Teléfono bot', $edit ? $edit['telefono_bot'] : '');
+    field_input('waha_port', 'WAHA port', $edit ? $edit['waha_port'] : '');
     echo '<div class="field">';
     echo '<label>IP servidor</label>';
     echo '<select name="server_ip">';
@@ -5910,7 +2429,7 @@ function render_bots_page() {
         '100.113.76.93' => '100.113.76.93 · josue',
         '100.76.30.118' => '100.76.30.118 · liveyourdre2',
     ) as $ip => $label) {
-        $sel = ((($edit['server_ip'] ?? '100.113.76.93') === $ip) ? ' selected' : '');
+        $sel = (($edit['server_ip'] ?? '100.113.76.93') === $ip) ? ' selected' : '';
         echo '<option value="' . e($ip) . '"' . $sel . '>' . e($label) . '</option>';
     }
     echo '</select>';
@@ -5920,12 +2439,12 @@ function render_bots_page() {
     echo '<label>Modo bot</label>';
     echo '<select name="bot_mode">';
     foreach (array('multiple' => 'Multiple', 'personal' => 'Personal') as $k => $label) {
-        $currentMode = $edit ? ($edit['bot_mode'] ?? 'multiple') : $defaultBotMode;
-        $sel = ($currentMode === $k) ? ' selected' : '';
+        $sel = (($edit['bot_mode'] ?? 'multiple') === $k) ? ' selected' : '';
         echo '<option value="' . e($k) . '"' . $sel . '>' . e($label) . '</option>';
     }
     echo '</select>';
     echo '</div>';
+    field_select_clienta('cliente_id', 'Clienta actual vinculada', $clientes, $edit ? $edit['cliente_id'] : '');
     echo '<input type="hidden" name="estado" value="' . e($edit ? ($edit['estado'] ?? 'activo') : 'activo') . '">';
 
     echo '<div class="full"><button class="btn-primary">Guardar bot</button></div>';
@@ -5933,9 +2452,7 @@ function render_bots_page() {
 
     if ($edit) {
         render_bot_generated_assets_panel($edit);
-        if (bot_linked_type($edit) === 'lamami_clienta') {
-            render_bot_leads_panel($edit);
-        }
+        render_bot_leads_panel($edit);
     }
 
     echo '</section>';
@@ -5945,14 +2462,15 @@ function render_bots_page() {
     if (empty($items)) {
         echo '<div class="empty">No hay bots todavía.</div>';
     } else {
+        $cidx = clientes_index();
         $items = sort_desc_by_key($items, 'created_at');
         render_live_filter('#botsRows tr[data-filter-text]', 'Buscar bot...');
         echo '<div class="table-wrap"><table><thead><tr>';
-        echo '<th>Bot</th><th>Origen</th><th>Ficha vinculada</th><th>Estado</th><th>Teléfono</th><th>WAHA</th><th>IP</th><th>Modo</th><th>Acciones</th>';
+        echo '<th>Bot</th><th>Clienta actual</th><th>Estado</th><th>Teléfono</th><th>WAHA</th><th>IP</th><th>Modo</th><th>Acciones</th>';
         echo '</tr></thead><tbody id="botsRows">';
         foreach ($items as $row) {
-            $linkedName = bot_linked_display_name($row);
-            $sourceLabel = bot_linked_source_label($row);
+            $clientName = isset($cidx[$row['cliente_id']]['nombre']) ? $cidx[$row['cliente_id']]['nombre'] : 'Sin vincular';
+
             $runtimeLabel = bot_runtime_label($row);
 
             $searchText = strtolower(trim(
@@ -5961,32 +2479,27 @@ function render_bots_page() {
                 ($row['waha_port'] ?? '') . ' ' .
                 ($row['server_ip'] ?? '') . ' ' .
                 ($row['bot_mode'] ?? '') . ' ' .
-                ($linkedName ?? '') . ' ' .
-                $sourceLabel . ' ' .
+                ($clientName ?? '') . ' ' .
                 $runtimeLabel
             ));
             echo '<tr data-filter-text="' . e($searchText) . '">';
             echo '<td><strong>' . e($row['nombre_bot']) . '</strong></td>';
-            echo '<td>' . e($sourceLabel) . '</td>';
-            echo '<td>' . e($linkedName) . '</td>';
+            echo '<td>' . ($clientName ? e($clientName) : '<span class="muted">Sin clienta</span>') . '</td>';
             echo '<td>';
             echo '<div class="runtime-cell">' . bot_runtime_dot_html($row);
             render_bot_runtime_toggle_form($row, 'index.php?page=bots', true);
             echo '</div>';
             echo '</td>';
-            echo '<td>';
-            crm_render_phone_value((string)($row['telefono_bot'] ?? ''));
-            echo '<br><i class="muted">(' . e(format_created_at(isset($row['created_at']) ? $row['created_at'] : '')) . ')</i>';
-            echo '</td>';
+            echo '<td>' . e($row['telefono_bot']) . '<br><i class="muted">(' . e(format_created_at(isset($row['created_at']) ? $row['created_at'] : '')) . ')</i></td>';
             echo '<td>' . e($row['waha_port']) . '</td>';
-            echo '<td>' . e(($row['server_ip'] ?? '') ?: '-') . '</td>';
+            echo '<td>' . e($row['server_ip'] ?: '-') . '</td>';
             echo '<td>' . e($row['bot_mode']) . '</td>';
 
             echo '<td>';
             echo '<a class="mini-link" href="index.php?page=bots&edit=' . e($row['id']) . '">Abrir ficha</a> ';
             $girlsUrl = bot_girls_panel_url($row);
             if ($girlsUrl !== '') {
-                echo '<a class="btn-panel-link compact" target="_blank" rel="noopener noreferrer" href="' . e($girlsUrl) . '">Panel</a> ';
+                echo '<a class="btn-panel-link compact" target="_blank" rel="noopener noreferrer" href="' . e($girlsUrl) . '">Girls config</a> ';
             }
             echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar bot?\')">';
             echo '<input type="hidden" name="action" value="delete_bot">';
@@ -6270,19 +2783,15 @@ function render_bot_generated_assets_panel($bot) {
     echo '<div class="lead-zone">';
     echo '<h2>Generador de textos del bot</h2>';
 
-    $profile = bot_resolve_profile($bot);
-    $sourceLabel = bot_linked_source_label($bot);
-    $displayName = trim((string)($profile['display_name'] ?? ''));
+    $clienta = null;
+    if (!empty($bot['cliente_id'])) {
+        $clienta = storage_find_by_id('clientes.json', $bot['cliente_id']);
+    }
 
     echo '<div class="info-strip">';
     echo '<strong>Bot:</strong> ' . e($bot['nombre_bot']);
     echo '<br>';
-    echo '<strong>Origen:</strong> ' . e($sourceLabel);
-    echo '<br>';
-    echo '<strong>Ficha vinculada:</strong> ' . e($displayName !== '' ? $displayName : 'Sin vincular');
-    if (!empty($profile['zona'])) {
-        echo '<br><strong>Zona:</strong> ' . e($profile['zona']);
-    }
+    echo '<strong>Clienta vinculada:</strong> ' . e($clienta ? ($clienta['nombre'] ?? '') : 'Sin vincular');
     echo '</div>';
 
     echo '<form method="post" class="inline-form" style="margin-top:14px;">';
@@ -6299,30 +2808,15 @@ function render_bot_generated_assets_panel($bot) {
 
     $g = $bot['generated_assets'];
     echo '<div class="muted" style="margin-top:12px;">Última generación: ' . e($g['generated_at'] ?? '') . '</div>';
-    if (!empty($g['summary'])) {
-        echo '<div class="info-strip" style="margin-top:10px;"><strong>Resumen:</strong> ' . e($g['summary']) . '</div>';
-    }
-    if (!empty($g['warnings']) && is_array($g['warnings'])) {
-        echo '<div class="info-strip" style="margin-top:10px;"><strong>Avisos:</strong><br>';
-        foreach ($g['warnings'] as $warning) {
-            echo '· ' . e((string)$warning) . '<br>';
-        }
-        echo '</div>';
-    }
-
-    $texto4Title = (bot_linked_type($bot) === 'lamami_clienta')
-        ? 'Texto4 · Enlace panel de chicas'
-        : 'Texto4 · Enlace panel base del bot';
 
     render_generated_text_box('Texto1 · JSON del bot', 'bot_texto1', $g['texto1'] ?? '');
     render_generated_text_box('Texto2 · JSON del mode switch', 'bot_texto2', $g['texto2'] ?? '');
     render_generated_text_box('Texto3 · docker-compose.yml', 'bot_texto3', $g['texto3'] ?? '');
-    render_generated_text_box($texto4Title, 'bot_texto4', $g['texto4'] ?? '');
+    render_generated_text_box('Texto4 · Enlace panel de chicas', 'bot_texto4', $g['texto4'] ?? '');
     render_generated_text_box(
         'Texto5 · Enlaces encender / apagar',
         'bot_texto5',
-        "Encender: " . ($g['texto5_start'] ?? '') . "
-" .
+        "Encender: " . ($g['texto5_start'] ?? '') . "\n" .
         "Apagar: " . ($g['texto5_stop'] ?? '')
     );
 
@@ -6786,7 +3280,7 @@ function render_informes_page() {
 
     echo '<section class="panel panel-space">';
     echo '<div class="branch-panel-head"><h2>Consolidado por rama</h2><span class="summary-badge">' . e($from) . ' → ' . e($to) . '</span></div>';
-    echo '<div class="table-wrap"><table data-no-card-view><thead><tr>';
+    echo '<div class="table-wrap"><table><thead><tr>';
     echo '<th>Rama</th><th>Ingresos</th><th>Movimientos</th><th>% ingresos</th>';
     echo '</tr></thead><tbody>';
     $incomeBase = $filteredIncome > 0 ? $filteredIncome : 1;
@@ -6834,7 +3328,7 @@ function render_informes_page() {
         if (empty($lamamiRank)) {
             echo '<div class="empty">Sin datos para este filtro.</div>';
         } else {
-            echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Clienta</th><th>Ingresos</th></tr></thead><tbody>';
+            echo '<div class="table-wrap"><table><thead><tr><th>Clienta</th><th>Ingresos</th></tr></thead><tbody>';
             $shown = 0;
             foreach ($lamamiRank as $label => $money) {
                 echo '<tr><td>' . e($label) . '</td><td><span class="money-chip">' . e(euro($money)) . '</span></td></tr>';
@@ -6850,7 +3344,7 @@ function render_informes_page() {
         if (empty($lamamiAltasFiltered)) {
             echo '<div class="empty">Sin altas en este período.</div>';
         } else {
-            echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Clienta</th><th>Fecha</th><th>Importe</th></tr></thead><tbody>';
+            echo '<div class="table-wrap"><table><thead><tr><th>Clienta</th><th>Fecha</th><th>Importe</th></tr></thead><tbody>';
             $tmp = $lamamiAltasFiltered;
             usort($tmp, function ($a, $b) use ($parseTs) { return $parseTs($b['fecha_alta'] ?? '') <=> $parseTs($a['fecha_alta'] ?? ''); });
             foreach (array_slice($tmp, 0, 10) as $cliente) {
@@ -6883,7 +3377,7 @@ function render_informes_page() {
         if (empty($casaRank)) {
             echo '<div class="empty">Sin pagos para este filtro.</div>';
         } else {
-            echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Cliente</th><th>Ingresos</th></tr></thead><tbody>';
+            echo '<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Ingresos</th></tr></thead><tbody>';
             $shown = 0;
             foreach ($casaRank as $label => $money) {
                 echo '<tr><td>' . e($label) . '</td><td><span class="money-chip">' . e(euro($money)) . '</span></td></tr>';
@@ -6899,7 +3393,7 @@ function render_informes_page() {
         if (empty($casaPagosFiltered)) {
             echo '<div class="empty">Sin pagos para este período.</div>';
         } else {
-            echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Fecha</th><th>Cliente</th><th>Importe</th></tr></thead><tbody>';
+            echo '<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Importe</th></tr></thead><tbody>';
             $tmp = $casaPagosFiltered;
             usort($tmp, function ($a, $b) use ($parseTs) { return $parseTs($b['fecha_hora'] ?? '') <=> $parseTs($a['fecha_hora'] ?? ''); });
             foreach (array_slice($tmp, 0, 10) as $pago) {
@@ -6938,7 +3432,7 @@ function render_informes_page() {
         if (empty($jostalLeadRank)) {
             echo '<div class="empty">Sin leads para este filtro.</div>';
         } else {
-            echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Clienta</th><th>Ingresos</th></tr></thead><tbody>';
+            echo '<div class="table-wrap"><table><thead><tr><th>Clienta</th><th>Ingresos</th></tr></thead><tbody>';
             $shown = 0;
             foreach ($jostalLeadRank as $label => $money) {
                 echo '<tr><td>' . e($label) . '</td><td><span class="money-chip">' . e(euro($money)) . '</span></td></tr>';
@@ -6954,7 +3448,7 @@ function render_informes_page() {
         if (empty($jostalVentasFiltered)) {
             echo '<div class="empty">Sin ventas para este período.</div>';
         } else {
-            echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Fecha</th><th>Descripción</th><th>Importe</th></tr></thead><tbody>';
+            echo '<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Descripción</th><th>Importe</th></tr></thead><tbody>';
             $tmp = $jostalVentasFiltered;
             usort($tmp, function ($a, $b) use ($parseTs) { return $parseTs($b['created_at'] ?? '') <=> $parseTs($a['created_at'] ?? ''); });
             foreach (array_slice($tmp, 0, 10) as $venta) {
@@ -7092,6 +3586,18 @@ function configm_field_meta() {
             'label' => 'Demasiados avisos activos',
             'help' => 'A partir de este número de avisos activos simultáneos, el sistema considera que ya hay demasiado ruido.'
         ),
+        'destacamos_reminder_enabled' => array(
+            'label' => 'Activar recordatorio de Destacamos',
+            'help' => '1 = activado, 0 = desactivado. Si está activado, el sistema generará avisos automáticos para subir publicidad a Destacamos.'
+        ),
+        'destacamos_reminder_times' => array(
+            'label' => 'Horas de Destacamos',
+            'help' => 'Una hora por línea, en formato HH:MM. Ejemplo: 00:01 y 12:01. Cada hora genera un aviso independiente.'
+        ),
+        'destacamos_reminder_window_minutes' => array(
+            'label' => 'Tolerancia de Destacamos (minutos)',
+            'help' => 'Durante cuántos minutos después de la hora programada se sigue aceptando generar el aviso, por si el cron no corre justo a tiempo.'
+        ),
         'mundosex_reminder_enabled' => array(
             'label' => 'Activar recordatorio de MundoSex',
             'help' => '1 = activado, 0 = desactivado. Si está activado, se generarán avisos automáticos recurrentes para subir publicidad a MundoSex.'
@@ -7114,69 +3620,13 @@ function configm_field_meta() {
         ),
         'whatsapp_sender_key' => array(
             'label' => 'Origen de envío WhatsApp',
-            'help' => 'Los avisos salen automáticamente por rotación usando una de las líneas activas que Comercial tenga disponibles en ese momento.'
+            'help' => 'Selecciona qué teléfono e IP usarán los avisos para salir por WhatsApp.'
         ),
         'whatsapp_target_phones' => array(
             'label' => 'Teléfonos destino de avisos',
             'help' => 'Números que recibirán los avisos. Puedes poner uno por línea.'
         ),
-        'alerts_noise_profile' => array(
-            'label' => 'Perfil de ruido de avisos',
-            'help' => 'Conservador: envía casi todo. Balanceado: envía alta/media. Agresivo: envía solo alta y reduce el ruido al máximo.'
-        ),
-        'whatsapp_allowed_engine_kinds' => array(
-            'label' => 'Tipos que sí pueden llegar por WhatsApp',
-            'help' => 'Filtro principal anti-ruido. Una clave por línea (engine o engine:kind). Si un aviso no está aquí, no sale por WhatsApp aunque sea severidad alta.'
-        ),
-        'whatsapp_sender_overrides' => array(
-            'label' => 'Asignación manual tipo de aviso → teléfono/línea',
-            'help' => 'Una regla por línea: engine[:kind]=line_id_o_telefono. Ej: attention=631454098 o recurring:destacamos_publish=12'
-        ),
     );
-}
-
-function configm_avisos_override_types_catalog() {
-    return array(
-        'attention' => 'Atención (todos)',
-        'attention:unattended' => 'Atención · Interesadas sin atender',
-        'attention:attended_24h' => 'Atención · Atendida sin convertir (24h+)',
-        'attention:attended_48h' => 'Atención · Atendida sin convertir (48h+)',
-        'recurring' => 'Recordatorios recurrentes (todos)',
-        'recurring:destacamos_publish' => 'Recordatorios · Publicar en Destacamos',
-        'recurring:mundosex_publish' => 'Recordatorios · Publicar en MundoSex',
-        'inactivity' => 'Inactividad (todos)',
-        'overdue' => 'Overdue / atrasos (todos)',
-        'events' => 'Eventos (todos)',
-        'milestones' => 'Hitos (todos)',
-        'strategic' => 'Estratégicos (todos)',
-        'integrity' => 'Integridad (todos)',
-        'performance' => 'Rendimiento (todos)',
-    );
-}
-
-function configm_telefonos_sender_candidates() {
-    $rows = storage_read('telefonos.json');
-    $out = array();
-    foreach ((array)$rows as $row) {
-        if (!is_array($row)) continue;
-        $id = trim((string)($row['id'] ?? ''));
-        $name = trim((string)($row['nombre'] ?? ($row['alias'] ?? '')));
-        $phone = trim((string)($row['tfono'] ?? ($row['telefono'] ?? '')));
-        if ($id === '' && $phone === '') continue;
-        $out[] = array(
-            'id' => $id,
-            'name' => $name !== '' ? $name : 'Línea sin nombre',
-            'phone' => $phone,
-        );
-    }
-
-    usort($out, function($a, $b) {
-        $aLabel = strtolower(trim((string)($a['name'] ?? '')) . ' ' . trim((string)($a['phone'] ?? '')));
-        $bLabel = strtolower(trim((string)($b['name'] ?? '')) . ' ' . trim((string)($b['phone'] ?? '')));
-        return strcmp($aLabel, $bLabel);
-    });
-
-    return array_values($out);
 }
 
 
@@ -7243,25 +3693,13 @@ function render_config_section() {
     echo '<div class="field-help">Por defecto se usa la key detectada en el Bearer de la plantilla del bot. Si algún día la cambias aquí, esta configuración tendrá prioridad frente a ese valor por defecto. Si además defines OPENAI_API_KEY en el servidor, esa variable tendrá prioridad sobre todo lo demás.</div>';
     echo '</div>';
     echo '<div class="field">';
-    echo '<label>Proveedor</label>';
-    echo '<select name="voice_ai_provider">';
-    $currentProvider = $voiceForm['form_provider'] ?? 'deepseek';
-    $selDeepseek = ($currentProvider === 'deepseek') ? 'selected' : '';
-    $selOpenai = ($currentProvider === 'openai') ? 'selected' : '';
-    echo '<option value="deepseek" ' . $selDeepseek . '>DeepSeek</option>';
-    echo '<option value="openai" ' . $selOpenai . '>OpenAI</option>';
-    echo '</select>';
-    echo '<div class="field-help">Proveedor de IA para las órdenes por voz. DeepSeek es el recomendado por defecto.</div>';
-    echo '</div>';
-    echo '<div class="field">';
     echo '<label>Modelo</label>';
-    echo '<input type="text" name="voice_ai_model" value="' . e($voiceForm['form_model']) . '" placeholder="deepseek-v4-pro" autocomplete="off">';
-    echo '<div class="field-help">Se guardará aquí y, si no hay nada, el sistema usará deepseek-v4-pro por defecto.</div>';
+    echo '<input type="text" name="voice_ai_model" value="' . e($voiceForm['form_model']) . '" placeholder="gpt-5.1" autocomplete="off">';
+    echo '<div class="field-help">Se guardará aquí y, si no hay nada, el sistema usará gpt-5.1 por defecto.</div>';
     echo '</div>';
     echo '<div class="field">';
     echo '<label>Estado actual</label>';
     echo '<div class="info-strip"><strong>IA activa:</strong> ' . ($voiceCfg['configured'] ? 'Sí' : 'No') . '</div>';
-    echo '<div class="info-strip" style="margin-top:10px;"><strong>Proveedor activo:</strong> ' . e(ucfirst((string)($voiceCfg['provider'] ?? 'deepseek'))) . '</div>';
     echo '<div class="info-strip" style="margin-top:10px;"><strong>Modelo activo:</strong> ' . e((string)$voiceCfg['model']) . '</div>';
     echo '<div class="info-strip" style="margin-top:10px;"><strong>Fuente de la key:</strong> ' . e((string)$voiceCfg['api_key_source']) . '</div>';
     echo '<div class="info-strip" style="margin-top:10px;"><strong>Fuente del modelo:</strong> ' . e((string)$voiceCfg['model_source']) . '</div>';
@@ -7287,9 +3725,6 @@ function render_configm_section() {
     $senderPresets = avisos_sender_presets();
     $senderKey = avisos_sender_config_key();
     $metaMap = configm_field_meta();
-    $overrideTypes = configm_avisos_override_types_catalog();
-    $overrideMap = function_exists('aviso_sender_overrides_map') ? aviso_sender_overrides_map() : array();
-    $senderCandidates = configm_telefonos_sender_candidates();
 
     echo '<div class="cards two">';
 
@@ -7312,37 +3747,20 @@ function render_configm_section() {
         $value = array_key_exists($key, $current) ? $current[$key] : $defaultValue;
 
         if ($key === 'whatsapp_sender_key') {
-            $availableCount = 0;
-            if (function_exists('avisos_comercial_sender_lines')) {
-                $availableCount = count((array)avisos_comercial_sender_lines());
-            }
-            echo '<div class="full">';
+            echo '<div class="field">';
             echo '<label>' . e($label) . '</label>';
-            echo '<div class="info-strip"><strong>Modo actual:</strong> routing determinista por tipo de aviso (estable por engine/kind).';
-            echo '<br><strong>Disponibles ahora:</strong> ' . e((string)$availableCount) . '</div>';
-            echo '<div class="field-help">' . e($help) . '</div>';
-            echo '</div>';
-            continue;
-        }
-
-        if ($key === 'alerts_noise_profile') {
-            $profile = trim((string)$value);
-            if (!in_array($profile, array('conservador', 'balanceado', 'agresivo'), true)) {
-                $profile = 'balanceado';
+            echo '<select name="whatsapp_sender_key">';
+            foreach ($senderPresets as $presetKey => $preset) {
+                $selected = ($senderKey === $presetKey) ? ' selected' : '';
+                echo '<option value="' . e($presetKey) . '"' . $selected . '>' . e($preset['label']) . '</option>';
             }
-            echo '<div class="full">';
-            echo '<label>' . e($label) . '</label>';
-            echo '<select name="alerts_noise_profile">';
-            echo '<option value="conservador"' . ($profile === 'conservador' ? ' selected' : '') . '>Conservador</option>';
-            echo '<option value="balanceado"' . ($profile === 'balanceado' ? ' selected' : '') . '>Balanceado</option>';
-            echo '<option value="agresivo"' . ($profile === 'agresivo' ? ' selected' : '') . '>Agresivo anti-ruido</option>';
             echo '</select>';
             echo '<div class="field-help">' . e($help) . '</div>';
             echo '</div>';
             continue;
         }
 
-        if ($key === 'whatsapp_target_phones' || $key === 'destacamos_reminder_times' || $key === 'whatsapp_allowed_engine_kinds') {
+        if ($key === 'whatsapp_target_phones' || $key === 'destacamos_reminder_times') {
             echo '<div class="full">';
             field_textarea(
                 $key,
@@ -7351,43 +3769,6 @@ function render_configm_section() {
                 4
             );
             echo '<div class="field-help">' . e($help) . '</div>';
-            echo '</div>';
-            continue;
-        }
-
-        if ($key === 'whatsapp_sender_overrides') {
-            echo '<div class="full">';
-            echo '<label>' . e($label) . '</label>';
-            echo '<div class="field-help" style="margin-bottom:10px;">Vincula cada tipo de aviso a una línea de Josue > Teléfonos. Si dejas "Automático", se usará el routing determinista por tipo.</div>';
-            echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Tipo de aviso</th><th>Línea origen</th></tr></thead><tbody>';
-            foreach ($overrideTypes as $typeKey => $typeLabel) {
-                $selected = trim((string)($overrideMap[strtolower($typeKey)] ?? ''));
-                echo '<tr>';
-                echo '<td><strong>' . e($typeLabel) . '</strong><br><span class="muted">' . e($typeKey) . '</span></td>';
-                echo '<td>';
-                echo '<select name="whatsapp_sender_override_map[' . e($typeKey) . ']">';
-                echo '<option value="">Automático (determinista)</option>';
-                foreach ($senderCandidates as $line) {
-                    $lineId = trim((string)($line['id'] ?? ''));
-                    $linePhone = trim((string)($line['phone'] ?? ''));
-                    $lineValue = $lineId !== '' ? $lineId : $linePhone;
-                    if ($lineValue === '') continue;
-                    $labelLine = trim((string)$line['name']) . ($linePhone !== '' ? (' · ' . $linePhone) : '');
-                    echo '<option value="' . e($lineValue) . '"' . ($selected === $lineValue ? ' selected' : '') . '>' . e($labelLine) . ($lineId !== '' ? (' (id ' . e($lineId) . ')') : '') . '</option>';
-                }
-                echo '</select>';
-                echo '</td>';
-                echo '</tr>';
-            }
-            echo '</tbody></table></div>';
-
-            $legacyRaw = is_array($value) ? implode("\n", $value) : (string)$value;
-            echo '<div style="margin-top:10px;">';
-            echo '<label>Reglas avanzadas (opcional)</label>';
-            echo '<textarea name="whatsapp_sender_overrides_legacy_extra" rows="4" placeholder="engine[:kind]=line_id_o_telefono\nEj: recurring:destacamos_publish=631454098">' . e($legacyRaw) . '</textarea>';
-            echo '<div class="field-help">Para tipos no listados en la tabla. Si repites una clave, prevalece la selección de la tabla.</div>';
-            echo '</div>';
-
             echo '</div>';
             continue;
         }
@@ -7406,47 +3787,6 @@ function render_configm_section() {
         echo '<div class="field-help">' . e($help) . '</div>';
         echo '</div>';
     }
-
-    // ---- Campos Pollo.ai (fuera del bucle de avisos_config.php) ----
-    $settingsRaw = settings_get();
-    $polloCookieCurrent = trim((string)($settingsRaw['pollo_session_cookie'] ?? ''));
-    $polloExpiresCurrent = trim((string)($settingsRaw['pollo_cookie_expires'] ?? '2026-07-14'));
-    $polloDaysLeft = function_exists('publicista_pollo_cookie_days_remaining') ? publicista_pollo_cookie_days_remaining() : -1;
-    if ($polloDaysLeft > 30) { $polloStatusBadge = 'OK'; $polloStatusColor = '#059669'; }
-    elseif ($polloDaysLeft > 7) { $polloStatusBadge = 'Aviso - menos de 1 mes'; $polloStatusColor = '#d97706'; }
-    elseif ($polloDaysLeft > 0) { $polloStatusBadge = 'URGENTE - menos de 1 semana'; $polloStatusColor = '#dc2626'; }
-    else { $polloStatusBadge = 'CADUCADA - renueva ya'; $polloStatusColor = '#dc2626'; }
-
-    echo '<div class="field full" style="margin-top:8px;">';
-    echo '<hr style="margin:4px 0 12px;border:none;border-top:1px solid #e5e7eb;">';
-    echo '<strong style="font-size:13px;color:#6b7280;">Pollo.ai · Cookie de sesión</strong>';
-    echo '</div>';
-
-    echo '<div class="field full">';
-    echo '<label>Cookie sesión Pollo.ai</label>';
-    echo '<textarea name="pollo_session_cookie" rows="3" autocomplete="off" spellcheck="false" style="font-family:monospace;font-size:11px;word-break:break-all;">' . e($polloCookieCurrent) . '</textarea>';
-    echo '<div class="field-help">Pega aquí el valor completo del header <code>Cookie:</code> copiado de las DevTools mientras estás logueado en pollo.ai. Empieza por <code>__Secure-next-auth.session-token=...</code>. Instrucciones detalladas en el formulario de creación de perfiles.</div>';
-    echo '</div>';
-
-    echo '<div class="field">';
-    echo '<label>Fecha expiración cookie Pollo.ai</label>';
-    echo '<input type="date" name="pollo_cookie_expires" value="' . e($polloExpiresCurrent) . '">';
-    echo '<div class="field-help">Fecha en que caduca la cookie. La ves en el header <code>set-cookie → Expires=</code> cuando capturas la cookie. Actualiza este campo cada vez que renuevas la cookie.</div>';
-    echo '</div>';
-
-    echo '<div class="field">';
-    echo '<label>Estado actual de la cookie</label>';
-    echo '<div class="info-strip" style="display:flex;align-items:center;gap:12px;">';
-    echo '<span style="font-size:13px;"><strong style="color:' . e($polloStatusColor) . ';">' . e($polloStatusBadge) . '</strong>';
-    if ($polloCookieCurrent !== '') {
-        echo ' · expira ' . e($polloExpiresCurrent);
-        if ($polloDaysLeft > 0) echo ' (en ' . e((string)$polloDaysLeft) . ' días)';
-    } else {
-        echo ' · Sin cookie configurada';
-    }
-    echo '</span>';
-    echo '</div>';
-    echo '</div>';
 
     echo '<div class="full"><button class="btn-primary">Guardar configuración</button></div>';
     echo '</form>';
@@ -7478,23 +3818,19 @@ function render_configm_section() {
     echo '</div>';
 
     echo '<div class="info-strip" style="margin-top:12px;">';
+    echo '<strong>Destacamos:</strong><br>';
+    echo 'Activo: ' . e((string)aviso_cfg('destacamos_reminder_enabled', 1)) . '<br>';
+    echo 'Horas: ' . e(is_array(aviso_cfg('destacamos_reminder_times', array())) ? implode(', ', aviso_cfg('destacamos_reminder_times', array())) : str_replace("\n", ', ', (string)aviso_cfg('destacamos_reminder_times', "00:01\n12:01"))) . '<br>';
+    echo 'Tolerancia: ' . e((string)aviso_cfg('destacamos_reminder_window_minutes', 90)) . ' min<br>';
+    echo '</div>';
+
+    echo '<div class="info-strip" style="margin-top:12px;">';
     echo '<strong>MundoSex:</strong><br>';
     echo 'Activo: ' . e((string)aviso_cfg('mundosex_reminder_enabled', 1)) . '<br>';
     echo 'Cada: ' . e((string)aviso_cfg('mundosex_reminder_interval_hours', 4)) . ' horas<br>';
     echo 'Desde: ' . e((string)aviso_cfg('mundosex_reminder_start_time', '08:00')) . '<br>';
     echo 'Hasta: ' . e((string)aviso_cfg('mundosex_reminder_end_time', '23:00')) . '<br>';
     echo 'Tolerancia: ' . e((string)aviso_cfg('mundosex_reminder_window_minutes', 90)) . ' min<br>';
-    echo '</div>';
-
-    echo '<div class="info-strip" style="margin-top:12px;">';
-    echo '<strong>Perfil ruido avisos:</strong> ' . e((string)aviso_cfg('alerts_noise_profile', 'balanceado')) . '<br>';
-    echo '<strong>Routing de líneas:</strong> determinista por tipo de aviso<br>';
-    $overrideRules = trim((string)aviso_cfg('whatsapp_sender_overrides', ''));
-    if ($overrideRules !== '') {
-        echo '<strong>Overrides activos:</strong><br><pre style="white-space:pre-wrap;word-break:break-word;margin:6px 0 0;">' . e($overrideRules) . '</pre>';
-    } else {
-        echo '<strong>Overrides activos:</strong> ninguno';
-    }
     echo '</div>';
 
     echo '<div class="info-strip" style="margin-top:12px;">';
@@ -7507,8 +3843,13 @@ function render_configm_section() {
 }
 
 function render_josue_page() {
+    $anunciosUnlocked = !empty($_SESSION['josue_anuncios_unlocked']);
+
     $tab = request_get('tab', 'publias');
-    $allowed = array('publias', 'captacion', 'notas', 'waha', 'telefonos', 'agenda', 'eurekas', 'config', 'configm');
+    $allowed = array('publias', 'captacion', 'sendtaxs', 'notas', 'autotube', 'waha', 'telefonos', 'agenda', 'config', 'configm');
+    if ($anunciosUnlocked) {
+        $allowed[] = 'anuncios';
+    }
 
     if (!in_array($tab, $allowed, true)) {
         $tab = 'publias';
@@ -7518,8 +3859,17 @@ function render_josue_page() {
     $anuncios = storage_read('anuncios.json');
     $telefonos = storage_read('telefonos.json');
     $agenda = storage_read('agenda.json');
-    $eurekas = storage_read('eurekas.json');
+    $sendtaxsState = isset($settings['sendtaxs_state']) && is_array($settings['sendtaxs_state'])
+        ? $settings['sendtaxs_state']
+        : array();
 
+    $sendtaxsDefaults = array_merge(array(
+        'porc_plaza' => '31.5',
+        'porc_publi_sched' => '28.4',
+        'porc_publipub' => '21.0',
+        'porc_pubcasas' => '19.1',
+        'total_deseado' => '51',
+    ), $sendtaxsState);
 
     $text = in_array($tab, array('publias', 'captacion', 'notas', 'waha'), true)
         ? (isset($settings[$tab . '_text']) ? (string)$settings[$tab . '_text'] : '')
@@ -7535,271 +3885,499 @@ function render_josue_page() {
 
     echo '<section class="panel panel-josue">';
 
+    if (!$anunciosUnlocked) {
+        echo '<div class="josue-unlock-box">';
+        echo '<form method="post" class="josue-unlock-form">';
+        echo '<input type="hidden" name="action" value="unlock_josue_anuncios">';
+        echo '<div class="field">';
+        echo '<label>Desbloquear Anuncios</label>';
+        echo '<input type="password" name="password" placeholder="Contraseña">';
+        echo '</div>';
+        echo '<button class="btn-secondary-mini">Entrar</button>';
+        echo '</form>';
+        echo '</div>';
+    }
+
     echo '<div class="subtabs">';
-    echo '<a class="subtab ' . ($tab === 'telefonos' ? 'active' : '') . '" href="' . e(comercial_page_url('lineas')) . '">Telefonos →</a>';
+    if ($anunciosUnlocked) {
+        echo '<a class="subtab ' . ($tab === 'anuncios' ? 'active' : '') . '" href="index.php?page=josue&tab=anuncios">Anuncios</a>';
+    }
+    echo '<a class="subtab ' . ($tab === 'telefonos' ? 'active' : '') . '" href="index.php?page=josue&tab=telefonos">Telefonos</a>';
     echo '<a class="subtab ' . ($tab === 'waha' ? 'active' : '') . '" href="index.php?page=josue&tab=waha">WAHA</a>';
     echo '<a class="subtab ' . ($tab === 'publias' ? 'active' : '') . '" href="index.php?page=josue&tab=publias">PublIas</a>';
     echo '<a class="subtab ' . ($tab === 'captacion' ? 'active' : '') . '" href="index.php?page=josue&tab=captacion">Captacion</a>';
+    echo '<a class="subtab ' . ($tab === 'sendtaxs' ? 'active' : '') . '" href="index.php?page=josue&tab=sendtaxs">SendTaxs</a>';
     echo '<a class="subtab ' . ($tab === 'agenda' ? 'active' : '') . '" href="index.php?page=josue&tab=agenda">Agenda</a>';
-    echo '<a class="subtab ' . ($tab === 'eurekas' ? 'active' : '') . '" href="index.php?page=josue&tab=eurekas">Eurekas</a>';
     //echo '<a class="subtab ' . ($tab === 'avisos' ? 'active' : '') . '" href="index.php?page=josue&tab=avisos">Avisos</a>';
     echo '<a class="subtab ' . ($tab === 'config' ? 'active' : '') . '" href="index.php?page=josue&tab=config">Config</a>';
     echo '<a class="subtab ' . ($tab === 'configm' ? 'active' : '') . '" href="index.php?page=josue&tab=configm">ConfigM</a>';
     echo '<a class="subtab ' . ($tab === 'notas' ? 'active' : '') . '" href="index.php?page=josue&tab=notas">Notas</a>';    
+    echo '<a class="subtab ' . ($tab === 'autotube' ? 'active' : '') . '" href="index.php?page=josue&tab=autotube">Autotube</a>';
     
     echo '</div>';
 
     echo '<div class="subtab-content">';
 
+    if ($tab === 'sendtaxs') {
+        echo '<div class="sendtaxs-tool">';
+        echo '<div class="sendtaxs-head">';
+        echo '<h2>Ajustador de Porcentajes y Tasas de Envío</h2>';
+        echo '<p>Ingresa los porcentajes deseados. Puedes editarlos libremente aunque no sumen 100%. Usa "Normalizar a 100%" para escalar proporcionalmente, o pulsa "Calcular" y se normalizará automáticamente antes de generar los ajustes.</p>';
+        echo '</div>';
 
-    if ($tab === 'config') {
+        echo '<div class="sendtaxs-grid">';
+        echo '  <div class="field"><label>Porcentaje Plaza</label><input type="number" id="porc_plaza" value="' . e($sendtaxsDefaults['porc_plaza']) . '" min="0" max="100" step="0.1"></div>';
+        echo '  <div class="field"><label>Porcentaje Lamami</label><input type="number" id="porc_publi_sched" value="' . e($sendtaxsDefaults['porc_publi_sched']) . '" min="0" max="100" step="0.1"></div>';
+        echo '  <div class="field"><label>Porcentaje Publicista</label><input type="number" id="porc_publipub" value="' . e($sendtaxsDefaults['porc_publipub']) . '" min="0" max="100" step="0.1"></div>';
+        echo '  <div class="field"><label>Porcentaje Casawasap</label><input type="number" id="porc_pubcasas" value="' . e($sendtaxsDefaults['porc_pubcasas']) . '" min="0" max="100" step="0.1"></div>';
+        echo '</div>';
+
+        echo '<div class="sendtaxs-toolbar">';
+        echo '  <button type="button" class="btn-secondary-mini" onclick="sendtaxsNormalizar()">Normalizar a 100%</button>';
+        echo '</div>';
+
+        echo '<div class="sendtaxs-grid sendtaxs-grid-single">';
+        echo '  <div class="field"><label>Total mensajes diarios deseado</label><input type="number" id="total_deseado" value="' . e($sendtaxsDefaults['total_deseado']) . '" min="1" step="1"></div>';
+        echo '</div>';
+
+        echo '<div class="sendtaxs-toolbar">';
+        echo '  <button type="button" class="btn-primary" onclick="sendtaxsCalcular()">Calcular envíos y ajustes</button>';
+        echo '</div>';
+
+        echo '<div id="sendtaxs_resultados" class="sendtaxs-resultados"></div>';
+        echo '</div>';
+
+        echo <<<'HTML'
+<script>
+(function () {
+    const sendtaxsEnvActual = { plaza: 14, publi_sched: 12.6, publipub: 9.3, pubcasas: 8.5 };
+    const sendtaxsRangosActual = {
+        plaza_pico_min: 2300, plaza_pico_max: 5000, plaza_resto_min: 3000, plaza_resto_max: 6000,
+        publi_pico_min: 2300, publi_pico_max: 5200, publi_resto_min: 5300, publi_resto_max: 6300,
+        publipub_min: 45, publipub_max: 90,
+        pubcasas_min: 90, pubcasas_max: 120
+    };
+
+    function sendtaxsGetIds() {
+        return ["porc_plaza", "porc_publi_sched", "porc_publipub", "porc_pubcasas"];
+    }
+
+    window.sendtaxsNormalizar = function () {
+        const ids = sendtaxsGetIds();
+        let suma = 0;
+        ids.forEach(function (id) {
+            const el = document.getElementById(id);
+            suma += parseFloat(el ? el.value : 0) || 0;
+        });
+        if (suma === 0) return;
+
+        ids.forEach(function (id) {
+            const el = document.getElementById(id);
+            const val = parseFloat(el ? el.value : 0) || 0;
+            const nuevoVal = (val / suma) * 100;
+            if (el) el.value = nuevoVal.toFixed(1);
+        });
+    };
+
+    window.sendtaxsCalcular = function () {
+        const ids = sendtaxsGetIds();
+        let suma = 0;
+        ids.forEach(function (id) {
+            const el = document.getElementById(id);
+            suma += parseFloat(el ? el.value : 0) || 0;
+        });
+
+        if (Math.abs(suma - 100) > 0.1) {
+            window.sendtaxsNormalizar();
+        }
+
+        const porcPlazaEl = document.getElementById("porc_plaza");
+        const porcPubliSchedEl = document.getElementById("porc_publi_sched");
+        const porcPublipubEl = document.getElementById("porc_publipub");
+        const porcPubcasasEl = document.getElementById("porc_pubcasas");
+        const totalEl = document.getElementById("total_deseado");
+        const resultadosEl = document.getElementById("sendtaxs_resultados");
+
+        if (!porcPlazaEl || !porcPubliSchedEl || !porcPublipubEl || !porcPubcasasEl || !totalEl || !resultadosEl) {
+            return;
+        }
+
+        const porcs = {
+            plaza: (parseFloat(porcPlazaEl.value) || 0) / 100,
+            publi_sched: (parseFloat(porcPubliSchedEl.value) || 0) / 100,
+            publipub: (parseFloat(porcPublipubEl.value) || 0) / 100,
+            pubcasas: (parseFloat(porcPubcasasEl.value) || 0) / 100
+        };
+
+        const total = parseFloat(totalEl.value) || 0;
+        if (total <= 0) {
+            resultadosEl.innerHTML = '<div class="sendtaxs-card"><strong>Indica un total válido mayor que 0.</strong></div>';
+            return;
+        }
+
+        const envNuevos = {
+            plaza: (total * porcs.plaza).toFixed(1),
+            publi_sched: (total * porcs.publi_sched).toFixed(1),
+            publipub: (total * porcs.publipub).toFixed(1),
+            pubcasas: (total * porcs.pubcasas).toFixed(1)
+        };
+
+        const plazaVal = parseFloat(envNuevos.plaza);
+        const publiSchedVal = parseFloat(envNuevos.publi_sched);
+        const publipubVal = parseFloat(envNuevos.publipub);
+        const pubcasasVal = parseFloat(envNuevos.pubcasas);
+
+        const scales = {
+            plaza: plazaVal > 0 ? (sendtaxsEnvActual.plaza / plazaVal) : 0,
+            publi_sched: publiSchedVal > 0 ? (sendtaxsEnvActual.publi_sched / publiSchedVal) : 0,
+            publipub: publipubVal > 0 ? (sendtaxsEnvActual.publipub / publipubVal) : 0,
+            pubcasas: pubcasasVal > 0 ? (sendtaxsEnvActual.pubcasas / pubcasasVal) : 0
+        };
+
+        let html = "";
+        html += `<div class="sendtaxs-card">`;
+        html += `<h3>Envíos diarios calculados</h3>`;
+        html += `<ul class="sendtaxs-list">`;
+        html += `<li><strong>Plaza:</strong> ${envNuevos.plaza} mensajes/día</li>`;
+        html += `<li><strong>Lamami:</strong> ${envNuevos.publi_sched} mensajes/día</li>`;
+        html += `<li><strong>Publicista:</strong> ${envNuevos.publipub} mensajes/día</li>`;
+        html += `<li><strong>Casawasap:</strong> ${envNuevos.pubcasas} mensajes/día</li>`;
+        html += `</ul>`;
+        html += `</div>`;
+
+        html += `<div class="sendtaxs-card">`;
+        html += `<h3>Ajustes en scripts</h3>`;
+
+        html += `<div class="sendtaxs-block">`;
+        html += `<strong>Plaza_scheduler.sh</strong><br>`;
+        html += `<span class="muted">/var/www/html/jostal/plaza_scheduler.sh</span><br><br>`;
+        html += `Pico (15-19): min_s=${Math.round(sendtaxsRangosActual.plaza_pico_min * scales.plaza)}, max_s=${Math.round(sendtaxsRangosActual.plaza_pico_max * scales.plaza)}<br>`;
+        html += `Resto: min_s=${Math.round(sendtaxsRangosActual.plaza_resto_min * scales.plaza)}, max_s=${Math.round(sendtaxsRangosActual.plaza_resto_max * scales.plaza)}`;
+        html += `</div>`;
+
+        html += `<div class="sendtaxs-block">`;
+        html += `<strong>Publicidad_scheduler.sh (Lamami)</strong><br>`;
+        html += `<span class="muted">/var/www/html/atupuerta/publicidad_scheduler.sh</span><br><br>`;
+        html += `Pico (13-19): min_s=${Math.round(sendtaxsRangosActual.publi_pico_min * scales.publi_sched)}, max_s=${Math.round(sendtaxsRangosActual.publi_pico_max * scales.publi_sched)}<br>`;
+        html += `Resto: min_s=${Math.round(sendtaxsRangosActual.publi_resto_min * scales.publi_sched)}, max_s=${Math.round(sendtaxsRangosActual.publi_resto_max * scales.publi_sched)}`;
+        html += `</div>`;
+
+        html += `<div class="sendtaxs-block">`;
+        html += `<strong>enviar-publicistas.php (Publicista)</strong><br>`;
+        html += `<span class="muted">/var/www/html/wasapbot/botPubli/enviar-publicistas.php</span><br>`;
+        html += `<span class="muted">/var/www/html/wasapbot/botPubli/enviar-publicistas2.php</span><br><br>`;
+        html += `MIN_WAIT_MINUTES=${Math.round(sendtaxsRangosActual.publipub_min * scales.publipub)}<br>`;
+        html += `MAX_WAIT_MINUTES=${Math.round(sendtaxsRangosActual.publipub_max * scales.publipub)}`;
+        html += `</div>`;
+
+        html += `<div class="sendtaxs-block">`;
+        html += `<strong>enviar.php (Casawasap)</strong><br>`;
+        html += `<span class="muted">/var/www/html/wasapbot/botPubli/enviar.php</span><br>`;
+        html += `<span class="muted">/var/www/html/wasapbot/botPubli/enviar2.php</span><br><br>`;
+        html += `MIN_WAIT_MINUTES=${Math.round(sendtaxsRangosActual.pubcasas_min * scales.pubcasas)}<br>`;
+        html += `MAX_WAIT_MINUTES=${Math.round(sendtaxsRangosActual.pubcasas_max * scales.pubcasas)}`;
+        html += `</div>`;
+
+        html += `</div>`;
+
+        resultadosEl.innerHTML = html;
+
+        fetch('index.php?page=josue&tab=sendtaxs', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+            },
+            body: new URLSearchParams({
+                action: 'save_sendtaxs_state',
+                porc_plaza: porcPlazaEl.value,
+                porc_publi_sched: porcPubliSchedEl.value,
+                porc_publipub: porcPublipubEl.value,
+                porc_pubcasas: porcPubcasasEl.value,
+                total_deseado: totalEl.value
+            })
+        }).catch(function () {});
+
+    };
+})();
+</script>
+HTML;
+
+if (!empty($sendtaxsState)) {
+    echo '<script>window.sendtaxsCalcular && window.sendtaxsCalcular();</script>';
+}
+
+/*
+    } elseif ($tab === 'avisos') {
+        render_avisos_section('index.php?page=josue&tab=avisos');
+*/
+    } elseif ($tab === 'config') {
         render_config_section();
 
     } elseif ($tab === 'configm') {
         render_configm_section();
 
     } elseif ($tab === 'anuncios') {
-        echo '<section class="panel panel-space">';
-        echo '<div class="branch-panel-head"><h2>Anuncios movido a Publicista</h2><span class="summary-badge">Reubicado</span></div>';
-        echo '<div class="info-strip">La gestión de cuentas de portales ya no vive en Josué. Ahora está en <strong>Publicista &gt; Cuentas</strong> para que quede unida al futuro módulo de campañas.</div>';
-        echo '<div style="margin-top:12px;"><a class="btn-primary" href="' . e(publicista_page_url('cuentas')) . '">Abrir cuentas en Publicista</a></div>';
+        $editId = request_get('edit', '');
+        $edit = $editId !== '' ? storage_find_by_id('anuncios.json', $editId) : null;
+
+        $telefonosByAnuncio = array();
+        foreach ($telefonos as $tel) {
+            $aid = $tel['destacamos_id'] ?? '';
+            if ($aid === '') continue;
+            if (!isset($telefonosByAnuncio[$aid])) $telefonosByAnuncio[$aid] = array();
+            $telefonosByAnuncio[$aid][] = $tel;
+        }
+
+        echo '<div class="cards two">';
+
+        echo '<section class="panel">';
+        echo '<div class="josue-head">';
+        echo '<h2>' . ($edit ? 'Editar anuncio' : 'Nuevo anuncio') . '</h2>';
+        echo '</div>';
+
+        echo '<form method="post" class="form-grid">';
+        echo '<input type="hidden" name="action" value="save_anuncio">';
+        echo '<input type="hidden" name="id" value="' . e($edit['id'] ?? '') . '">';
+        field_input('url', 'URL', $edit['url'] ?? '', true);
+        field_input('user', 'User', $edit['user'] ?? '', true);
+        field_input('pass', 'Pass', $edit['pass'] ?? '', true);
+        field_textarea('descripcion', 'Descripción', $edit['descripcion'] ?? '', 4);
+        echo '<div class="full"><button class="btn-primary">Guardar anuncio</button></div>';
+        echo '</form>';
+
+        if ($edit) {
+            $linked = $telefonosByAnuncio[$edit['id']] ?? array();
+            echo '<hr class="sep">';
+            echo '<h2>Teléfonos vinculados</h2>';
+            if (empty($linked)) {
+                echo '<div class="empty">No hay teléfonos vinculados a este anuncio.</div>';
+            } else {
+                echo '<div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Teléfono</th><th>WAHA Port</th><th>WAHA</th></tr></thead><tbody>';
+                foreach ($linked as $tel) {
+                    echo '<tr>';
+                    echo '<td><a class="mini-link" href="index.php?page=josue&tab=telefonos&edit=' . e($tel['id']) . '">' . e($tel['nombre'] ?? '') . '</a></td>';
+                    echo '<td>' . e($tel['tfono'] ?? '') . '</td>';
+                    echo '<td>' . e($tel['waha_port'] ?? '') . '</td>';
+                    echo '<td>' . e($tel['waha'] ?? '') . '</td>';
+                    echo '</tr>';
+                }
+                echo '</tbody></table></div>';
+            }
+        }
         echo '</section>';
-    } elseif ($tab === 'telefonos') {
-        echo '<section class="panel panel-space">';
-        echo '<div class="branch-panel-head"><h2>Gestión de líneas movida</h2><span class="summary-badge">Reubicado</span></div>';
-        echo '<div class="info-strip">La gestión de líneas telefónicas (crear, editar, eliminar, ver salud WAHA) ahora está en <strong>Comercial &gt; Líneas</strong>.</div>';
-        echo '<div style="margin-top:12px;"><a class="btn-primary" href="' . e(comercial_page_url('lineas')) . '">Abrir Líneas en Comercial</a></div>';
+
+        echo '<section class="panel">';
+        echo '<h2>Listado anuncios</h2>';
+        if (empty($anuncios)) {
+            echo '<div class="empty">Todavía no hay anuncios registrados.</div>';
+        } else {
+            $anuncios = sort_desc_by_key($anuncios, 'created_at');
+            render_live_filter('#anunciosRows tr[data-filter-text]', 'Buscar anuncio...');
+            echo '<div class="table-wrap"><table><thead><tr>';
+            echo '<th>URL</th><th>User</th><th>Pass</th><th>Descripción</th><th>Acciones</th>';
+            echo '</tr></thead><tbody id="anunciosRows">';
+            foreach ($anuncios as $row) {
+                $searchText = strtolower(trim(
+                    ($row['url'] ?? '') . ' ' .
+                    ($row['user'] ?? '') . ' ' .
+                    ($row['pass'] ?? '') . ' ' .
+                    ($row['descripcion'] ?? '')
+                ));
+
+                echo '<tr data-filter-text="' . e($searchText) . '">';
+                echo '<td><div class="copy-row copy-row-vertical"><span>' . e($row['url'] ?? '') . '</span><button type="button" class="btn-copy-mini" data-copy="' . e($row['url'] ?? '') . '">Copiar</button></div></td>';
+                echo '<td><div class="copy-row copy-row-vertical"><span>' . e($row['user'] ?? '') . '</span><button type="button" class="btn-copy-mini" data-copy="' . e($row['user'] ?? '') . '">Copiar</button></div></td>';
+                echo '<td><div class="copy-row copy-row-vertical"><span>' . e($row['pass'] ?? '') . '</span><button type="button" class="btn-copy-mini" data-copy="' . e($row['pass'] ?? '') . '">Copiar</button></div></td>';
+                echo '<td>' . nl2br(e($row['descripcion'] ?? '')) . '</td>';
+                echo '<td>';
+                echo '<a class="mini-link" href="index.php?page=josue&tab=anuncios&edit=' . e($row['id']) . '">Editar</a> ';
+                echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar este anuncio?\')">';
+                echo '<input type="hidden" name="action" value="delete_anuncio">';
+                echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
+                echo '<button class="btn-danger-mini">Eliminar</button>';
+                echo '</form>';
+                echo '</td>';
+                echo '</tr>';
+
+                $linked = $telefonosByAnuncio[$row['id']] ?? array();
+                echo '<tr class="subrow-phones" data-filter-text="' . e($searchText) . '">';
+                echo '<td colspan="5">';
+                echo '<div class="subrow-label">Teléfonos vinculados:</div>';
+                if (empty($linked)) {
+                    echo '<div class="muted">Ninguno</div>';
+                } else {
+                    echo '<div class="linked-tags">';
+                    foreach ($linked as $tel) {
+                        $label = trim(($tel['nombre'] ?? '') . ' · ' . ($tel['tfono'] ?? ''));
+                        echo '<a class="linked-tag" href="index.php?page=josue&tab=telefonos&edit=' . e($tel['id']) . '">' . e($label) . '</a>';
+                    }
+                    echo '</div>';
+                }
+                echo '<hr class="sep">';
+                echo '</td>';
+                echo '</tr>';
+            }
+            echo '</tbody></table></div>';
+        }
         echo '</section>';
+
+        echo '</div>';
     } elseif ($tab === 'agenda') {
         $editId = request_get('edit', '');
         $edit = $editId !== '' ? storage_find_by_id('agenda.json', $editId) : null;
-        $agendaRows = sort_desc_by_key($agenda, 'updated_at');
 
         echo '<div class="cards two">';
 
         echo '<section class="panel">';
         echo '<div class="josue-head">';
-        echo '<h2>' . ($edit ? 'Editar contacto' : 'Nuevo contacto') . '</h2>';
-        if ($edit) {
-            echo '<a class="btn-secondary-mini" href="index.php?page=josue&tab=agenda">Nuevo contacto</a>';
-        }
+        echo '<h2>' . ($edit ? 'Ficha agenda' : 'Nuevo contacto agenda') . '</h2>';
         echo '</div>';
-        echo '<div class="info-strip">Agenda simple para guardar teléfonos útiles de Josué. Mantiene el mismo JSON y flujo actual.</div>';
 
-        echo '<form method="post" class="form-grid" style="margin-top:12px;">';
+        echo '<form method="post" class="form-grid">';
         echo '<input type="hidden" name="action" value="save_agenda">';
         echo '<input type="hidden" name="id" value="' . e($edit['id'] ?? '') . '">';
         field_input('nombre', 'Nombre', $edit['nombre'] ?? '', true);
-        field_input('telefono', 'Telefono', $edit['telefono'] ?? '', true);
-        field_textarea('observaciones', 'Observaciones', $edit['observaciones'] ?? '', 6);
-        echo '<div class="full josue-actions">';
-        echo '<button class="btn-primary" type="submit">' . ($edit ? 'Guardar cambios' : 'Crear contacto') . '</button>';
-        if ($edit) {
-            echo '<a class="btn-secondary-mini" href="index.php?page=josue&tab=agenda">Cancelar</a>';
-        }
-        echo '</div>';
+        field_input('telefono', 'Teléfono', $edit['telefono'] ?? '', true);
+        field_textarea('observaciones', 'Observaciones', $edit['observaciones'] ?? '', 5);
+        echo '<div class="full"><button class="btn-primary">Guardar contacto</button></div>';
         echo '</form>';
         echo '</section>';
 
         echo '<section class="panel">';
-        echo '<div class="josue-head">';
-        echo '<h2>Agenda</h2>';
-        echo '<span class="summary-badge">' . count($agendaRows) . ' contactos</span>';
-        echo '</div>';
+        echo '<h2>Listado agenda</h2>';
 
-        if (empty($agendaRows)) {
-            echo '<div class="empty">Todavía no hay contactos en la agenda.</div>';
+        if (empty($agenda)) {
+            echo '<div class="empty">Todavía no hay contactos en agenda.</div>';
         } else {
-            render_live_filter('#agendaCards .contact-card[data-filter-text]', 'Buscar por nombre, telefono u observaciones...');
-            echo '<div id="agendaCards" class="stack-list">';
-            foreach ($agendaRows as $row) {
-                $nombre = trim((string)($row['nombre'] ?? ''));
-                $telefono = trim((string)($row['telefono'] ?? ''));
-                $observaciones = trim((string)($row['observaciones'] ?? ''));
-                $searchText = strtolower(trim($nombre . ' ' . $telefono . ' ' . $observaciones));
+            $agenda = sort_desc_by_key($agenda, 'created_at');
 
-                echo '<article class="contact-card info-strip" data-filter-text="' . e($searchText) . '">';
-                echo '<div class="contact-card-main">';
-                echo '<div class="contact-card-body">';
-                echo '<div class="contact-card-name">' . e($nombre !== '' ? $nombre : 'Sin nombre') . '</div>';
-                if ($telefono !== '') {
-                    echo '<div class="contact-card-phone-wrap">';
-                    crm_render_phone_value($telefono, array('tel_link' => true));
-                    echo '</div>';
-                } else {
-                    echo '<div class="muted contact-card-subline">Sin telefono</div>';
-                }
-                if ($observaciones !== '') {
-                    echo '<div class="muted contact-card-notes">' . e($observaciones) . '</div>';
-                } else {
-                    echo '<div class="muted contact-card-notes">Sin observaciones</div>';
-                }
-                echo '</div>';
+            render_live_filter('#agendaRows tr[data-filter-text]', 'Buscar contacto agenda...');
 
-                echo '<div class="contact-card-actions">';
-                if ($telefono !== '') {
-                    echo '<a class="mini-link" href="tel:' . e($telefono) . '">Llamar</a>';
-                }
-                echo '<a class="mini-link" href="index.php?page=josue&tab=agenda&edit=' . e($row['id']) . '">Editar</a>';
-                echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar este contacto de agenda?\')">';
+            echo '<div class="table-wrap"><table><thead><tr>';
+            echo '<th>Nombre</th><th>Teléfono</th><th>Observaciones</th><th>Acciones</th>';
+            echo '</tr></thead><tbody id="agendaRows">';
+
+            foreach ($agenda as $row) {
+                $searchText = strtolower(trim(
+                    ($row['nombre'] ?? '') . ' ' .
+                    ($row['telefono'] ?? '') . ' ' .
+                    ($row['observaciones'] ?? '')
+                ));
+
+                echo '<tr data-filter-text="' . e($searchText) . '">';
+                echo '<td>' . e($row['nombre'] ?? '') . '</td>';
+                echo '<td>' . e($row['telefono'] ?? '') . '</td>';
+                echo '<td>' . e($row['observaciones'] ?? '') . '</td>';
+                echo '<td>';
+                echo '<a class="mini-link" href="index.php?page=josue&tab=agenda&edit=' . e($row['id']) . '">Editar</a> ';
+                echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar este contacto?\')">';
                 echo '<input type="hidden" name="action" value="delete_agenda">';
                 echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
-                echo '<button class="btn-danger-mini" type="submit">Eliminar</button>';
+                echo '<button class="btn-danger-mini">Eliminar</button>';
                 echo '</form>';
-                echo '</div>';
-                echo '</div>';
-
-                echo '<div class="muted contact-card-meta">Actualizado: ' . e($row['updated_at'] ?? '-') . '</div>';
-                echo '</article>';
+                echo '</td>';
+                echo '</tr>';
             }
-            echo '</div>';
+
+            echo '</tbody></table></div>';
         }
+
         echo '</section>';
 
         echo '</div>';
-    } elseif ($tab === 'eurekas') {
+    } elseif ($tab === 'telefonos') {
         $editId = request_get('edit', '');
-        $edit = $editId !== '' ? storage_find_by_id('eurekas.json', $editId) : null;
-        $eurekaRows = sort_desc_by_key($eurekas, 'updated_at');
-        $statusLabels = array(
-            'pendiente' => 'Pendiente',
-            'descartada' => 'Descartada',
-            'cumplida' => 'Cumplida',
-        );
-        $estadoFilter = trim((string)request_get('estado', 'todas'));
-        if ($estadoFilter !== 'todas' && !isset($statusLabels[$estadoFilter])) {
-            $estadoFilter = 'todas';
-        }
-        if ($estadoFilter !== 'todas') {
-            $eurekaRows = array_values(array_filter($eurekaRows, function ($row) use ($estadoFilter) {
-                return trim((string)($row['estado'] ?? 'pendiente')) === $estadoFilter;
-            }));
+        $edit = $editId !== '' ? storage_find_by_id('telefonos.json', $editId) : null;
+
+        $anunciosIndex = array();
+        foreach ($anuncios as $an) {
+            $anunciosIndex[$an['id']] = $an;
         }
 
         echo '<div class="cards two">';
 
         echo '<section class="panel">';
         echo '<div class="josue-head">';
-        echo '<h2>' . ($edit ? 'Editar eureka' : 'Nueva eureka') . '</h2>';
-        if ($edit) {
-            echo '<a class="btn-secondary-mini" href="index.php?page=josue&tab=eurekas">Nueva eureka</a>';
-        }
+        echo '<h2>' . ($edit ? 'Ficha teléfono' : 'Nuevo teléfono') . '</h2>';
         echo '</div>';
 
-
-        echo '<form method="post" class="form-grid" style="margin-top:12px;">';
-        echo '<input type="hidden" name="action" value="save_eureka">';
+        echo '<form method="post" class="form-grid">';
+        echo '<input type="hidden" name="action" value="save_telefono">';
         echo '<input type="hidden" name="id" value="' . e($edit['id'] ?? '') . '">';
-        field_textarea('descripcion', 'Descripción', $edit['descripcion'] ?? '', 8);
-        echo '<div class="full josue-actions">';
-        echo '<button class="btn-primary" type="submit">' . ($edit ? 'Guardar cambios' : 'Crear eureka') . '</button>';
-        if ($edit) {
-            echo '<a class="btn-secondary-mini" href="index.php?page=josue&tab=eurekas">Cancelar</a>';
+        field_input('nombre', 'Nombre', $edit['nombre'] ?? '', true);
+        field_input('tfono', 'Tfono', $edit['tfono'] ?? '', true);
+        field_input('uso', 'Uso', $edit['uso'] ?? '');
+        field_input('pin', 'PIN', $edit['pin'] ?? '');
+        field_input('compania', 'Compañía', $edit['compania'] ?? '');
+        field_input('waha_port', 'WAHA Port', $edit['waha_port'] ?? '');
+        field_input('waha', 'WAHA', $edit['waha'] ?? '');
+        echo '<div class="field">';
+        echo '<label>Destacamos</label>';
+        echo '<select name="destacamos_id">';
+        echo '<option value="">Sin vincular</option>';
+        foreach ($anuncios as $an) {
+            $val = $an['id'] ?? '';
+            $label = trim(($an['url'] ?? '') . ' - ' . ($an['user'] ?? ''));
+            $sel = (($edit['destacamos_id'] ?? '') === $val) ? ' selected' : '';
+            echo '<option value="' . e($val) . '"' . $sel . '>' . e($label) . '</option>';
         }
+        echo '</select>';
         echo '</div>';
+        field_textarea('notas', 'Notas', $edit['notas'] ?? '', 4);
+        echo '<div class="full"><button class="btn-primary">Guardar teléfono</button></div>';
         echo '</form>';
         echo '</section>';
 
         echo '<section class="panel">';
-        echo '<div class="josue-head">';
-        echo '<h2>Eurekas</h2>';
-        echo '<span class="summary-badge">' . count($eurekaRows) . ' items</span>';
-        echo '</div>';
-
-        echo '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 6px;">';
-        $filterOptions = array('todas' => 'Todas', 'pendiente' => 'Pendientes', 'cumplida' => 'Cumplidas', 'descartada' => 'Descartadas');
-        foreach ($filterOptions as $filterValue => $filterLabel) {
-            $href = 'index.php?page=josue&tab=eurekas';
-            if ($filterValue !== 'todas') {
-                $href .= '&estado=' . urlencode($filterValue);
-            }
-            $class = ($estadoFilter === $filterValue) ? 'btn-primary' : 'btn-secondary-mini';
-            echo '<a class="' . $class . '" href="' . e($href) . '">' . e($filterLabel) . '</a>';
-        }
-        echo '</div>';
-
-        if (empty($eurekaRows)) {
-            echo '<div class="empty">Todavía no hay eurekas guardadas.</div>';
+        echo '<h2>Listado teléfonos</h2>';
+        if (empty($telefonos)) {
+            echo '<div class="empty">Todavía no hay teléfonos registrados.</div>';
         } else {
-            render_live_filter('#eurekaCards .contact-card[data-filter-text]', 'Buscar por descripción o estado...');
-            echo '<div id="eurekaCards" class="stack-list">';
-            foreach ($eurekaRows as $row) {
-                $descripcion = trim((string)($row['descripcion'] ?? ''));
-                $estado = trim((string)($row['estado'] ?? 'pendiente'));
-                $promptCodex = trim((string)($row['prompt_codex'] ?? ''));
-                $promptGeneratedAt = trim((string)($row['prompt_generated_at'] ?? ''));
-                if (!isset($statusLabels[$estado])) {
-                    $estado = 'pendiente';
-                }
-                $searchText = strtolower(trim($descripcion . ' ' . $estado));
-
-                echo '<article class="contact-card info-strip" data-filter-text="' . e($searchText) . '">';
-                echo '<div class="contact-card-main">';
-                echo '<div class="contact-card-body">';
-                echo '<div class="contact-card-name">' . e($statusLabels[$estado]) . '</div>';
-                echo '<div class="contact-card-notes">' . nl2br(e($descripcion !== '' ? $descripcion : 'Sin descripción')) . '</div>';
-                echo '</div>';
-
-                echo '<div class="contact-card-actions">';
-                if ($estado !== 'pendiente') {
-                    echo '<form method="post" class="inline-form">';
-                    echo '<input type="hidden" name="action" value="set_eureka_estado">';
-                    echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
-                    echo '<input type="hidden" name="estado" value="pendiente">';
-                    echo '<button class="mini-link" type="submit">Pendiente</button>';
-                    echo '</form>';
-                }
-                if ($estado !== 'cumplida') {
-                    echo '<form method="post" class="inline-form">';
-                    echo '<input type="hidden" name="action" value="set_eureka_estado">';
-                    echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
-                    echo '<input type="hidden" name="estado" value="cumplida">';
-                    echo '<button class="mini-link" type="submit">Cumplida</button>';
-                    echo '</form>';
-                }
-                if ($estado !== 'descartada') {
-                    echo '<form method="post" class="inline-form">';
-                    echo '<input type="hidden" name="action" value="set_eureka_estado">';
-                    echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
-                    echo '<input type="hidden" name="estado" value="descartada">';
-                    echo '<button class="mini-link" type="submit">Descartar</button>';
-                    echo '</form>';
-                }
-                echo '<form method="post" class="inline-form">';
-                echo '<input type="hidden" name="action" value="generate_eureka_prompt">';
+            $telefonos = sort_desc_by_key($telefonos, 'created_at');
+            render_live_filter('#telefonosRows tr[data-filter-text]', 'Buscar teléfono...');
+            echo '<div class="table-wrap"><table><thead><tr>';
+            echo '<th>Nombre</th><th>Tfono</th><th>Uso</th><th>WAHA Port</th><th>WAHA</th><th>Destacamos</th><th>Acciones</th>';
+            echo '</tr></thead><tbody id="telefonosRows">';
+            foreach ($telefonos as $row) {
+                $dest = $anunciosIndex[$row['destacamos_id'] ?? ''] ?? null;
+                $destLabel = $dest ? trim(($dest['url'] ?? '') . ' - ' . ($dest['user'] ?? '')) : '-';
+                $searchText = strtolower(trim(
+                    ($row['nombre'] ?? '') . ' ' .
+                    ($row['tfono'] ?? '') . ' ' .
+                    ($row['uso'] ?? '') . ' ' .
+                    ($row['compania'] ?? '') . ' ' .
+                    ($row['waha_port'] ?? '') . ' ' .
+                    ($row['waha'] ?? '') . ' ' .
+                    ($destLabel ?? '')
+                ));
+                echo '<tr data-filter-text="' . e($searchText) . '">';
+                echo '<td>' . e($row['nombre'] ?? '') . '</td>';
+                echo '<td>' . e($row['tfono'] ?? '') . '</td>';
+                echo '<td>' . e($row['uso'] ?? '') . '</td>';
+                echo '<td>' . e($row['waha_port'] ?? '') . '</td>';
+                echo '<td>' . e($row['waha'] ?? '') . '</td>';
+                echo '<td>' . e($destLabel) . '</td>';
+                echo '<td>';
+                echo '<a class="mini-link" href="index.php?page=josue&tab=telefonos&edit=' . e($row['id']) . '">Editar</a> ';
+                echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar este teléfono?\')">';
+                echo '<input type="hidden" name="action" value="delete_telefono">';
                 echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
-                echo '<button class="mini-link" type="submit">' . e($promptCodex !== '' ? 'Regenerar prompt' : 'Generar prompt') . '</button>';
+                echo '<button class="btn-danger-mini">Eliminar</button>';
                 echo '</form>';
-                echo '<a class="mini-link" href="index.php?page=josue&tab=eurekas&edit=' . e($row['id']) . '">Editar</a>';
-                echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar esta eureka?\')">';
-                echo '<input type="hidden" name="action" value="delete_eureka">';
-                echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
-                echo '<button class="btn-danger-mini" type="submit">Eliminar</button>';
-                echo '</form>';
-                echo '</div>';
-                echo '</div>';
-
-                if ($promptCodex !== '') {
-                    echo '<details style="margin-top:12px;">';
-                    echo '<summary>Prompt Codex' . ($promptGeneratedAt !== '' ? ' · ' . e(format_created_at($promptGeneratedAt)) : '') . '</summary>';
-                    echo '<div class="generated-box" style="margin-top:10px;">';
-                    echo '<div class="generated-box-head">';
-                    echo '<h3>Prompt listo para pasar a Codex</h3>';
-                    echo '<button type="button" class="btn-copy-mini" data-copy="' . e($promptCodex) . '">Copiar prompt</button>';
-                    echo '</div>';
-                    echo '<textarea class="generated-textarea" rows="14" readonly>' . e($promptCodex) . '</textarea>';
-                    echo '</div>';
-                    echo '</details>';
-                }
-
-                echo '<div class="muted contact-card-meta">Actualizado: ' . e($row['updated_at'] ?? '-') . '</div>';
-                echo '</article>';
+                echo '</td>';
+                echo '</tr>';
             }
-            echo '</div>';
+            echo '</tbody></table></div>';
         }
         echo '</section>';
 
         echo '</div>';
+    } elseif ($tab === 'autotube') {
+        echo '<div class="josue-head"><h2>Autotube</h2></div>';
+        echo '<div style="padding:0;overflow:visible;border-radius:8px;background:#0a0a0f">';
+        echo '<iframe src="/autotube/" style="width:100%;min-height:calc(100vh - 280px);height:auto;border:none;display:block" title="Panel Autotube" loading="lazy" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>';
+        echo '</div>';
+
     } else {
         $title = ($tab === 'publias') ? 'PublIas' : (($tab === 'captacion') ? 'Captacion' : (($tab === 'notas') ? 'Notas' : 'WAHA'));
 
@@ -7867,10 +4445,7 @@ function render_casawasap_page() {
     field_input('telefono', 'Teléfono', $edit ? $edit['telefono'] : '', true);
     field_input('quien_lo_trae', 'Quién lo trae', $edit ? $edit['quien_lo_trae'] : '');
     field_textarea('notas', 'Notas', $edit ? $edit['notas'] : '', 4);
-    if ($edit && in_array(($edit['estado'] ?? ''), array('cliente', 'baja'), true)) {
-        render_casawasap_bot_profile_fields($edit);
-    }
-    echo '<div class="full"><button class="btn-primary">' . (($edit && in_array(($edit['estado'] ?? ''), array('cliente', 'baja'), true)) ? 'Guardar ficha completa' : 'Guardar interesado') . '</button></div>';
+    echo '<div class="full"><button class="btn-primary">' . (($edit && in_array(($edit['estado'] ?? ''), array('cliente', 'baja'), true)) ? 'Guardar ficha base' : 'Guardar interesado') . '</button></div>';
     echo '</form>';
 
     if ($edit && in_array(($edit['estado'] ?? ''), array('cliente', 'baja'), true)) {
@@ -7883,18 +4458,6 @@ function render_casawasap_page() {
         echo '<div><strong>Periodicidad de cobro:</strong> ' . e($edit['periodicidad_cobro'] ?? '-') . '</div>';
         echo '<div><strong>Fecha alta cliente:</strong> ' . e(format_created_at($edit['cliente_at'] ?? '')) . '</div>';
         echo '</div>';
-        echo '</div>';
-
-        $linkedBot = get_casawasap_cliente_current_bot($edit['id'] ?? '');
-        echo '<div class="info-strip" style="margin-top:12px;">';
-        if ($linkedBot) {
-            echo '<strong>Bot vinculado actual:</strong> ' . e($linkedBot['nombre_bot'] ?? 'Bot') . ' · ';
-            echo '<a class="mini-link" href="index.php?page=bots&edit=' . e($linkedBot['id'] ?? '') . '">Abrir ficha del bot</a>';
-        } else {
-            $createUrl = 'index.php?page=bots&linked_ref=' . urlencode(bot_build_linked_ref('casawasap_cliente', $edit['id'] ?? ''));
-            echo '<strong>Sin bot individual todavía.</strong> ';
-            echo '<a class="mini-link" href="' . e($createUrl) . '">Crear bot para este cliente</a>';
-        }
         echo '</div>';
     }
 
@@ -7958,7 +4521,6 @@ function render_casawasap_page() {
         }
         echo '</select>';
         echo '</div>';
-        render_casawasap_bot_profile_fields($edit);
         echo '<div class="full"><button class="btn-ok-mini">Convertir en cliente</button></div>';
         echo '</form>';
     }
@@ -8041,10 +4603,7 @@ function render_casawasap_page() {
             ));
             echo '<tr class="' . (($row['estado'] ?? '') === 'descartado' ? 'row-soft-danger' : '') . '" data-filter-text="' . e($searchText) . '">';
 
-            echo '<td>';
-            crm_render_phone_value((string)($row['telefono'] ?? ''), array('strong' => true));
-            echo '<br><i class="muted">(' . e(format_created_at(isset($row['created_at']) ? $row['created_at'] : '')) . ')</i>';
-            echo '</td>';
+            echo '<td><strong>' . e($row['telefono']) . '</strong><br><i class="muted">(' . e(format_created_at(isset($row['created_at']) ? $row['created_at'] : '')) . ')</i></td>';
             echo '<td>' . e(isset($row['quien_lo_trae']) ? $row['quien_lo_trae'] : '') . '</td>';
 
             $estadoCasa = $row['estado'] ?? 'interesado';
@@ -8231,17 +4790,6 @@ function render_jostal_page() {
             echo '</div>';
 
             field_input('first_arrival_date', 'Primera llegada a la casa', business_today_date(), true, 'date');
-            echo '<div class="field">';
-            echo '<label>Día semanal de cobro</label>';
-            echo '<select name="rent_due_weekday">';
-            $defaultDueWeekday = jostal_weekday_from_date(business_today_date());
-            foreach (jostal_weekday_options() as $weekday => $weekdayLabel) {
-                $sel = ((int)$defaultDueWeekday === (int)$weekday) ? ' selected' : '';
-                echo '<option value="' . e((string)$weekday) . '"' . $sel . '>' . e($weekdayLabel) . '</option>';
-            }
-            echo '</select>';
-            echo '<div class="field-help">Por defecto se usa el mismo día de la semana en que entra en la casa.</div>';
-            echo '</div>';
             echo '<div class="full"><button class="btn-ok-mini">Convertir en clienta</button></div>';
             echo '</form>';
         }
@@ -8270,10 +4818,7 @@ function render_jostal_page() {
                     ($row['estado'] ?? '')
                 ));
                 echo '<tr class="' . (($row['estado'] ?? '') === 'descartada' ? 'row-soft-danger' : '') . '" data-filter-text="' . e($searchText) . '">';
-                echo '<td>';
-                crm_render_phone_value((string)($row['telefono'] ?? ''), array('strong' => true));
-                echo '<br><i class="muted">(' . e(format_created_at($row['created_at'] ?? '')) . ')</i>';
-                echo '</td>';
+                echo '<td><strong>' . e($row['telefono']) . '</strong><br><i class="muted">(' . e(format_created_at($row['created_at'] ?? '')) . ')</i></td>';
                 echo '<td>' . e($row['interesada_en']) . '</td>';
                 echo '<td>' . e($row['fecha']) . '</td>';
                 echo '<td>' . e($row['observaciones']) . '</td>';
@@ -8350,8 +4895,6 @@ if ($tab === 'clientas') {
         echo '<input type="hidden" name="source_interesada_id" value="' . e($isNew ? ($newFromInteresada['id'] ?? '') : ($edit['source_interesada_id'] ?? '')) . '">';
         field_input('nombre', 'Nombre', $edit['nombre'] ?? '', true);
         field_input('telefono', 'Teléfono', $edit['telefono'] ?? ($newFromInteresada['telefono'] ?? ''), true);
-        field_input('nombre_real', 'Nombre real', $edit['nombre_real'] ?? '', false);
-        field_input('dni', 'DNI/NIE/Pasaporte', $edit['dni'] ?? '', false);
 
         echo '<div class="field">';
         echo '<label>Modo</label>';
@@ -8370,21 +4913,6 @@ if ($tab === 'clientas') {
         echo '</select>';
         echo '</div>';
 
-        echo '<div class="field">';
-        echo '<label>Día semanal de cobro</label>';
-        echo '<select name="rent_due_weekday">';
-        $dueWeekdayCurrent = $edit ? jostal_alquiler_due_weekday($edit) : jostal_weekday_from_date(business_today_date());
-        if ($dueWeekdayCurrent < 1 || $dueWeekdayCurrent > 7) {
-            $dueWeekdayCurrent = 1;
-        }
-        foreach (jostal_weekday_options() as $weekday => $weekdayLabel) {
-            $sel = ((int)$dueWeekdayCurrent === (int)$weekday) ? ' selected' : '';
-            echo '<option value="' . e((string)$weekday) . '"' . $sel . '>' . e($weekdayLabel) . '</option>';
-        }
-        echo '</select>';
-        echo '<div class="field-help">Solo aplica al modo alquiler. Se puede ajustar cuando quieras.</div>';
-        echo '</div>';
-
         if ($isNew) {
             field_input('first_arrival_date', 'Primera llegada a la casa', business_today_date(), true, 'date');
         }
@@ -8394,43 +4922,13 @@ if ($tab === 'clientas') {
         echo '</form>';
 
         if ($edit) {
-            $paymentInfo = jostal_alquiler_payment_info($edit);
-            if (!empty($paymentInfo['enabled'])) {
-                echo '<div class="info-strip" style="margin-bottom:12px;">';
-                echo '<strong>Alquiler en casa</strong><br>';
-                echo 'Entró el ' . e((string)$paymentInfo['entry_date']) . ' (' . e((string)$paymentInfo['entry_weekday_label']) . ')<br>';
-                echo 'Cobra cada ' . e((string)$paymentInfo['due_weekday_label']) . '<br>';
-                echo 'Próximo pago: ' . e((string)$paymentInfo['next_due_date']);
-                if (!empty($paymentInfo['due_today'])) {
-                    echo ' · <strong>toca pagar hoy</strong>';
-                } else {
-                    echo ' · faltan <strong>' . e((string)$paymentInfo['days_left']) . '</strong> día' . ((int)$paymentInfo['days_left'] === 1 ? '' : 's');
-                }
-                echo '<form method="post" class="inline-form" style="margin-top:10px;">';
-                echo '<input type="hidden" name="action" value="jostal_update_rent_due_weekday">';
-                echo '<input type="hidden" name="id" value="' . e($edit['id']) . '">';
-                echo '<label class="inline-label">Cambiar día cobro</label>';
-                echo '<select name="rent_due_weekday">';
-                foreach (jostal_weekday_options() as $weekday => $weekdayLabel) {
-                    $sel = ((int)($paymentInfo['due_weekday'] ?? 0) === (int)$weekday) ? ' selected' : '';
-                    echo '<option value="' . e((string)$weekday) . '"' . $sel . '>' . e($weekdayLabel) . '</option>';
-                }
-                echo '</select>';
-                echo '<button class="btn-secondary-mini" type="submit">Actualizar</button>';
-                echo '</form>';
-                echo '</div>';
-            }
-
             echo '<hr class="sep">';
             echo '<div class="money-callout">';
             echo '<div class="money-title">Registrar lead Jostal</div>';
             echo '<form method="post" class="lead-quick-inline lead-quick-inline-jostal" onsubmit="return confirmLeadSubmit(this);">';
             echo '<input type="hidden" name="action" value="jostal_add_lead">';
             echo '<input type="hidden" name="clienta_id" value="' . e($edit['id']) . '">';
-            echo '<label class="inline-label">Fecha (día/mes/año)</label>';
-            echo '<input type="date" name="created_at_date" value="' . e(business_today_date()) . '" class="money-date">';
-            echo '<label class="inline-label">Hora</label>';
-            echo '<input type="time" name="created_at_time" value="' . e(date('H:i')) . '" class="money-date">';
+            echo '<input type="datetime-local" name="created_at" value="' . e(today_datetime_local()) . '" class="money-date">';
             echo '<input type="text" name="precio" value="10" class="money-input">';
             echo '<input type="text" name="observacion" placeholder="Observación del lead" class="money-note">';
             echo '<button class="btn-money">€ Añadir lead</button>';
@@ -8468,7 +4966,7 @@ if ($tab === 'clientas') {
                 echo '<div class="empty">Todavía no hay periodos registrados.</div>';
             } else {
                 render_live_filter('#jostalPeriodosRows tr[data-filter-text]', 'Buscar periodo...');
-                echo '<div class="table-wrap"><table data-no-card-view><thead><tr><th>Entrada</th><th>Salida</th><th>Estado</th></tr></thead><tbody id="jostalPeriodosRows">';
+                echo '<div class="table-wrap"><table><thead><tr><th>Entrada</th><th>Salida</th><th>Estado</th></tr></thead><tbody id="jostalPeriodosRows">';
                 foreach (array_reverse($periodos) as $p) {
                     $periodoEstado = (($p['salida'] ?? '') === '' ? 'En casa' : 'Finalizado');
                     $searchText = strtolower(trim(($p['entrada'] ?? '') . ' ' . ($p['salida'] ?? '') . ' ' . $periodoEstado));
@@ -8481,124 +4979,24 @@ if ($tab === 'clientas') {
                 echo '</tbody></table></div>';
             }
 
-            // --- CONTRATO SECTION ---
-            echo '<hr class="sep">';
-            echo '<h2>Contrato de uso de habitación</h2>';
-
-            $contrato = contrato_find_by_clienta($edit['id']);
-
-            if (!$contrato) {
-                echo '<div class="contrato-section contrato-empty">';
-                echo '<div class="contrato-empty-icon">📄</div>';
-                echo '<p><strong>Esta clienta no tiene contrato.</strong></p>';
-                echo '<p>El contrato es necesario para dejar claras las condiciones de ocupación, pago y convivencia.</p>';
-                echo '<form method="post" class="inline-form">';
-                echo '<input type="hidden" name="action" value="save_jostal_contrato">';
-                echo '<input type="hidden" name="clienta_id" value="' . e($edit['id']) . '">';
-                echo '<input type="hidden" name="ocupante_nombre_real" value="' . e($edit['nombre_real'] ?? $edit['nombre'] ?? '') . '">';
-                echo '<input type="hidden" name="ocupante_dni" value="' . e($edit['dni'] ?? '') . '">';
-                echo '<input type="hidden" name="ocupante_telefono" value="' . e($edit['telefono'] ?? '') . '">';
-                echo '<button class="btn-primary">Crear contrato</button>';
-                echo '</form>';
-                echo '</div>';
-            } else {
-                $estadoLabel = ($contrato['estado'] === 'firmado') ? '✅ Firmado' : (($contrato['estado'] === 'enviado') ? '📤 Enviado' : '📝 Borrador');
-                echo '<div class="contrato-section contrato-exists">';
-                echo '<div class="contrato-header">';
-                echo '<span class="contrato-badge contrato-badge--' . e($contrato['estado']) . '">' . $estadoLabel . '</span>';
-                if ($contrato['estado'] !== 'borrador') {
-                    $urlFirma = contrato_generar_url_firma($contrato);
-                    echo '<div class="contrato-actions">';
-                    echo '<button type="button" class="btn-wa-mini" onclick="window.open(\'https://wa.me/?text=\' + encodeURIComponent(\'Firma tu contrato: ' . e($urlFirma) . '\'), \'_blank\')">📱 WhatsApp</button>';
-                    echo '<button type="button" class="btn-secondary-mini" onclick="copyToClipboard(\'' . e($urlFirma) . '\');showToast(\'Enlace copiado\',\'ok\')">📋 Copiar enlace</button>';
-                    echo '</div>';
-                }
-                echo '</div>';
-                echo '<form method="post" class="form-grid contrato-form">';
-                echo '<input type="hidden" name="action" value="save_jostal_contrato">';
-                echo '<input type="hidden" name="clienta_id" value="' . e($edit['id']) . '">';
-                echo '<div class="field"><strong>Datos del titular (Josué):</strong></div>';
-                field_input('arrendadora_nombre', 'Nombre', $contrato['datos_arrendadora']['nombre'] ?? 'Josué', true);
-                field_input('arrendadora_dni', 'DNI', $contrato['datos_arrendadora']['dni'] ?? '', false);
-                field_input('arrendadora_telefono', 'Teléfono', $contrato['datos_arrendadora']['telefono'] ?? '', false);
-                field_input('arrendadora_domicilio', 'Domicilio', $contrato['datos_arrendadora']['domicilio'] ?? '', false);
-                echo '<div class="field"><strong>Datos de la ocupante:</strong></div>';
-                field_input('ocupante_nombre_real', 'Nombre real', $contrato['datos_ocupante']['nombre_real'] ?? ($edit['nombre_real'] ?? $edit['nombre'] ?? ''), true);
-                field_input('ocupante_dni', 'DNI/NIE/Pasaporte', $contrato['datos_ocupante']['dni'] ?? ($edit['dni'] ?? ''), false);
-                field_input('ocupante_telefono', 'Teléfono', $contrato['datos_ocupante']['telefono'] ?? ($edit['telefono'] ?? ''), false);
-                echo '<div class="field"><strong>Habitación:</strong></div>';
-                field_input('habitacion_plaza', 'Habitación o plaza', $contrato['habitacion_plaza'] ?? '', true);
-                field_input('direccion_inmueble', 'Dirección del inmueble', $contrato['direccion_inmueble'] ?? '', false);
-                echo '<div class="field"><strong>Precio:</strong></div>';
-                field_input('precio_semanal', 'Precio semanal (€)', $contrato['precio_semanal'] ?? '', true);
-                field_input('fianza', 'Fianza (€)', $contrato['fianza'] ?? '', true);
-                echo '<div class="field"><strong>Contenido de la habitación:</strong></div>';
-                $contenidoTxt = is_array($contrato['contenido_habitacion'] ?? null) ? implode("\n", $contrato['contenido_habitacion']) : '';
-                field_textarea('contenido_habitacion', 'Una línea por cada item (ej: 3 sábanas, 2 toallas, 1 mando TV...)', $contenidoTxt, 6);
-                echo '<div class="full"><button class="btn-primary">Guardar contrato</button></div>';
-                echo '</form>';
-                echo '<div class="contrato-fechas">';
-                echo '<small>📅 Vigencia: ' . e($contrato['fecha_inicio'] ?? '—') . ' hasta ' . e($contrato['fecha_fin'] ?? '—') . ' (15 días, se renueva automáticamente)</small>';
-                echo '</div>';
-                echo '</div>';
-            }
-
             echo '<hr class="sep">';
             echo '<h2>LEADS</h2>';
 
             $clientaLeads = get_jostal_leads_for_clienta($edit['id']);
             $clientaLeads = sort_desc_by_key($clientaLeads, 'created_at');
 
-            $editLeadId = trim((string)request_get('editlead', ''));
-
-            if (empty($clientaLeads) && $editLeadId === '') {
+            if (empty($clientaLeads)) {
                 echo '<div class="empty">Todavía no hay leads para esta clienta.</div>';
             } else {
                 echo '<div class="table-wrap"><table><thead><tr>';
-                echo '<th>Fecha</th><th>Precio</th><th>Observación</th><th></th>';
+                echo '<th>Fecha</th><th>Precio</th><th>Observación</th>';
                 echo '</tr></thead><tbody>';
                 foreach ($clientaLeads as $lead) {
-                    $lid = $lead['id'] ?? '';
-                    $isEditing = ($editLeadId !== '' && $editLeadId === $lid);
-
-                    if ($isEditing) {
-                        $leadDateVal = substr((string)($lead['created_at'] ?? ''), 0, 10);
-                        $leadTimeVal = substr((string)($lead['created_at'] ?? ''), 11, 5);
-                        echo '<tr style="background:#fef3c7;">';
-                        echo '<td colspan="4">';
-                        echo '<form method="post" class="lead-quick-inline lead-quick-inline-jostal" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">';
-                        echo '<input type="hidden" name="action" value="jostal_edit_lead">';
-                        echo '<input type="hidden" name="lead_id" value="' . e($lid) . '">';
-                        echo '<input type="hidden" name="clienta_id" value="' . e($edit['id']) . '">';
-                        echo '<label class="inline-label">Fecha</label>';
-                        echo '<input type="date" name="created_at_date" value="' . e($leadDateVal) . '" class="money-date">';
-                        echo '<label class="inline-label">Hora</label>';
-                        echo '<input type="time" name="created_at_time" value="' . e($leadTimeVal) . '" class="money-date">';
-                        echo '<label class="inline-label">€</label>';
-                        echo '<input type="text" name="precio" value="' . e((string)($lead['precio'] ?? '0')) . '" class="money-input" style="width:60px;">';
-                        echo '<label class="inline-label">Obs</label>';
-                        echo '<input type="text" name="observacion" value="' . e($lead['observacion'] ?? '') . '" class="money-note">';
-                        echo '<button class="btn-ok-mini">Guardar</button>';
-                        echo ' <a href="' . e('index.php?page=jostal&tab=clientas&edit=' . urlencode($edit['id'])) . '" class="btn-secondary-mini">Cancelar</a>';
-                        echo '</form>';
-                        echo '</td>';
-                        echo '</tr>';
-                    } else {
-                        echo '<tr>';
-                        echo '<td>' . e(format_created_at($lead['created_at'] ?? '')) . '</td>';
-                        echo '<td><span class="money-chip">' . e(euro($lead['precio'] ?? 0)) . '</span></td>';
-                        echo '<td>' . e($lead['observacion'] ?? '') . '</td>';
-                        echo '<td style="display:flex;gap:4px;">';
-                        echo '<a class="btn-secondary-mini" href="' . e('index.php?page=jostal&tab=clientas&edit=' . urlencode($edit['id']) . '&editlead=' . urlencode($lid)) . '">Editar</a>';
-                        echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Seguro que quieres eliminar este lead?\')">';
-                        echo '<input type="hidden" name="action" value="jostal_delete_lead">';
-                        echo '<input type="hidden" name="lead_id" value="' . e($lid) . '">';
-                        echo '<input type="hidden" name="clienta_id" value="' . e($edit['id']) . '">';
-                        echo '<button class="btn-danger-mini">Eliminar</button>';
-                        echo '</form>';
-                        echo '</td>';
-                        echo '</tr>';
-                    }
+                    echo '<tr>';
+                    echo '<td>' . e(format_created_at($lead['created_at'] ?? '')) . '</td>';
+                    echo '<td><span class="money-chip">' . e(euro($lead['precio'] ?? 0)) . '</span></td>';
+                    echo '<td>' . e($lead['observacion'] ?? '') . '</td>';
+                    echo '</tr>';
                 }
                 echo '</tbody></table></div>';
             }
@@ -8660,18 +5058,13 @@ if ($tab === 'clientas') {
                         ? mb_strtolower($rawSearchText, 'UTF-8')
                         : strtolower($rawSearchText);
 
-                    $sinContrato = jostal_clienta_en_casa($row) && !contrato_clienta_tiene_contrato_firmado($row['id']);
-                    echo '<tr data-filter-text="' . e($searchText) . '" class="' . ($sinContrato ? 'row-warning' : '') . '">';
+                    echo '<tr data-filter-text="' . e($searchText) . '">';
                     echo '<td><strong>' . e($row['nombre'] ?? '') . '</strong></td>';
-                    echo '<td>'; crm_render_phone_value((string)($row['telefono'] ?? '')); echo '</td>';
+                    echo '<td>' . e($row['telefono'] ?? '') . '</td>';
                     echo '<td>' . e($row['modo'] ?? '') . '</td>';
                     echo '<td>' . e(jostal_clienta_en_casa($row) ? 'En casa' : 'Fuera') . '</td>';
                     echo '<td>' . e($row['observaciones'] ?? '') . '</td>';
-                    echo '<td>';
-                    if ($sinContrato) {
-                        echo '<span class="contrato-badge contrato-badge--warning" title="Sin contrato firmado">⚠ Sin contrato</span> ';
-                    }
-                    echo '<a class="mini-link" href="index.php?page=jostal&tab=clientas&edit=' . e($row['id']) . '">Abrir ficha</a></td>';
+                    echo '<td><a class="mini-link" href="index.php?page=jostal&tab=clientas&edit=' . e($row['id']) . '">Abrir ficha</a></td>';
                     echo '</tr>';
                 }
                 echo '</tbody></table></div>';
@@ -8700,7 +5093,7 @@ if ($tab === 'clientas') {
         } else {
             $ventas = sort_desc_by_key($ventas, 'created_at');
             render_live_filter('#jostalVentasRows tr[data-filter-text]', 'Buscar venta Jostal...');
-            echo '<div class="table-wrap"><table data-no-card-view><thead><tr>';
+            echo '<div class="table-wrap"><table><thead><tr>';
             echo '<th>Descripción</th><th>Precio</th><th>Created at</th>';
             echo '</tr></thead><tbody id="jostalVentasRows">';
             foreach ($ventas as $venta) {
@@ -8833,9 +5226,6 @@ function render_informes_grid_view($filteredMovements, $gastosFiltered, $from, $
     foreach ($filteredMovements as $row) {
         $ts = (int)($row['ts'] ?? 0);
         if (!$ts) continue;
-
-        // Skip gastos here — they are handled separately from $gastosFiltered below
-        if (($row['type'] ?? '') === 'gasto') continue;
 
         $dayKey = business_day_key_from_ts($ts);
         if (!isset($itemsByDay[$dayKey])) continue;
@@ -9236,7 +5626,7 @@ function render_gastos_page() {
 
     echo '<section class="panel">';
     echo '<h2>Nuevo gasto</h2>';
-    echo '<form method="post" class="form-grid" onsubmit="return confirmGastoSubmit(this);">';
+    echo '<form method="post" class="form-grid">';
     echo '<input type="hidden" name="action" value="add_gasto">';
     field_input('cantidad', 'Cantidad', '', true);
     field_input('created_at', 'Fecha y hora', today_datetime_local(), true, 'datetime-local');
@@ -9288,21 +5678,9 @@ function render_live_filter($targetSelector, $placeholder = 'Buscar...') {
 }
 
 function field_input($name, $label, $value = '', $required = false, $type = 'text') {
-    $name = (string)$name;
-    $label = (string)$label;
-    $value = (string)$value;
-    $isPhone = ($type === 'tel') || crm_is_phone_field_name($name) || crm_is_phone_field_name($label);
-    $copyPhone = $isPhone ? crm_phone_copy_value($value) : '';
     echo '<div class="field">';
     echo '<label>' . e($label) . '</label>';
-    if ($isPhone && $copyPhone !== '') {
-        echo '<div class="copy-row">';
-        echo '<input type="' . e($type) . '" name="' . e($name) . '" value="' . e($value) . '" style="flex:1 1 auto;min-width:0;"' . ($required ? ' required' : '') . '>';
-        echo '<button type="button" class="btn-copy-mini" data-copy="' . e($copyPhone) . '">Copiar</button>';
-        echo '</div>';
-    } else {
-        echo '<input type="' . e($type) . '" name="' . e($name) . '" value="' . e($value) . '"' . ($required ? ' required' : '') . '>';
-    }
+    echo '<input type="' . e($type) . '" name="' . e($name) . '" value="' . e($value) . '"' . ($required ? ' required' : '') . '>';
     echo '</div>';
 }
 
@@ -9323,91 +5701,5 @@ function field_select_clienta($name, $label, $clientes, $selected = '') {
         echo '<option value="' . e($cliente['id']) . '"' . $sel . '>' . e($cliente['nombre']) . '</option>';
     }
     echo '</select>';
-    echo '</div>';
-}
-
-function field_select_bot_linked_entity($name, $label, $lamamiClientas, $casawasapClientes, $selected = '') {
-    echo '<div class="field full">';
-    echo '<label>' . e($label) . '</label>';
-    echo '<select name="' . e($name) . '">';
-    echo '<option value="">-- Selecciona ficha vinculada --</option>';
-
-    if (!empty($lamamiClientas)) {
-        echo '<optgroup label="LaMami · clientas activas">';
-        foreach ($lamamiClientas as $clienta) {
-            $value = bot_build_linked_ref('lamami_clienta', $clienta['id'] ?? '');
-            if ($value === '') continue;
-            $sel = ($selected === $value) ? ' selected' : '';
-            echo '<option value="' . e($value) . '"' . $sel . '>' . e($clienta['nombre'] ?? 'Clienta') . '</option>';
-        }
-        echo '</optgroup>';
-    }
-
-    if (!empty($casawasapClientes)) {
-        echo '<optgroup label="CasaWasap · clientes">';
-        foreach ($casawasapClientes as $cliente) {
-            $profile = casawasap_bot_profile_from_contact($cliente);
-            $labelText = trim((string)($profile['business_name'] ?? ''));
-            if ($labelText === '') {
-                $labelText = trim((string)($cliente['telefono'] ?? 'Cliente CasaWasap'));
-            }
-            $value = bot_build_linked_ref('casawasap_cliente', $cliente['id'] ?? '');
-            if ($value === '') continue;
-            $sel = ($selected === $value) ? ' selected' : '';
-            echo '<option value="' . e($value) . '"' . $sel . '>' . e($labelText) . '</option>';
-        }
-        echo '</optgroup>';
-    }
-
-    echo '</select>';
-    echo '<div class="field-help">El bot guardará el vínculo por tipo de ficha: clienta LaMami o cliente CasaWasap.</div>';
-    echo '</div>';
-}
-
-function render_casawasap_bot_profile_fields($row = array()) {
-    $row = is_array($row) ? $row : array();
-
-    echo '<div class="full info-strip"><strong>Datos para bot</strong><br>Estos campos alimentan la generación del bot cuando este cliente se usa desde la sección Bots.</div>';
-    field_input('bot_business_name', 'Nombre comercial / nombre visible del bot', $row['bot_business_name'] ?? ($row['nombre'] ?? ''), false);
-    field_textarea('bot_contexto', 'Contexto del negocio / briefing corto', $row['bot_contexto'] ?? ($row['notas'] ?? ''), 3);
-    field_textarea('bot_servicios', 'Servicios para el bot', $row['bot_servicios'] ?? '', 4);
-    field_textarea('bot_tarifas', 'Tarifas para el bot', $row['bot_tarifas'] ?? '', 4);
-    field_input('bot_zona', 'Zona / ubicación textual', $row['bot_zona'] ?? '', false);
-    field_input('bot_ubicacion_maps', 'Ubicación Maps', $row['bot_ubicacion_maps'] ?? '', false);
-    field_input('bot_horario', 'Horario', $row['bot_horario'] ?? '', false);
-    field_input('bot_objetivo', 'Objetivo / CTA principal', $row['bot_objetivo'] ?? '', false);
-
-    echo '<div class="field">';
-    echo '<label>Modo sugerido para el bot</label>';
-    echo '<select name="bot_modo_preferido">';
-    $currentMode = (string)($row['bot_modo_preferido'] ?? ($row['modo'] ?? 'multiple'));
-    if ($currentMode !== 'personal') {
-        $currentMode = 'multiple';
-    }
-    foreach (array('multiple' => 'Multiple', 'personal' => 'Personal') as $k => $labelText) {
-        $sel = ($currentMode === $k) ? ' selected' : '';
-        echo '<option value="' . e($k) . '"' . $sel . '>' . e($labelText) . '</option>';
-    }
-    echo '</select>';
-    echo '</div>';
-}
-
-function publicista_field_clienta_picker($name, $label, $clientas, $selected = '') {
-    $selected = trim((string)$selected);
-    $selectId = 'publicista_clienta_picker_' . substr(md5($name . '|' . $selected . '|' . count($clientas)), 0, 10);
-
-    echo '<div class="field full publicista-clienta-picker">';
-    echo '<label>' . e($label) . '</label>';
-    echo '<input type="text" class="js-publicista-clienta-filter" data-target-select="#' . e($selectId) . '" placeholder="Buscar por nombre, teléfono, ciudad, sección o estado...">';
-    echo '<select id="' . e($selectId) . '" name="' . e($name) . '" size="8">';
-    echo '<option value="">-- Selecciona clienta --</option>';
-    foreach ($clientas as $clienta) {
-        $value = trim((string)($clienta['picker_value'] ?? ''));
-        if ($value === '') continue;
-        $sel = ($selected === $value) ? ' selected' : '';
-        echo '<option value="' . e($value) . '" data-search="' . e($clienta['search_text'] ?? '') . '"' . $sel . '>' . e($clienta['display_label'] ?? ($clienta['nombre'] ?? $value)) . '</option>';
-    }
-    echo '</select>';
-    echo '<div class="field-help">Se muestran clientas de LaMami y de Jostal, estén o no en la casa. Escribe para filtrar el listado y luego selecciona una.</div>';
     echo '</div>';
 }

@@ -198,6 +198,8 @@ var ChatApp = (function() {
                 if (d.ok && d.token) {
                     if (typeof _apiToken !== 'undefined') _apiToken = d.token;
                     if (typeof _csrf !== 'undefined') _csrf = d.token;
+                    // Also update hidden CSRF inputs for form-based (non-AJAX) submissions
+                    if (typeof updateAllCsrfInputs === 'function') updateAllCsrfInputs(d.token);
                 }
                 _tokenRefreshPromise = null;
             })
@@ -277,7 +279,8 @@ var ChatApp = (function() {
                 '<h3 style="margin-bottom:0;display:flex;align-items:center;gap:6px">💬 Conversaciones' +
                     '<span class="tooltip-wrap" style="display:inline-flex;position:relative">' +
                         '<span class="tooltip-icon" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--info);color:#fff;font-size:.7rem;font-weight:700;cursor:help;line-height:1">?</span>' +
-                        '<span class="tooltip-box" style="display:none;position:absolute;z-index:100;top:100%;left:0;margin-top:6px;background:var(--panel);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;font-size:.75rem;color:var(--text);max-width:260px;box-shadow:0 10px 30px rgba(0,0,0,.6);line-height:1.55;white-space:normal;font-weight:400">Desde aqui puedes:<br>• <strong>Contestar tu mismo</strong> a las conversaciones<br>• <strong>Ver en directo</strong> como responde el bot<br>• <strong>Pausar el bot</strong> para una conversacion concreta<br>• <strong>Intervenir</strong> cuando quieras<br>• <strong>Volver a encender</strong> el bot para esa conversacion</span>' +
+                        '<span class="tooltip-box" style="display:none;position:absolute;z-index:100;top:100%;left:0;margin-top:6px;background:var(--panel);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;font-size:.75rem;color:var(--text);max-width:280px;box-shadow:0 10px 30px rgba(0,0,0,.6);line-height:1.55;white-space:normal;font-weight:400">' +
+                        'Aquí aparecen todas las conversaciones de WhatsApp. Puedes:<br>• <strong>Ver en directo</strong> cómo responde el bot<br>• <strong>Pausar el bot</strong> en una conversación concreta<br>• <strong>Contestar tú</strong> manualmente<br>• <strong>Reactivar el bot</strong> cuando quieras<br>• <strong>Control total</strong> de tu WhatsApp</span>' +
                     '</span>' +
                 '</h3>' +
                 '<button class="chat-sidebar-close" title="Cerrar chat" onclick="ChatApp.close()">✕</button>' +
@@ -291,6 +294,26 @@ var ChatApp = (function() {
         sidebar.appendChild(linesList);
 
         container.appendChild(sidebar);
+
+        // ── Tooltip toggle for the "?" icon next to "Conversaciones" ──
+        (function() {
+            var tooltipWrap = sidebar.querySelector('.tooltip-wrap');
+            var tooltipIcon = sidebar.querySelector('.tooltip-icon');
+            var tooltipBox = sidebar.querySelector('.tooltip-box');
+            if (tooltipIcon && tooltipBox) {
+                tooltipIcon.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    var isVisible = tooltipBox.style.display === 'block';
+                    tooltipBox.style.display = isVisible ? 'none' : 'block';
+                });
+                // Close on click outside
+                document.addEventListener('click', function(e) {
+                    if (tooltipWrap && !tooltipWrap.contains(e.target)) {
+                        tooltipBox.style.display = 'none';
+                    }
+                });
+            }
+        })();
 
         // Main chat area
         var main = document.createElement('div');
@@ -491,7 +514,8 @@ var ChatApp = (function() {
         }).catch(function(){});
     }
 
-    function markRead(threadId) {
+    function markRead(threadId, retries) {
+        retries = retries || 0;
         var fd = new FormData();
         fd.append('thread_id', threadId);
         fd.append('csrf_token', (typeof _csrf !== 'undefined' ? _csrf : ''));
@@ -507,8 +531,20 @@ var ChatApp = (function() {
                 }
                 // Confirm line summary badges with server
                 refreshLinesSummary();
+            } else if (retries < 2) {
+                // Server error — retry after short delay
+                setTimeout(function() { markRead(threadId, retries + 1); }, 2000);
+            } else {
+                console.warn('ChatApp: markRead failed after retries', threadId, d.error);
             }
-        }).catch(function(){});
+        }).catch(function() {
+            if (retries < 2) {
+                // Network error — retry after short delay
+                setTimeout(function() { markRead(threadId, retries + 1); }, 2000);
+            } else {
+                console.warn('ChatApp: markRead network error after retries', threadId);
+            }
+        });
     }
 
     function refreshLinesSummary(last9) {
@@ -522,12 +558,12 @@ var ChatApp = (function() {
                 // If threads were recently marked read locally (via markRead),
                 // the server may still report stale total_unread before
                 // read_status.json is persisted. Count how many threads were
-                // recently read per line and clamp server values accordingly.
+                // recently read per line and subtract from server values.
                 var now = Date.now();
                 var readByLine = {};
                 for (var tid in state._readTimestamps) {
                     if (state._readTimestamps.hasOwnProperty(tid)) {
-                        if (now - state._readTimestamps[tid] < 15000) {
+                        if (now - state._readTimestamps[tid] < 30000) {
                             var pos = tid.indexOf('_');
                             var lineId = (pos !== -1) ? tid.substring(0, pos) : '';
                             if (lineId) {
@@ -542,10 +578,10 @@ var ChatApp = (function() {
                     if (d.summary.hasOwnProperty(k)) {
                         var svrUnread = d.summary[k].total_unread || 0;
                         var locallyRead = readByLine[k] || 0;
-                        // If we recently marked >= threads as the server thinks
-                        // are unread, it means the server hasn't caught up yet → clamp
-                        if (svrUnread > 0 && locallyRead >= svrUnread) {
-                            d.summary[k].total_unread = 0;
+                        // Subtract recently-read threads from server count
+                        // instead of all-or-nothing clamp
+                        if (locallyRead > 0 && svrUnread > 0) {
+                            d.summary[k].total_unread = Math.max(0, svrUnread - locallyRead);
                         }
                         state.linesSummary[k] = d.summary[k];
                     }
@@ -571,7 +607,9 @@ var ChatApp = (function() {
         for (var i = 0; i < state.lines.length; i++) {
             var line = state.lines[i];
             var last9 = line.last9 || '';
-            var label = line.descripcion || line.label || ('Línea ' + line.id);
+            var label = (typeof _isAdminPanel !== 'undefined' && _isAdminPanel)
+                ? (line.descripcion || line.label || ('Línea ' + line.id))
+                : (line.label || ('Línea ' + line.id));
             var phone = line.health_phone || line.phone || last9;
             var liveSt = line.live_status || line.health_status || 'unknown';
 
@@ -690,17 +728,19 @@ var ChatApp = (function() {
         // ── Clear unread badges LOCALLY before rendering ──
         // This makes the badge disappear instantly (not waiting for server POST).
         var lineLast9 = state.activeLine;
+        var hadUnread = false;
         if (lineLast9 && state.conversations[lineLast9]) {
             var convs = state.conversations[lineLast9];
             for (var i = 0; i < convs.length; i++) {
                 if (convs[i].thread_id === threadId && convs[i].unread > 0) {
                     convs[i].unread = 0;
+                    hadUnread = true;
                     break;
                 }
             }
         }
-        // Decrement line-level badge optimistically
-        if (lineLast9 && state.linesSummary[lineLast9] && state.linesSummary[lineLast9].total_unread > 0) {
+        // Decrement line-level badge optimistically — only if this conversation actually had unreads
+        if (hadUnread && lineLast9 && state.linesSummary[lineLast9] && state.linesSummary[lineLast9].total_unread > 0) {
             state.linesSummary[lineLast9].total_unread = Math.max(0, (state.linesSummary[lineLast9].total_unread || 0) - 1);
         }
         // Set readTimestamp early to protect against polling race conditions
@@ -721,7 +761,10 @@ var ChatApp = (function() {
             var lineLabel = '';
             for (var i = 0; i < state.lines.length; i++) {
                 if (state.lines[i].last9 === state.activeLine) {
-                    lineLabel = state.lines[i].label || '';
+                    var lo = state.lines[i];
+                    lineLabel = (typeof _isAdminPanel !== 'undefined' && _isAdminPanel)
+                        ? (lo.descripcion || lo.label || '')
+                        : (lo.label || '');
                     break;
                 }
             }
@@ -872,7 +915,7 @@ var ChatApp = (function() {
         for (var p = 0; p < conversation.length; p++) {
             if (conversation[p]._pending) {
                 var msgTs = new Date(conversation[p].ts).getTime();
-                if (now - msgTs < 5 * 60 * 1000) {  // ≤ 5 minutes
+                if (now - msgTs < 5 * 60 * 1000 || (typeof IS_DEMO !== 'undefined' && IS_DEMO)) {  // ≤ 5 min OR demo mode
                     hasRecentPending = true;
                     break;
                 }
@@ -1232,7 +1275,7 @@ var ChatApp = (function() {
                 var tid = d.threads[i].thread_id;
                 var readTs = state._readTimestamps[tid];
                 if (readTs) {
-                    if (now - readTs < 15000) {   // 15-second protection window
+                    if (now - readTs < 30000) {   // 30-second protection window
                         d.threads[i].unread = 0;
                     } else {
                         delete state._readTimestamps[tid];
@@ -1420,6 +1463,12 @@ var ChatApp = (function() {
         var m = url.match(/^https?:\/\/(?:[^\/]*\.)?compartir\.site\/([a-z0-9]+)\/?$/i);
         if (m) {
             return 'https://compartir.site/' + m[1] + '/' + m[1] + '.jpg';
+        }
+        // Append auth token for image-proxy.php URLs so images load even
+        // without a valid session cookie (token-based auth in image-proxy.php)
+        if (/\/api\/image-proxy\.php/i.test(url) && typeof _apiToken !== 'undefined' && _apiToken) {
+            var sep = url.indexOf('?') === -1 ? '?' : '&';
+            return url + sep + 'token=' + encodeURIComponent(_apiToken);
         }
         // Already a direct image URL (e.g., /api/image-proxy.php, i.ibb.co, etc.)
         return url;

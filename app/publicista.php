@@ -2,7 +2,7 @@
 
 function publicista_ai_default_models() {
     return array(
-        'descriptor' => 'deepseek-v4-pro',
+        'descriptor' => 'gpt-4o-mini',
         'image' => 'pollo-image-v2',
     );
 }
@@ -324,7 +324,9 @@ function publicista_prompt_cache_key($purpose, $model = '') {
 function publicista_response_payload_defaults($purpose, $model) {
     $cfg = publicista_ai_config();
     $payload = array();
-    if ($cfg['responses_service_tier'] !== 'auto' && $cfg['responses_service_tier'] !== '') {
+    // gpt-4o-mini no soporta service_tier flex; solo se asigna para modelos que sí
+    $skipFlexTier = (strpos($model, 'gpt-4o-mini') === 0);
+    if (!$skipFlexTier && $cfg['responses_service_tier'] !== 'auto' && $cfg['responses_service_tier'] !== '') {
         $payload['service_tier'] = $cfg['responses_service_tier'];
     }
     $payload['prompt_cache_key'] = publicista_prompt_cache_key($purpose, $model);
@@ -2447,19 +2449,78 @@ function publicista_descriptor_schema() {
             'type' => 'object',
             'additionalProperties' => false,
             'required' => array(
-                'adult_appearing', 'framing', 'skin_tone', 'hair_color', 'hair_texture', 'hair_length',
-                'body_build', 'body_curves', 'face_shape', 'eyes', 'lips', 'nose', 'eyebrows', 'makeup', 'outfit_summary',
-                'dominant_colors', 'accessories', 'pose_summary', 'expression', 'background_summary',
-                'lighting_summary', 'distinguishing_features', 'identity_anchors', 'similarity_guidance', 'risk_notes', 'quality_notes'
+                // ── Tier 1: cuerpo — críticos para recrear la silueta ──
+                'adult_appearing',
+                'height',
+                'body_build',
+                'body_fat_distribution',
+                'breast_size',
+                'skin_tone',
+                'hair_color',
+                'hair_texture',
+                'hair_length',
+                // ── Tier 2: proporciones y estructura ──
+                'hip_width',
+                'shoulder_width',
+                'waist_definition',
+                'frame_size',
+                'leg_torso_ratio',
+                'muscle_tone',
+                // ── Contexto (secundario pero requerido x compatibilidad) ──
+                'framing',
+                'outfit_summary',
+                'dominant_colors',
+                'pose_summary',
+                'expression',
+                'background_summary',
+                'lighting_summary',
+                // ── Rasgos distintivos + anclas + guía ──
+                'distinguishing_features',
+                'identity_anchors',
+                'similarity_guidance',
+                'risk_notes',
+                'quality_notes',
+
+                // ── Mantenidos x compatibilidad (mínimo token) ──
+                'body_curves',
+                'face_shape',
+                'eyes',
+                'lips',
+                'nose',
+                'eyebrows',
+                'makeup',
+                'accessories',
             ),
             'properties' => array(
+                // ── Tier 1: cuerpo ──
                 'adult_appearing' => array('type' => 'boolean'),
-                'framing' => array('type' => 'string'),
+                'height' => array('type' => 'string',
+                    'description' => 'Estatura: muy_baja (<150cm) | baja (150-160) | media (160-170) | alta (170-180) | muy_alta (>180)'),
+                'body_build' => array('type' => 'string',
+                    'description' => 'Complexión general: muy_delgada | delgada | normal | rellenita | gorda | muy_gorda'),
+                'body_fat_distribution' => array('type' => 'string',
+                    'description' => 'Distribución de grasa: manzana (abdomen) | pera (caderas/muslos) | reloj_de_arena (cintura marcada) | rectangulo (recto) | cuchara (pera con cintura)'),
+                'breast_size' => array('type' => 'string',
+                    'description' => 'Tamaño de pecho: plano | pequeno | mediano | grande | muy_grande'),
+                // ── Piel y pelo (ya existían) ──
                 'skin_tone' => array('type' => 'string'),
                 'hair_color' => array('type' => 'string'),
                 'hair_texture' => array('type' => 'string'),
                 'hair_length' => array('type' => 'string'),
-                'body_build' => array('type' => 'string'),
+                // ── Tier 2: proporciones ──
+                'hip_width' => array('type' => 'string',
+                    'description' => 'Anchura de cadera: estrecha | media | ancha | muy_ancha'),
+                'shoulder_width' => array('type' => 'string',
+                    'description' => 'Anchura de hombros: estrecha | media | ancha'),
+                'waist_definition' => array('type' => 'string',
+                    'description' => 'Definición de cintura: poco_definida | definida | muy_definida'),
+                'frame_size' => array('type' => 'string',
+                    'description' => 'Estructura ósea: pequena (muñecas/tobillos finos) | media | grande (robusta)'),
+                'leg_torso_ratio' => array('type' => 'string',
+                    'description' => 'Proporción piernas-torso: piernas_cortas | equilibrado | piernas_largas'),
+                'muscle_tone' => array('type' => 'string',
+                    'description' => 'Tono muscular: blando | normal | definido'),
+                // ── Campos heredados (compatibilidad) ──
                 'body_curves' => array('type' => 'string'),
                 'face_shape' => array('type' => 'string'),
                 'eyes' => array('type' => 'string'),
@@ -2467,6 +2528,7 @@ function publicista_descriptor_schema() {
                 'nose' => array('type' => 'string'),
                 'eyebrows' => array('type' => 'string'),
                 'makeup' => array('type' => 'string'),
+                'framing' => array('type' => 'string'),
                 'outfit_summary' => array('type' => 'string'),
                 'dominant_colors' => array(
                     'type' => 'array',
@@ -2506,20 +2568,39 @@ function publicista_descriptor_instructions($job) {
     $services = trim((string)($job['services_snapshot'] ?? ''));
     $location = trim((string)(($job['localidad_snapshot'] ?? '') . ' ' . ($job['provincia_snapshot'] ?? '')));
 
-    return "Analiza la fotografía y devuelve SOLO un JSON estricto con rasgos visuales útiles para recrear una persona parecida, no idéntica. "
-        . "PRIORIDAD ABSOLUTA: describe con la mayor fidelidad posible la APARIENCIA FÍSICA real de la mujer (rostro, piel, cabello, complexión, silueta y rasgos distintivos permanentes). "
-        . "La ropa, el maquillaje, la pose, el fondo y la iluminación sí deben describirse, pero siempre como información secundaria y nunca deben contaminar los campos de parecido físico. "
-        . "No inventes datos que no se vean. "
-        . "No identifiques a la persona ni des por hecho nombre, nacionalidad real o edad exacta; solo si aparenta ser adulta. "
-        . "En body_build describe la complexión general (delgada/normal/voluptuosa/etc) con fidelidad visual, sin embellecerla ni adelgazarla o engordarla artificialmente. "
-        . "En body_curves describe con detalle objetivo las curvas visibles: tamaño aproximado del pecho (pequeño/mediano/grande/muy grande), prominencia de caderas, relación cintura-cadera, forma general de la silueta y presencia corporal, de manera que luego pueda recrearse el mismo tipo físico. "
-        . "En face_shape, eyes, lips, nose y eyebrows sé concreto y visual. "
-        . "En similarity_guidance resume en 1 frase cómo mantener parecido general sin replicar identidad exacta — NO menciones ropa, outfit ni vestuario aquí. "
-        . "En distinguishing_features lista SOLO rasgos físicos permanentes y muy reconocibles (tono de piel, color/textura/largo de cabello, estructura facial, ojos, labios, nariz, cejas, silueta, rasgos distintivos, etc.) — NO incluyas ropa, accesorios, maquillaje ni estilo de vestimenta porque en la imagen generada la ropa será diferente. "
-        . "En identity_anchors lista entre 3 y 6 rasgos físicos MUY ESPECÍFICOS y ÚNICOS de esta persona que deben preservarse a toda costa para mantener el parecido: por ejemplo 'hoyuelo en barbilla', 'cejas muy oscuras y muy arqueadas', 'nariz respingona pequeña con punta redondeada', 'ojos rasgados de color miel', 'pómulos altos marcados'. Solo rasgos físicos permanentes, nada de ropa ni accesorios. Sé concreto y descriptivo. "
-        . "En outfit_summary limítate a un resumen corto y descriptivo de la ropa actual, sin convertirlo en el foco principal del análisis. "
-        . ($services !== '' ? "Servicios asociados al pack: {$services}. " : '')
-        . ($location !== '' ? "Contexto comercial/localidad: {$location}. " : '');
+    return "Analiza la fotografía y devuelve SOLO un JSON estricto con los rasgos FÍSICOS CORPORALES de la mujer. "
+        . "OBJETIVO: extraer la información necesaria para que otro sistema genere una mujer de CUERPO IDÉNTICO — mismo peso, misma silueta, mismas proporciones, mismo volumen. "
+        . "La cara NO es relevante (se difuminará después). La ropa y el fondo cambiarán en la imagen generada. "
+
+        . "═══ PRIORIDAD MÁXIMA: CUERPO ═══ "
+        . "Estima la estatura en height usando estas categorías: muy_baja (<150cm), baja (150-160), media (160-170), alta (170-180), muy_alta (>180cm). "
+        . "Describe la complexión en body_build con TOTAL FIDELIDAD, sin embellecer ni estilizar: muy_delgada (anorexia visible), delgada (fina pero sana), normal (peso medio), rellenita (algo de sobrepeso), gorda (sobrepeso claro), muy_gorda (obesidad). "
+        . "Identifica el patrón de distribución de grasa en body_fat_distribution: manzana (acumula en abdomen y cintura), pera (acumula en caderas, muslos y glúteos), reloj_de_arena (cintura marcada con curvas arriba y abajo proporcionadas), rectangulo (silueta recta sin apenas cintura), cuchara (como pera pero con cintura algo más definida). "
+        . "Tamaño de pecho en breast_size con fidelidad absoluta: plano (sin pecho), pequeno (copa A-B), mediano (copa B-C), grande (copa C-D), muy_grande (copa D+). Describe lo que ves, no lo que imaginas. "
+        . "Anchura de cadera en hip_width: estrecha, media, ancha, muy_ancha. "
+        . "Anchura de hombros en shoulder_width: estrecha, media, ancha. "
+        . "Definición de cintura en waist_definition: poco_definida (cintura recta), definida (cintura visible), muy_definida (cintura muy marcada tipo avispa). "
+        . "Estructura ósea en frame_size: pequena (muñecas y tobillos finos, huesos delicados), media, grande (robusta, huesos anchos). "
+        . "Proporción piernas-torso en leg_torso_ratio: piernas_cortas (torso largo), equilibrado, piernas_largas. "
+        . "Tono muscular en muscle_tone: blando (cero definición, flacidez), normal, definido (se marcan músculos). "
+
+        . "═══ PIEL Y PELO (sí se ven en la imagen final) ═══ "
+        . "Describe skin_tone, hair_color, hair_texture, hair_length con precisión. El pelo enmarca la silueta y se verá aunque la cara esté borrosa. "
+
+        . "═══ RASGOS DISTINTIVOS CORPORALES ═══ "
+        . "En distinguishing_features lista SOLO marcas físicas permanentes del CUERPO: tatuajes, cicatrices, estrías visibles, celulitis marcada, lunares en torso/brazos/piernas, marcas de nacimiento, pecas corporales. NO incluyas ropa, accesorios ni maquillaje. "
+        . "En identity_anchors lista entre 3 y 6 rasgos corporales ÚNICOS que definen el físico de esta persona: por ejemplo 'caderas muy anchas con muslos muy gruesos', 'cintura extremadamente marcada tipo reloj de arena', 'pecho muy grande desproporcionado con el resto del cuerpo', 'piernas muy cortas respecto al torso largo', 'piel muy blanca con pecas en hombros y escote'. Solo cuerpo, nada de cara ni ropa. "
+        . "En similarity_guidance resume en 1 frase cómo recrear un cuerpo idéntico a este — solo menciona cuerpo: peso, forma, volumen, proporciones. "
+
+        . "═══ CARA (MÍNIMO TOKEN — SE DIFUMINARÁ) ═══ "
+        . "Rellena face_shape, eyes, lips, nose, eyebrows y makeup con 1-2 palabras descriptivas como máximo cada uno. No detalles la cara. "
+
+        . "═══ CONTEXTO (SECUNDARIO — breve y funcional) ═══ "
+        . "Rellena outfit_summary, framing, pose_summary, expression, background_summary, lighting_summary, dominant_colors, accessories y body_curves de forma breve. Esta info es solo referencia, no el foco. "
+
+        . "No inventes datos que no se vean. No identifiques a la persona (nombre, edad exacta, nacionalidad). Sé clínico, objetivo y fiel a la imagen. "
+        . ($services !== '' ? "Servicios: {$services}. " : '')
+        . ($location !== '' ? "Localidad: {$location}. " : '');
 }
 
 function publicista_describe_source_with_openai($jobId) {
@@ -2529,13 +2610,9 @@ function publicista_describe_source_with_openai($jobId) {
     }
 
     $cfg = publicista_ai_config();
-    $descriptorProvider = (string)($cfg['descriptor_provider'] ?? 'deepseek');
 
-    if (!$cfg['configured'] && $descriptorProvider === 'openai') {
-        return array(false, 'OpenAI no está configurado. Revisa la API key en Josue > Config o en OPENAI_API_KEY.');
-    }
-    if (!$cfg['copy_configured'] && $descriptorProvider === 'deepseek') {
-        return array(false, 'DeepSeek no está configurado para Publicista. Revisa la API key en Josue > Config.');
+    if (!$cfg['configured']) {
+        return array(false, 'OpenAI no está configurado para el descriptor. Revisa la API key en Josue > Config.');
     }
 
     $sourceRel = trim((string)($job['source_image']['stored_path'] ?? ''));
@@ -2558,7 +2635,7 @@ function publicista_describe_source_with_openai($jobId) {
         return array(false, 'No se pudo leer la imagen original para enviarla.');
     }
 
-    $descriptorModel = $descriptorProvider === 'deepseek' ? $cfg['copy_model'] : $cfg['descriptor_model'];
+    $descriptorModel = $cfg['descriptor_model'];
 
     $payload = array_merge(publicista_response_payload_defaults('descriptor', $descriptorModel), array(
         'model' => $descriptorModel,
@@ -2587,20 +2664,16 @@ function publicista_describe_source_with_openai($jobId) {
         ),
     ));
 
-    // ── Ruta según proveedor ──────────────────────────────────────────
-    if ($descriptorProvider === 'deepseek') {
-        $response = publicista_uncensored_chat_request($payload, $cfg['timeouts']['responses']);
-    } else {
-        $response = publicista_openai_json_request('/v1/responses', $payload, $cfg['timeouts']['responses'], array(
-            'on_retry' => function($retryLog) use ($jobId) {
-                publicista_job_log_write($jobId, 'openai_descriptor_retry', array(
-                    'ts' => now_datetime(),
-                    'phase' => 'descriptor_pipeline',
-                    'retry' => $retryLog,
-                ));
-            },
-        ));
-    }
+    // ── Descriptor siempre por OpenAI (requiere visión) ──────────────────
+    $response = publicista_openai_json_request('/v1/responses', $payload, $cfg['timeouts']['responses'], array(
+        'on_retry' => function($retryLog) use ($jobId) {
+            publicista_job_log_write($jobId, 'openai_descriptor_retry', array(
+                'ts' => now_datetime(),
+                'phase' => 'descriptor_pipeline',
+                'retry' => $retryLog,
+            ));
+        },
+    ));
 
     $rawToStore = $response;
     if (!empty($rawToStore['raw_body']) && strlen($rawToStore['raw_body']) > 150000) {
@@ -2609,8 +2682,7 @@ function publicista_describe_source_with_openai($jobId) {
     publicista_job_log_write($jobId, 'openai_descriptor', $rawToStore);
 
     if (!$response['ok']) {
-        $providerLabel = $descriptorProvider === 'deepseek' ? 'DeepSeek' : 'OpenAI';
-        return array(false, $providerLabel . ' descriptor falló: ' . ($response['error'] !== '' ? $response['error'] : 'sin detalle'));
+        return array(false, 'OpenAI descriptor falló: ' . ($response['error'] !== '' ? $response['error'] : 'sin detalle'));
     }
 
     $outputText = publicista_response_output_text($response['decoded']);
@@ -3088,18 +3160,26 @@ function publicista_build_pollo_subject_description($job) {
     $d = is_array(publicista_array_get($job, 'descriptor', array())) ? publicista_array_get($job, 'descriptor', array()) : array();
     $data = is_array(publicista_array_get($d, 'data', array())) ? publicista_array_get($d, 'data', array()) : array();
 
-    $skinTone   = trim((string)publicista_array_get($data, 'skin_tone', ''));
-    $hairColor  = trim((string)publicista_array_get($data, 'hair_color', ''));
-    $hairTexture= trim((string)publicista_array_get($data, 'hair_texture', ''));
-    $hairLength = trim((string)publicista_array_get($data, 'hair_length', ''));
-    $bodyBuild  = trim((string)publicista_array_get($data, 'body_build', ''));
-    $bodyCurves = trim((string)publicista_array_get($data, 'body_curves', ''));
-    $faceShape  = trim((string)publicista_array_get($data, 'face_shape', ''));
-    $eyes       = trim((string)publicista_array_get($data, 'eyes', ''));
-    $lips       = trim((string)publicista_array_get($data, 'lips', ''));
-    $nose       = trim((string)publicista_array_get($data, 'nose', ''));
-    $eyebrows   = trim((string)publicista_array_get($data, 'eyebrows', ''));
-    $simGuide   = trim((string)publicista_array_get($data, 'similarity_guidance', ''));
+    // ── Tier 1: cuerpo ──
+    $height           = trim((string)publicista_array_get($data, 'height', ''));
+    $bodyBuild        = trim((string)publicista_array_get($data, 'body_build', ''));
+    $fatDistribution  = trim((string)publicista_array_get($data, 'body_fat_distribution', ''));
+    $breastSize       = trim((string)publicista_array_get($data, 'breast_size', ''));
+    $bodyCurves       = trim((string)publicista_array_get($data, 'body_curves', ''));
+    // ── Piel y pelo ──
+    $skinTone         = trim((string)publicista_array_get($data, 'skin_tone', ''));
+    $hairColor        = trim((string)publicista_array_get($data, 'hair_color', ''));
+    $hairTexture      = trim((string)publicista_array_get($data, 'hair_texture', ''));
+    $hairLength       = trim((string)publicista_array_get($data, 'hair_length', ''));
+    // ── Tier 2: proporciones ──
+    $hipWidth         = trim((string)publicista_array_get($data, 'hip_width', ''));
+    $shoulderWidth    = trim((string)publicista_array_get($data, 'shoulder_width', ''));
+    $waistDef         = trim((string)publicista_array_get($data, 'waist_definition', ''));
+    $frameSize        = trim((string)publicista_array_get($data, 'frame_size', ''));
+    $legTorsoRatio    = trim((string)publicista_array_get($data, 'leg_torso_ratio', ''));
+    $muscleTone       = trim((string)publicista_array_get($data, 'muscle_tone', ''));
+    // ── Guía de similitud ──
+    $simGuide         = trim((string)publicista_array_get($data, 'similarity_guidance', ''));
 
     $features = publicista_array_get($data, 'distinguishing_features', array());
     if (!is_array($features)) $features = array();
@@ -3115,33 +3195,39 @@ function publicista_build_pollo_subject_description($job) {
 
     $parts = array();
 
-    // ── Piel y cabello ─────────────────────────────────────────────────────────
-    if ($skinTone !== '') $parts[] = 'piel ' . $skinTone;
-    $hairBits = array_filter(array($hairColor, $hairTexture, $hairLength));
-    if (!empty($hairBits)) $parts[] = 'cabello ' . implode(', ', $hairBits);
+    // ── Estatura ──────────────────────────────────────────────────────────────
+    if ($height !== '') $parts[] = 'estatura ' . $height;
 
     // ── Complexión — bloque de alta prioridad con instrucción anti-adelgazamiento ──
-    // Repetir la complexión con énfasis para que el modelo no la ignore ni estilice
-    if ($bodyBuild !== '' || $bodyCurves !== '') {
-        $buildText = $bodyBuild !== '' ? $bodyBuild : '';
-        $curvesText = $bodyCurves !== '' ? $bodyCurves : '';
-        $complexionBlock = 'complexión EXACTA a conservar: ' . trim($buildText . ($curvesText !== '' ? ', ' . $curvesText : ''));
-        $complexionBlock .= '. OBLIGATORIO: NO adelgaces ni estilices el cuerpo — genera la misma complexión, volumen y distribución corporal que la referencia, sin reducir talla, sin afinar silueta, sin restar carnes ni volumen.';
+    $complexionPieces = array();
+    if ($bodyBuild !== '') $complexionPieces[] = 'complexión ' . $bodyBuild;
+    if ($fatDistribution !== '') $complexionPieces[] = 'distribución de grasa tipo ' . $fatDistribution;
+    if ($breastSize !== '') $complexionPieces[] = 'pecho ' . $breastSize;
+    if ($bodyCurves !== '' && $breastSize === '') $complexionPieces[] = $bodyCurves; // fallback compat
+    if (!empty($complexionPieces)) {
+        $complexionBlock = implode(', ', $complexionPieces);
+        $complexionBlock .= '. OBLIGATORIO: NO adelgaces ni estilices el cuerpo — genera la misma complexión, volumen y distribución corporal que la referencia, sin reducir talla, sin afinar silueta, sin restar carnes ni volumen. Si hay duda, genera MÁS volumen, nunca menos. El pecho debe ser exactamente del mismo tamaño que la referencia.';
         $parts[] = $complexionBlock;
-    } elseif ($bodyBuild !== '') {
-        $parts[] = 'complexión ' . $bodyBuild . '. Mantén exactamente este volumen corporal, sin estilizar ni adelgazar.';
     }
 
-    // ── Rostro con énfasis en rasgos concretos ─────────────────────────────────
-    $faceParts = array();
-    if ($faceShape !== '') $faceParts[] = 'forma ' . $faceShape;
-    if ($eyes !== '') $faceParts[] = 'ojos ' . $eyes;
-    if ($lips !== '') $faceParts[] = 'labios ' . $lips;
-    if ($nose !== '') $faceParts[] = 'nariz ' . $nose;
-    if ($eyebrows !== '') $faceParts[] = 'cejas ' . $eyebrows;
-    if (!empty($faceParts)) {
-        $parts[] = 'rasgos faciales a conservar: ' . implode(', ', $faceParts) . '. El rostro debe parecerse a la referencia en estos rasgos concretos sin copiar identidad exacta.';
+    // ── Proporciones y estructura ─────────────────────────────────────────────
+    $propPieces = array();
+    if ($hipWidth !== '') $propPieces[] = 'cadera ' . $hipWidth;
+    if ($shoulderWidth !== '') $propPieces[] = 'hombros ' . $shoulderWidth;
+    if ($waistDef !== '') $propPieces[] = 'cintura ' . $waistDef;
+    if ($frameSize !== '') $propPieces[] = 'estructura ósea ' . $frameSize;
+    if ($legTorsoRatio !== '') $propPieces[] = 'proporción piernas-torso ' . $legTorsoRatio;
+    if ($muscleTone !== '') $propPieces[] = 'tono muscular ' . $muscleTone;
+    if (!empty($propPieces)) {
+        $parts[] = 'proporciones corporales a conservar: ' . implode(', ', $propPieces) . '. Mantén exactamente estas proporciones y estructura.';
     }
+
+    // ── Piel y cabello ─────────────────────────────────────────────────────────
+    $skinHairPieces = array();
+    if ($skinTone !== '') $skinHairPieces[] = 'piel ' . $skinTone;
+    $hairBits = array_filter(array($hairColor, $hairTexture, $hairLength));
+    if (!empty($hairBits)) $skinHairPieces[] = 'cabello ' . implode(', ', $hairBits);
+    if (!empty($skinHairPieces)) $parts[] = implode('. ', $skinHairPieces);
 
     // ── Rasgos distintivos ─────────────────────────────────────────────────────
     if (!empty($filteredFeatures)) {
@@ -3213,148 +3299,503 @@ function publicista_detect_prompt_contradictions($prompt, $productionParams = ar
     return $warnings;
 }
 
-function publicista_build_pollo_master_prompt($job) {
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPACT PROMPT BUILDERS for Pollo (<2000 chars)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Builds a compact identity block from descriptor in keyword format (~200-300 chars).
+ * Extracts only essential fields: complexion, breast, skin, hair, face, proportions.
+ * Merges with manual_girl_description if present.
+ */
+function publicista_build_compact_identity_block($job) {
+    $d = is_array(publicista_array_get($job, 'descriptor', array())) ? publicista_array_get($job, 'descriptor', array()) : array();
+    $data = is_array(publicista_array_get($d, 'data', array())) ? publicista_array_get($d, 'data', array()) : array();
     $pp = function_exists('publicista_job_production_params') ? publicista_job_production_params($job) : array();
-    $outfitDetails = publicista_build_outfit_prompt_details($job);
-    $envDesc = publicista_build_setting_description($job);
-    $subject = publicista_build_pollo_subject_description($job);
+
+    $parts = array();
+
+    // ── Complexión (máxima prioridad) ──
+    $complexPieces = array();
+    $bodyBuild = trim((string)publicista_array_get($data, 'body_build', ''));
+    $fatDist   = trim((string)publicista_array_get($data, 'body_fat_distribution', ''));
+    $breast    = trim((string)publicista_array_get($data, 'breast_size', ''));
+    $bodyCurves = trim((string)publicista_array_get($data, 'body_curves', ''));
+    if ($bodyBuild !== '') $complexPieces[] = 'complex:' . $bodyBuild;
+    if ($fatDist !== '')   $complexPieces[] = 'grasa:' . $fatDist;
+    if ($breast !== '')    $complexPieces[] = 'pecho:' . $breast;
+    if ($bodyCurves !== '' && $breast === '') $complexPieces[] = 'curvas:' . $bodyCurves;
+    if (!empty($complexPieces)) {
+        $parts[] = implode(' ', $complexPieces) . ' NO_adelgazar NO_estilizar';
+    }
+
+    // ── Piel + pelo ──
+    $skinHair = array();
+    $skinTone = trim((string)publicista_array_get($data, 'skin_tone', ''));
+    $hairCol  = trim((string)publicista_array_get($data, 'hair_color', ''));
+    $hairTex  = trim((string)publicista_array_get($data, 'hair_texture', ''));
+    $hairLen  = trim((string)publicista_array_get($data, 'hair_length', ''));
+    if ($skinTone !== '') $skinHair[] = 'piel:' . $skinTone;
+    $hairBits = array_filter(array($hairCol, $hairTex, $hairLen));
+    if (!empty($hairBits)) $skinHair[] = 'pelo:' . implode('_', $hairBits);
+    if (!empty($skinHair)) $parts[] = implode(' ', $skinHair);
+
+    // ── Rostro ──
+    $faceBits = array();
+    $faceShape = trim((string)publicista_array_get($data, 'face_shape', ''));
+    $eyes      = trim((string)publicista_array_get($data, 'eyes', ''));
+    $lips      = trim((string)publicista_array_get($data, 'lips', ''));
+    $eyebrows  = trim((string)publicista_array_get($data, 'eyebrows', ''));
+    if ($faceShape !== '') $faceBits[] = 'rostro:' . $faceShape;
+    if ($eyes !== '')      $faceBits[] = 'ojos:' . $eyes;
+    if ($lips !== '')      $faceBits[] = 'labios:' . $lips;
+    if ($eyebrows !== '')  $faceBits[] = 'cejas:' . $eyebrows;
+    if (!empty($faceBits)) $parts[] = implode(' ', $faceBits);
+
+    // ── Proporciones ──
+    $propBits = array();
+    $hip        = trim((string)publicista_array_get($data, 'hip_width', ''));
+    $shoulder   = trim((string)publicista_array_get($data, 'shoulder_width', ''));
+    $waist      = trim((string)publicista_array_get($data, 'waist_definition', ''));
+    $frame      = trim((string)publicista_array_get($data, 'frame_size', ''));
+    $legTorso   = trim((string)publicista_array_get($data, 'leg_torso_ratio', ''));
+    $muscle     = trim((string)publicista_array_get($data, 'muscle_tone', ''));
+    if ($hip !== '')      $propBits[] = 'cad:' . $hip;
+    if ($shoulder !== '') $propBits[] = 'homb:' . $shoulder;
+    if ($waist !== '')    $propBits[] = 'cint:' . $waist;
+    if ($frame !== '')    $propBits[] = 'estruct:' . $frame;
+    if ($legTorso !== '') $propBits[] = 'piernas-torso:' . $legTorso;
+    if ($muscle !== '')   $propBits[] = 'tono_musc:' . $muscle;
+    if (!empty($propBits)) $parts[] = 'propor: ' . implode(' ', $propBits);
+
+    // ── Rasgos distintivos (top 3) ──
+    $features = publicista_array_get($data, 'distinguishing_features', array());
+    if (!is_array($features)) $features = array();
+    $clothingWords = array('ropa', 'vestido', 'top', 'falda', 'pantalon', 'blusa', 'conjunto', 'outfit', 'mono', 'body', 'camisa', 'chaqueta', 'abrigo', 'zapato', 'tacon', 'bota', 'bolso', 'accesorio', 'cinturon', 'complemento', 'maquillaje');
+    $filteredFeatures = array_values(array_filter((array)$features, function($f) use ($clothingWords) {
+        $fl = strtolower(trim((string)$f));
+        if ($fl === '') return false;
+        foreach ($clothingWords as $w) { if (strpos($fl, $w) !== false) return false; }
+        return true;
+    }));
+    if (!empty($filteredFeatures)) {
+        $parts[] = 'rasgos:' . implode(',', array_slice(array_map(function($f) {
+            return mb_substr(trim((string)$f), 0, 25);
+        }, $filteredFeatures), 0, 3));
+    }
+
+    // ── Identity anchors (top 4) ──
+    $rawAnchors = publicista_array_get($data, 'identity_anchors', array());
+    if (!is_array($rawAnchors)) $rawAnchors = array();
+    $anchors = array_values(array_filter(array_map('trim', array_map('strval', $rawAnchors))));
+    if (!empty($anchors)) {
+        $parts[] = 'anclas:' . implode(';', array_slice(array_map(function($a) {
+            return mb_substr(trim((string)$a), 0, 40);
+        }, $anchors), 0, 4));
+    }
+
+    // ── Similarity guidance (abreviada) ──
+    $simGuide = trim((string)publicista_array_get($data, 'similarity_guidance', ''));
+    if ($simGuide !== '') {
+        $parts[] = 'parecerse_a_ref';
+    }
+
+    // ── Manual girl description (campo nuevo del form) ──
+    $pp = function_exists('publicista_job_production_params') ? publicista_job_production_params($job) : array();
+    $manualDesc = trim((string)($pp['manual_girl_description'] ?? ''));
+    if ($manualDesc !== '') {
+        // Poner al PRINCIPIO del bloque ID para que tenga prioridad
+        array_unshift($parts, '[DESC_MANUAL] ' . $manualDesc);
+    }
+
+    return trim(implode(' | ', $parts));
+}
+
+/**
+ * Builds compact realism block — ALWAYS first in prompt (PRIO1).
+ * Compact keywords format, ~350-400 chars.
+ */
+function publicista_build_compact_realism_block() {
+    return '[REAL] foto real selfie movil — 1 mujer sola protagonista — '
+        . '1 sola foto en el archivo, NO dos fotos, NO diptych, NO collage — '
+        . 'poros textura piel real, imperfecciones naturales, grano fino camara, '
+        . 'luz natural ventana o bombilla doméstica, sombras contacto reales — '
+        . 'NO CGI NO 3D NO anime NO ilust NO render NO videojuego NO cartoon '
+        . 'NO collage NO multi-persona NO montaje NO piel plastico NO maniqui '
+        . 'NO barbie NO skin_smoothing NO airbrush — '
+        . '5 dedos manos normales anatomia correcta proporcion humana real '
+        . 'NO ojos desproporcionados NO texto NO watermark NO logo NO firma';
+}
+
+/**
+ * NEW compact Pollo master prompt — ALL in one, <2000 chars budget.
+ * Format: [FORMATO] [BRIEF] [REAL] [ID] [IMG1]...[IMG4] [EXTRA] [NEG]
+ * Outfits and backgrounds are PRE-SELECTED before building this prompt.
+ */
+function publicista_build_pollo_compact_prompt($job) {
+    $pp = function_exists('publicista_job_production_params') ? publicista_job_production_params($job) : array();
+    $count = 4; // Pollo siempre 4 imágenes
+
     $operatorBrief = trim((string)($pp['operator_brief'] ?? ''));
-    $restrictions = publicista_compose_restrictions_summary($job);
-    $selfieMode = trim((string)($pp['selfie_mode'] ?? 'off'));
-    $framing = trim((string)($pp['framing'] ?? 'variado'));
-    $pose = trim((string)($pp['pose'] ?? 'variado'));
-    $expression = trim((string)($pp['expression'] ?? 'variado'));
-    $makeup = trim((string)($pp['makeup'] ?? 'auto'));
-    $outfitVariety = trim((string)($pp['outfit_variety'] ?? 'off'));
+    $restrictions  = publicista_compose_restrictions_summary($job);
+    $selfieMode    = trim((string)($pp['selfie_mode'] ?? 'off'));
+    $outfitVariety = trim((string)($pp['outfit_variety'] ?? 'mixed'));
 
-    $poseLine = 'pose femenina, segura, fotogénica y natural, evitando brazos muertos pegados al torso y evitando postura rígida de pasaporte';
-    $poseMap = array(
-        'pie_estatica' => 'pose de pie femenina y segura, con peso sobre una pierna, cadera marcada, hombros girados, mirada directa y magnética — presencia atractiva natural',
-        'pie_dinamica' => 'pose de pie con movimiento sutil, cadera viva, cuerpo torcido favorecedor, actitud segura y llamativa — como modelo de anuncio pero natural',
-        'sentada' => 'pose sentada con piernas cruzadas, espalda ligeramente arqueada, mirada atractiva — elegante y femenina sin ser vulgar',
-        'apoyada' => 'pose apoyada en pared o marco de puerta con el cuerpo ligeramente arqueado, silueta favorecida, mirada sugerente — llamativa pero natural',
-        'casual' => 'pose cotidiana pero atractiva: cuerpo relajado, una mano en la cadera, caderas ligeramente giradas, mirada cómplice — como una foto espontánea pero favorecedora',
-        'sugerente' => 'pose muy femenina y atractiva: cuerpo torcido, silueta realzada, caderas marcadas, gesto atractivo, mirada magnética directa a cámara — sexy de anuncio SIN cruzar a lo sexual. Brazos que enmarcan el cuerpo, postura que invita a mirar.',
-    );
-    if (isset($poseMap[$pose])) $poseLine = $poseMap[$pose];
-
-    $framingLine = 'encuadre casual de móvil, variando entre planos cercanos y lejanos, a veces descentrado, como fotos reales tomadas por una persona normal — nada de composición profesional perfecta';
-    $framingMap = array(
-        'entero' => 'encuadre de cuerpo entero, de cabeza a pies, con aire suficiente alrededor y sin cortar manos ni pies',
-        'medio' => 'encuadre medio o tres cuartos corto, centrado en rostro, torso y actitud',
-        'tres_cuartos' => 'encuadre tres cuartos, dejando ver bien silueta, ropa y gesto corporal',
-        'lejano' => 'encuadre con la persona más alejada de la cámara, viéndose mucho espacio y entorno alrededor, como foto casual de móvil donde el fotógrafo está a 2-3 metros — nada de retrato cercano ni primer plano',
-        'descentrado' => 'encuadre donde la persona NO está en el centro de la imagen sino desplazada a un lado, dejando espacio vacío en el otro lado — como foto casual mal encuadrada de móvil',
-    );
-    if (isset($framingMap[$framing])) $framingLine = $framingMap[$framing];
-
-    $expressionLine = 'expresión atractiva, magnética y segura — mirada que cautiva, sin ser explícita';
-    $expressionMap = array(
-        'sonrisa' => 'expresión cálida con sonrisa natural y creíble',
-        'seria' => 'expresión seria, segura y elegante',
-        'sugerente' => 'expresión magnética, confiada y muy llamativa, sexy en clave comercial pero no explícita',
-    );
-    if (isset($expressionMap[$expression])) $expressionLine = $expressionMap[$expression];
-
-    $makeupLine = '';
-    $makeupMap = array(
-        'natural' => 'maquillaje natural favorecedor',
-        'elegante' => 'maquillaje elegante de noche, muy favorecedor',
-        'intenso' => 'maquillaje intenso, llamativo y bien ejecutado',
-    );
-    if (isset($makeupMap[$makeup])) $makeupLine = $makeupMap[$makeup];
-
-    $selfieLine = '';
-    if ($selfieMode === 'mixed') {
-        $selfieLine = 'La serie puede incluir selfies realistas o fotos tipo selfie frente al espejo, con ángulo natural de móvil, sin convertir todas las tomas en primerísimo plano.';
+    // ── Pre-seleccionar outfits y fondos ANTES de construir el prompt ──
+    $outfits = array();
+    if (function_exists('publicista_pick_outfits_for_images')) {
+        $outfits = publicista_pick_outfits_for_images($job, $count);
+    }
+    if (empty($outfits)) {
+        // Fallback básico
+        $outfits = array('look casual calle', 'vaqueros+top', 'vestido corto', 'pantalon+blusa');
     }
 
-    $styleKey = trim((string)($pp['style'] ?? 'auto_random'));
-    if ($styleKey === 'auto_random') {
-        $outfitLine = 'Cada imagen de esta serie lleva un look diferente asignado automáticamente en [ROPA PARA ESTA IMAGEN] al final del prompt. NO uses la misma ropa en todas las imágenes.';
-        $outfitLine .= ' Toda la ropa debe ser BARATA y de clase humilde: poliéster de mercadillo, licra, algodón fino, denim desgastado, imitación cuero. NADA de lujo, nada de diseño, nada de marca.';
-        $outfitLine .= ' La ropa debe ser favorecedora y atractiva pero SIN cruzar el límite sexual: ceñida, escotes moderados, algo de piel (piernas, hombros, cintura). NUNCA lencería visible, NUNCA transparencias, NUNCA desnudo. Atractiva y accesible, no de pasarela.';
-        $outfitLine .= ' VARIEDAD DE PRENDAS OBLIGATORIA: las 4 imágenes deben mostrar TIPOS DE PRENDA DIFERENTES. No todas con vestido. Mezcla: una con vaqueros+top, otra con falda, otra con pantalón, otra con vestido o mono. Varía la categoría de prenda entre imágenes, no solo el color.';
-    } else {
-        $outfitLine = 'La ropa debe basarse en lo elegido en el formulario: ' . trim((string)($outfitDetails['summary'] ?? 'look casual de calle realista'));
-        $outfitLine .= '. La ropa debe verse natural, de calle, como la que llevaría una persona normal en su día a día, no ropa de pasarela ni de sesión de fotos profesional.';
-        $outfitLine .= ' Tejidos normales (algodón, denim, punto, lino), caída natural, arrugas sutiles donde corresponda. Nada de tejidos perfectos sin textura ni ropa que parece recién comprada.';
-        $outfitLine .= ' Evita vestidos idénticos en todas las fotos: si hay varias imágenes, que la ropa varíe de forma natural entre looks cotidianos coherentes.';
+    $backgrounds = array();
+    if (function_exists('publicista_pick_backgrounds_for_images')) {
+        $backgrounds = publicista_pick_backgrounds_for_images($job, $count);
+    }
+    if (empty($backgrounds)) {
+        $backgrounds = array('salon casa real', 'dormitorio real', 'calle dia', 'cafeteria');
     }
 
+    // ── Identity block ──
+    $identityBlock = publicista_build_compact_identity_block($job);
+
+    // ── Build sections ──
     $sections = array();
 
-    // CAPA-2-OP: Operator brief (if exists) — injected ONCE only, no duplicate
+    // [FORMATO] Format lock — first thing Pollo reads. UNA sola foto, NUNCA collage.
+    $sections[] = '[FORMATO] 1 sola fotografía — NUNCA 2 fotos juntas, NUNCA collage, '
+        . 'NUNCA diptych, NUNCA mosaico de imágenes, NUNCA antes/después, '
+        . 'NUNCA montaje de varias tomas. El archivo debe contener UNA única foto. '
+        . '1 mujer, 1 encuadre, 1 escena, 1 archivo = 1 foto.';
+
+    // [BRIEF] Operator brief — PRIO1
     if ($operatorBrief !== '') {
-        $sections[] = '[CAPA-2-OP BRIEF LIBRE DEL OPERADOR — PRIORIDAD MÁXIMA] ' . $operatorBrief;
+        $sections[] = '[BRIEF] ' . $operatorBrief;
     }
 
-    // CAPA-1-ID: Identity (non-compressible, must survive compaction)
-    $sections[] = '[CAPA-1-ID PRIORIDAD#1 PARECIDO A LA ORIGINAL — OBLIGATORIO] La mujer de la foto DEBE ser indistinguible de la persona de la referencia: mismo rostro, misma nariz, mismos ojos, misma boca, misma forma de cara, mismo tono de piel, misma complexión y volumen corporal exacto. Cópiala fielmente — solo la ropa y el fondo cambian. ' . $subject . '. PROHIBIDO: anime, ilustración, CGI, render 3D, caricatura, cómic, dibujo, ojos desproporcionados, piel plastificada/maniquí/Barbie. El resultado DEBE ser una foto real con imperfecciones naturales.';
+    // [REAL] Realism block — ALWAYS PRIO1
+    $sections[] = publicista_build_compact_realism_block();
 
-    // CAPA-3-CPX: Complexion (non-compressible)
-    $d2 = is_array(publicista_array_get($job, 'descriptor', array())) ? publicista_array_get($job, 'descriptor', array()) : array();
-    $data2 = is_array(publicista_array_get($d2, 'data', array())) ? publicista_array_get($d2, 'data', array()) : array();
-    $bodyBuild2  = trim((string)publicista_array_get($data2, 'body_build', ''));
-    $bodyCurves2 = trim((string)publicista_array_get($data2, 'body_curves', ''));
-    if ($bodyBuild2 !== '' || $bodyCurves2 !== '') {
-        $bodyLine = trim($bodyBuild2 . ($bodyCurves2 !== '' ? '. ' . $bodyCurves2 : ''));
-        $sections[] = '[CAPA-3-CPX COMPLEXIÓN — OBLIGATORIO, NO NEGOCIABLE] La mujer DEBE tener la misma complexión que la referencia: ' . $bodyLine . '. PROHIBIDO adelgazar, estilizar, afinar o reducir el volumen corporal. PROHIBIDO generar una silueta más estrecha, más atlética o de menor talla que la referencia. Si hay duda, genera más volumen, nunca menos. El cuerpo debe conservar el mismo peso visual y distribución de carnes que la referencia.';
+    // [ID] Identity (descriptor + manual description)
+    $sections[] = '[ID] ' . $identityBlock;
+
+    // [IMG1]...[IMG4] — Per-image details
+    $poseShortMap = array(
+        'pie_estatica' => 'de_pie_estatica', 'pie_dinamica' => 'de_pie_dinamica',
+        'sentada' => 'sentada', 'apoyada' => 'apoyada_pared', 'casual' => 'casual_natural',
+        'sugerente' => 'insinuante_sexy', 'variado' => 'pose_natural',
+    );
+    $poseKey  = trim((string)($pp['pose'] ?? 'variado'));
+    $poseWord = isset($poseShortMap[$poseKey]) ? $poseShortMap[$poseKey] : 'pose_natural_favorecedora';
+
+    $framingShortMap = array(
+        'entero' => 'cuerpo_entero', 'medio' => 'cintura_arriba', 'tres_cuartos' => 'rodillas_arriba',
+        'lejano' => '2-3m_lejos', 'descentrado' => 'descentrado_lado', 'variado' => 'variado',
+    );
+    $framingKey  = trim((string)($pp['framing'] ?? 'variado'));
+    $framingWord = isset($framingShortMap[$framingKey]) ? $framingShortMap[$framingKey] : 'variado';
+
+    $expressionShortMap = array(
+        'sonrisa' => 'sonrisa_natural', 'seria' => 'seria_segura',
+        'sugerente' => 'magnética_atractiva', 'variado' => 'expresion_natural',
+    );
+    $expKey  = trim((string)($pp['expression'] ?? 'variado'));
+    $expWord = isset($expressionShortMap[$expKey]) ? $expressionShortMap[$expKey] : 'expresion_natural';
+
+    $makeupShortMap = array(
+        'natural' => 'maq_natural', 'elegante' => 'maq_elegante', 'intenso' => 'maq_intenso', 'auto' => '',
+    );
+    $makeupKey  = trim((string)($pp['makeup'] ?? 'auto'));
+    $makeupWord = isset($makeupShortMap[$makeupKey]) ? $makeupShortMap[$makeupKey] : '';
+
+    $selfieUse = ($selfieMode === 'mixed');
+
+    // Shot variations (compact)
+    $shots = array(
+        'cuerpo_entero_casual',
+        'tres_cuartos_ligero_giro',
+        'cintura_arriba_favorecedor',
+        'lejano_2-3m_descentrado',
+    );
+    $poses = array(
+        'de_pie_cadera_marcada',
+        'sentada_piernas_cruzadas',
+        'apoyada_pared_silueta',
+        'casual_espontanea',
+    );
+
+    for ($i = 0; $i < $count; $i++) {
+        $isSelfie = $selfieUse && ($i === 1 || $i === 3);
+        $shot = $isSelfie ? 'selfie_movil_brazo_visible' : $shots[$i % count($shots)];
+        $pose = $poses[$i % count($poses)];
+        $outfit = isset($outfits[$i]) ? $outfits[$i] : $outfits[$i % count($outfits)];
+        $bg = isset($backgrounds[$i]) ? $backgrounds[$i] : $backgrounds[$i % count($backgrounds)];
+
+        $line = '[IMG' . ($i + 1) . '] fondo:' . $bg . ' | ropa:' . $outfit
+              . ' | enc:' . $shot . ' | pose:' . $pose;
+        $sections[] = $line;
     }
 
-    // CAPA-4-OUT: Outfit
-    $sections[] = '[CAPA-4-OUT ROPA Y ESTILO] ' . $outfitLine;
-
-    // CAPA-5-POSE: Pose + expression
-    $sections[] = '[CAPA-5-POSE POSE Y ACTITUD] ' . $poseLine . '. ' . $expressionLine . '. Mirada viva, lenguaje corporal femenino y natural, postura atractiva y segura. La pose debe sentirse espontánea, como si un amigo tomara la foto, no una modelo profesional posando en estudio. Evita poses demasiado perfectas o simétricas: mejor un gesto natural e imperfecto.';
-
-    // CAPA-6-SELF: Selfie mode
-    if ($selfieLine !== '') {
-        $sections[] = '[CAPA-6-SELF SELFIE] ' . $selfieLine;
-    }
-
-    // CAPA-7-FRM: Framing
-    $sections[] = '[CAPA-7-FRM ENCUADRE] ' . $framingLine . '.';
-
-    // CAPA-8-AMB: Ambiente/background
-    $ambientKey = trim((string)($pp['setting'] ?? 'random'));
-    if ($ambientKey === 'random') {
-        $sections[] = '[CAPA-8-AMB AMBIENTE] CADA IMAGEN USA UN FONDO DISTINTO descrito en [FONDO PARA ESTA IMAGEN] al final. REGLA OBLIGATORIA: EXTIENDE LA ESCENA, NO LA REEMPLACES. El entorno debe parecer una CONTINUACIÓN NATURAL del espacio — mismo tipo de espacio doméstico (habitación, salón, cocina), mismo estilo arquitectónico, misma calidad de luz. La persona debe sentirse PLANTADA en el suelo (pies con sombra de contacto, peso visual coherente). NUNCA parece un montaje donde la persona "flota" sobre un fondo distinto. NUNCA fondo liso de estudio, NUNCA ciclorama, NUNCA fondo borroso artificial, NUNCA degradado sintético. El fondo debe tener objetos cotidianos reales, texturas en paredes/suelo, y algo de desorden natural.';
-    } else {
-        $sections[] = '[CAPA-8-AMB AMBIENTE] Fondo: ' . trim((string)($envDesc['setting'] ?? 'entorno interior realista con contexto')) . '. REGLA: EXTIENDE EL ENTORNO, no lo reemplaces por otro artificial. Mantén la coherencia espacial: mismo tipo de espacio, misma arquitectura, misma relación de distancia sujeto-paredes. La persona debe sentirse DENTRO de la escena (pies en el suelo con sombra, peso corporal visible). Incluye objetos personales, mobiliario real y desorden sutil. NUNCA fondo liso de estudio ni ciclorama genérico.';
-    }
-
-    // CAPA-9-LUZ: Lighting + realism
-    $lightingLine = trim((string)($envDesc['lighting'] ?? 'luz ambiente natural realista'));
-    $realismNote = 'FOTO REAL INDISTINGUIBLE — piel con poros, vello, asimetrías, imperfecciones. Cabello con mechones individuales y peso real. Ojos con reflejo de luz e iris detallado. Sin skin smoothing, sin filtro belleza, sin efecto plastificado. ILUMINACIÓN: solo luz natural diurna o luz interior doméstica realista (bombilla cálida, ventana). PROHIBIDO ABSOLUTAMENTE: luces de neón rosa/violeta/azul/colores sobre la piel, iluminación de discoteca, reflejos de colores irreales, rim lights de color, hair light artificial, key lights de estudio que no coinciden con el entorno. La luz DEBE ser coherente entre sujeto y fondo: misma dirección, misma temperatura, misma intensidad. Parece foto espontánea tomada con móvil en una habitación real.';
-    if ($makeupLine !== '') {
-        $sections[] = '[CAPA-9-LUZ LUZ Y ACABADO] ' . $lightingLine . '. ' . $makeupLine . '. ' . $realismNote;
-    } else {
-        $sections[] = '[CAPA-9-LUZ LUZ Y ACABADO] ' . $lightingLine . '. ' . $realismNote;
-    }
-
-    // CAPA-10-CAL: Quality + backgrounds
-    $sections[] = '[CAPA-10-CAL CALIDAD, COMPOSICIÓN Y FONDOS] Foto real de persona real — NO ilustración, NO CGI, NO caricatura, NO render, NO dibujo. Piel con textura heterogénea, poros y líneas de expresión. Ojos con iris detallado y microreflejos. Cabello con peso y mechones reales. Manos correctas (5 dedos, articulaciones naturales). COMPOSICIÓN SUJETO-ENTORNO: la persona debe estar INTEGRADA en el entorno — mismo nivel de iluminación entre sujeto y fondo, misma temperatura de color, mismas sombras. PROHIBIDO: sujeto con iluminación de estudio sobre fondo doméstico, persona flotando sin sombra de contacto, profundidad incoherente entre sujeto y fondo. FONDO: entorno doméstico real (salón, cocina, calle, escalera, dormitorio normal). PROHIBIDO: fondo liso de estudio, ciclorama, degradado sintético, pared genérica sin textura, fondo borroso artificial, montaje digital. El fondo debe tener objetos reales, texturas de pared/suelo, mobiliario creíble y algo de desorden natural. PROHIBIDO: anime, manga, caricatura, render 3D, dibujo animado, contornos cómic, hipersaturación, ojos de muñeca, piel Barbie, texto, watermark, collage, anatomía incorrecta.';
-
-    // CAPA-11-SEG: Safety
-    $sections[] = '[CAPA-11-SEG SEGURIDAD] Sexy y llamativa sí, pero siempre como glamour adulto no explícito: totalmente vestida, sin lencería visible, sin desnudo, sin transparencias íntimas, sin acto sexual ni foco fetichista.';
-
-    // CAPA-12-RES: Restrictions
-    if ($restrictions !== '') {
-        $sections[] = '[CAPA-12-RES RESTRICCIONES] ' . $restrictions . '.';
-    }
-
-    // CAPA-13-VAR: Outfit variety
+    // [EXTRA] Style params from form (compact)
+    $extraBits = array();
     if ($outfitVariety === 'mixed') {
-        $sections[] = '[CAPA-13-VAR VARIEDAD DE ROPA] ENTRE LAS DISTINTAS IMÁGENES DE ESTA SERIE, LA ROPA DEBE VARIAR. No uses exactamente el mismo outfit en todas las fotos. Usa 2-3 looks diferentes pero del mismo estilo y vibra (ej: vaqueros con distinto top, o misma americana sobre distinta camiseta). Cada imagen debe ser visualmente distinta en cuanto a ropa se refiere. No conviertas esto en un desfile de moda — son looks cotidianos de la misma persona.';
+        $extraBits[] = 'var_ropa:si';
+    }
+    if ($selfieUse) {
+        $extraBits[] = 'selfie:algunas';
+    }
+    $extraBits[] = 'exp:' . $expWord;
+    if ($makeupWord !== '') {
+        $extraBits[] = $makeupWord;
     }
 
-    // CAPA-NEG: Negative block unificado
-    $sections[] = '[CAPA-NEG NEGATIVOS UNIFICADOS] ' . publicista_pollo_negative_block();
+    // Lighting from form
+    $lightingKey = trim((string)($pp['lighting'] ?? 'natural'));
+    $lightingMap = array('natural'=>'luz_natural_ventana', 'studio'=>'luz_suave_sombras', 'calida'=>'luz_calida_lampara', 'contraluz'=>'contraluz_ventana');
+    $extraBits[] = isset($lightingMap[$lightingKey]) ? $lightingMap[$lightingKey] : 'luz_natural_ventana';
 
-    return trim(implode("\n\n", array_filter($sections, function($x) {
-        return trim((string)$x) !== '';
-    })));
+    if (!empty($extraBits)) {
+        $sections[] = '[EXTRA] ' . implode(' ', $extraBits);
+    }
+
+    // [NEG] Negative block (compact)
+    $negBlock = '[NEG] NO dibujo NO ilustracion NO texto NO marca_agua NO manos_deformes '
+        . 'NO espejo_salvo_selfie NO desnudo NO lenceria_visible NO transparencia '
+        . 'NO estudio NO ciclorama NO bokeh_falso NO neón_colores NO discoteca '
+        . 'NO deformidad NO doble_cara NO objetos_flotantes '
+        . 'NO 2_fotos_juntas NO diptych NO mosaico NO collage NO antes_despues';
+    $sections[] = $negBlock;
+
+    // [RES] Restrictions (if any, compact)
+    if ($restrictions !== '') {
+        $sections[] = '[RES] ' . mb_substr($restrictions, 0, 150);
+    }
+
+    $prompt = trim(implode("\n", $sections));
+
+    // ── Fit to budget ──
+    $prompt = publicista_compact_prompt_fit_budget($prompt, 2000);
+
+    return $prompt;
+}
+
+/**
+ * Compact regeneration prompt — built FRESH from descriptor + form params + refine_text.
+ * Only includes ONE [IMG] block (the target image's outfit/background).
+ * Injects refine_text into [ID] so it never gets truncated.
+ * Entire prompt fits within 2000 chars budget.
+ */
+function publicista_build_pollo_compact_regeneration_prompt($job, $targetIndex, $refineText = '') {
+    $pp = function_exists('publicista_job_production_params') ? publicista_job_production_params($job) : array();
+    $operatorBrief = trim((string)($pp['operator_brief'] ?? ''));
+    $selfieMode    = trim((string)($pp['selfie_mode'] ?? 'off'));
+    $outfitVariety = trim((string)($pp['outfit_variety'] ?? 'mixed'));
+    $refineText    = trim((string)$refineText);
+
+    // ── Identity block (descriptor + manual_girl_description) ──
+    $identityBlock = publicista_build_compact_identity_block($job);
+
+    // ── Inject refine_text into identity block ──
+    if ($refineText !== '') {
+        $identityBlock = '[REFINO: ' . $refineText . '] | ' . $identityBlock;
+    }
+
+    // ── Pick outfit + background for THIS specific image ──
+    $outfits = array();
+    if (function_exists('publicista_pick_outfits_for_images')) {
+        $outfits = publicista_pick_outfits_for_images($job, 4);
+    }
+    $backgrounds = array();
+    if (function_exists('publicista_pick_backgrounds_for_images')) {
+        $backgrounds = publicista_pick_backgrounds_for_images($job, 4);
+    }
+
+    $outfit = isset($outfits[$targetIndex]) ? $outfits[$targetIndex] : 'look casual calle';
+    $bg     = isset($backgrounds[$targetIndex]) ? $backgrounds[$targetIndex] : 'interior casa real';
+
+    // ── Shot rotation (same as build_pollo_compact_prompt) ──
+    $shots = array('cuerpo_entero_casual', 'tres_cuartos_ligero_giro', 'cintura_arriba_favorecedor', 'lejano_2-3m_descentrado');
+    $poses = array('de_pie_cadera_marcada', 'sentada_piernas_cruzadas', 'apoyada_pared_silueta', 'casual_espontanea');
+    $isSelfie = ($selfieMode === 'mixed') && ($targetIndex === 1 || $targetIndex === 3);
+    $shot = $isSelfie ? 'selfie_movil_brazo_visible' : $shots[$targetIndex % count($shots)];
+    $pose = $poses[$targetIndex % count($poses)];
+
+    // ── Short params ──
+    $expShortMap = array('sonrisa'=>'sonrisa_natural','seria'=>'seria_segura','sugerente'=>'magnética_atractiva','variado'=>'expresion_natural');
+    $expKey  = trim((string)($pp['expression'] ?? 'variado'));
+    $expWord = isset($expShortMap[$expKey]) ? $expShortMap[$expKey] : 'expresion_natural';
+
+    $makeupMap = array('natural'=>'maq_natural','elegante'=>'maq_elegante','intenso'=>'maq_intenso','auto'=>'');
+    $makeupKey = trim((string)($pp['makeup'] ?? 'auto'));
+    $makeupWord = isset($makeupMap[$makeupKey]) ? $makeupMap[$makeupKey] : '';
+
+    $lightingMap = array('natural'=>'luz_natural_ventana','studio'=>'luz_suave_sombras','calida'=>'luz_calida_lampara','contraluz'=>'contraluz_ventana');
+    $lightingKey = trim((string)($pp['lighting'] ?? 'natural'));
+    $lightingWord = isset($lightingMap[$lightingKey]) ? $lightingMap[$lightingKey] : 'luz_natural_ventana';
+
+    // ── Build sections ──
+    $sections = array();
+
+    // [FORMATO] Format lock
+    $sections[] = '[FORMATO] 1 sola fotografía — NUNCA 2 fotos juntas, NUNCA collage, '
+        . 'NUNCA diptych, NUNCA mosaico de imágenes, NUNCA antes/después. '
+        . '1 mujer, 1 encuadre, 1 escena, 1 archivo = 1 foto.';
+
+    // [BRIEF] Operator brief
+    if ($operatorBrief !== '') {
+        $sections[] = '[BRIEF] ' . $operatorBrief;
+    }
+
+    // [REAL] Realism block
+    $sections[] = publicista_build_compact_realism_block();
+
+    // [ID] Identity + refine_text
+    $sections[] = '[ID] ' . $identityBlock;
+
+    // [IMG] Single image spec
+    $extraBits = array();
+    if ($outfitVariety === 'mixed') $extraBits[] = 'var_ropa:si';
+    if ($selfieMode === 'mixed') $extraBits[] = 'selfie:algunas';
+    $extraBits[] = 'exp:' . $expWord;
+    if ($makeupWord !== '') $extraBits[] = $makeupWord;
+    $extraBits[] = $lightingWord;
+
+    $sections[] = '[IMG] fondo:' . $bg . ' | ropa:' . $outfit
+        . ' | enc:' . $shot . ' | pose:' . $pose;
+
+    // [EXTRA]
+    if (!empty($extraBits)) {
+        $sections[] = '[EXTRA] ' . implode(' ', $extraBits);
+    }
+
+    // [NEG] Negative block
+    $sections[] = '[NEG] NO dibujo NO ilustracion NO texto NO marca_agua NO manos_deformes '
+        . 'NO espejo_salvo_selfie NO desnudo NO lenceria_visible NO transparencia '
+        . 'NO estudio NO ciclorama NO bokeh_falso NO neón_colores NO discoteca '
+        . 'NO deformidad NO doble_cara NO objetos_flotantes '
+        . 'NO 2_fotos_juntas NO diptych NO mosaico NO collage NO antes_despues';
+
+    // [RES] Restrictions
+    $restrictions = publicista_compose_restrictions_summary($job);
+    if ($restrictions !== '') {
+        $sections[] = '[RES] ' . mb_substr($restrictions, 0, 150);
+    }
+
+    $prompt = trim(implode("\n", $sections));
+
+    // ── Fit to budget ──
+    $prompt = publicista_compact_prompt_fit_budget($prompt, 2000);
+
+    return $prompt;
+}
+
+/**
+ * Dynamic budget management: ensures prompt fits within $maxChars.
+ * Trimming order: [NEG] → [RES] → [EXTRA] details → [ID] rasgos → shorten per-image lines.
+ * NEVER trims [FORMATO], [BRIEF] or [REAL].
+ */
+function publicista_compact_prompt_fit_budget($prompt, $maxChars = 2000) {
+    $len = mb_strlen($prompt);
+    if ($len <= $maxChars) {
+        // Under budget: we could expand [ID] with more detail, but for now return as-is
+        return $prompt;
+    }
+
+    $lines = explode("\n", $prompt);
+    $over = $len - $maxChars;
+
+    // Pass 1: Drop purely negative lines ([NEG])
+    $filtered = array();
+    $droppedNeg = false;
+    foreach ($lines as $line) {
+        $trimmed = trim($line);
+        if (!$droppedNeg && strpos($trimmed, '[NEG]') === 0 && $over > 0) {
+            $droppedNeg = true;
+            $over -= mb_strlen($line) + 1;
+            continue;
+        }
+        $filtered[] = $line;
+    }
+    $lines = $filtered;
+
+    // Pass 2: Shorten [RES] line if present
+    if ($over > 0) {
+        foreach ($lines as &$line) {
+            if (strpos(trim($line), '[RES]') === 0) {
+                $oldLen = mb_strlen($line);
+                $cut = min($over, $oldLen - 10); // keep at least 10 chars
+                if ($cut > 0) {
+                    $line = mb_substr($line, 0, $oldLen - $cut);
+                    $over -= $cut;
+                }
+                break;
+            }
+        }
+        unset($line);
+    }
+
+    // Pass 3: Shorten [EXTRA] line
+    if ($over > 0) {
+        foreach ($lines as &$line) {
+            if (strpos(trim($line), '[EXTRA]') === 0) {
+                $oldLen = mb_strlen($line);
+                $parts = explode(' ', $line);
+                // Drop last tokens until budget fits
+                while ($over > 0 && count($parts) > 2) {
+                    $removed = array_pop($parts);
+                    $over -= mb_strlen($removed) + 1;
+                }
+                $line = implode(' ', $parts);
+                break;
+            }
+        }
+        unset($line);
+    }
+
+    // Pass 4: Shorten [ID] — cut after anclas/rasgos
+    if ($over > 0) {
+        foreach ($lines as &$line) {
+            if (strpos(trim($line), '[ID]') === 0) {
+                $oldLen = mb_strlen($line);
+                // Remove "| rasgos:" and "| anclas:" parts
+                $line = preg_replace('/\| *rasgos:.*?(?=\||$)/u', '', $line);
+                $newLen = mb_strlen($line);
+                $over -= ($oldLen - $newLen);
+                if ($over <= 0) break;
+                $line = preg_replace('/\| *anclas:.*?(?=\||$)/u', '', $line);
+                $newLen2 = mb_strlen($line);
+                $over -= ($newLen - $newLen2);
+                if ($over <= 0) break;
+                // Cut more from the end if still over
+                while ($over > 0 && mb_strlen($line) > 30) {
+                    $line = mb_substr($line, 0, mb_strlen($line) - 5);
+                    $over -= 5;
+                }
+                break;
+            }
+        }
+        unset($line);
+    }
+
+    // Pass 5: Shorten [IMG] lines
+    if ($over > 0) {
+        foreach ($lines as $i => &$line) {
+            if (strpos(trim($line), '[IMG') === 0 && $over > 0) {
+                $oldLen = mb_strlen($line);
+                // Cut desc after 100 chars
+                if ($oldLen > 100) {
+                    $line = mb_substr($line, 0, 100);
+                    $over -= ($oldLen - 100);
+                }
+            }
+        }
+        unset($line);
+    }
+
+    return trim(implode("\n", array_values(array_filter($lines, function($l) { return trim($l) !== ''; }))));
 }
 
 function publicista_build_master_prompt($job) {
@@ -4717,39 +5158,37 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
 
     $pipelineImageModel = trim((string)(($job['models'] ?? array())['image'] ?? ''));
     $usePollo = function_exists('publicista_is_pollo_model') && publicista_is_pollo_model($pipelineImageModel);
-    $masterPrompt = $usePollo ? publicista_build_pollo_master_prompt($job) : publicista_build_master_prompt($job);
-    $variants = publicista_build_prompt_variants($masterPrompt, $usePollo ? 4 : 6, false, $job);
-    publicista_store_prompt_master($jobId, $masterPrompt, $variants);
 
     $sourceFs = BASE_PATH . '/' . ltrim((string)publicista_array_get(publicista_array_get($job, 'source_image', array()), 'stored_path', ''), '/');
     $candidates = array();
     $polloBatchImages = array();
     $polloBatchMeta = array();
+    $polloTargetCount = 4;
+
     if ($usePollo) {
-        // Construir prompt compuesto: variante base + instrucciones de variedad
-        // para que Pollo distribuya fondos y ropa distintos entre las 4 imágenes.
-        $varietyLines = array();
-        foreach ($variants as $vi => $vp) {
-            $vpStr = trim((string)$vp);
-            if (preg_match('/\[FONDO PARA ESTA IMAGEN\].*?(?=\[|$)/s', $vpStr, $m)) {
-                $varietyLines[] = 'Imagen ' . ($vi + 1) . ' — ' . trim($m[0]);
-            }
-            if (preg_match('/\[ROPA PARA ESTA IMAGEN\].*?(?=\[|$)/s', $vpStr, $m)) {
-                $varietyLines[] = 'Imagen ' . ($vi + 1) . ' — ' . trim($m[0]);
-            }
-        }
-        $varietyBlock = '';
-        if (!empty($varietyLines)) {
-            $varietyBlock = "\n\n[VARIEDAD ENTRE IMÁGENES] Genera 4 imágenes DISTINTAS. Cada una debe usar una combinación DIFERENTE de las siguientes:\n" . implode("\n", $varietyLines)
-                . "\n\nRESTRICCIONES DE VARIEDAD: Máximo 1 imagen con vestido. Al menos 2 imágenes deben llevar pantalón, vaqueros o shorts. Varía el TIPO de prenda entre imágenes, no solo el color o el estampado. Varía también el fondo: máximo 1 imagen con el mismo tipo de entorno.";
-        }
-        $batchPrompt = trim((string)($variants[0] ?? '') . $varietyBlock);
-        list($okPolloBatch, $polloBatchOrError) = publicista_generate_candidate_images_pollo_batch($jobId, count($variants), $batchPrompt, $pipelineImageModel, $job);
+        // ── COMPACT MODE: single prompt <2000 chars with all 4 image specs inline ──
+        $masterPrompt = publicista_build_pollo_compact_prompt($job);
+        // Store the compact prompt for inspection/debug
+        $variantsPlaceholder = array($masterPrompt, $masterPrompt, $masterPrompt, $masterPrompt);
+        publicista_store_prompt_master($jobId, $masterPrompt, $variantsPlaceholder);
+
+        // The compact prompt IS the batch prompt — send directly
+        list($okPolloBatch, $polloBatchOrError) = publicista_generate_candidate_images_pollo_batch(
+            $jobId, $polloTargetCount, $masterPrompt, $pipelineImageModel, $job
+        );
         if (!$okPolloBatch) {
             return array(false, is_string($polloBatchOrError) ? $polloBatchOrError : 'No se pudo generar el lote de candidatas con Pollo.ai.');
         }
         $polloBatchMeta = is_array($polloBatchOrError) ? $polloBatchOrError : array();
         $polloBatchImages = array_values((array)($polloBatchMeta['images'] ?? array()));
+
+        // Use placeholder variants for the loop below
+        $variants = array_fill(0, $polloTargetCount, $masterPrompt);
+    } else {
+        // ── OPENAI MODE: unchanged ──
+        $masterPrompt = publicista_build_master_prompt($job);
+        $variants = publicista_build_prompt_variants($masterPrompt, 6, false, $job);
+        publicista_store_prompt_master($jobId, $masterPrompt, $variants);
     }
 
     foreach ($variants as $idx => $variantPrompt) {
@@ -4984,14 +5423,14 @@ function publicista_candidate_meets_minimum_threshold($candidate) {
     $likeness = (int)publicista_array_get($eval, 'likeness_score', 0);
     $bodyOk = array_key_exists('body_proportions_match', $eval) ? !empty($eval['body_proportions_match']) : null;
     
-    // GATE 1: Parecido mínimo absoluto (rechazo automático)
+    // GATE 1: Parecido muy bajo (warning, no rechaza)
     if ($likeness < 30) {
-        return array(false, 'IDENTITY_REJECT: likeness_score=' . $likeness . ' < 30 (umbral mínimo absoluto)');
+        return array(true, 'IDENTITY_WARNING: likeness_score=' . $likeness . ' < 30 — se convierte en definitiva con advertencia');
     }
     
-    // GATE 2: Si parecido es bajo (<50), la complexión DEBE coincidir
+    // GATE 2: Si parecido es bajo (<50), la complexión DEBE coincidir (warning, no rechaza)
     if ($likeness < 50 && $bodyOk === false) {
-        return array(false, 'SILHOUETTE_REJECT: likeness=' . $likeness . ' < 50 y body_proportions_match=false');
+        return array(true, 'SILHOUETTE_WARNING: likeness=' . $likeness . ' < 50 y body_proportions_match=false — se convierte en definitiva con advertencia');
     }
     
     // GATE 3: Si parecido es bajo (<40), necesita revisión manual
@@ -5006,20 +5445,20 @@ function publicista_candidate_meets_minimum_threshold($candidate) {
 function publicista_rebuild_finals_from_candidates($jobId, $candidates, $job = null) {
     $rows = is_array($candidates) ? $candidates : array();
     
-    // ── FASE 1: Filtrar candidatas que no cumplen umbrales mínimos ─────────
+    // ── FASE 1: Recoger todas las candidatas con imagen y marcar advertencias ───
     $eligible = array();
-    $rejected = array();
+    $warnings = array();
     foreach ($rows as $candidate) {
         if (trim((string)publicista_array_get($candidate, 'square_path', '')) === '') {
             continue; // sin imagen, no elegible
         }
         list($passes, $reason) = publicista_candidate_meets_minimum_threshold($candidate);
-        if ($passes || strpos($reason, 'WARNING') !== false) {
-            $eligible[] = $candidate;
-        } else {
-            $candidate['_reject_reason'] = $reason;
-            $rejected[] = $candidate;
+        if ($passes && $reason !== 'OK') {
+            // Advertencia de calidad: la candidata se convierte en definitiva igualmente
+            $candidate['_quality_warning'] = $reason;
+            $warnings[] = $candidate;
         }
+        $eligible[] = $candidate;
     }
     
     // ── FASE 2: Ordenar elegibles por effective_score ──────────────────────
@@ -5032,12 +5471,12 @@ function publicista_rebuild_finals_from_candidates($jobId, $candidates, $job = n
     $selectedIds = array();
     foreach ($selected as $candidate) $selectedIds[] = publicista_array_get($candidate, 'id', '');
     
-    // Marcar selected=true solo en las seleccionadas; rejected quedan selected=false
+    // Marcar selected=true solo en las seleccionadas
     foreach ($rows as $idx => $row) {
         $cid = publicista_array_get($row, 'id', '');
         $rows[$idx]['selected'] = in_array($cid, $selectedIds, true);
-        if (isset($row['_reject_reason'])) {
-            unset($rows[$idx]['_reject_reason']); // limpiar campo interno
+        if (isset($row['_quality_warning'])) {
+            unset($rows[$idx]['_quality_warning']); // limpiar campo interno
         }
     }
     
@@ -5051,19 +5490,19 @@ function publicista_rebuild_finals_from_candidates($jobId, $candidates, $job = n
             : publicista_finalize_candidate_output($jobId, $candidate, $i + 1, $job);
     }
     
-    // Añadir info de rechazos al pipeline summary para trazabilidad
-    if (!empty($rejected)) {
+    // Añadir info de advertencias al pipeline summary para trazabilidad
+    if (!empty($warnings)) {
         $job2 = is_array($job) ? $job : publicista_job_get($jobId);
         if ($job2) {
             $pipeline = is_array(publicista_array_get($job2, 'pipeline', array())) ? publicista_array_get($job2, 'pipeline', array()) : array();
-            $rejectSummary = count($rejected) . ' candidatas rechazadas por umbral mínimo de identidad/silueta.';
-            $pipeline['rejection_summary'] = $rejectSummary;
-            $pipeline['rejected_candidates'] = array_map(function($c) {
+            $warnSummary = count($warnings) . ' candidatas incluidas con advertencia de calidad (identidad/silueta por debajo del umbral recomendado).';
+            $pipeline['quality_warnings'] = $warnSummary;
+            $pipeline['warned_candidates'] = array_map(function($c) {
                 return array(
                     'id' => publicista_array_get($c, 'id', ''),
-                    'reason' => publicista_array_get($c, '_reject_reason', 'unknown'),
+                    'warning' => publicista_array_get($c, '_quality_warning', 'unknown'),
                 );
-            }, $rejected);
+            }, $warnings);
             $job2['pipeline'] = $pipeline;
             publicista_job_save($job2);
         }
@@ -5168,23 +5607,21 @@ function publicista_regenerate_candidate($jobId, $candidateId, $refineText = '',
     $sourceFs = BASE_PATH . '/' . ltrim((string)publicista_array_get(publicista_array_get($job, 'source_image', array()), 'stored_path', ''), '/');
     if (!file_exists($sourceFs)) return array(false, 'La imagen original no existe en disco.');
 
-    $basePrompt = trim((string)publicista_array_get($candidates[$targetIndex], 'base_prompt', ''));
-    if ($basePrompt === '') {
-        $basePrompt = trim((string)publicista_array_get($candidates[$targetIndex], 'prompt', ''));
-    }
-    $prompt = $basePrompt;
-    if ($prompt === '') {
-        if (publicista_job_uses_pollo_model($job)) {
-            $prompt = publicista_build_pollo_master_prompt($job) . "\n\n[REINTENTO — PRIORIDAD ABSOLUTA PARECIDO AL ORIGINAL] La mujer DEBE ser idéntica a la de la foto de referencia: mismo rostro, mismos rasgos, misma complexión, mismo volumen. Piel con poros y textura real. Foto real, NO ilustración, NO CGI, NO caricatura. Luz natural, sin neones ni reflejos de colores. Fondo doméstico real, no estudio sintético.";
-        } else {
-            $prompt = publicista_build_reference_locked_prompt($job, publicista_build_master_prompt($job) . ' Prioriza todavía más manos correctas, un único rostro y máximo hiperrealismo fotográfico: piel con textura real, ojos vivos, figura humana creíble e indistinguible de una foto real.');
+    // ── Reconstruir siempre el prompt desde cero usando el descriptor ya extraído ──
+    // Para Pollo: builder compacto de regeneración (1 sola imagen, refine_text inyectado en [ID])
+    // Para OpenAI: reference_locked_prompt con master prompt + prioridades
+    if (publicista_job_uses_pollo_model($job)) {
+        $prompt = publicista_build_pollo_compact_regeneration_prompt($job, $targetIndex, $refineText);
+    } else {
+        $prompt = publicista_build_reference_locked_prompt($job, publicista_build_master_prompt($job) . ' Prioriza cuerpo idéntico al original, manos correctas, máximo hiperrealismo fotográfico: piel con textura real, figura humana creíble e indistinguible de una foto real.');
+        $refineStr = trim((string)$refineText);
+        if ($refineStr !== '') {
+            $prompt .= "\n\n[REFINADO USUARIO]\n" . $refineStr;
         }
+        $prompt .= "\n- Corrección extra: misma complexión y volumen corporal que la original, manos limpias, fondo coherente.";
     }
-    $refineText = trim((string)$refineText);
-    if ($refineText !== '') {
-        $prompt .= "\n\n[REFINADO USUARIO]\n" . $refineText;
-    }
-    $prompt .= "\n- Corrección extra: todavía más fidelidad al rostro y complexión original, manos limpias y fondo 1:1 natural.";
+    // Guardar base_prompt para trazabilidad (no se reusa en siguientes regeneraciones)
+    $candidates[$targetIndex]['base_prompt'] = $prompt;
 
     // ── Cola serializada: solo un proceso activo por job a la vez ──────────────
     // Evita saturar Pollo.ai con peticiones paralelas que causan "La generacion fallo: desconocido"
@@ -9170,12 +9607,11 @@ function publicista_ads_euros($value) {
 function publicista_pollo_negative_block() {
     return 'NO: anime, manga, illustration, CGI, 3D render, cartoon, drawing, painting, sketch. ' .
            'NO: plastic skin, wax skin, mannequin, Barbie, beauty filter, skin smoothing, airbrush. ' .
-           'NO: neon pink light, neon violet, purple glow, colored skin reflections, disco lights, unnatural rim light. ' .
-           'NO: studio cyclorama, plain wall, seamless background, generic backdrop, blurred fake bokeh. ' .
-           'NO: doll eyes, giant eyes, anime eyes, dead stare, asymmetrical pupils. ' .
+           'NO: neon pink/violet/colored light, disco lights, unnatural rim light. ' .
+           'NO: studio cyclorama, plain wall, seamless backdrop, blurred fake bokeh. ' .
+           'NO: doll eyes, giant eyes, dead stare, asymmetrical pupils. ' .
            'NO: text, watermark, logo, signature, collage, frame, border. ' .
-           'NO: extra fingers, fused fingers, missing fingers, deformed hands, extra limbs. ' .
-           'NO: double face, merged faces, floating body parts, impossible anatomy.';
+           'NO: extra/missing/fused fingers, deformed hands, extra limbs, double face, floating parts, impossible anatomy.';
 }
 
 function publicista_pollo_models() {
@@ -9324,8 +9760,8 @@ function publicista_pollo_measure_constraint_retention($originalPrompt, $compact
     
     // Extract key constraints from original using anchor keywords
     $anchors = array(
-        'capas' => array('[capa-1-id', '[capa-2-op', '[capa-3-cpx'),
-        'identity' => array('mismo rostro', 'misma nariz', 'mismos ojos', 'misma boca', 'tono de piel', 'complexión', 'volumen corporal'),
+        'capas' => array('[capa-1-id', '[capa-2-op'),
+        'identity' => array('misma complexión', 'mismo volumen', 'mismo pecho', 'mismas proporciones', 'tono de piel', 'volumen corporal', 'tamaño de pecho'),
         'prohibitions' => array('prohibido', 'nunca', 'no ', 'no:'),
         'realism' => array('piel con poros', 'piel con textura', 'foto real', 'hiperrealista', 'indistinguible'),
         'lighting' => array('luz natural', 'luz ambiente', 'sin neón', 'sin skin smoothing'),
@@ -9382,7 +9818,7 @@ function publicista_pollo_compact_smart($prompt, $maxChars) {
         return array('prompt' => $hardCapped, 'final_length' => publicista_utf8_len($hardCapped));
     }
     
-    // Priority: keep CAPA-1-ID, CAPA-2-OP, CAPA-3-CPX intact
+    // Priority: keep CAPA-1-ID, CAPA-4-OUT, CAPA-3-CPX intact (body + outfit are critical)
     $lockedSections = array();    // Never truncated
     $importantSections = array(); // Truncated last
     $normalSections = array();    // Truncated first
@@ -9393,10 +9829,10 @@ function publicista_pollo_compact_smart($prompt, $maxChars) {
         
         // CAPA markers must be at START of section to prevent injection confusion
         $isLocked = (strpos($sectionTrim, '[CAPA-1-ID') === 0) ||
-                     (strpos($sectionTrim, '[CAPA-3-CPX') === 0);
+                     (strpos($sectionTrim, '[CAPA-4-OUT') === 0);
         $isImportant = (strpos($sectionTrim, '[CAPA-2-OP') === 0) ||
-                       (strpos($sectionTrim, '[CAPA-11-SEG') === 0) ||
-                       (strpos($sectionTrim, '[CAPA-10-CAL') === 0);
+                       (strpos($sectionTrim, '[CAPA-10-CAL') === 0) ||
+                       (strpos($sectionTrim, '[CAPA-NEG') === 0);
         
         if ($isLocked) {
             $lockedSections[] = $section;
@@ -9491,9 +9927,9 @@ function publicista_pollo_prepare_prompt($jobId, $prompt, $modelName = '', $hard
 
     $instructions = "Resume y reescribe este prompt para un generador de imágenes con límite estricto de " . $targetChars . " caracteres. "
         . "Conserva solo lo esencial. PRIORIDADES ESTRICTAS en este orden: "
-        . "(1) PARECIDO EXACTO a la persona de la foto original: rostro, rasgos faciales, tono piel, complexión, volumen corporal, cabello, señas distintivas, anclas de identidad — es LO MÁS IMPORTANTE, "
+        . "(1) CUERPO IDÉNTICO a la referencia: complexión exacta, volumen corporal, distribución de grasa, tamaño de pecho, proporciones corporales, estatura, tono de piel, cabello, señas corporales distintivas — es LO MÁS IMPORTANTE. La cara no es relevante, "
         . "(2) instrucciones nuevas del operador (brief libre, texto de regeneración o refinado del usuario), "
-        . "(3) outfit y vestuario, "
+        . "(3) outfit y vestuario tal cual fue elegido, "
         . "(4) ambiente realista (habitación, calle, salón, cocina, objetos, texturas) SIN convertirlo en fondo liso/estudio, "
         . "(5) iluminación natural (NO luces neón rosa/violeta, NO colores artificiales sobre la piel), "
         . "(6) estilo fotográfico hiperrealista (piel con poros, imperfecciones, anti-plástico, anti-CGI, anti-caricatura), "
@@ -9769,7 +10205,7 @@ function publicista_build_pollo_environment_guard($job, $maxChars = 0) {
         $guard = '[AMBIENTE Y FONDO] Usa un entorno realista con contexto visible y profundidad natural, no un fondo uniforme o de estudio genérico. La escena debe incluir detalles ambientales creíbles alrededor de la mujer y luz coherente.';
     }
 
-    $antiAi = '[ANTI-AI LOOK] La imagen NO debe verse generada por inteligencia artificial. Añade imperfecciones propias de fotografía real: ruido sutil de sensor, grano fino en zonas oscuras, textura de poros en la piel, ligeras sombras duras donde corresponda, reflejos naturales en ojos y labios. La piel debe tener textura humana, no acabado plastificado ni filtro belleza. La iluminación debe parecer luz real de habitación, no iluminación de render 3D. El resultado debe confundirse con una foto tomada con móvil por una persona normal.';
+    $antiAi = '[ANTI-AI LOOK] La imagen NO debe verse generada por IA. Añade imperfecciones de foto real: ruido de sensor, grano fino, poros visibles, sombras duras donde corresponda, reflejos naturales en ojos. Sin acabado plastificado ni filtro belleza. Debe confundirse con foto tomada con móvil por una persona normal.';
     $guard = trim($guard . "\n\n" . $antiAi);
 
     $guard = trim(publicista_pollo_normalize_prompt_text($guard, false));

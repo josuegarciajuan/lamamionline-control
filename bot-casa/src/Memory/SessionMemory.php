@@ -77,6 +77,29 @@ final class SessionMemory implements SessionMemoryInterface
             $existingLines = $this->readAllLines($memoryFile);
             $records = $this->parseLines($existingLines);
 
+            // 2b. Clean matching _pending records for this thread.
+            // When the bot responds, remove orphaned _pending flag records
+            // so the chat UI doesn't show a stuck typing indicator. We do
+            // this atomically inside the same soft lock — no race condition.
+            $pendingCleaned = 0;
+            $records = array_values(array_filter($records, function (array $rec) use ($threadId, $userMessage, &$pendingCleaned): bool {
+                if (!empty($rec['_pending'])
+                    && ((string) ($rec['thread_id'] ?? '')) === $threadId
+                ) {
+                    $pendingMsg = (string) ($rec['user_msg'] ?? '');
+                    // Match if the pending user_msg is contained within the
+                    // current (possibly coalesced) message being replied to.
+                    if ($pendingMsg !== '' && mb_strpos($userMessage, $pendingMsg) !== false) {
+                        $pendingCleaned++;
+                        return false; // drop this _pending record
+                    }
+                }
+                return true;
+            }));
+            if ($pendingCleaned > 0) {
+                $this->logger->info("SessionMemory: cleaned {$pendingCleaned} matching _pending records for thread={$threadId}");
+            }
+
             // 3. Calculate next sequence number
             $nextSeq = $this->nextSequence($records);
 
@@ -126,6 +149,26 @@ final class SessionMemory implements SessionMemoryInterface
         return array_values(array_filter($all, function (array $rec) use ($threadId): bool {
             return ($rec['thread_id'] ?? '') === $threadId;
         }));
+    }
+
+    /**
+     * List all unique thread IDs in the session memory file.
+     *
+     * @return list<string>
+     */
+    public function listThreadIds(): array
+    {
+        $memoryFile = (string) $this->config->get('files.session_memory', 'data/session_memory.ndjson');
+        $all = $this->parseLines($this->readAllLines($memoryFile));
+
+        $ids = [];
+        foreach ($all as $rec) {
+            $tid = (string) ($rec['thread_id'] ?? '');
+            if ($tid !== '') {
+                $ids[] = $tid;
+            }
+        }
+        return array_values(array_unique($ids));
     }
 
     /**

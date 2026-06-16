@@ -1,0 +1,110 @@
+{
+    "enabled": 1,
+    "frecuencia_tipo": "cada_x_horas",
+    "frecuencia_valor": 6,
+    "hora_inicio": "08:00",
+    "hora_fin": "23:00",
+    "formato": "mix_aleatorio",
+    "lineas": [
+        1
+    ],
+    "last_scheduled_run_at": "2026-06-11T15:00:08+00:00",
+    "log": [
+        {
+            "published_at": "2026-06-11T11:15:26+00:00",
+            "formato": "duo_sexy",
+            "texto": "👯 Federica 👯",
+            "resultados": [
+                {
+                    "line_id": 1,
+                    "ok": true,
+                    "http_code": 201
+                }
+            ]
+        },
+        {
+            "published_at": "2026-06-11T11:15:42+00:00",
+            "formato": "duo_sexy",
+            "texto": "👯 Federica 👯",
+            "resultados": [
+                {
+                    "line_id": 1,
+                    "ok": true,
+                    "http_code": 201
+                }
+            ]
+        },
+        {
+            "published_at": "2026-06-11T11:15:51+00:00",
+            "formato": "duo_sexy",
+            "texto": "👯 Federica 👯",
+            "resultados": [
+                {
+                    "line_id": 1,
+                    "ok": true,
+                    "http_code": 201
+                }
+            ]
+        },
+        {
+            "published_at": "2026-06-11T11:15:55+00:00",
+            "formato": "duo_sexy",
+            "texto": "👯 Federica 👯",
+            "resultados": [
+                {
+                    "line_id": 1,
+                    "ok": true,
+                    "http_code": 201
+                }
+            ]
+        },
+        {
+            "published_at": "2026-06-11T11:36:24+00:00",
+            "formato": "mix_aleatorio",
+            "texto": "⚡ OFERTA FLASH: 15€ de descuento si vienes antes de las 20h. Federica te espera ⚡\n\nFederica: /api/image-proxy.php?uid=9&img=kvvae/kvvae.jpg\n\nDate prisa. Esta oferta no dura ⏰💨",
+            "resultados": [
+                {
+                    "line_id": 1,
+                    "ok": true,
+                    "http_code": 201
+                }
+            ]
+        },
+        {
+            "published_at": "2026-06-11T11:42:21+00:00",
+            "formato": "mix_aleatorio",
+            "texto": "🍎 Hoy caerás en la tentación... Federica 🍎\n/api/image-proxy.php?uid=9&img=kvvae/kvvae.jpg\n/api/image-proxy.php?uid=9&img=yclf8/yclf8.jpg\n\nMírala bien... y dime que no 😈🔥",
+            "resultados": [
+                {
+                    "line_id": 1,
+                    "ok": true,
+                    "http_code": 201
+                }
+            ]
+        },
+        {
+            "published_at": "2026-06-11T11:49:54+00:00",
+            "formato": "mix_aleatorio",
+            "texto": "🍭 Este caramelo quiere conocerte... Federica 🍭\nhttps://admin.casawasap.com/api/image-proxy.php?uid=9&img=kvvae/kvvae.jpg\nhttps://admin.casawasap.com/api/image-proxy.php?uid=9&img=yclf8/yclf8.jpg\n\nPruébala. Solo una vez... ¿o no? 😋💘",
+            "resultados": [
+                {
+                    "line_id": 1,
+                    "ok": true,
+                    "http_code": 201
+                }
+            ]
+        },
+        {
+            "published_at": "2026-06-11T15:00:08+00:00",
+            "formato": "mix_aleatorio",
+            "texto": "🍎 Hoy caerás en la tentación... Federica 🍎\nhttps://compartir.site/k5vrt/\nhttps://compartir.site/emwef/\n\nMírala bien... y dime que no 😈🔥",
+            "resultados": [
+                {
+                    "line_id": 1,
+                    "ok": true,
+                    "http_code": 201
+                }
+            ]
+        }
+    ]
+}

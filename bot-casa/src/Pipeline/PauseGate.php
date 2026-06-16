@@ -25,8 +25,17 @@ final class PauseGate implements PipelineStageInterface
         ?\WasapBot\Core\LoggerInterface $logger = null,
     ) {
         $rootDir = defined('WASAPBOT_ROOT') ? WASAPBOT_ROOT : dirname(__DIR__, 2);
-        // Resolve user-scoped path if userId is available
-        $this->pausedFile = $rootDir . '/data/paused_threads.ndjson';
+        // Use per-user paused file when config provides it (multi-user isolation).
+        // Fall back to shared data/paused_threads.ndjson for legacy/admin.
+        $pausedFromConfig = ($this->config !== null)
+            ? (string) $this->config->get('files.paused_threads', '')
+            : '';
+        if ($pausedFromConfig !== '' && file_exists(dirname($pausedFromConfig))) {
+            $this->pausedFile = $pausedFromConfig;
+        } else {
+            $this->pausedFile = $rootDir . '/data/paused_threads.ndjson';
+        }
+        // Cancel dir is always shared (temporary signal, not conversation data)
         $this->cancelDir  = $rootDir . '/data/cancel';
         if (!is_dir($this->cancelDir)) {
             @mkdir($this->cancelDir, 0700, true);

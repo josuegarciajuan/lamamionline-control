@@ -2371,7 +2371,7 @@ a.subtab.active {
   }
 
   .main {
-    padding: 14px 10px;
+    padding: 38px 10px 80px;
   }
 
   /* Cards: ensure consistent collapse over style.css !important overrides */
@@ -2840,11 +2840,6 @@ a.subtab.active {
   .mobile-more-group-title,
   .mobile-more-link { display: none !important; }
 
-  /* ── Push main content up for bottom nav ── */
-  .main {
-    padding-bottom: 80px !important;
-  }
-
   /* ── T1.2: Toolbar superior simplificada (ocultar botón Menú) ── */
   #mobileMenuToggle {
     display: none !important;
@@ -2852,7 +2847,8 @@ a.subtab.active {
 
   .app-shell-tools {
     justify-content: flex-end;
-    gap: 8px;
+    gap: 3px;
+    top: 4px;
   }
 
   .app-shell-btn-mobile {
@@ -2869,8 +2865,30 @@ a.subtab.active {
   }
 
   .app-shell-btn {
-    padding: 8px 14px;
-    font-size: 13px;
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .app-shell-btn-mic {
+    width: 30px;
+    min-width: 30px;
+    flex: 0 0 30px;
+    border-color: rgba(245, 158, 11, 0.20) !important;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(249, 115, 22, 0.12)) !important;
+    font-size: 15px;
+  }
+
+  /* ── Compact page-head on mobile ── */
+  .page-head {
+    margin-bottom: 10px;
+  }
+
+  .page-head h1 {
+    font-size: 20px;
+  }
+
+  .page-head p {
+    font-size: 12px;
   }
 
   /* ── T1.3: Zero overflow horizontal — defensa completa ── */
@@ -3056,13 +3074,13 @@ a.subtab.active {
     height: 52px;
     border-radius: 50%;
     border: none;
-    background: linear-gradient(135deg, #e83e8c, #8a5cf6);
+    background: linear-gradient(135deg, #f59e0b, #d97706);
     color: #fff;
     font-size: 26px;
     font-weight: 700;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 6px 20px rgba(232, 62, 140, 0.35);
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.35);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     transition: transform 0.18s, box-shadow 0.18s;
@@ -3072,7 +3090,7 @@ a.subtab.active {
 
   .mobile-fab:active {
     transform: scale(0.9);
-    box-shadow: 0 4px 14px rgba(232, 62, 140, 0.25);
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.25);
   }
 
   /* Form Bottom Sheet — slides up from bottom */

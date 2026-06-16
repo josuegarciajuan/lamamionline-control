@@ -1,0 +1,115 @@
+{
+    "id": "evt_01ktybeygcnj075wn5af3fdw23",
+    "timestamp": 1781282601484,
+    "event": "message",
+    "session": "default",
+    "me": {
+        "id": "34658283816@c.us",
+        "pushName": "🥰",
+        "lid": "41116510466238@lid",
+        "jid": "34658283816:12@s.whatsapp.net"
+    },
+    "payload": {
+        "id": "false_277476546711679@lid_ACCFAB77E53797866167976D5F714D0A",
+        "timestamp": 1781282601,
+        "from": "277476546711679@lid",
+        "fromMe": false,
+        "source": "app",
+        "body": "Holaaa",
+        "to": null,
+        "participant": null,
+        "hasMedia": false,
+        "media": null,
+        "ack": 2,
+        "location": null,
+        "vCards": null,
+        "ackName": "DEVICE",
+        "replyTo": null,
+        "_data": {
+            "Info": {
+                "Chat": "277476546711679@lid",
+                "Sender": "277476546711679@lid",
+                "IsFromMe": false,
+                "IsGroup": false,
+                "AddressingMode": "",
+                "SenderAlt": "34654464023@s.whatsapp.net",
+                "RecipientAlt": "",
+                "BroadcastListOwner": "",
+                "BroadcastRecipients": null,
+                "ID": "ACCFAB77E53797866167976D5F714D0A",
+                "ServerID": 0,
+                "Type": "text",
+                "PushName": "✌🏻",
+                "Timestamp": "2026-06-12T18:43:21+02:00",
+                "Category": "",
+                "Multicast": false,
+                "MediaType": "",
+                "Edit": "",
+                "MsgBotInfo": {
+                    "EditType": "",
+                    "EditTargetID": "",
+                    "EditSenderTimestampMS": "0001-01-01T00:00:00Z"
+                },
+                "MsgMetaInfo": {
+                    "TargetID": "",
+                    "TargetSender": "",
+                    "TargetChat": "",
+                    "DeprecatedLIDSession": null,
+                    "ThreadMessageID": "",
+                    "ThreadMessageSenderJID": ""
+                },
+                "VerifiedName": null,
+                "DeviceSentMeta": null
+            },
+            "Message": {
+                "conversation": "Holaaa",
+                "messageContextInfo": {
+                    "deviceListMetadata": {
+                        "senderKeyHash": "3rhQBCsU0BfT2w==",
+                        "senderTimestamp": 1781257746,
+                        "recipientKeyHash": "VGiqzvJJL5WheA==",
+                        "recipientTimestamp": 1781282465
+                    },
+                    "deviceListMetadataVersion": 2,
+                    "messageSecret": "4eg5wfndjph9X6zfLl6Oh1tTdsqzXNi8Q6SSZwS9nvE="
+                }
+            },
+            "IsEphemeral": false,
+            "IsViewOnce": false,
+            "IsViewOnceV2": false,
+            "IsViewOnceV2Extension": false,
+            "IsDocumentWithCaption": false,
+            "IsLottieSticker": false,
+            "IsBotInvoke": false,
+            "IsEdit": false,
+            "SourceWebMsg": null,
+            "UnavailableRequestID": "",
+            "RetryCount": 0,
+            "NewsletterMeta": null,
+            "RawMessage": {
+                "conversation": "Holaaa",
+                "messageContextInfo": {
+                    "deviceListMetadata": {
+                        "senderKeyHash": "3rhQBCsU0BfT2w==",
+                        "senderTimestamp": 1781257746,
+                        "recipientKeyHash": "VGiqzvJJL5WheA==",
+                        "recipientTimestamp": 1781282465
+                    },
+                    "deviceListMetadataVersion": 2,
+                    "messageSecret": "4eg5wfndjph9X6zfLl6Oh1tTdsqzXNi8Q6SSZwS9nvE="
+                }
+            },
+            "Status": 3
+        }
+    },
+    "environment": {
+        "version": "2026.5.1",
+        "engine": "GOWS",
+        "tier": "CORE",
+        "browser": null,
+        "platform": "linux\/x64",
+        "worker": {
+            "id": null
+        }
+    }
+}

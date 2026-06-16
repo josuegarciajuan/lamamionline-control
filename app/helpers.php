@@ -524,23 +524,41 @@ function publicista_outfit_style_options() {
 }
 
 function publicista_cheap_sexy_outfit_pool() {
+    // Estructura: [key => [level, category, desc_corta]]
+    // Niveles: discreto (tapado), sexy (atrevido barrio), sugerente (glamour max sin sexual)
+    // Categorías: usadas para evitar repetición entre imágenes
     return array(
-        'minifalda_top_ceñido' => 'minifalda vaquera barata muy corta con top ceñido de tirantes finos que marca el pecho, cintura al aire — sexy de barrio, provocador sin ser explícito',
-        'vestido_corto_escote' => 'vestido corto de punto barato muy ceñido con escote en V profundo pero sin mostrar sujetador, por encima de la rodilla, poliéster de mercadillo — elegante y sexy',
-        'shorts_ceñidos_top' => 'shorts vaqueros muy cortos y ceñidos con camiseta de tirantes ajustada y fina, ombros al aire, look veraniego provocador de tienda barata',
-        'leggings_top_largo' => 'leggings negros muy ceñidos que marcan toda la silueta, con top largo de licra ajustado — look deportivo sexy de gimnasio low-cost',
-        'body_vaqueros_rotos' => 'body escotado de licra barata muy ceñido con vaqueros ajustados rotos en los muslos, look de discoteca económico y muy llamativo',
-        'vestido_lencero_falso' => 'vestido corto imitación satén con tirantes finos y escote en pico, ceñido al cuerpo — parece lencero pero es un VESTIDO real, NO ropa interior',
-        'mono_escotado_ceñido' => 'mono corto barato con escote pronunciado en V, sin mangas, tela elástica de poliéster muy ceñido al cuerpo — una sola pieza ultra favorecedora',
-        'falda_tubo_top' => 'falda de tubo de imitación cuero barata muy ceñida con top corto de licra que deja ver la cintura, look de noche económico y provocador',
-        'conjunto_deportivo_abierto' => 'conjunto de chándal barato con chaqueta abierta sin nada debajo y pantalón muy ceñido de cintura baja — look sporty sexy de barrio',
-        'vestido_transparencia_controlada' => 'vestido corto ceñido con mangas translúcidas de gasa barata pero cuerpo opaco — insinuante sin enseñar de más, elegante low-cost',
-        'falda_cruzada_top' => 'falda cruzada corta barata con abertura lateral y top halter ajustado de licra que realza el escote — sexy de noche económico',
-        'camiseta_mojada_falsa' => 'camiseta blanca ceñida de algodón fino ligeramente húmeda marcando la silueta con vaqueros cortos — efecto mojado sensual sin ser explícito',
-        'vestido_escote_espalda' => 'vestido corto barato con escote en la espalda, ceñido al cuerpo, sin mangas — elegante y muy sexy de fiesta low-cost',
-        'top_palabra_honor_falda' => 'top palabra de honor ajustado sin tirantes con minifalda de tubo barata — hombros y escote al aire, muy favorecedor',
-        'body_transparente_parcial' => 'body de manga larga con paneles de gasa translúcida en mangas y costados pero opaco en zonas íntimas — sugerente sin enseñar',
-        'vestido_punto_ceñido' => 'vestido de punto barato muy ceñido tipo venda, escote redondo, largo midi ajustado que marca toda la silueta — look de alfombra roja low-cost',
+        // ═══ DISCRETO ═══
+        'blusa_suelta_pantalon'    => ['discreto','pantalon_top',      'blusa fluida estampada + pantalón ajustado tiro alto, zapatillas blancas'],
+        'vestido_midi_manga'       => ['discreto','vestido',           'vestido midi punto fino con mangas tres cuartos, cuello redondo, botines'],
+        'america_vaqueros'         => ['discreto','vaqueros_top',      'americana oscura sobre camiseta blanca y vaqueros rectos, look oficina'],
+        'jersey_falda_larga'       => ['discreto','jersey_falda',      'jersey de punto fino gris con falda larga plisada, botas planas'],
+        'camisa_pantalon_palazzo'  => ['discreto','pantalon_top',      'camisa blanca semientallada + pantalón palazzo fluido negro, sandalias'],
+        'mono_largo_elegante'      => ['discreto','mono',              'mono largo negro de corte limpio con cinturón fino, escote barco'],
+
+        // ═══ SEXY ═══
+        'minifalda_top_ceñido'     => ['sexy','falda_top',            'minifalda vaquera corta + top ceñido tirantes, cintura al aire, zapatillas'],
+        'shorts_ceñidos_camiseta'  => ['sexy','short_top',            'shorts vaqueros cortos ceñidos + camiseta tirantes ajustada, hombros al aire'],
+        'leggings_sudadera_corta'  => ['sexy','leggings_top',         'leggings negros ceñidos que marcan silueta + sudadera corta ajustada'],
+        'body_vaqueros_rotos'      => ['sexy','body_pantalon',        'body escotado ceñido + vaqueros rotos ajustados, look discoteca económico'],
+        'conjunto_chandal_abierto' => ['sexy','conjunto',             'chándal barato chaqueta abierta sin nada debajo + pantalón cintura baja'],
+        'falda_tubo_top'           => ['sexy','falda_top',            'falda tubo imitación cuero ceñida + top corto que deja ver cintura'],
+        'vestido_punto_ceñido'     => ['sexy','vestido',              'vestido punto ceñido tipo venda, escote redondo, por encima rodilla'],
+        'top_halter_falda_cruzada' => ['sexy','falda_top',            'top halter ajustado + falda cruzada corta con abertura lateral'],
+        'camiseta_blanca_ceñida_vaqueros' => ['sexy','vaqueros_top',  'camiseta blanca ceñida algodón + vaqueros pitillo, look casual sexy'],
+        'vestido_corto_escote_v'   => ['sexy','vestido',              'vestido corto punto ceñido escote V profundo, poliéster mercadillo'],
+        'chaleco_vaquero_vestido_blanco' => ['sexy','chaqueta_vestido','chaleco vaquero abierto sobre vestido blanco corto ceñido'],
+        'jersey_cuello_alto_falda' => ['sexy','jersey_falda',         'jersey fino cuello alto ajustado + falda corta tubo, botas planas'],
+
+        // ═══ SUGERENTE ═══
+        'vestido_lencero_falso'    => ['sugerente','vestido',         'vestido corto imitación satén tirantes finos escote pico, ceñido — parece lencero pero es VESTIDO real'],
+        'mono_escotado_ceñido'     => ['sugerente','mono',            'mono corto escote V pronunciado sin mangas, tela elástica muy ceñido'],
+        'vestido_escote_espalda'   => ['sugerente','vestido',         'vestido corto escote en la espalda ceñido sin mangas, fiesta low-cost'],
+        'top_palabra_honor_falda'  => ['sugerente','falda_top',       'top palabra de honor ajustado sin tirantes + minifalda tubo — hombros y escote al aire'],
+        'body_transparente_parcial'=>['sugerente','body_pantalon',    'body manga larga paneles gasa translúcida en mangas, opaco en zonas íntimas + vaqueros'],
+        'vestido_transparencia_controlada' => ['sugerente','vestido', 'vestido corto ceñido mangas translúcidas gasa, cuerpo opaco — insinuante'],
+        'top_escote_profundo_shorts'=>['sugerente','short_top',       'top escote corazón profundo ceñido + shorts vaqueros muy cortos'],
+        'body_palabra_honor_pantalon' => ['sugerente','body_pantalon','body palabra de honor ajustado sin tirantes + pantalón ceñido cintura baja'],
     );
 }
 
@@ -554,14 +572,190 @@ function publicista_pick_random_outfits($count = 4) {
         if (empty($available)) break;
         $idx = array_rand($available);
         $key = $available[$idx];
+        $entry = $pool[$key];
+        // Compatibilidad: nuevo formato [level, category, desc] o viejo string
+        $desc = is_array($entry) ? $entry[2] : $entry;
+        $cat  = is_array($entry) ? $entry[1] : '';
         $picked[] = array(
             'key' => $key,
-            'description' => $pool[$key],
+            'category' => $cat,
+            'description' => $desc,
         );
         unset($available[$idx]);
         $available = array_values($available);
     }
     return $picked;
+}
+
+/**
+ * Selecciona N outfits ANTES del prompt, aplicando params del form:
+ * - Filtra por nivel (discreto/sexy/sugerente)
+ * - Si style != auto_random, genera descripciones coherentes con ese estilo
+ * - Si color != auto, lo inyecta en cada descripción
+ * - Garantiza categoría de prenda distinta por imagen
+ * - Devuelve array de N strings cortos (30-50 chars c/u)
+ */
+function publicista_pick_outfits_for_images($job, $count = 4) {
+    $pp = function_exists('publicista_job_production_params') ? publicista_job_production_params($job) : array();
+    $level   = trim((string)($pp['level']   ?? 'sexy'));
+    $style   = trim((string)($pp['style']   ?? 'auto_random'));
+    $color   = trim((string)($pp['color']   ?? 'auto'));
+    $fit     = trim((string)($pp['fit']     ?? 'ajustado'));
+
+    // Mapa rápido de colores a adjetivos cortos
+    $colorAdj = array(
+        'negro'=>'negro', 'rojo'=>'rojo', 'burdeos'=>'burdeos', 'nude'=>'beige',
+        'blanco'=>'blanco', 'azul'=>'azul', 'verde'=>'verde', 'dorado'=>'dorado',
+        'fucsia'=>'fucsia', 'plateado'=>'plateado',
+    );
+    $colorWord = isset($colorAdj[$color]) ? $colorAdj[$color] : '';
+
+    $outfits = array();
+
+    if ($style === 'auto_random') {
+        // ── Modo auto: elegir del pool filtrado por nivel, categorías distintas ──
+        $pool = publicista_cheap_sexy_outfit_pool();
+        $candidates = array();
+        foreach ($pool as $key => $entry) {
+            if (!is_array($entry)) continue;
+            if ($entry[0] === $level || ($level === 'sexy' && $entry[0] === 'sugerente')) {
+                $candidates[] = array('key' => $key, 'level' => $entry[0], 'category' => $entry[1], 'desc' => $entry[2]);
+            }
+        }
+        if (empty($candidates)) {
+            // fallback: usar todos los del nivel sexy
+            foreach ($pool as $key => $entry) {
+                if (!is_array($entry)) continue;
+                if ($entry[0] === 'sexy') {
+                    $candidates[] = array('key' => $key, 'level' => $entry[0], 'category' => $entry[1], 'desc' => $entry[2]);
+                }
+            }
+        }
+
+        $usedCategories = array();
+        $remaining = count($candidates);
+        for ($i = 0; $i < $count; $i++) {
+            $filtered = array_values(array_filter($candidates, function($c) use ($usedCategories) {
+                return !in_array($c['category'], $usedCategories, true);
+            }));
+            if (empty($filtered)) {
+                $filtered = $candidates; // si no quedan categorías únicas, repetir
+                $usedCategories = array();
+            }
+            $pick = $filtered[array_rand($filtered)];
+            $usedCategories[] = $pick['category'];
+
+            $desc = $pick['desc'];
+            if ($colorWord !== '') {
+                // Inyectar color si no lo menciona ya
+                if (mb_stripos($desc, $colorWord) === false && mb_stripos($desc, 'color') === false) {
+                    // Añadir color al final si falta
+                    $desc = rtrim($desc, '.') . ', en tonos ' . $colorWord;
+                }
+            }
+            $outfits[] = mb_substr($desc, 0, 60); // max 60 chars por outfit
+        }
+    } else {
+        // ── Modo estilo concreto: generar descripciones coherentes con variaciones ──
+        $styleNames = array(
+            'vestido_corto'      => 'vestido corto ceñido',
+            'vestido_largo'      => 'vestido largo elegante',
+            'conjunto_top'       => 'conjunto top y falda',
+            'mono'               => 'mono entero',
+            'conjunto_pantalon'  => 'conjunto pantalón y blusa',
+            'body_falda'         => 'body con falda',
+            'vaqueros_top'       => 'vaqueros ajustados + top',
+            'pantalon_camisa'    => 'pantalón fluido + camisa',
+            'falda_casual'       => 'falda casual + top',
+            'chaqueta_casual'    => 'chaqueta + vaqueros',
+        );
+        $baseDesc = isset($styleNames[$style]) ? $styleNames[$style] : 'look casual de calle';
+
+        $variations = array(
+            array('detalle' => 'escote redondo'),
+            array('detalle' => 'tirantes finos'),
+            array('detalle' => 'manga corta'),
+            array('detalle' => 'escote pico'),
+            array('detalle' => 'cuello halter'),
+            array('detalle' => 'palabra de honor'),
+            array('detalle' => 'manga larga'),
+            array('detalle' => 'espalda descubierta'),
+        );
+
+        for ($i = 0; $i < $count; $i++) {
+            $v = $variations[$i % count($variations)];
+            $desc = $baseDesc . ', ' . $v['detalle'];
+            if ($colorWord !== '') {
+                $desc .= ', en ' . $colorWord;
+            } else {
+                $colorCycle = array('negro', 'rojo', 'azul', 'blanco', 'verde', 'burdeos', 'beige', 'gris');
+                $desc .= ', en ' . $colorCycle[$i % count($colorCycle)];
+            }
+            $outfits[] = $desc;
+        }
+    }
+
+    return $outfits;
+}
+
+/**
+ * Selecciona N fondos ANTES del prompt, aplicando params del form.
+ * Si setting == random, elige N fondos distintos del pool.
+ * Si setting concreto, usa ese fondo con ligeras variaciones.
+ * Devuelve array de N strings cortos (~25-35 chars c/u).
+ */
+function publicista_pick_backgrounds_for_images($job, $count = 4) {
+    $pp = function_exists('publicista_job_production_params') ? publicista_job_production_params($job) : array();
+    $settingKey = trim((string)($pp['setting'] ?? 'random'));
+
+    $backgrounds = array();
+
+    if ($settingKey === 'random') {
+        $pool = publicista_natural_background_pool();
+        $keys = array_keys($pool);
+        $available = $keys;
+        for ($i = 0; $i < $count; $i++) {
+            if (empty($available)) {
+                $available = $keys; // repetir si no hay más
+            }
+            $idx = array_rand($available);
+            $key = $available[$idx];
+            $desc = $pool[$key];
+            // Comprimir a ~25-35 chars
+            $short = mb_substr($desc, 0, 40);
+            // recortar hasta el último espacio para no cortar palabra
+            if (mb_strlen($short) >= 35) {
+                $lastSpace = mb_strrpos($short, ' ');
+                if ($lastSpace > 15) {
+                    $short = mb_substr($short, 0, $lastSpace);
+                }
+            }
+            $backgrounds[] = $short;
+            unset($available[$idx]);
+            $available = array_values($available);
+        }
+    } else {
+        // Setting concreto
+        $envDesc = function_exists('publicista_build_setting_description') ? publicista_build_setting_description($job) : array('setting' => 'interior realista');
+        $base = mb_substr(trim((string)($envDesc['setting'] ?? 'interior realista')), 0, 35);
+
+        $settingVariants = array(
+            'hotel_lujoso'     => array('hotel, cama hecha', 'hotel, ventana luz', 'hotel, sillón', 'hotel, escritorio'),
+            'minimalista'      => array('pared neutra, suelo madera', 'pared blanca, planta', 'pared gris, mueble simple', 'pared beige, espejo'),
+            'calido'           => array('salón, sofá cojines', 'salón, lámpara pie', 'salón, mesa revistas', 'salón, estantería libros'),
+            'urbano_noche'     => array('calle noche, farolas', 'terraza noche, luces', 'calle noche, escaparates', 'calle noche, coches'),
+            'dormitorio_real'  => array('dormitorio, cama deshecha', 'dormitorio, ropa silla', 'dormitorio, ventana luz', 'dormitorio, espejo pared'),
+            'salon_casa'       => array('salón, sofá mantas', 'salón, mesa centro', 'salón, tele pared', 'salón, planta rincón'),
+            'espejo_selfie'    => array('espejo selfie, dormitorio', 'espejo selfie, baño', 'espejo selfie, pasillo', 'espejo selfie, armario'),
+        );
+
+        $variants = isset($settingVariants[$settingKey]) ? $settingVariants[$settingKey] : array($base, $base, $base, $base);
+        for ($i = 0; $i < $count; $i++) {
+            $backgrounds[] = $variants[$i % count($variants)];
+        }
+    }
+
+    return $backgrounds;
 }
 
 function publicista_outfit_level_options() {
@@ -723,6 +917,16 @@ function publicista_normalize_outfit_params($raw) {
     }
     $rawBrief = preg_replace('/\[CAPA\b/i', '[C4P4-', $rawBrief);
     $out['operator_brief'] = $rawBrief;
+
+    $rawManualDesc = trim((string)($raw['manual_girl_description'] ?? ''));
+    if (function_exists('mb_substr')) {
+        $rawManualDesc = mb_substr($rawManualDesc, 0, 300, 'UTF-8');
+    } else {
+        $rawManualDesc = substr($rawManualDesc, 0, 300);
+    }
+    $rawManualDesc = preg_replace('/\[CAPA\b/i', '[C4P4-', $rawManualDesc);
+    $out['manual_girl_description'] = $rawManualDesc;
+
     $out['copy_brief']   = trim((string)($raw['copy_brief'] ?? ''));
 
     $allowedSelfieModes = array_keys(publicista_selfie_mode_options());

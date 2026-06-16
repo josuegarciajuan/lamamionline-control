@@ -42,6 +42,46 @@ if (file_exists($vendorAutoload)) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+//  Demo host auto-login
+//  When accessed via demo.casawasap.com, auto-authenticate as the
+//  "demo" user so visitors don't need to log in manually.
+// ─────────────────────────────────────────────────────────────────────
+
+$isDemoHost = (($_SERVER['HTTP_HOST'] ?? '') === 'demo.casawasap.com');
+
+if ($isDemoHost) {
+    // Start session (secure cookies) if not already started
+    if (session_status() === PHP_SESSION_NONE) {
+        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                   || (int) ($_SERVER['SERVER_PORT'] ?? 80) === 443;
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path'     => '/',
+            'domain'   => '',
+            'secure'   => $isHttps,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+        session_start();
+    }
+
+    // Auto-login as demo user if not already authenticated
+    if (empty($_SESSION['user_id'])) {
+        $um = new \WasapBot\Core\UserManager(WASAPBOT_ROOT);
+        $demoUser = $um->getUserByUsername('demo');
+
+        if ($demoUser !== null && !empty($demoUser['active'])) {
+            session_regenerate_id(true);
+            $_SESSION['user_id']   = (int) ($demoUser['id'] ?? 0);
+            $_SESSION['username']  = (string) ($demoUser['username'] ?? '');
+            $_SESSION['role']      = (string) ($demoUser['role'] ?? 'user');
+            $_SESSION['name']      = (string) ($demoUser['name'] ?? '');
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
 //  Routing
 // ─────────────────────────────────────────────────────────────────────
 
@@ -251,6 +291,33 @@ try {
             ], JSON_UNESCAPED_UNICODE);
             break;
 
+        // ── POST /api/paypal-webhook → PayPal webhook handler ────
+        case $method === 'POST' && $uri === '/api/paypal-webhook':
+            $webhookPath = WASAPBOT_ROOT . '/public/api/paypal-webhook.php';
+            if (file_exists($webhookPath)) {
+                require $webhookPath;
+            } else {
+                http_response_code(503);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => false, 'error' => 'Webhook handler not available.'], JSON_UNESCAPED_UNICODE);
+            }
+            break;
+
+        // ── GET|POST /pago → payment page ──────────────────────
+        case ($method === 'GET' || $method === 'POST') && $uri === '/pago':
+            if (!botcasa_is_authenticated()) {
+                header('Location: login');
+                exit;
+            }
+            $pagoPath = WASAPBOT_ROOT . '/public/pago.php';
+            if (file_exists($pagoPath)) {
+                require $pagoPath;
+            } else {
+                http_response_code(503);
+                echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>503</title></head><body style="background:#080d17;color:#f0f3fa;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><div style="text-align:center"><h1 style="color:#f59e0b">503</h1><p>Página de pago no disponible.</p></div></body></html>';
+            }
+            break;
+
         // ── 404 fallback ───────────────────────────────────────
         default:
             http_response_code(404);
@@ -259,12 +326,14 @@ try {
                 'status'  => 'error',
                 'message' => 'Not found. Available: POST /webhook, GET /panel, GET /cliente, GET /login, GET /health, GET /info',
                 'routes'  => [
-                    'POST /webhook' => 'WAHA webhook handler',
-                    'GET  /panel'   => 'Admin panel',
-                    'GET  /cliente' => 'Client panel',
-                    'GET  /login'   => 'Login page',
-                    'GET  /health'  => 'Health check',
-                    'GET  /info'    => 'Bot info',
+                    'POST /webhook'             => 'WAHA webhook handler',
+                    'GET  /panel'               => 'Admin panel',
+                    'GET  /cliente'             => 'Client panel',
+                    'GET  /pago'                => 'Payment page',
+                    'GET  /login'               => 'Login page',
+                    'GET  /health'              => 'Health check',
+                    'GET  /info'                => 'Bot info',
+                    'POST /api/paypal-webhook'  => 'PayPal webhook',
                 ],
             ], JSON_UNESCAPED_UNICODE);
             break;

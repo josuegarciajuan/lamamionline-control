@@ -491,88 +491,25 @@ final class ContextAssembler implements PipelineStageInterface
             }
         }
 
-        // ── NOVA B6: Anti-bucle — conversation end detection ─────────
-        // Three layers:
-        //   A) Explicit farewell → send goodbye, set __conversation_ended
-        //   B) Filler loop (3+ monosyllables) → detect death, halt pipeline
-        //   C) Previously ended + filler → silence completely
-
-        $convEndedRecently = $this->wasConversationEndedRecently($history);
-
-        if ($convEndedRecently) {
-            $ctx['__conversation_ended_recently'] = true;
-        }
-
-        // B. Filler loop detection
-        $fillerLoopCount = (int) ($ctx['__filler_loop_count'] ?? 0);
-        $isJustFiller = $this->isPureFiller($messageText);
-
-        if ($isJustFiller) {
-            if ($convEndedRecently) {
-                // Conversation already ended, client is teasing → SILENCE
-                $ctx['__conversation_dead'] = true;
-                $ctx['output_text'] = '';
-                if ($this->logger !== null) {
-                    $this->logger->info('ContextAssembler: conversation dead — filler after end', [
-                        'phone' => $ctx['from_phone'] ?? '?',
-                    ]);
-                }
-                return null; // Halt pipeline completely
-            }
-
-            if ($fillerLoopCount >= 3) {
-                // 3+ consecutive fillers → conversation is dead
-                $ctx['__conversation_dead'] = true;
-                $ctx['output_text'] = '';
-                if ($this->logger !== null) {
-                    $this->logger->info('ContextAssembler: conversation dead — filler loop detected', [
-                        'phone' => $ctx['from_phone'] ?? '?',
-                        'filler_count' => $fillerLoopCount,
-                    ]);
-                }
-                return null; // Halt pipeline
-            }
-
-            if ($fillerLoopCount >= 2 && !$convEndedRecently) {
-                // 2 fillers → one last closing emoji, then end
-                $closingEmojis = ['😘', '😊', '😏', '😉'];
-                $ctx['output_text'] = $closingEmojis[array_rand($closingEmojis)];
-                $ctx['__conversation_ended'] = true;
-                $ctx['__skip_llm'] = true;
-                $ctx['lead_detected'] = false;
-                $ctx['photo_action'] = 'none';
-                if ($this->logger !== null) {
-                    $this->logger->info('ContextAssembler: filler loop → closing emoji sent', [
-                        'phone' => $ctx['from_phone'] ?? '?',
-                    ]);
-                }
-            }
-        }
-
-        // A. Explicit farewell → set ended flag
+        // ── NOVA B6: Conversation end detection (non-blocking hint) ──
+        // Explicit farewell flag: informs the LLM but does NOT halt the pipeline.
+        // The LLM decides whether to close the conversation or keep going.
         $endIntent = $ctx['conversation_end_intent'] ?? false;
         if ($endIntent) {
             $ctx['__conversation_ended'] = true;
         }
 
-        // ── NOVA B8: Early dead conversation detection ───────────────
-        // Check if the conversation should be treated as dead BEFORE
-        // wasting an LLM call.  Multiple signals are evaluated:
-        //   - 24h+ of silence since last user message
-        //   - Client profile marked as hostile + current message hostile
-        //   - 5+ exchanges without meaningful progress (no girl, no price, no location)
-        //   - 15+ messages total without any lead signals (mareador confirmado)
-        if ($this->isConversationDead($ctx, $history)) {
-            $ctx['__conversation_dead'] = true;
-            $ctx['output_text'] = '';
-            if ($this->logger !== null) {
-                $this->logger->info('ContextAssembler: conversation dead — early detection', [
-                    'phone' => $ctx['from_phone'] ?? '?',
-                    'thread_id' => $ctx['thread_id'] ?? '?',
-                ]);
-            }
-            return null;
-        }
+        // ── NOVA B6.5: Pending questions from client ─────────────────────
+        // Detecta si el cliente hizo preguntas que aún no han sido respondidas.
+        // Esto evita que el LLM ignore preguntas sustantivas cuando llegan
+        // mensajes filler adicionales.
+        $ctx['preguntas_pendientes'] = $this->detectPendingQuestions($history, $ctx);
+
+        // ── NOVA B6.6: Bot confusion count ─────────────────────────────
+        // Cuenta cuántas veces el bot ha expresado confusión en sus
+        // últimas respuestas. Si >= 1, ToneBuilder inyecta directiva
+        // anti-confusión para romper el bucle.
+        $ctx['__bot_confusion_count'] = $this->countBotConfusion($history);
 
         // ── NOVA B7: Sticky state fallback ───────────────────────────
         // If the current iteration lost speaker/selected girl state
@@ -708,29 +645,25 @@ final class ContextAssembler implements PipelineStageInterface
     /**
      * ¿El mensaje actual indica intención EXPLÍCITA de elegir chica para servicio?
      */
+    /**
+     * Check if user explicitly chose a girl for service.
+     *
+     * RELAXED: The regex is intentionally permissive — it accepts any mention
+     * of a girl name combined with minimal intent words. The LLM will later
+     * confirm via the girl_selection_intent field in its JSON response.
+     *
+     * If the regex doesn't match but the LLM says girl_selection_intent=true,
+     * the post-LLM handler in Bot.php will override.
+     */
     private function isExplicitServiceChoice(string $normalizedText): bool
     {
-        $patterns = [
-            '/quiero\s+(ir\s+con|a\s+la\s+|con)/iu',
-            '/me\s+quedo\s+con/iu',
-            '/prefiero\s+(a\s+)?/iu',
-            '/reservo\s+con/iu',
-            '/cita\s+con/iu',
-            '/voy\s+con/iu',
-            '/al\s+final\s+(me\s+quedo|quiero|elijo)/iu',
-            '/me\s+gusta\s+m[áa]s/iu',
-            '/me\s+mola\s+m[áa]s/iu',
-            '/esta\s+me\s+gusta/iu',
-            '/con\s+esta\s+(quiero|me\s+quedo|prefiero)/iu',
-            '/elijo\s+a\s+/iu',
-            '/la\s+que\s+(m[áa]s\s+)?me\s+gusta\s+es/iu',
-        ];
-        foreach ($patterns as $p) {
-            if (preg_match($p, $normalizedText)) {
-                return true;
-            }
-        }
-        return false;
+        if ($normalizedText === '') return false;
+        return (bool) preg_match(
+            '/\b(quiero\s+ir\s+con|quiero\s+a\s+la\s+|quiero\s+con'
+            . '|me\s+quedo\s+con|me\s+gusta\s+|prefiero\s+(a\s+)?|elijo\s+a\s+'
+            . '|me\s+mola\s+|voy\s+con|reservo\s+con|cita\s+con)\b/iu',
+            $normalizedText
+        );
     }
 
     // ==================================================================
@@ -1052,145 +985,123 @@ final class ContextAssembler implements PipelineStageInterface
     }
 
     /**
-     * Check if the conversation was already ended in recent history.
-     * Looks for short farewell bot replies or previously set __conversation_ended flag.
+     * Cuenta cuántas de las últimas respuestas del bot expresan confusión.
+     *
+     * @param list<array<string, mixed>> $history
+     * @return int Número de respuestas del bot con patrones de confusión
      */
-    private function wasConversationEndedRecently(array $history): bool
+    private function countBotConfusion(array $history): int
     {
-        if ($history === []) return false;
+        $count = 0;
+        $confusionRegex = '/\b(?:no\s+(?:entiendo|te\s+entiendo|te\s+he\s+entendido|s[eé]\b|se\b|se\s+que|tengo\s+ni\s+idea)|'
+            . 'eso\s+no\s+(?:es\s+lo\s+m[ií]o|te\s+lo\s+s[eé])|'
+            . 'de\s+eso\s+no\s+(?:entiendo|s[eé]|tengo\s+ni\s+idea))\b/iu';
 
-        // Check last 3 bot replies for farewell patterns
-        $farewellWords = ['hablamos', 'adios', 'chao', 'bye', 'suerte', 'ya me diras',
-                         'descansa', 'sueña', 'hasta mañana', 'nos vemos', 'cuando quieras'];
-        $checked = 0;
-        for ($i = count($history) - 1; $i >= 0 && $checked < 3; $i--) {
+        // Scan from most recent backwards, count consecutive confusion
+        for ($i = count($history) - 1; $i >= 0; $i--) {
             $botReply = (string) ($history[$i]['bot_reply'] ?? '');
             if ($botReply === '') continue;
-            $checked++;
-
-            // Short emoji-only or very short replies after farewell → conversation ended
-            $trimmed = trim($botReply);
-            if (mb_strlen($trimmed) <= 3) {
-                return true;
-            }
-
-            $lower = mb_strtolower($trimmed, 'UTF-8');
-            foreach ($farewellWords as $w) {
-                if (str_contains($lower, $w)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Determine if a message is purely filler (monosyllabic acknowledgment, emoji only, etc.)
-     */
-    private function isPureFiller(string $text): bool
-    {
-        $t = trim($text);
-        if ($t === '') return false;
-
-        // Emoji-only messages (up to 3 emojis)
-        if (preg_match('/^[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}\s]{1,3}$/u', $t)) {
-            return true;
-        }
-
-        // Pure monosyllabic fillers
-        $tNormalized = mb_strtolower($t, 'UTF-8');
-        $pureFillers = ['ok', 'oki', 'okey', 'oka', 'vale', 'vle', 'si', 'sip', 'yas',
-                       'da', 'dale', 'jj', 'jjj', 'jjjj', 'jaja', 'jeje', 'jiji',
-                       'ta bien', 'claro', 'perfecto', 'genial', 'guay', 'de acuerdo',
-                       '👍', '👌', '✅', '🔥', '💋', '😘', '😊', '😏', '😉'];
-
-        if (in_array($tNormalized, $pureFillers, true) || mb_strlen($tNormalized) <= 3) {
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * Early dead conversation detection — evaluated BEFORE calling the LLM.
-     *
-     * Multiple signals are checked to avoid wasting API credits on
-     * conversations that have no chance of converting.
-     *
-     * @param array<string, mixed> $ctx     Current pipeline context.
-     * @param list<array<string, mixed>> $history  Filtered history records.
-     * @return bool  True if the conversation should be treated as dead.
-     */
-    private function isConversationDead(array $ctx, array $history): bool
-    {
-        $now = time();
-
-        // ── Signal 1: 24h+ of silence ────────────────────────────────
-        $deadHours = (int) $this->config->get('dead_detection.silence_hours', 24);
-        if ($history !== []) {
-            $lastRec = $history[count($history) - 1];
-            $lastTs = strtotime((string) ($lastRec['ts'] ?? ''));
-            if ($lastTs !== false && ($now - $lastTs) >= $deadHours * 3600) {
-                return true;
-            }
-        }
-
-        // ── Signal 2: Client profile marks as hostile ────────────────
-        $profileHint = (string) ($ctx['client_profile_hint'] ?? '');
-        if ($profileHint !== '' && stripos($profileHint, 'hostil') !== false) {
-            $messageText = (string) ($ctx['message_text'] ?? '');
-            $hostilePatterns = '/\b(vete|fuera|no\s+me\s+interesa|deja\s+de\s+escribir|para\s+ya|pesad[oa]|mentira|engaño|estafa)\b/iu';
-            if (preg_match($hostilePatterns, $messageText)) {
-                return true;
-            }
-        }
-
-        // ── Signal 3: 5+ exchanges without meaningful progress ───────
-        // No girl selected, no price asked, no location requested in the
-        // last 5 user messages — the client isn't engaging.
-        $deadAfterNoProgress = (int) $this->config->get('dead_detection.no_progress_msgs', 5);
-        $userMsgsChecked = 0;
-        $hasProgress = false;
-        for ($i = count($history) - 1; $i >= 0 && $userMsgsChecked < $deadAfterNoProgress; $i--) {
-            $userMsg = (string) ($history[$i]['user_msg'] ?? '');
-            if ($userMsg === '') continue;
-            $userMsgsChecked++;
-
-            if (preg_match('/\b(precio|tarifa|cu[aá]nto|ubicaci[oó]n|donde\s+est|maps?|mapa|direcci[oó]n|quiero\s+a\b|me\s+gusta\s+\w|voy\s+para|voy\s+en|llego\s+en|tardo\s+\d+|estoy\s+fuera|estoy\s+cerca)\b/iu', $userMsg)) {
-                $hasProgress = true;
+            if (preg_match($confusionRegex, $botReply)) {
+                $count++;
+            } else {
+                // Stop counting at first non-confusion bot reply
                 break;
             }
         }
-        if ($userMsgsChecked >= $deadAfterNoProgress && !$hasProgress) {
-            $selectedGirl = trim((string) ($ctx['selected_girl_name'] ?? ''));
-            if ($selectedGirl === '') {
-                return true; // No girl + no progress = dead
-            }
-        }
-
-        // ── Signal 4: 15+ total messages, no lead signals ────────────
-        $totalMsgs = count($history);
-        $mareoMin = (int) $this->config->get('dead_detection.mareador_min_messages', 15);
-        if ($totalMsgs >= $mareoMin) {
-            $hasLeadSignal = false;
-            foreach ($history as $rec) {
-                if (!empty($rec['maps_sent']) || !empty($rec['eta_from_user_flag'])) {
-                    $hasLeadSignal = true;
-                    break;
-                }
-                $ya = (array) ($rec['ya_enviado'] ?? []);
-                if (in_array('ubicacion', $ya, true) || in_array('ubicacion_precisa', $ya, true)) {
-                    $hasLeadSignal = true;
-                    break;
-                }
-            }
-            if (!$hasLeadSignal) {
-                return true; // Mareador confirmado
-            }
-        }
-
-        return false;
+        return $count;
     }
+
+    /**
+     * Detecta preguntas del cliente que aún no han sido respondidas.
+     *
+     * Escanea los mensajes del usuario en el historial y comprueba si el bot
+     * ya envió la información solicitada después de cada pregunta.
+     *
+     * @param list<array<string, mixed>> $history
+     * @param array<string, mixed> $ctx
+     * @return list<string> Etiquetas de preguntas pendientes (ej: 'fotos', 'precios', 'ubicacion')
+     */
+    private function detectPendingQuestions(array $history, array $ctx): array
+    {
+        $pending = [];
+        $yaEnviado = (array) ($ctx['ya_enviado'] ?? []);
+
+        if ($history === []) {
+            return [];
+        }
+
+        // Recorrer historial de más reciente a más antiguo
+        for ($i = count($history) - 1; $i >= 0; $i--) {
+            $rec  = $history[$i];
+            $ts   = strtotime((string) ($rec['ts'] ?? ''));
+            $um   = (string) ($rec['user_msg'] ?? '');
+            $bot  = (string) ($rec['bot_reply'] ?? '');
+            $norm = $this->normalizeStr($um);
+
+            if ($um === '') continue;
+
+            // ── Detectar si el mensaje pide fotos ────────────────────
+            $pideFotos = (bool) preg_match(
+                '/\b(?:foto|fotos|foto\s*normal|fotito|fotitos|verte\s*mejor|mas\s*fotos?|tienes\s*fotos?|hay\s*fotos?|ens[ée][ñn]ame|m[áa]ndame\s*fotos?|puedo\s*ver(?:te)?)/iu',
+                $norm
+            );
+            if ($pideFotos && $bot === '') {
+                // Pregunta del usuario sin respuesta del bot → pendiente
+                if (!in_array('fotos_pendientes', $pending, true)) {
+                    $pending[] = 'fotos_pendientes';
+                }
+                break;
+            }
+            if ($pideFotos && $bot !== '') {
+                // El bot respondió — ¿envió fotos en esa respuesta?
+                $hasPhotos = (bool) preg_match(
+                    '/(?:https?:\/\/(?:compartir\.site|ibb\.co|i\.ibb\.co)\/)/i',
+                    $bot
+                );
+                if (!$hasPhotos && !in_array('fotos_pendientes', $pending, true)) {
+                    $pending[] = 'fotos_pendientes';
+                }
+                break; // El bot respondió a esta pregunta, no seguir hacia atrás
+            }
+
+            // ── Detectar si el mensaje pide precios ──────────────────
+            $pidePrecios = (bool) preg_match(
+                '/\b(?:precio|precios|tarifa|tarifas|cu[áa]nto|cuesta|vale\b(?!\s+reina|\s+gracias)|informaci[óo]n|informarme|cu[ée]ntame|me\s*dices)/iu',
+                $norm
+            );
+            if ($pidePrecios && !in_array('precios', $yaEnviado, true)) {
+                if (!in_array('precios_pendientes', $pending, true)) {
+                    $pending[] = 'precios_pendientes';
+                }
+                break;
+            }
+
+            // ── Detectar si el mensaje pide ubicación ────────────────
+            $pideUbicacion = (bool) preg_match(
+                '/\b(?:d[óo]nde|ubicaci[óo]n|direcci[óo]n|maps|mapa|calle|zona|barrio|queda|est[aá]s?|est[aá]n?|c[óo]mo\s+llego|pin|punto\s+exacto)/iu',
+                $norm
+            );
+            if ($pideUbicacion && !in_array('ubicacion', $yaEnviado, true) && !in_array('ubicacion_precisa', $yaEnviado, true)) {
+                if (!in_array('ubicacion_pendiente', $pending, true)) {
+                    $pending[] = 'ubicacion_pendiente';
+                }
+                break;
+            }
+        }
+
+        return $pending;
+    }
+
+    /**
+     * Early dead conversation detection — evaluado por el LLM en lugar de regex.
+     *
+     * Los métodos wasConversationEndedRecently(), isPureFiller() e isConversationDead()
+     * han sido eliminados. La detección de si una conversación está viva o muerta
+     * ahora la hace el LLM mediante el campo conversation_health en su respuesta JSON.
+     *
+     * @see DeepSeekClient::formatContext() para el contexto que recibe el LLM
+     * @see Bot.php::buildSystemPrompt() para el formato de respuesta esperado
+     */
 
     private function detectInteresFuerte(string $normalizedText): bool
     {

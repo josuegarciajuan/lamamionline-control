@@ -1754,3 +1754,12 @@
         padding: 10px 16px;
     }
 }
+
+/* ── Tooltip (chat sidebar header "?" bubble) ── */
+.tooltip-wrap .tooltip-box {
+    display: none;
+}
+.tooltip-wrap:hover .tooltip-box {
+    display: block;
+}
+/* Mobile: click toggle handled by JS (chat.js) */

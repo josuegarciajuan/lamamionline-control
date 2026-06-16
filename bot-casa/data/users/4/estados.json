@@ -1,0 +1,11 @@
+{
+    "enabled": 0,
+    "frecuencia_tipo": "x_veces_al_dia",
+    "frecuencia_valor": 8,
+    "hora_inicio": "12:12",
+    "hora_fin": "23:00",
+    "formato": "chica_del_dia",
+    "lineas": [],
+    "last_scheduled_run_at": null,
+    "log": []
+}

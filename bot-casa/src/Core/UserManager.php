@@ -65,9 +65,11 @@ final class UserManager
     /**
      * Crea un nuevo usuario.
      *
+     * @param bool $unlimited Si true, el usuario se crea sin restricciones monetarias (subscription_status = 'unlimited').
+     *                         Si false (por defecto), se inicia trial de 10 días.
      * @return array{ok: bool, user?: array, error?: string}
      */
-    public function createUser(string $username, string $password, string $role = 'user', string $name = ''): array
+    public function createUser(string $username, string $password, string $role = 'user', string $name = '', bool $unlimited = false): array
     {
         $username = trim($username);
         if ($username === '') {
@@ -97,14 +99,25 @@ final class UserManager
 
             $nextId = (int) ($data['next_id'] ?? 1);
 
+            $now = date('c');
+            $trialEnd = (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Madrid')))->modify('+10 days')->format('c');
+
             $user = [
                 'id' => $nextId,
                 'username' => $username,
                 'password_hash' => password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]),
                 'role' => $role,
                 'name' => $name !== '' ? $name : $username,
-                'created_at' => date('c'),
+                'created_at' => $now,
                 'active' => true,
+                // Subscription fields
+                'subscription_status' => ($unlimited || $role === 'admin') ? 'unlimited' : 'trial',
+                'trial_start' => ($unlimited || $role === 'admin') ? null : $now,
+                'trial_end' => ($unlimited || $role === 'admin') ? null : $trialEnd,
+                'subscription_start' => null,
+                'subscription_end' => null,
+                'subscription_type' => null,
+                'payments' => [],
             ];
 
             $data['users'][] = $user;
@@ -121,7 +134,9 @@ final class UserManager
     /**
      * Actualiza un usuario existente.
      *
-     * @param array<string, mixed> $fields Campos a actualizar (username, password, role, name, active)
+     * @param array<string, mixed> $fields Campos a actualizar (username, password, role, name, active,
+     *                                      subscription_status, trial_start, trial_end, subscription_start,
+     *                                      subscription_end, subscription_type, payments)
      * @return array{ok: bool, error?: string}
      */
     public function updateUser(int $id, array $fields): array
@@ -166,6 +181,29 @@ final class UserManager
 
                 if (isset($fields['active'])) {
                     $u['active'] = (bool) $fields['active'];
+                }
+
+                // ── Subscription fields ──
+                if (array_key_exists('subscription_status', $fields)) {
+                    $u['subscription_status'] = $fields['subscription_status'] !== null ? (string) $fields['subscription_status'] : null;
+                }
+                if (array_key_exists('trial_start', $fields)) {
+                    $u['trial_start'] = $fields['trial_start'] !== null ? (string) $fields['trial_start'] : null;
+                }
+                if (array_key_exists('trial_end', $fields)) {
+                    $u['trial_end'] = $fields['trial_end'] !== null ? (string) $fields['trial_end'] : null;
+                }
+                if (array_key_exists('subscription_start', $fields)) {
+                    $u['subscription_start'] = $fields['subscription_start'] !== null ? (string) $fields['subscription_start'] : null;
+                }
+                if (array_key_exists('subscription_end', $fields)) {
+                    $u['subscription_end'] = $fields['subscription_end'] !== null ? (string) $fields['subscription_end'] : null;
+                }
+                if (array_key_exists('subscription_type', $fields)) {
+                    $u['subscription_type'] = $fields['subscription_type'] !== null ? (string) $fields['subscription_type'] : null;
+                }
+                if (array_key_exists('payments', $fields)) {
+                    $u['payments'] = is_array($fields['payments']) ? $fields['payments'] : [];
                 }
 
                 break;
@@ -238,6 +276,10 @@ final class UserManager
      * Acquire an exclusive lock for the read-modify-write cycle.
      * Uses a dedicated .lock file to avoid race conditions.
      *
+     * Robust: handles permission issues where the lock file was created
+     * by another user (e.g., CLI as root). Since www-data owns the data/
+     * directory, it can unlink and recreate the file.
+     *
      * @return bool True if lock acquired
      */
     private function acquireLock(): bool
@@ -248,7 +290,14 @@ final class UserManager
             @mkdir($dir, 0700, true);
         }
 
-        $handle = @fopen($lockFile, 'w');
+        $handle = @fopen($lockFile, 'c+');
+        if ($handle === false) {
+            // Permission issue (e.g., file owned by root) — unlink and retry
+            @unlink($lockFile);
+            clearstatcache(true, $lockFile);
+            $handle = @fopen($lockFile, 'c+');
+        }
+
         if ($handle === false) {
             return false;
         }
@@ -368,6 +417,13 @@ final class UserManager
                     'name' => 'Administrador',
                     'created_at' => date('c'),
                     'active' => true,
+                    'subscription_status' => 'unlimited',
+                    'trial_start' => null,
+                    'trial_end' => null,
+                    'subscription_start' => null,
+                    'subscription_end' => null,
+                    'subscription_type' => null,
+                    'payments' => [],
                 ],
             ],
             'next_id' => 2,
@@ -385,6 +441,13 @@ final class UserManager
         $dir = dirname($this->usersFile);
         if (!is_dir($dir)) {
             @mkdir($dir, 0700, true);
+        }
+
+        // Ensure www-data can write even if file was created by another user (e.g. root CLI).
+        // Since $dir is owned by www-data, we can unlink and recreate.
+        if (file_exists($this->usersFile) && !is_writable($this->usersFile)) {
+            @unlink($this->usersFile);
+            clearstatcache(true, $this->usersFile);
         }
 
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

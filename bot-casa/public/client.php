@@ -35,6 +35,9 @@ if (!$isLoggedIn) { header('Location: login'); exit; }
 // ── Security headers ──
 header('X-Frame-Options: DENY');
 header('X-Content-Type-Options: nosniff');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: Thu, 01 Jan 1970 00:00:00 GMT');
 
 // ── Determine effective user ID ──
 // $clientUserId is set by index.php (for admin suplantar)
@@ -50,7 +53,16 @@ if ($clientUser === null || empty($clientUser['active'])) {
     exit;
 }
 
+// ── Subscription status ──
+$subManager = new \WasapBot\Core\SubscriptionManager($um);
+$subStatus = $subManager->getStatus($clientUserId);
+$subExpired = $subStatus['isExpired'];
+$subShowBanner = !in_array($subStatus['status'], ['unlimited', 'demo'], true);
+
 $clientName = h((string) ($clientUser['name'] ?? $clientUser['username'] ?? 'Usuario'));
+
+// ── Demo mode detection ──
+$isDemo = (($_SESSION['username'] ?? '') === 'demo');
 
 // ── Load user config ──
 $configDir = \WasapBot\Bot::resolveUserConfigDir(WASAPBOT_ROOT, $clientUserId);
@@ -65,11 +77,9 @@ if ($clientUserId > 1) {
             $config->set($key, \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $clientUserId, $val));
         }
     }
-    // Clear admin's personal data from dist template
-    $config->set('telegram.chat_ids', []);
-    $config->set('telegram.whatsapp_phones', '');
-    $config->set('telegram.alert_enabled', false);
-    $config->set('urls.google_maps_location', '');
+    // Note: Don't clear telegram/maps settings here — each user has their own
+    // config.local.json in data/users/{id}/. Clearing them destroys saved user data
+    // on every page load, which breaks the toggle_bot check and empties form fields.
 }
 
 // ── Helpers ──
@@ -111,11 +121,15 @@ function generateCsrfToken(): string {
 function validateCsrfToken(string $token): bool {
     $secret = getCsrfSecret();
     $userId = (int) ($_SESSION['user_id'] ?? 0);
-    $current = hash_hmac('sha256', $userId . '|' . date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
-    if (hash_equals($current, $token)) return true;
-    $prevSlot = max(0, floor((int) date('i') / 10) - 1);
-    $previous = hash_hmac('sha256', $userId . '|' . date('Y-m-d-H') . $prevSlot, $secret);
-    return hash_equals($previous, $token);
+    // Accept current slot + up to 5 previous 10-min windows (60 min total).
+    // Uses time() + offset so hour-day boundaries are handled correctly.
+    $now = time();
+    for ($offset = 0; $offset <= 5; $offset++) {
+        $t = $now - ($offset * 600);
+        $expected = hash_hmac('sha256', $userId . '|' . date('Y-m-d-H', $t) . (int) floor((int) date('i', $t) / 10), $secret);
+        if (hash_equals($expected, $token)) return true;
+    }
+    return false;
 }
 function requireValidCsrf(): void {
     $token = (string) ($_POST['csrf_token'] ?? '');
@@ -206,6 +220,20 @@ if (file_exists($linesMapPath)) {
         }
     }
 }
+// Fallback: count from user's lines.json if lines_map has no entries for this user
+if ($linesForUser <= 0) {
+    $userLinesFile = WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/lines.json';
+    if (file_exists($userLinesFile)) {
+        $userLines = @json_decode((string) @file_get_contents($userLinesFile), true);
+        if (is_array($userLines)) $linesForUser = count($userLines);
+    }
+}
+
+// ── Renewal price (based on line count) ──
+$extraLineCost = 25; // €/week per extra line
+$basePrice = 100;    // €/week base (1 line included)
+$extraLineCount = max($linesForUser - 1, 0);
+$renewalPrice = $basePrice + ($extraLineCount * $extraLineCost);
 
 // ─────────────────────────────────────────────────────────────────────
 //   Actions
@@ -215,9 +243,20 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $action = (string) ($_GET['action'] ?? '');
 $baseUrl = 'cliente';
 $notification = '';
+if (isset($_GET['toggled']) && $_GET['toggled'] === '1') {
+    $notification = '<div class="alert alert-success">✅ Bot ENCENDIDO. ¡A recibir clientes!</div>';
+}
+if (isset($_GET['toggled']) && $_GET['toggled'] === '0') {
+    $notification = '<div class="alert alert-success">✅ Bot APAGADO.</div>';
+}
+if (isset($_GET['saved'])) {
+    $notification = '<div class="alert alert-success">✅ Configuración guardada correctamente.</div>';
+}
 
 // ── Save config ──
 if ($method === 'POST' && $action === 'save_config') {
+    if ($isDemo) { $notification = '<div class="alert alert-warning">🔒 Modo demostración: los cambios no se guardan.</div>'; }
+    else {
     requireValidCsrf();
 
     // ── Allowed config keys (explicit allowlist) ──
@@ -245,18 +284,48 @@ if ($method === 'POST' && $action === 'save_config') {
         'telegram.whatsapp_phones',
         'telegram.alert_enabled',
         // Human delays (all subkeys)
-        'human_delays.seen.fallback_sec',
         'human_delays.seen.random_min_sec',
         'human_delays.seen.random_max_sec',
-        'human_delays.typing.fallback_sec',
         'human_delays.typing.chars_per_sec_min',
         'human_delays.typing.chars_per_sec_max',
+        'human_delays.typing.chunk_size',
+        'human_delays.typing.chunk_pause_factor',
+        'human_delays.typing.start_min_ms',
+        'human_delays.typing.start_max_ms',
+        'human_delays.typing.max_incoming_chars',
+        'human_delays.typing.clamp_max_ms',
         'human_delays.read.base_min_ms',
         'human_delays.read.base_max_ms',
+        'human_delays.read.per_char_ms',
+        'human_delays.read.clamp_min_ms',
+        'human_delays.read.clamp_max_ms',
         'human_delays.presend_sleep_sec',
         'human_delays.habituation.start_boost',
         'human_delays.habituation.decay',
         'human_delays.habituation.floor',
+        'human_delays.after_send_fallback_sec',
+        'human_delays.read.short_threshold_chars',
+        'human_delays.read.short_base_min_ms',
+        'human_delays.read.short_base_max_ms',
+        'human_delays.pace.enabled',
+        'human_delays.pace.min_factor',
+        'human_delays.pace.max_factor',
+        'human_delays.pace.reference_sec',
+        'human_delays.pace.steepness',
+        'human_delays.correction.enabled',
+        'human_delays.correction.probability',
+        'human_delays.correction.pause_min_ms',
+        'human_delays.correction.pause_max_ms',
+        'human_delays.pattern_variation.enabled',
+        'human_delays.pattern_variation.weight_standard',
+        'human_delays.pattern_variation.weight_skip_read',
+        'human_delays.pattern_variation.weight_read_first',
+        'human_delays.burst.enabled',
+        'human_delays.burst.window_sec',
+        'human_delays.burst.threshold_msgs',
+        'human_delays.burst.rapid_factor',
+        'human_delays.urgent.enabled',
+        'human_delays.urgent.factor',
         // Cron
         'cron.followup.enabled',
         'cron.followup.max_leads_per_run',
@@ -304,7 +373,9 @@ if ($method === 'POST' && $action === 'save_config') {
         $config->set($key, $value);
     }
     $config->save();
-    $notification = '<div class="alert alert-success">✅ Configuración guardada correctamente.</div>';
+    header('Location: cliente?saved=1');
+    exit;
+    } // end else (not demo)
 }
 
 // ── Config check for A6 (moved here — needed by toggle_bot and progress) ──
@@ -339,14 +410,31 @@ if (file_exists($gf)) {
     if (is_array($gd)) $girlsActiveCount = count(array_filter($gd['girls']??[], fn($g)=>!empty($g['activa'])));
 }
 
+// ── Demo mode: override stats with marketing-friendly numbers ──
+if ($isDemo) {
+    $leadsTotal = 312;
+    $leadsToday = 17;
+    $leadsArrived = 234;
+    $allThreads = array_fill(0, 847, true);
+    $todayThreads = array_fill(0, 42, true);
+    $linesForUser = 3;
+    $girlsActiveCount = 6;
+}
+
 // ── Toggle bot ──
 if ($method === 'POST' && $action === 'toggle_bot') {
+    if ($isDemo) { $notification = '<div class="alert alert-warning">🔒 Modo demostración: el bot no se puede encender ni apagar.</div>'; }
+    else {
     requireValidCsrf();
     $newMode = ($botMode === 'start') ? 'stop' : 'start';
 
     // A4: Block turning ON if not fully configured
     if ($newMode === 'start') {
         $errors = [];
+
+        // ── Subscription check ──
+        if ($subExpired) $errors[] = 'Tu acceso ha expirado. <a href="pago" style="color:var(--accent);font-weight:600">Activa tu plan →</a>';
+
         if ($linesForUser <= 0) $errors[] = 'No tienes ninguna línea WhatsApp vinculada. Ve a 📱 Líneas.';
         if (!$promptConfigured) $errors[] = 'No has configurado tus tarifas. Ve a 🎭 Personalidad.';
         // Check active girls
@@ -372,18 +460,22 @@ if ($method === 'POST' && $action === 'toggle_bot') {
             $dir = dirname($modeFilePath);
             if (!is_dir($dir)) @mkdir($dir, 0750, true);
             if (@file_put_contents($modeFilePath, $newMode, LOCK_EX) !== false) @chmod($modeFilePath, 0664);
-            $botMode = $newMode;
-            $botStatusClass = 'status-on'; $botStatusLabel = 'ENCENDIDO';
-            $notification = '<div class="alert alert-success">✅ Bot ENCENDIDO. ¡A recibir clientes!</div>';
+            // Mark that the bot has been turned on at least once
+            $everOnMarker = WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/.bot_has_been_on';
+            if (!file_exists($everOnMarker)) {
+                @file_put_contents($everOnMarker, date('c'), LOCK_EX);
+            }
+            header('Location: cliente?toggled=1');
+            exit;
         }
     } else {
         $dir = dirname($modeFilePath);
         if (!is_dir($dir)) @mkdir($dir, 0750, true);
         if (@file_put_contents($modeFilePath, $newMode, LOCK_EX) !== false) @chmod($modeFilePath, 0664);
-        $botMode = $newMode;
-        $botStatusClass = 'status-off'; $botStatusLabel = 'APAGADO';
-        $notification = '<div class="alert alert-success">✅ Bot APAGADO.</div>';
+        header('Location: cliente?toggled=0');
+        exit;
     }
+    } // end else (not demo)
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -392,149 +484,155 @@ if ($method === 'POST' && $action === 'toggle_bot') {
 
 $sectionKeys = ['rol', 'estilo', 'tarifas', 'servicios', 'ubicacion', 'instrucciones_fotos', 'identidad_chicas', 'seguridad', 'ejemplos', 'formato_respuesta'];
 
+// ── Detect if direct access (admin.casawasap.com) vs CRM embed (lamami.online) ──
+$isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== false);
+
 ?><!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<?php if ($isDirectAccess): ?>
+<meta name="theme-color" content="#f5f5f7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CasaWasap">
+<link rel="manifest" href="manifest.json?v=20260611_1">
+<link rel="apple-touch-icon" href="https://casawasap.com/img/hero-casawasap.png">
+<?php endif; ?>
 <title>bot-casa — <?php echo $clientName; ?></title>
-<link rel="stylesheet" href="assets/style.css?v=20260610_2">
-<link rel="stylesheet" href="assets/chat.css?v=20260610_2">
-<style>
-/* ── Client panel overrides / additions ── */
-.tooltip-icon {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 18px; height: 18px; border-radius: 50%;
-    background: var(--info); color: #fff; font-size: .7rem; font-weight: 700;
-    cursor: help; margin-left: 4px; line-height: 1;
-}
-.tooltip-box {
-    display: none; position: absolute; z-index: 100;
-    background: var(--panel); border: 1px solid var(--accent);
-    border-radius: var(--radius-sm); padding: 10px 12px;
-    font-size: .78rem; color: var(--text); max-width: 280px;
-    box-shadow: var(--shadow-md); line-height: 1.5;
-}
-.tooltip-wrap { position: relative; display: inline; }
-.tooltip-wrap:hover .tooltip-box, .tooltip-wrap:focus-within .tooltip-box { display: block; }
-
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 4px; }
-.stat-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 18px 20px;
-    text-align: center;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
-.stat-card .stat-num { font-size: 2rem; font-weight: 800; }
-.stat-card .stat-label { font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
-.stat-card .stat-sub { font-size: .7rem; color: rgba(255,255,255,.25); margin-top: 2px; }
-
-.config-checklist { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
-.checklist-item { display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: .8rem; }
-.checklist-item .check-icon { font-size: .9rem; }
-.check-ok { color: var(--ok); border-color: rgba(45,212,191,.25); }
-.check-warn { color: var(--warn); border-color: rgba(251,191,36,.25); }
-
-.section-guide {
-    background: var(--info-bg);
-    border: 1px solid rgba(124,92,255,0.2);
-    border-radius: var(--radius-sm);
-    padding: 12px 16px;
-    margin-bottom: 12px;
-    font-size: .82rem;
-    color: var(--info);
-}
-
-@media (max-width: 768px) {
-    .prompt-layout { flex-direction: column !important; }
-    .prompt-edit-col, .prompt-preview-col { flex: 1 1 100% !important; max-width: 100% !important; }
-    .prompt-preview-card { position: static !important; max-height: 50vh !important; }
-    .stats-grid { grid-template-columns: repeat(2, 1fr); }
-}
-
-/* ── Header value-prop ── */
-.header-brand { display: flex; flex-direction: column; }
-.header-tagline {
-    font-size: .75rem; color: var(--text-muted); margin-top: 2px;
-    font-weight: 400; opacity: .8; max-width: 360px; line-height: 1.4;
-}
-.header-pills { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.header-pill {
-    display: inline-flex; align-items: center; gap: 4px;
-    background: rgba(255,59,141,0.08); border: 1px solid rgba(255,59,141,0.15);
-    border-radius: var(--radius-pill); padding: 4px 12px;
-    font-size: .72rem; color: var(--accent-light);
-    white-space: nowrap; font-weight: 500;
-}
-
-/* ── Wizard polish ── */
-.wizard-hero {
-    width: 72px; height: 72px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    display: flex; align-items: center; justify-content: center;
-    margin: 0 auto 16px; font-size: 2rem;
-    animation: wizardPulse 2.5s infinite;
-    box-shadow: 0 0 30px rgba(255,59,141,0.3);
-}
-@keyframes wizardPulse {
-    0%, 100% { box-shadow: 0 0 30px rgba(255,59,141,0.3); }
-    50%      { box-shadow: 0 0 50px rgba(255,59,141,0.55); }
-}
-.wizard-step {
-    animation: wizardStepIn 0.4s cubic-bezier(0.16,1,0.3,1) both;
-}
-.wizard-step:nth-child(1) { animation-delay: 0.1s; }
-.wizard-step:nth-child(2) { animation-delay: 0.2s; }
-.wizard-step:nth-child(3) { animation-delay: 0.3s; }
-@keyframes wizardStepIn {
-    from { opacity: 0; transform: translateX(-12px); }
-    to   { opacity: 1; transform: translateX(0); }
-}
-
-/* ── Responsive header ── */
-@media (max-width: 768px) {
-    .header-pills { order: 3; width: 100%; }
-    .header-tagline { max-width: 100%; font-size: .7rem; }
-}
-</style>
+<link rel="stylesheet" href="assets/style.css?v=20260614_1">
+<link rel="stylesheet" href="assets/chat.css?v=20260614_1">
+<?php if ($isDirectAccess): ?>
+<script src="assets/pwa.js?v=20260613_1"></script>
+<?php endif; ?>
+<script>
+// ── Theme toggle ──
+(function() {
+    var saved = null;
+    try { saved = localStorage.getItem('botcasa_theme'); } catch(e) {}
+    if (saved === 'dark') document.body.classList.add('theme-dark');
+    document.addEventListener('DOMContentLoaded', function() {
+        var btn = document.getElementById('themeToggle');
+        if (!btn) return;
+        var isDark = document.body.classList.contains('theme-dark');
+        var iconLight = btn.querySelector('.theme-icon-light');
+        var iconDark = btn.querySelector('.theme-icon-dark');
+        if (iconLight) iconLight.style.display = isDark ? 'none' : 'inline';
+        if (iconDark) iconDark.style.display = isDark ? 'inline' : 'none';
+        btn.addEventListener('click', function() {
+            document.body.classList.toggle('theme-dark');
+            var nowDark = document.body.classList.contains('theme-dark');
+            try { localStorage.setItem('botcasa_theme', nowDark ? 'dark' : 'light'); } catch(e) {}
+            if (iconLight) iconLight.style.display = nowDark ? 'none' : 'inline';
+            if (iconDark) iconDark.style.display = nowDark ? 'inline' : 'none';
+        });
+    });
+})();
+</script>
 </head>
-<body>
+<body<?php echo $isDirectAccess ? ' class="app-client"' : ''; ?>>
 
 <div class="header-client">
     <div class="header-brand">
-        <div class="brand-icon">🏠</div>
+        <div class="brand-icon">CW</div>
         <div class="brand-text">
             <h1>CasaWasap<span>.com</span></h1>
             <span class="header-slogan">Deja de vivir pegado al WhatsApp</span>
         </div>
-    </div>
-    <div class="header-pills">
-        <span class="header-pill">🤖 IA Conversacional</span>
-        <span class="header-pill">💬 24 Horas</span>
-        <span class="header-pill">📊 Leads Automáticos</span>
     </div>
     <div class="header-user">
         <?php $userInitial = mb_substr($clientName, 0, 1); ?>
         <div class="user-avatar"><?php echo h($userInitial); ?></div>
         <span class="user-name"><?php echo $clientName; ?></span>
         <?php if (($_SESSION['role'] ?? '') === 'admin' && ($_SESSION['user_id'] ?? 0) !== $clientUserId): ?>
-        <span style="color:var(--warn);font-size:.78rem;font-weight:600;background:rgba(251,191,36,.2);padding:3px 10px;border-radius:var(--radius-pill)">👁 Suplantando</span>
+        <span class="suplantando-badge">👁 Suplantando</span>
         <?php endif; ?>
-        <form method="post" action="cliente?action=toggle_bot" style="display:inline">
+        <button id="themeToggle" class="btn btn-sm" title="Cambiar tema" type="button">
+            <span class="theme-icon-light">☀️</span>
+            <span class="theme-icon-dark" style="display:none">🌙</span>
+        </button>
+        <form method="post" action="cliente?action=toggle_bot" style="display:inline"<?php echo $isDemo ? ' onsubmit="showDemoToast(event)"' : ''; ?>>
             <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
-            <button type="submit" class="btn <?php echo $botMode === 'start' ? 'btn-danger' : 'btn-success'; ?> btn-sm">
+            <button type="submit" class="btn <?php echo $botMode === 'start' ? 'btn-danger' : 'btn-success'; ?> btn-sm"<?php echo ($isDemo || ($subExpired && $botMode !== 'start')) ? ' disabled' : ''; ?> title="<?php echo $subExpired ? 'Acceso expirado — activa tu plan para usar el bot' : ''; ?>">
                 <?php echo $botMode === 'start' ? '⏹ APAGAR' : '▶ ENCENDER'; ?>
             </button>
         </form>
-        <button onclick="window.location.reload()" class="btn btn-sm" title="Recargar panel">↻</button>
         <a href="logout" class="btn btn-sm">Salir</a>
     </div>
 </div>
 
 <?php echo $notification; ?>
+
+<?php if ($isDemo): ?>
+<div class="demo-banner">
+    <span class="demo-banner-icon">🔒</span>
+    <span class="demo-banner-text"><strong>Modo demostración</strong> — Solo lectura. Navega libremente por todas las pestañas para ver cómo funciona CasaWasap en producción real.</span>
+</div>
+<?php endif; ?>
+
+<?php if ($subShowBanner): ?>
+<?php
+    $bannerClass = '';
+    $bannerIcon = '';
+    $bannerTitle = '';
+    $bannerBody = '';
+    $bannerCta = '';
+    $bannerCtaUrl = '';
+
+    $cur = $subStatus['currentDay'];
+    $tot = $subStatus['totalDays'];
+    $left = $subStatus['daysLeft'];
+    $barPct = ($tot > 0) ? round($cur / $tot * 100) : 0;
+
+    if ($subStatus['status'] === 'trial') {
+        $bannerClass = 'sub-trial';
+        $bannerIcon = '🎁';
+        $bannerTitle = 'Prueba gratuita — Día ' . $cur . ' de ' . $tot;
+        $bannerBody = ($left <= 2 && $left > 0)
+            ? '⚠️ Tu prueba termina en ' . $left . ' día' . ($left > 1 ? 's' : '') . '. Activa tu plan para seguir usando el bot.'
+            : '';
+        $bannerCta = '<a href="pago" class="btn btn-sm" style="background:var(--accent);color:#fff;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:600">Pagar con PayPal — ' . $renewalPrice . '€/sem</a>';
+    } elseif ($subStatus['status'] === 'active') {
+        $bannerClass = 'sub-active';
+        $bannerIcon = '✅';
+        $bannerTitle = 'Plan semanal — Día ' . $cur . ' de ' . $tot;
+        $bannerBody = ($left <= 2 && $left > 0)
+            ? '⚠️ Tu plan vence en ' . $left . ' día' . ($left > 1 ? 's' : '') . '. Renueva para no perder el acceso.'
+            : '';
+        $bannerCta = '<a href="pago" class="btn btn-sm" style="background:var(--accent);color:#fff;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:600">Pagar con PayPal — ' . $renewalPrice . '€/sem</a>';
+    } elseif ($subStatus['status'] === 'expired') {
+        $bannerClass = 'sub-expired';
+        $bannerIcon = '🔴';
+        $bannerTitle = 'Acceso expirado';
+        $bannerBody = 'Tu periodo de acceso ha finalizado. Activa tu plan para seguir usando el bot.';
+        $bannerCta = '<a href="pago" class="btn btn-sm" style="background:var(--danger);color:#fff;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:600">Pagar con PayPal — ' . $renewalPrice . '€/sem</a>';
+        $barPct = 100; // full bar but red
+    }
+?>
+<div class="subscription-banner <?php echo $bannerClass; ?>">
+    <div class="sub-banner-left">
+        <span class="sub-icon"><?php echo $bannerIcon; ?></span>
+        <div class="sub-info">
+            <span class="sub-title"><?php echo $bannerTitle; ?></span>
+            <?php if ($bannerBody !== ''): ?>
+            <span class="sub-body"><?php echo $bannerBody; ?></span>
+            <?php endif; ?>
+        </div>
+    </div>
+    <div class="sub-banner-right">
+        <?php if ($tot > 0): ?>
+        <div class="sub-progress-mini">
+            <div class="sub-progress-track">
+                <div class="sub-progress-fill <?php echo $subStatus['status'] === 'expired' ? 'sub-progress-fill--danger' : ''; ?>" style="width:<?php echo $barPct; ?>%"></div>
+            </div>
+            <span class="sub-progress-label"><?php echo $cur; ?>/<?php echo $tot; ?> días</span>
+        </div>
+        <?php endif; ?>
+        <?php echo $bannerCta; ?>
+    </div>
+</div>
+<?php endif; ?>
 
 <?php
 // ── Progress indicator ──
@@ -542,25 +640,28 @@ $progressTotal = 4;
 $progressDone = 0;
 if ($linesForUser > 0) $progressDone++;
 if ($promptConfigured) $progressDone++;
+$botEverOnMarker = WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/.bot_has_been_on';
+$botEverOn = file_exists($botEverOnMarker);
 if (file_exists(WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/girls.json')) {
     $gd = @json_decode((string)@file_get_contents(WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/girls.json'), true);
     if (is_array($gd) && count(array_filter($gd['girls']??[], fn($g)=>!empty($g['activa']))) > 0) $progressDone++;
 }
-$configPath = WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/config.local.json';
-if (file_exists($configPath)) $progressDone++;
+if ($hasNotifications) $progressDone++;
 $progressPct = $progressDone > 0 ? round($progressDone / $progressTotal * 100) : 0;
-if ($progressPct < 100):
 ?>
-<div style="padding:0 20px;margin-bottom:8px">
-    <div style="display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--text-muted)">
+<div id="dashboard-progress">
+<?php if ($progressPct < 100): ?>
+<div class="progress-bar-wrap">
+    <div class="progress-bar">
         <span>⚙️ Configuración: <?php echo $progressDone; ?>/<?php echo $progressTotal; ?></span>
-        <div style="flex:1;background:var(--input-bg);border-radius:4px;height:6px;overflow:hidden">
-            <div style="background:linear-gradient(90deg,var(--accent),var(--ok));height:100%;width:<?php echo $progressPct; ?>%;border-radius:4px;transition:width .3s"></div>
+        <div class="progress-bar-track">
+            <div class="progress-bar-fill" style="width:<?php echo $progressPct; ?>%"></div>
         </div>
         <span><?php echo $progressPct; ?>%</span>
     </div>
 </div>
 <?php endif; ?>
+</div>
 
 <?php
 // ── Onboarding wizard (shown if progress < 25%) ──
@@ -610,27 +711,50 @@ function dismissWizard() {
     <button type="button" data-tab="tab-personalidad">🎭 Personalidad</button>
     <button type="button" data-tab="tab-lineas">📱 Líneas</button>
     <button type="button" data-tab="tab-chicas">👩 Chicas</button>
-    <button type="button" data-tab="tab-estados">📢 Estados</button>
     <button type="button" data-tab="tab-clientes">🔔 Notificaciones</button>
     <button type="button" data-tab="tab-mensajes">💬 Chat</button>
+    <button type="button" data-tab="tab-estados">📢 Estados</button>
     <button type="button" data-tab="tab-seguimiento">📨 Seguimiento</button>
+    <button type="button" data-tab="tab-learning">🧠 Aprendizaje</button>
     <button type="button" data-tab="tab-ajustes">⚙️ Ajustes</button>
     <button type="button" data-tab="tab-estadisticas">📈 Estadísticas</button>
 </div>
 
-<form method="post" action="cliente?action=save_config" class="main-form">
+<form method="post" action="cliente?action=save_config" class="main-form<?php echo $isDemo ? ' main-form--readonly' : ''; ?>"<?php echo $isDemo ? ' onsubmit="showDemoToast(event);return false"' : ''; ?>>
 <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
 <input type="hidden" name="active_tab" class="js-active-tab-input" value="tab-dashboard">
 
 <!-- ===== TAB: Dashboard ===== -->
 <div class="tab-content active" id="tab-dashboard">
-    <div class="card">
-        <h2>Estado de tu Bot</h2>
-        <div class="bot-status">
-            <span class="bot-indicator <?php echo $botStatusClass; ?>"></span>
-            <span class="bot-status-text"><?php echo h($botStatusLabel); ?></span>
+    <div id="dashboard-dynamic">
+    <div class="card bot-status-bar">
+    <span class="bot-emoji">🤖</span>
+    <span class="bot-label">Estado del Bot</span>
+    <span class="bot-indicator <?php echo $botStatusClass; ?>"></span>
+    <span class="bot-status-text"><?php echo h($botStatusLabel); ?></span>
+</div>
+
+    <?php if ($progressPct < 100): ?>
+    <div class="dashboard-hero">
+        <div class="dashboard-hero-inner">
+            <span class="dh-emoji">🚀</span>
+            <div class="dh-body">
+                <strong class="dh-title">Completa estos simples pasos para poner en marcha tu bot ya mismo</strong>
+                <p class="dh-desc">Muy fácil de usar. <strong>CasaWasap</strong>, tu asistente que te ayuda a comunicarte y fidelizar clientes.</p>
+            </div>
         </div>
     </div>
+    <?php else: ?>
+    <div class="dashboard-hero dashboard-hero--done">
+        <div class="dashboard-hero-inner">
+            <span class="dh-emoji">✅</span>
+            <div class="dh-body">
+                <strong class="dh-title">¡Todo listo! Has completado todos los pasos de configuración</strong>
+                <p class="dh-desc">Tu bot ya está en marcha. Si quieres modificar algo, vuelve a las pestañas de configuración cuando quieras.</p>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <?php
     // ── Setup cards data ──
@@ -692,11 +816,11 @@ function dismissWizard() {
         <?php endforeach; ?>
     </div>
 
-    <?php if ($progressPct >= 100): ?>
+    <?php if ($progressPct >= 100 && !$botEverOn): ?>
     <div class="setup-cta">
         <div class="cta-icon">🚀</div>
         <div class="cta-title">¡Todo listo!</div>
-        <div class="cta-sub">Enciende tu bot y empieza a recibir clientes automáticamente.</div>
+        <div class="cta-sub">Enciende tu bot con el botón ▶ ENCENDER de arriba y empieza a recibir clientes automáticamente.</div>
     </div>
     <?php endif; ?>
 
@@ -704,50 +828,60 @@ function dismissWizard() {
         <h2>Estadísticas</h2>
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-num" style="color:var(--info)"><?php echo count($allThreads); ?></div>
+                <div class="stat-num stat-num--info"><?php echo count($allThreads); ?></div>
                 <div class="stat-label">Conversaciones totales</div>
             </div>
             <div class="stat-card">
-                <div class="stat-num" style="color:var(--accent)"><?php echo count($todayThreads); ?></div>
+                <div class="stat-num stat-num--accent"><?php echo count($todayThreads); ?></div>
                 <div class="stat-label">Conversaciones hoy</div>
             </div>
             <div class="stat-card">
-                <div class="stat-num" style="color:var(--ok)"><?php echo $leadsTotal; ?></div>
+                <div class="stat-num stat-num--ok"><?php echo $leadsTotal; ?></div>
                 <div class="stat-label">Leads totales</div>
             </div>
             <div class="stat-card">
-                <div class="stat-num" style="color:var(--money)"><?php echo $leadsToday; ?></div>
+                <div class="stat-num stat-num--ok"><?php echo $leadsToday; ?></div>
                 <div class="stat-label">Leads hoy</div>
             </div>
             <div class="stat-card">
-                <div class="stat-num" style="color:var(--accent2)"><?php echo $linesForUser; ?></div>
+                <div class="stat-num stat-num--accent2"><?php echo $linesForUser; ?></div>
                 <div class="stat-label">Líneas WhatsApp</div>
                 <div class="stat-sub">Vinculadas al bot</div>
             </div>
             <?php ?>
             <div class="stat-card">
-                <div class="stat-num" style="color:#a78bfa"><?php echo $girlsActiveCount; ?></div>
+                <div class="stat-num stat-num--accent2"><?php echo $girlsActiveCount; ?></div>
                 <div class="stat-label">Chicas activas</div>
                 <div class="stat-sub">En catálogo</div>
             </div>
             <div class="stat-card">
-                <div class="stat-num" style="color:<?php echo $leadsTotal>0&&$leadsArrived>0?'var(--ok)':'var(--text-muted)'; ?>"><?php echo $leadsArrived??0; ?></div>
+                <div class="stat-num stat-num--ok"><?php echo $leadsArrived??0; ?></div>
                 <div class="stat-label">Clientes recibidos</div>
                 <div class="stat-sub">Marcados como llegados</div>
             </div>
             <div class="stat-card">
-                <div class="stat-num" style="color:#f97316"><?php echo count($allThreads)>0 ? round(count($allThreads)/max($leadsTotal,1),1) : 0; ?></div>
+                <div class="stat-num stat-num--warn"><?php echo count($allThreads)>0 ? round(count($allThreads)/max($leadsTotal,1),1) : 0; ?></div>
                 <div class="stat-label">Ratio conv/lead</div>
                 <div class="stat-sub">Conversaciones por lead</div>
             </div>
         </div>
+    </div>
+    </div>
+
+    <div class="stats-more-link">
+        <span>📈</span>
+        <span>¿Quieres ver estadísticas más detalladas? Visita la pestaña <a href="#" onclick="event.preventDefault();switchTab('tab-estadisticas')">Estadísticas</a> con gráficos completos de rendimiento.</span>
     </div>
 </div>
 
 <!-- ===== TAB: Personalidad ===== -->
 <div class="tab-content" id="tab-personalidad">
     <div class="section-guide">
-        💡 <strong>Consejo:</strong> Cuanto más detallada sea la configuración, mejor responderá tu bot. Tómate tu tiempo para rellenar cada sección. Usa el botón 🔄 para restaurar valores de fábrica si te lías.
+        <span class="section-guide-icon">💡</span>
+        <div class="section-guide-body">
+            <strong>Define la personalidad de tu bot</strong>
+            <span>Cuanto más detallada sea la configuración, mejor responderá. Tómate tu tiempo para rellenar cada sección. Usa 🔄 para restaurar valores de fábrica si te lías.</span>
+        </div>
     </div>
 
     <div class="prompt-layout">
@@ -839,14 +973,14 @@ function dismissWizard() {
             <!-- Tarifas (A11: accordion + bigger) -->
             <details class="prompt-details" open>
                 <summary class="prompt-summary">💰 Tarifas y precios</summary>
-                <div style="padding:12px;border-top:1px solid var(--border)">
-                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:8px">
+                <div class="detail-body">
+                <p class="form-hint">
                     Escribe tus tarifas en lenguaje natural. Ejemplo: "30€ rapidito 10 min, 50€ media hora, 100€ 1 hora completo"
                 </p>
                 <textarea name="prompt[sections][tarifas]" class="code-area" style="width:100%;min-height:180px" spellcheck="false" oninput="buildPreview()"><?php echo cv('prompt.sections.tarifas'); ?></textarea>
-                <div style="margin-top:8px;display:flex;gap:6px">
+                <div class="form-actions">
                     <button type="submit" class="btn btn-primary btn-sm">💾 Guardar tarifas</button>
-                    <button type="button" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted)" 
+                    <button type="button" class="btn btn-sm" class="btn-ghost" 
                         onclick="if(confirm('¿Restaurar tarifas por defecto?'))resetField('prompt\\[sections\\]\\[tarifas\\]','30€ = rapidito 10 min\\n50€ = media hora completo\\n100€ = 1 hora completo')">🔄 Restaurar</button>
                 </div>
                 </div>
@@ -855,15 +989,15 @@ function dismissWizard() {
             <!-- Anti-regateo (A12) -->
             <details class="prompt-details">
                 <summary class="prompt-summary">🛡️ Anti-regateo</summary>
-                <div style="padding:12px;border-top:1px solid var(--border)">
-                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:8px">Cómo reacciona el bot cuando un cliente intenta negociar el precio.</p>
+                <div class="detail-body">
+                <p class="form-hint">Cómo reacciona el bot cuando un cliente intenta negociar el precio.</p>
                 <label class="checkbox-label" style="margin-bottom:8px">
                     <input type="hidden" name="prompt[sections][no_regateo]" value="0">
                     <input type="checkbox" name="prompt[sections][no_regateo]" value="1" <?php echo checked((bool)$config->get('prompt.sections.no_regateo',false)); ?> onchange="buildPreview()"> No aceptar regateo de ningún tipo
                 </label>
-                <div class="form-group"><label>1er regateo <span style="color:var(--text-muted);font-weight:400">— primera vez que negocian</span></label><input type="text" name="prompt[sections][regateo_1]" value="<?php echo cv('prompt.sections.regateo_1','precio fijo cari, por eso la calidad es buena 😏'); ?>" placeholder="Respuesta al primer regateo"></div>
-                <div class="form-group"><label>2º regateo <span style="color:var(--text-muted);font-weight:400">— si insisten</span></label><input type="text" name="prompt[sections][regateo_2]" value="<?php echo cv('prompt.sections.regateo_2','no puedo bajar mas amor, son los precios que tengo'); ?>" placeholder="Respuesta si insiste"></div>
-                <div class="form-group"><label>3er regateo <span style="color:var(--text-muted);font-weight:400">— corte final</span></label><input type="text" name="prompt[sections][regateo_3]" value="<?php echo cv('prompt.sections.regateo_3','si buscas mas barato no soy yo, suerte 😘'); ?>" placeholder="Respuesta final"></div>
+                <div class="form-group"><label>1er regateo <span class="label-muted">— primera vez que negocian</span></label><input type="text" name="prompt[sections][regateo_1]" value="<?php echo cv('prompt.sections.regateo_1','precio fijo cari, por eso la calidad es buena 😏'); ?>" placeholder="Respuesta al primer regateo"></div>
+                <div class="form-group"><label>2º regateo <span class="label-muted">— si insisten</span></label><input type="text" name="prompt[sections][regateo_2]" value="<?php echo cv('prompt.sections.regateo_2','no puedo bajar mas amor, son los precios que tengo'); ?>" placeholder="Respuesta si insiste"></div>
+                <div class="form-group"><label>3er regateo <span class="label-muted">— corte final</span></label><input type="text" name="prompt[sections][regateo_3]" value="<?php echo cv('prompt.sections.regateo_3','si buscas mas barato no soy yo, suerte 😘'); ?>" placeholder="Respuesta final"></div>
                 <button type="submit" class="btn btn-primary btn-sm" style="margin-top:6px">💾 Guardar anti-regateo</button>
                 </div>
             </details>
@@ -871,13 +1005,13 @@ function dismissWizard() {
             <!-- Ubicación (A13: simplificado) -->
             <details class="prompt-details">
                 <summary class="prompt-summary">📍 Ubicación</summary>
-                <div style="padding:12px;border-top:1px solid var(--border)">
+                <div class="detail-body">
                 <div class="form-row">
-                    <div class="form-group" style="flex:2">
+                    <div class="form-group form-group--wide" style">
                         <label>Zona / ciudad</label>
                         <input type="text" name="prompt[sections][zona]" value="<?php echo cv('prompt.sections.zona'); ?>" placeholder="Ej: Madrid centro, zona tranquila" oninput="buildPreview()">
                     </div>
-                    <div class="form-group" style="flex:1">
+                    <div class="form-group form-group--narrow"
                         <label>Enlace Google Maps</label>
                         <input type="url" name="urls[google_maps_location]" value="<?php echo cv('urls.google_maps_location'); ?>" placeholder="https://maps.app.goo.gl/... (pega aquí tu enlace de Google Maps)">
                     </div>
@@ -899,12 +1033,12 @@ function dismissWizard() {
             <!-- Servicios (A11: accordion + bigger) -->
             <details class="prompt-details">
                 <summary class="prompt-summary">🛏️ Servicios</summary>
-                <div style="padding:12px;border-top:1px solid var(--border)">
+                <div class="detail-body">
                 <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:6px">Describe los servicios disponibles. El bot usará esta información cuando le pregunten.</p>
                 <textarea name="prompt[sections][servicios]" class="code-area" style="width:100%;min-height:150px" spellcheck="false" oninput="buildPreview()"><?php echo cv('prompt.sections.servicios'); ?></textarea>
                 <div style="margin-top:6px;display:flex;gap:6px">
                     <button type="submit" class="btn btn-primary btn-sm">💾 Guardar servicios</button>
-                    <button type="button" class="btn btn-sm" style="background:var(--input-bg);color:var(--text-muted)"
+                    <button type="button" class="btn btn-sm" class="btn-ghost"
                         onclick="if(confirm('¿Restaurar servicios por defecto?'))resetField('prompt\\[sections\\]\\[servicios\\]','Servicio completo con preservativo.\\nFrancés natural solo en tarifa de 1h si el cliente lo pide.\\nGriego solo si el cliente pregunta expresamente.\\nNo salidas a domicilio.')">🔄 Restaurar</button>
                 </div>
                 </div>
@@ -913,7 +1047,7 @@ function dismissWizard() {
             <!-- Ofertas (A14: simplificado) -->
             <details class="prompt-details">
                 <summary class="prompt-summary">🎁 Ofertas especiales (opcional)</summary>
-                <div style="padding:12px;border-top:1px solid var(--border)">
+                <div class="detail-body">
                 <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:6px">Describe ofertas o promociones temporales. El bot las mencionará cuando sea relevante para la conversación.</p>
                 <textarea name="prompt[sections][ofertas]" class="code-area" style="width:100%;min-height:100px" spellcheck="false" oninput="buildPreview()"><?php echo cv('prompt.sections.ofertas'); ?></textarea>
                 <button type="submit" class="btn btn-primary btn-sm" style="margin-top:6px">💾 Guardar ofertas</button>
@@ -925,11 +1059,11 @@ function dismissWizard() {
         <div class="prompt-preview-col">
             <div class="card prompt-preview-card">
                 <h2>🧠 Configuración actual</h2>
-                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:8px">
+                <p class="form-hint">
                     Resumen de cómo está configurado tu bot ahora mismo.
                 </p>
-                <div id="prompt-summary" style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 10px;font-size:.82rem;line-height:1.5;color:var(--text);max-height:60vh;overflow-y:auto">
-                    <div style="color:var(--text-muted);text-align:center;padding:12px 0;font-size:.8rem">⏳ Cargando resumen...</div>
+                <div id="prompt-summary">
+                    <div class="empty-state" style="font-size:.8rem">⏳ Cargando resumen...</div>
                 </div>
                 <div id="prompt-stats" class="prompt-stats"></div>
             </div>
@@ -946,16 +1080,38 @@ function dismissWizard() {
             </span>
         </h2>
         <div class="section-guide">
-            📱 <strong>Cada línea es un número de WhatsApp que conectas al bot.</strong> Cuando alguien 
-            escriba a ese número, el bot contestará automáticamente. Puedes tener varios números 
-            —por ejemplo, uno distinto para cada zona o anuncio— y el bot los atenderá todos.
+            <span class="section-guide-icon">📱</span>
+            <div class="section-guide-body">
+                <strong>Cada línea es un número de WhatsApp que conectas al bot</strong>
+                <span>Cuando alguien escriba a ese número, el bot contestará automáticamente. Puedes tener varios números y el bot los atenderá todos.</span>
+            </div>
         </div>
 
+        <?php if ($subStatus['status'] === 'trial'): ?>
+        <div class="trial-limit-notice">
+            <span>🔒</span>
+            <span><strong>Modo prueba gratuita:</strong> 1 línea incluida. Para añadir más líneas, <a href="pago" style="color:var(--accent);font-weight:600">activa el plan de pago →</a></span>
+        </div>
+        <?php elseif ($subStatus['status'] === 'active'): ?>
+        <div class="trial-limit-notice" style="background:linear-gradient(135deg, rgba(5,150,105,0.08), rgba(5,150,105,0.04));border-color:rgba(5,150,105,0.2)">
+            <span>💡</span>
+            <span>Cada línea extra: <strong>+<?php echo $extraLineCost; ?>€/semana</strong>. 
+            <?php if ($extraLineCount > 0): ?>
+            Tienes <?php echo $linesForUser; ?> línea<?php echo $linesForUser > 1 ? 's' : ''; ?> → tu renovación: <strong><?php echo $renewalPrice; ?>€/sem</strong>.
+            <?php else: ?>
+            Tu renovación: <strong><?php echo $renewalPrice; ?>€/sem</strong>.
+            <?php endif; ?>
+            ¿Muchas líneas? <a href="pago" style="color:var(--accent);font-weight:600">Borra las que no uses antes de pagar →</a></span>
+        </div>
+        <?php endif; ?>
+
+        <?php $trialAndHasLine = ($subStatus['status'] === 'trial' && $linesForUser >= 1); ?>
+        <?php if (!$trialAndHasLine): ?>
         <!-- Add form -->
-        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:20px">
+        <div class="form-section">
             <h3 style="margin-bottom:10px">➕ Añadir línea</h3>
-            <p style="color:var(--text-muted);font-size:.75rem;margin-bottom:10px">Al crear una línea, recibirás un código QR. Escanéalo con tu móvil desde WhatsApp → Ajustes → Vincular dispositivo para que el bot pueda usar ese número.</p>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+            <p style="color:var(--text-muted);font-size:.75rem;margin-bottom:10px">Al crear una línea, aparecerá un botón <strong>QR</strong> en la tabla. Púlsalo para ver el código QR. Debes escanearlo <strong>rápido (antes de 1-2 minutos)</strong> desde tu WhatsApp → Ajustes → Vincular dispositivo.</p>
+            <div class="form-row-end">
                 <div style="flex:2;min-width:160px">
                     <label style="font-size:.78rem;color:var(--text-muted)">Número de teléfono</label>
                     <input type="text" id="new-line-phone" placeholder="Ej: 612345678" style="width:100%">
@@ -970,34 +1126,35 @@ function dismissWizard() {
             </div>
             <div id="add-line-status" style="margin-top:6px;font-size:.78rem;color:var(--text-muted)"></div>
         </div>
+        <?php endif; ?>
 
         <!-- Lines table -->
         <div id="lines-container">
-            <p style="color:var(--text-muted);text-align:center;padding:20px">No hay líneas configuradas.</p>
+            <p class="empty-state">No hay líneas configuradas.</p>
         </div>
 
         <!-- QR modal (hidden) -->
-        <div id="qr-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;align-items:center;justify-content:center">
-            <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);padding:24px;max-width:400px;text-align:center">
+        <div id="qr-modal" class="modal-backdrop">
+            <div class="modal-panel">
                 <h3>📱 Escanea el QR</h3>
-                <p style="color:var(--text-muted);font-size:.82rem;margin:8px 0">Abre WhatsApp → Ajustes → Vincular dispositivo</p>
-                <p style="color:var(--danger);font-size:.75rem;margin:4px 0">⚠️ El QR caduca en 30-60 segundos. Ten el móvil listo.</p>
-                <img id="qr-image" src="" style="max-width:280px;border-radius:8px;margin:12px auto" alt="QR Code">
-                <div id="qr-status" style="margin-top:8px;font-size:.85rem"></div>
-                <button type="button" class="btn btn-sm btn-primary" style="margin-top:4px" onclick="regenerateQR()">🔄 Regenerar QR</button>
-                <button type="button" class="btn btn-sm" style="margin-top:4px;background:var(--input-bg);color:var(--text-muted)" onclick="document.getElementById('qr-modal').style.display='none'">Cerrar</button>
+                <p class="modal-hint">Abre WhatsApp → Ajustes → Vincular dispositivo</p>
+                <p class="modal-warn">⚠️ El QR caduca rápido. Si al escanear desde WhatsApp → Dispositivos vinculados te da error, probablemente ha caducado. Regenera el QR y escanea de nuevo.</p>
+                <img id="qr-image" src="" class="modal-img" alt="QR Code">
+                <div id="qr-status" class="modal-status"></div>
+                <button type="button" class="btn btn-sm btn-primary" onclick="regenerateQR()">🔄 Regenerar QR</button>
+                <button type="button" class="btn btn-sm btn-ghost" onclick="document.getElementById('qr-modal').classList.remove('open')">Cerrar</button>
             </div>
         </div>
 
         <!-- Test modal -->
-        <div id="test-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;align-items:center;justify-content:center">
-            <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);padding:24px;max-width:400px;text-align:center">
+        <div id="test-modal" class="modal-backdrop">
+            <div class="modal-panel">
                 <h3>📤 Enviar mensaje de prueba</h3>
-                <input type="text" id="test-phone" placeholder="Ej: 666555444 (formato español)" style="width:100%;margin:12px 0">
+                <input type="text" id="test-phone" placeholder="Ej: 666555444 (formato español)" class="modal-input">
                 <input type="hidden" id="test-line-id">
                 <button type="button" class="btn btn-primary" onclick="sendTestMessage()">Enviar prueba</button>
-                <button type="button" class="btn btn-sm" style="margin-top:8px;background:var(--input-bg);color:var(--text-muted)" onclick="document.getElementById('test-modal').style.display='none'">Cancelar</button>
-                <div id="test-result" style="margin-top:8px;font-size:.82rem"></div>
+                <button type="button" class="btn btn-sm btn-ghost" style="margin-top:8px" onclick="document.getElementById('test-modal').classList.remove('open')">Cancelar</button>
+                <div id="test-result" class="modal-result"></div>
             </div>
         </div>
     </div>
@@ -1013,10 +1170,11 @@ function dismissWizard() {
         </h2>
 
         <div class="section-guide">
-            👩 <strong>Tu catálogo de chicas.</strong> Añade su nombre, una breve descripción y hasta 
-            4 fotos. Puedes activarlas o desactivarlas cuando quieras —las chicas inactivas no 
-            aparecerán. El bot conoce los datos de cada una: cuando un cliente pregunta por una 
-            chica en concreto, sabe qué decir y qué fotos enviar.
+            <span class="section-guide-icon">👩</span>
+            <div class="section-guide-body">
+                <strong>Tu catálogo de chicas</strong>
+                <span>Añade su nombre, una breve descripción y hasta 4 fotos. Puedes activarlas o desactivarlas cuando quieras —las chicas inactivas no aparecerán.</span>
+            </div>
         </div>
 
         <!-- Add/edit form -->
@@ -1024,11 +1182,11 @@ function dismissWizard() {
             <h3 id="girl-form-title" style="margin-bottom:10px">➕ Nueva chica</h3>
             <input type="hidden" id="girl-edit-id">
             <div class="form-row">
-                <div class="form-group" style="flex:1;min-width:140px">
+                <div class="form-group form-group--narrow" style="min-width:140px">
                     <label>Nombre *</label>
                     <input type="text" id="girl-nombre" placeholder="Ej: Sandra" style="width:100%">
                 </div>
-                <div class="form-group" style="flex:2;min-width:250px">
+                <div class="form-group form-group--wide" style;min-width:250px">
                     <label>Descripción</label>
                     <textarea id="girl-desc" rows="3" placeholder="Ej: Morena, 25 años, cariñosa, simpática..." style="width:100%;min-height:60px"></textarea>
                 </div>
@@ -1050,7 +1208,7 @@ function dismissWizard() {
 
         <!-- Girls list -->
         <div id="girls-container">
-            <p style="color:var(--text-muted);text-align:center;padding:20px">Cargando chicas...</p>
+            <p class="empty-state">Cargando chicas...</p>
         </div>
     </div>
 </div>
@@ -1064,17 +1222,19 @@ function dismissWizard() {
             </span>
         </h2>
         <div class="section-guide">
-            📢 <strong>¿Cómo funciona?</strong> El bot crea y publica estados de WhatsApp automáticamente según la frecuencia que configures. 
-            Los estados se generan con las chicas que tengas activas en la pestaña 👩 Chicas. Si no hay chicas activas, no se publicará nada.
-            Puedes elegir entre varios formatos (catálogo completo, chica del día, dúo, etc.) y el bot los irá alternando.
+            <span class="section-guide-icon">📢</span>
+            <div class="section-guide-body">
+                <strong>El bot publica estados automáticamente</strong>
+                <span>Los estados se generan con las chicas activas de 👩 Chicas. Si no hay chicas activas, no se publicará nada. El bot alterna entre varios formatos.</span>
+            </div>
         </div>
 
         <!-- Config form -->
-        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;margin-bottom:20px">
+        <div class="form-section">
             <!-- ON/OFF + Save -->
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
                 <label class="checkbox-label" style="font-size:.9rem"><input type="checkbox" id="estados-enabled" onchange="saveEstadosConfig()"> Activar publicador de estados</label>
-                <span style="flex:1"></span>
+                <span class="form-spacer"></span>
                 <button type="button" class="btn btn-primary btn-sm" onclick="saveEstadosConfig()">💾 Guardar configuración</button>
                 <button type="button" class="btn btn-success btn-sm" onclick="publishEstado()">📢 Publicar ahora</button>
             </div>
@@ -1087,18 +1247,45 @@ function dismissWizard() {
                         <option value="x_veces_al_dia">X veces al día</option>
                     </select>
                 </div>
-                <div class="form-group" style="max-width:70px">
+                <div class="form-group form-group--pin">
                     <label>Cada</label>
                     <input type="number" id="estados-freq-valor" value="6" min="1" max="24" onchange="saveEstadosConfig()">
                 </div>
                 <div class="form-group">
                     <label>Formato</label>
                     <select id="estados-formato" onchange="saveEstadosConfig()">
-                        <option value="mix_aleatorio">🎲 Aleatorio (recomendado)</option>
-                        <option value="chicas_de_hoy">Todas las chicas, 1 foto</option>
-                        <option value="chica_del_dia">1 chica aleatoria, 2 fotos</option>
-                        <option value="duo_sexy">2 chicas, 1 foto c/u</option>
-                        <option value="catalogo_rapido">Solo nombres</option>
+                        <option value="mix_aleatorio">🎲 Mix aleatorio (recomendado)</option>
+                        <optgroup label="── Individual (1 chica) ──">
+                            <option value="chica_del_dia">🔥 Chica del día (1 + 2 fotos)</option>
+                            <option value="tentacion_del_dia">🍎 Tentación del día (1 + 2 fotos)</option>
+                            <option value="dulce_prohibido">🍭 Dulce prohibido (1 + 2 fotos)</option>
+                            <option value="ven_ya">⏳ Ven ya (1 urgente + 2 fotos)</option>
+                            <option value="susurro">🤫 Al oído (1 íntima + 2 fotos)</option>
+                            <option value="confesion">🌙 Confesión nocturna (1 + 2 fotos)</option>
+                            <option value="frase_del_dia">💬 Frase del día (1 + frase pícara)</option>
+                            <option value="solo_valientes">💪 Solo para valientes (1 + desafío)</option>
+                            <option value="cita_a_ciegas">🕶️ Cita a ciegas (1 + misterio, sin foto)</option>
+                            <option value="regalo_sorpresa">🎁 Regalo sorpresa (1 + tono regalo)</option>
+                            <option value="amiga_recomienda">🗣️ Amiga recomienda (1 + curiosidad)</option>
+                            <option value="la_nueva">🆕 Te está esperando (1 + directo)</option>
+                        </optgroup>
+                        <optgroup label="── Varias chicas ──">
+                            <option value="chicas_de_hoy">👯‍♀️ Chicas de hoy (todas + 1 foto c/u)</option>
+                            <option value="duo_sexy">💋 Dúo sexy (2 + 1 foto c/u)</option>
+                            <option value="estrella_grupo">⭐ Estrella + grupo (1 destacada + resto)</option>
+                            <option value="trio_tentador">👯 Triple tentación (3 + 1 foto c/u)</option>
+                            <option value="puertas_abiertas">🚪 Puertas abiertas (todas, bienvenida)</option>
+                            <option value="antojos">🍒 Antojos (todas, estilo menú)</option>
+                            <option value="el_equipo">💪 El equipazo (todas, alineación)</option>
+                            <option value="frescas">🌸 Recién llegaditas (todas, frescas)</option>
+                            <option value="catalogo_rapido">📋 Catálogo rápido (solo nombres)</option>
+                            <option value="juego_parejas">🎭 Juego de parejas (2 + química)</option>
+                            <option value="el_casting">🎬 El casting (todas + tú eres el juez)</option>
+                            <option value="modo_finde">🍾 Modo finde (todas + festivo)</option>
+                        </optgroup>
+                        <optgroup label="── Especial ──">
+                            <option value="oferta_flash">⚡ Ahora o nunca (1+ chicas + urgencia)</option>
+                        </optgroup>
                     </select>
                 </div>
             </div>
@@ -1107,13 +1294,13 @@ function dismissWizard() {
                 <div class="form-group"><label>Horario fin</label><input type="time" id="estados-hora-fin" value="23:00" onchange="saveEstadosConfig()"></div>
             </div>
             <div id="estados-lines-checkboxes" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px"></div>
-            <div id="estados-status" style="margin-top:8px;font-size:.82rem;color:var(--text-muted)"></div>
+            <div id="estados-status" class="status-msg"></div>
         </div>
 
         <!-- History -->
         <h3>📋 Historial de publicaciones</h3>
-        <div id="estados-history" style="margin-top:8px">
-            <p style="color:var(--text-muted);text-align:center;padding:10px">No hay publicaciones todavía.</p>
+        <div id="estados-history" class="status-msg">
+            <p class="empty-state" style="padding:10px">No hay publicaciones todavía.</p>
         </div>
     </div>
 </div>
@@ -1128,32 +1315,35 @@ function dismissWizard() {
         </h2>
 
         <div class="section-guide">
-            👥 <strong>El bot te avisa cuando detecta un cliente en camino.</strong> 
-            Cuando alguien pregunta tarifas, ubicación y da una hora aproximada, el bot 
-            lo marca como lead y te notifica al instante para que estés preparado.
-            Tú eliges dónde recibir esos avisos: por <strong>Telegram</strong> (recomendado) 
-            o por <strong>WhatsApp</strong>. Configúralo aquí abajo y activa las alertas.
+            <span class="section-guide-icon">🔔</span>
+            <div class="section-guide-body">
+                <strong>El bot te avisa cuando detecta un cliente en camino</strong>
+                <span>Configura aquí dónde recibir los avisos: por <strong>Telegram</strong> (recomendado) o por <strong>WhatsApp</strong>. Los leads aparecerán en la pestaña 🧠 Aprendizaje.</span>
+            </div>
         </div>
 
         <!-- Telegram config -->
-        <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:16px">
+        <divclass="config-section">
             <details open>
                 <summary style="padding:0 0 8px 0;cursor:pointer;font-weight:600;font-size:.84rem;color:var(--text)">📱 Configurar avisos (Telegram o WhatsApp)</summary>
                 <div style="padding-top:8px;font-size:.78rem;color:var(--text-muted)">
-                    <strong>Telegram (recomendado):</strong><br>
-                    1. Abre Telegram, busca @BotFather, crea un bot con /newbot y copia el token<br>
-                    2. Busca @userinfobot para obtener tu Chat ID personal<br>
-                    3. Pega tu Chat ID abajo (uno por línea si tienes varios)<br>
-                    4. Activa las alertas con el checkbox<br><br>
-                    <strong>WhatsApp:</strong><br>
-                    Puedes poner tu número personal para recibir avisos por WhatsApp. 
-                    <strong>IMPORTANTE:</strong> El número que pongas aquí NO puede ser uno de los 
-                    que tengas configurados como línea del bot en 📱 Líneas. Usa tu número personal.
+                    <strong>📱 Telegram (recomendado) — paso a paso:</strong><br>
+                    1. Abre la app de Telegram en tu móvil u ordenador<br>
+                    2. En el buscador, escribe <strong>@BotFather</strong> (es el bot oficial para crear bots)<br>
+                    3. Escríbele <strong>/newbot</strong> y sigue sus instrucciones: te pedirá un nombre (ej: "Avisos Casa") y un usuario (ej: <code>avisos_casa_bot</code>)<br>
+                    4. @BotFather te dará un <strong>token</strong> (un texto largo). CÓPIALO, lo necesitarás<br>
+                    5. Ahora busca <strong>@userinfobot</strong> en Telegram, inícialo con /start y te dará tu <strong>Chat ID</strong> (un número, ej: 123456789)<br>
+                    6. Pega tu Chat ID en la caja de abajo (uno por línea si tienes varios)<br>
+                    7. Marca el checkbox <strong>Alertas activadas</strong><br>
+                    8. Pulsa el botón 💾 Guardar avisos<br><br>
+                    <strong>WhatsApp (alternativa):</strong><br>
+                    Puedes poner tu número personal para recibir los avisos por WhatsApp (menos recomendado).
+                    <strong>IMPORTANTE:</strong> El número que pongas NO puede ser uno de los que tengas como línea del bot en 📱 Líneas. Usa tu número personal.
                 </div>
             </details>
             <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:10px">
             <div class="form-row">
-                <div class="form-group" style="flex:2">
+                <div class="form-group form-group--wide" style">
                     <label>Chat IDs de Telegram (uno por línea)</label>
                     <textarea name="telegram[chat_ids]" rows="2" class="code-area" spellcheck="false"><?php echo h(implode("\n", cva('telegram.chat_ids'))); ?></textarea>
                 </div>
@@ -1169,11 +1359,6 @@ function dismissWizard() {
             <button type="submit" class="btn btn-primary btn-sm">💾 Guardar avisos</button>
             </div>
         </div>
-
-        <!-- Leads table -->
-        <div id="clientes-table-container">
-            <p style="color:var(--text-muted);text-align:center;padding:20px">No hay leads registrados todavía.</p>
-        </div>
     </div>
 </div>
 
@@ -1184,9 +1369,13 @@ function dismissWizard() {
 <div class="tab-content" id="tab-seguimiento">
     <div class="card">
         <h2>📨 Seguimiento automático</h2>
-        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">
-            Estas funciones te ayudan a <strong style="color:var(--accent)">no perder clientes</strong> y a mantenerlos informados sin que tengas que hacer nada.
-        </p>
+        <div class="section-guide">
+            <span class="section-guide-icon">📨</span>
+            <div class="section-guide-body">
+                <strong>No pierdas clientes automáticamente</strong>
+                <span>Estas funciones te ayudan a mantener a los clientes informados sin que tengas que hacer nada.</span>
+            </div>
+        </div>
 
         <!-- Follow-up -->
         <div class="feature-card">
@@ -1205,7 +1394,7 @@ function dismissWizard() {
                 <strong>¿Cuándo se envía?</strong> Solo a clientes con los que se habló hace 48-72h y que NO hayan sido marcados como "llegó".
             </p>
             <div class="alert-warning" style="margin-bottom:12px;font-size:.8rem;padding:10px 14px;border-radius:8px">
-                ⚠️ <strong>Importante:</strong> Marca los leads como "llegó" en la pestaña Notificaciones. Si no los marcas, el bot les reenviará mensajes y puede quedar raro.
+                ⚠️ <strong>Importante:</strong> Marca los leads como "llegó" en la pestaña <strong>🧠 Aprendizaje</strong>. Si no los marcas, cuando pase el tiempo que el cliente dijo que iba a tardar, el bot le recordará igual que tiene una cita. Si no tienes tiempo de marcar llegadas, mejor <strong>desactiva esta función</strong>.
             </div>
             <div class="form-row">
                 <div class="form-group"><label>Máx leads por ejecución</label><input type="number" name="cron[followup][max_leads_per_run]" value="<?php echo cv('cron.followup.max_leads_per_run','10'); ?>"></div>
@@ -1226,8 +1415,8 @@ function dismissWizard() {
             <p>
                 Si un cliente dice <strong>"llego en 20 minutos"</strong>, el bot le enviará <strong>un solo recordatorio</strong> pasado ese tiempo para confirmar que sigue en camino.
             </p>
-            <div class="alert-warning" style="margin-bottom:10px;font-size:.85rem;padding:12px 14px;border-radius:8px;border:2px solid var(--warn);background:rgba(251,191,36,.12)">
-                ⚠️ <strong>IMPORTANTE:</strong> Este recordatorio se envía automáticamente aunque no hayas marcado el lead como "llegó". El bot se basa solo en lo que el cliente dijo.
+            <div class="alert-warning" style="margin-bottom:10px;font-size:.85rem;padding:12px 14px;border-radius:8px;border:2px solid var(--warn)">
+                ⚠️ <strong>IMPORTANTE:</strong> Este recordatorio se envía automáticamente aunque no hayas marcado el lead como "llegó" en 🧠 Aprendizaje. El bot se basa solo en lo que el cliente dijo. Si el cliente llega pero no lo marcaste, el bot le enviará el recordatorio igual. Si no tienes tiempo de marcar llegadas, <strong>mejor no uses esta función</strong>.
             </div>
         </div>
 
@@ -1235,48 +1424,173 @@ function dismissWizard() {
     </div>
 </div>
 
+<!-- ===== TAB: Aprendizaje ===== -->
+<div class="tab-content" id="tab-learning">
+    <div class="card">
+        <h2>🧠 Aprendizaje del Bot
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span>
+                <span class="tooltip-box">El bot analiza las conversaciones para aprender tu estilo y detectar patrones. Cuantos más leads confirmes, más inteligente se hará.</span>
+            </span>
+        </h2>
+        <div class="section-guide">
+            <span class="section-guide-icon">🧠</span>
+            <div class="section-guide-body">
+                <strong>El bot aprende de tus conversaciones</strong>
+                <span>Coge tu estilo si contestas desde la pestaña Chat. Aquí verás las estadísticas de aprendizaje, el playbook generado por IA, y las conversaciones clasificadas por el bot.</span>
+            </div>
+        </div>
+
+        <!-- Stats cards (populated by JS) -->
+        <div id="learning-stats" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;margin-bottom:16px">
+            <div style="flex:1;min-width:105px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center">
+                <div style="font-size:1.5rem;font-weight:700;color:var(--text-muted)">—</div>
+                <div style="font-size:.7rem;color:var(--text-muted);margin-top:2px">Cargando…</div>
+            </div>
+        </div>
+
+        <!-- Playbook section -->
+        <div id="learning-playbook" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;display:none">
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px">
+                <strong>Playbook:</strong> <span id="playbook-status"></span>
+                <button type="button" class="btn btn-sm btn-info" style="margin-left:12px" onclick="viewPlaybook()" id="btn-view-playbook">📖 Ver playbook</button>
+            </div>
+            <?php if ($isDemo): ?>
+            <div class="demo-playbook-banner" style="margin-top:12px;background:linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(245,158,11,0.06) 100%);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:12px 14px;font-size:.82rem;line-height:1.55;color:var(--text-muted)">
+                <div style="display:flex;align-items:flex-start;gap:8px">
+                    <span style="font-size:1.2rem;flex-shrink:0">💡</span>
+                    <div>
+                        <strong style="color:#f59e0b">Esto es una demostración</strong>
+                        <div style="margin-top:4px">Este playbook y las estadísticas de aprendizaje son datos simulados para que puedas ver <strong>lo que el bot sería capaz de aprender por sí solo</strong> analizando tus conversaciones reales:</div>
+                        <ul style="margin:6px 0 0 0;padding-left:18px;color:var(--text-muted)">
+                            <li>Qué chica convierte más leads</li>
+                            <li>Qué patrones detectan mareadores antes de que te hagan perder el tiempo</li>
+                            <li>Qué señales predicen un ghosteo</li>
+                            <li>Cómo optimizar el bot para vender más</li>
+                        </ul>
+                        <div style="margin-top:6px;font-size:.76rem">Con tus conversaciones reales, el playbook se genera automáticamente cada día y se vuelve más preciso con el tiempo.</div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
+        <div id="playbook-preview" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;max-height:500px;overflow:auto;font-size:.82rem;line-height:1.6;white-space:pre-wrap;margin-bottom:16px"></div>
+
+        <!-- Classified outcomes table -->
+        <h3 style="margin-top:20px;margin-bottom:12px">📋 Conversaciones clasificadas</h3>
+        <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+            <span id="outcomes-count" style="font-size:.8rem;color:var(--text-muted)">Cargando…</span>
+        </div>
+        <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+                <thead><tr style="background:var(--bg)">
+                    <th style="padding:8px;text-align:left;border-bottom:1px solid var(--border)">Teléfono</th>
+                    <th style="padding:8px;text-align:left;border-bottom:1px solid var(--border)">Outcome</th>
+                    <th style="padding:8px;text-align:left;border-bottom:1px solid var(--border)">Msgs</th>
+                    <th style="padding:8px;text-align:left;border-bottom:1px solid var(--border)">Fecha</th>
+                    <th style="padding:8px;text-align:left;border-bottom:1px solid var(--border)">Acción</th>
+                </tr></thead>
+                <tbody id="outcomes-tbody">
+                    <tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text-muted)">Cargando…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <!-- ===== TAB: Ajustes ===== -->
 <div class="tab-content" id="tab-ajustes">
     <div class="card">
         <h2>⚙️ Ajustes del Bot</h2>
-        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">
-            Configuración avanzada. Si no estás seguro, deja los valores por defecto.
-        </p>
+        <div class="section-guide">
+            <span class="section-guide-icon">⚙️</span>
+            <div class="section-guide-body">
+                <strong>Ajustes avanzados del bot</strong>
+                <span>Configura los tiempos de respuesta para que parezca humano. Si no estás seguro, deja los valores recomendados.</span>
+            </div>
+        </div>
 
-        <details style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0;margin-bottom:8px" open>
+        <details class="prompt-details" open>
             <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:.9rem">⏱ Humanización (Delays)</summary>
-            <div style="padding:12px 16px;border-top:1px solid var(--border)">
-                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:10px">
+            <div class="detail-body">
+                <p class="form-hint">
                     Estos tiempos hacen que el bot parezca humano al responder. Simula que "lee", "piensa" y "escribe".
                     Valores bajos = parece artificial (responde al instante). Valores altos = cliente espera demasiado.
                 </p>
                 <div class="form-row">
-                    <div class="form-group"><label>Espera antes de "ver" mensaje (seg) <span style="color:var(--ok)">Recomendado: 1</span></label><input type="number" step="0.1" name="human_delays[seen][fallback_sec]" value="<?php echo cv('human_delays.seen.fallback_sec','1'); ?>"></div>
-                    <div class="form-group"><label>Espera aleatoria mínima "visto" (seg) <span style="color:var(--ok)">Recomendado: 1</span></label><input type="number" step="0.1" name="human_delays[seen][random_min_sec]" value="<?php echo cv('human_delays.seen.random_min_sec','1'); ?>"></div>
-                    <div class="form-group"><label>Espera aleatoria máxima "visto" (seg) <span style="color:var(--ok)">Recomendado: 3</span></label><input type="number" step="0.1" name="human_delays[seen][random_max_sec]" value="<?php echo cv('human_delays.seen.random_max_sec','3'); ?>"></div>
+                    <div class="form-group"><label>Espera aleatoria mínima "visto" (seg) <span class="rec-label">Recomendado: 1</span></label><input type="number" step="0.1" name="human_delays[seen][random_min_sec]" value="<?php echo cv('human_delays.seen.random_min_sec','1'); ?>"></div>
+                    <div class="form-group"><label>Espera aleatoria máxima "visto" (seg) <span class="rec-label">Recomendado: 3</span></label><input type="number" step="0.1" name="human_delays[seen][random_max_sec]" value="<?php echo cv('human_delays.seen.random_max_sec','3'); ?>"></div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>Tiempo base "escribiendo" (seg) <span style="color:var(--ok)">Recomendado: 4</span></label><input type="number" step="0.1" name="human_delays[typing][fallback_sec]" value="<?php echo cv('human_delays.typing.fallback_sec','4'); ?>"></div>
-                    <div class="form-group"><label>Caracteres/segundo mín <span style="color:var(--ok)">Recomendado: 38</span></label><input type="number" name="human_delays[typing][chars_per_sec_min]" value="<?php echo cv('human_delays.typing.chars_per_sec_min','38'); ?>"></div>
-                    <div class="form-group"><label>Caracteres/segundo máx <span style="color:var(--ok)">Recomendado: 85</span></label><input type="number" name="human_delays[typing][chars_per_sec_max]" value="<?php echo cv('human_delays.typing.chars_per_sec_max','85'); ?>"></div>
+                    <div class="form-group"><label>Caracteres/segundo mín <span class="rec-label">Recomendado: 38</span></label><input type="number" name="human_delays[typing][chars_per_sec_min]" value="<?php echo cv('human_delays.typing.chars_per_sec_min','38'); ?>"></div>
+                    <div class="form-group"><label>Caracteres/segundo máx <span class="rec-label">Recomendado: 85</span></label><input type="number" name="human_delays[typing][chars_per_sec_max]" value="<?php echo cv('human_delays.typing.chars_per_sec_max','85'); ?>"></div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>Tiempo lectura mín (ms) <span style="color:var(--ok)">Recomendado: 900</span></label><input type="number" name="human_delays[read][base_min_ms]" value="<?php echo cv('human_delays.read.base_min_ms','900'); ?>"></div>
-                    <div class="form-group"><label>Tiempo lectura máx (ms) <span style="color:var(--ok)">Recomendado: 2200</span></label><input type="number" name="human_delays[read][base_max_ms]" value="<?php echo cv('human_delays.read.base_max_ms','2200'); ?>"></div>
-                    <div class="form-group"><label>Espera entre mensajes (seg) <span style="color:var(--ok)">Recomendado: 15</span></label><input type="number" step="0.1" name="human_delays[presend_sleep_sec]" value="<?php echo cv('human_delays.presend_sleep_sec','15'); ?>"></div>
+                    <div class="form-group"><label>Tiempo lectura mín (ms) <span class="rec-label">Recomendado: 900</span></label><input type="number" name="human_delays[read][base_min_ms]" value="<?php echo cv('human_delays.read.base_min_ms','900'); ?>"></div>
+                    <div class="form-group"><label>Tiempo lectura máx (ms) <span class="rec-label">Recomendado: 2200</span></label><input type="number" name="human_delays[read][base_max_ms]" value="<?php echo cv('human_delays.read.base_max_ms','2200'); ?>"></div>
+                    <div class="form-group"><label>Espera entre mensajes (seg) <span class="rec-label">Recomendado: 15</span></label><input type="number" step="0.1" name="human_delays[presend_sleep_sec]" value="<?php echo cv('human_delays.presend_sleep_sec','15'); ?>"></div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>Habituación inicio <span style="color:var(--ok)">Recomendado: 6.2</span></label><input type="number" step="0.1" name="human_delays[habituation][start_boost]" value="<?php echo cv('human_delays.habituation.start_boost','6.2'); ?>"></div>
-                    <div class="form-group"><label>Habituación decaimiento <span style="color:var(--ok)">Recomendado: 0.92</span></label><input type="number" step="0.01" name="human_delays[habituation][decay]" value="<?php echo cv('human_delays.habituation.decay','0.92'); ?>"></div>
-                    <div class="form-group"><label>Habituación suelo <span style="color:var(--ok)">Recomendado: 1.25</span></label><input type="number" step="0.01" name="human_delays[habituation][floor]" value="<?php echo cv('human_delays.habituation.floor','1.25'); ?>"></div>
+                    <div class="form-group"><label>Habituación inicio <span class="rec-label">Recomendado: 6.2</span></label><input type="number" step="0.1" name="human_delays[habituation][start_boost]" value="<?php echo cv('human_delays.habituation.start_boost','6.2'); ?>"></div>
+                    <div class="form-group"><label>Habituación decaimiento <span class="rec-label">Recomendado: 0.92</span></label><input type="number" step="0.01" name="human_delays[habituation][decay]" value="<?php echo cv('human_delays.habituation.decay','0.92'); ?>"></div>
+                    <div class="form-group"><label>Habituación suelo <span class="rec-label">Recomendado: 1.25</span></label><input type="number" step="0.01" name="human_delays[habituation][floor]" value="<?php echo cv('human_delays.habituation.floor','1.25'); ?>"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Lectura por carácter (ms) <span class="rec-label">Recomendado: 22</span></label><input type="number" name="human_delays[read][per_char_ms]" value="<?php echo cv('human_delays.read.per_char_ms','22'); ?>"></div>
+                    <div class="form-group"><label>Lectura clamp mín (ms) <span class="rec-label">Recomendado: 1200</span></label><input type="number" name="human_delays[read][clamp_min_ms]" value="<?php echo cv('human_delays.read.clamp_min_ms','1200'); ?>"></div>
+                    <div class="form-group"><label>Lectura clamp máx (ms) <span class="rec-label">Recomendado: 22000</span></label><input type="number" name="human_delays[read][clamp_max_ms]" value="<?php echo cv('human_delays.read.clamp_max_ms','22000'); ?>"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Umbral msg corto (chars) <span class="rec-label">Recomendado: 15</span></label><input type="number" name="human_delays[read][short_threshold_chars]" value="<?php echo cv('human_delays.read.short_threshold_chars','15'); ?>"></div>
+                    <div class="form-group"><label>Lectura base corta mín (ms) <span class="rec-label">Recomendado: 300</span></label><input type="number" name="human_delays[read][short_base_min_ms]" value="<?php echo cv('human_delays.read.short_base_min_ms','300'); ?>"></div>
+                    <div class="form-group"><label>Lectura base corta máx (ms) <span class="rec-label">Recomendado: 800</span></label><input type="number" name="human_delays[read][short_base_max_ms]" value="<?php echo cv('human_delays.read.short_base_max_ms','800'); ?>"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Tipeo chunk (chars) <span class="rec-label">Recomendado: 24</span></label><input type="number" name="human_delays[typing][chunk_size]" value="<?php echo cv('human_delays.typing.chunk_size','24'); ?>"></div>
+                    <div class="form-group"><label>Pausa chunk (factor) <span class="rec-label">Recomendado: 0.65</span></label><input type="number" step="0.01" name="human_delays[typing][chunk_pause_factor]" value="<?php echo cv('human_delays.typing.chunk_pause_factor','0.65'); ?>"></div>
+                    <div class="form-group"><label>Start typing mín (ms) <span class="rec-label">Recomendado: 350</span></label><input type="number" name="human_delays[typing][start_min_ms]" value="<?php echo cv('human_delays.typing.start_min_ms','350'); ?>"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Start typing máx (ms) <span class="rec-label">Recomendado: 1200</span></label><input type="number" name="human_delays[typing][start_max_ms]" value="<?php echo cv('human_delays.typing.start_max_ms','1200'); ?>"></div>
+                    <div class="form-group"><label>Chars entrantes máx <span class="rec-label">Recomendado: 180</span></label><input type="number" name="human_delays[typing][max_incoming_chars]" value="<?php echo cv('human_delays.typing.max_incoming_chars','180'); ?>"></div>
+                    <div class="form-group"><label>Clamp máx typing (ms) <span class="rec-label">Recomendado: 90000</span></label><input type="number" name="human_delays[typing][clamp_max_ms]" value="<?php echo cv('human_delays.typing.clamp_max_ms','90000'); ?>"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Pausa tras enviar (seg) <span class="rec-label">Recomendado: 0.4</span></label><input type="number" step="0.1" name="human_delays[after_send_fallback_sec]" value="<?php echo cv('human_delays.after_send_fallback_sec','0.4'); ?>"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>🎯 Pace: factor mín <span class="rec-label">0.5</span></label><input type="number" step="0.01" name="human_delays[pace][min_factor]" value="<?php echo cv('human_delays.pace.min_factor','0.5'); ?>"></div>
+                    <div class="form-group"><label>Pace: factor máx <span class="rec-label">2.0</span></label><input type="number" step="0.01" name="human_delays[pace][max_factor]" value="<?php echo cv('human_delays.pace.max_factor','2'); ?>"></div>
+                    <div class="form-group"><label>Pace: ref (seg) <span class="rec-label">60</span></label><input type="number" step="0.1" name="human_delays[pace][reference_sec]" value="<?php echo cv('human_delays.pace.reference_sec','60'); ?>"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Pace: steepness <span class="rec-label">0.2</span></label><input type="number" step="0.01" name="human_delays[pace][steepness]" value="<?php echo cv('human_delays.pace.steepness','0.2'); ?>"></div>
+                    <div class="form-group"><label>Corrección: prob <span class="rec-label">0.12</span></label><input type="number" step="0.01" name="human_delays[correction][probability]" value="<?php echo cv('human_delays.correction.probability','0.12'); ?>"></div>
+                    <div class="form-group"><label>Corrección: pausa mín (ms) <span class="rec-label">400</span></label><input type="number" name="human_delays[correction][pause_min_ms]" value="<?php echo cv('human_delays.correction.pause_min_ms','400'); ?>"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Corrección: pausa máx (ms) <span class="rec-label">1800</span></label><input type="number" name="human_delays[correction][pause_max_ms]" value="<?php echo cv('human_delays.correction.pause_max_ms','1800'); ?>"></div>
+                    <div class="form-group"><label>Ráfaga: ventana (seg) <span class="rec-label">30</span></label><input type="number" name="human_delays[burst][window_sec]" value="<?php echo cv('human_delays.burst.window_sec','30'); ?>"></div>
+                    <div class="form-group"><label>Ráfaga: umbral (msgs) <span class="rec-label">3</span></label><input type="number" name="human_delays[burst][threshold_msgs]" value="<?php echo cv('human_delays.burst.threshold_msgs','3'); ?>"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Ráfaga: factor <span class="rec-label">0.33</span></label><input type="number" step="0.01" name="human_delays[burst][rapid_factor]" value="<?php echo cv('human_delays.burst.rapid_factor','0.33'); ?>"></div>
+                    <div class="form-group"><label>Urgencia: factor <span class="rec-label">0.25</span></label><input type="number" step="0.01" name="human_delays[urgent][factor]" value="<?php echo cv('human_delays.urgent.factor','0.25'); ?>"></div>
+                    <div class="form-group"><label>Patrón: Std / Skip / Read1 (%) <span class="rec-label">70/20/10</span></label>
+                        <input type="number" name="human_delays[pattern_variation][weight_standard]" value="<?php echo cv('human_delays.pattern_variation.weight_standard','70'); ?>" placeholder="70" style="width:32%;display:inline">
+                        <input type="number" name="human_delays[pattern_variation][weight_skip_read]" value="<?php echo cv('human_delays.pattern_variation.weight_skip_read','20'); ?>" placeholder="20" style="width:32%;display:inline">
+                        <input type="number" name="human_delays[pattern_variation][weight_read_first]" value="<?php echo cv('human_delays.pattern_variation.weight_read_first','10'); ?>" placeholder="10" style="width:32%;display:inline">
+                    </div>
+                </div>
+                <div class="alert-warning" style="margin-top:12px;font-size:.8rem;padding:10px 14px;border-radius:8px">
+                    ⚠️ <strong>Cuidado:</strong> Modifica estos valores con precaución. Si los cambias sin control, el bot puede desajustarse: contestar demasiado rápido (parecerá artificial y espantará clientes) o demasiado lento (el cliente se impacientará y se irá). Los valores recomendados están probados y funcionan bien.
                 </div>
             </div>
         </details>
 
-        <details style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0;margin-bottom:8px">
+        <details class="prompt-details">
             <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:.9rem">🎲 Variantes de mensajes</summary>
-            <div style="padding:12px 16px;border-top:1px solid var(--border)">
-                <p style="color:var(--text-muted);font-size:.78rem;margin-bottom:6px">
+            <div class="detail-body">
+                <p class="form-hint">
                     Frases que el bot elige al azar cuando recibe un audio (una por línea).
                     <button type="button" class="btn btn-sm" style="margin-left:8px;background:var(--input-bg);color:var(--text-muted);font-size:.65rem"
                         onclick="if(confirm('¿Restaurar frases por defecto?'))this.parentElement.nextElementSibling.value='no puedo escuchar audios amor, me lo escribes mejor?\namor por aqui no escucho audios, escribeme y te digo 😘\ncari no puedo oir audios ahora, me lo pones en texto?\nme va mejor si me lo escribes amor, los audios no puedo escucharlos\nguapo no puedo reproducir audios, escribeme un momentito y te contesto\nay amor, sin audio mejor, escribeme y asi te respondo rapido\ncielo no escucho audios por aqui, me lo mandas escrito?\nno puedo con audios ahora cari, escribeme mejor'">🔄 Restaurar</button>
@@ -1305,31 +1619,38 @@ function dismissWizard() {
 <div class="tab-content" id="tab-estadisticas">
     <div class="card">
         <h2>📈 Estadísticas</h2>
-        <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:16px">
-            Consulta el rendimiento de tu bot con datos reales: cuántas conversaciones ha mantenido, 
-            cuántos leads ha generado, cuántos clientes han llegado y qué ratio de conversión tienes. 
-            Entender estas cifras te ayuda a saber si tu inversión funciona y dónde puedes mejorar.
-        </p>
+        <div class="section-guide">
+            <span class="section-guide-icon">📈</span>
+            <div class="section-guide-body">
+                <strong>Rendimiento real de tu bot</strong>
+                <span>Conversaciones, leads generados, clientes que llegaron y ratio de conversión. Entiende si tu inversión funciona y dónde mejorar.</span>
+            </div>
+        </div>
         <div id="estadisticas-container">
-            <p style="color:var(--text-muted);text-align:center;padding:30px">Cargando estadísticas...</p>
+            <p class="empty-state empty-state--large">Cargando estadísticas...</p>
         </div>
     </div>
 </div>
 
 </form>
 <script>
+// ── Demo mode guard ──
+var IS_DEMO = <?php echo $isDemo ? 'true' : 'false'; ?>;
+function showDemoToast(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    var existing = document.querySelector('.demo-toast');
+    if (existing) { existing.remove(); }
+    var t = document.createElement('div');
+    t.className = 'demo-toast';
+    t.textContent = '🔒 Modo demo: solo lectura. No se permiten cambios.';
+    t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--warn);color:#000;padding:10px 24px;border-radius:8px;font-size:.85rem;font-weight:600;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,.3);animation:demoToastIn .3s ease';
+    document.body.appendChild(t);
+    setTimeout(function() { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; setTimeout(function() { if (t.parentNode) t.remove(); }, 300); }, 2000);
+}
 // ── Tab switching helper ──
 function switchTab(tabId) {
-    var tabNav = document.getElementById('tabNav');
-    if (tabNav) {
-        var btns = tabNav.querySelectorAll('button[data-tab]');
-        btns.forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-tab') === tabId); });
-    }
-    var contents = document.querySelectorAll('.tab-content');
-    contents.forEach(function(c) { c.classList.toggle('active', c.id === tabId); });
-    // Update hidden input for form submission
-    var input = document.querySelector('.js-active-tab-input');
-    if (input) input.value = tabId;
+    var btn = document.querySelector('#tabNav button[data-tab="' + tabId + '"]');
+    if (btn) btn.click();
 }
 
 // Global API token for all AJAX calls (works even without session cookie)
@@ -1338,10 +1659,42 @@ var _apiToken = <?php echo json_encode(generateCsrfToken()); ?>;
 function apiUrl(url) {
     return url + (url.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(_apiToken);
 }
+// Keep all CSRF hidden inputs up-to-date (prevent 403 on form POSTs after long sessions)
+function updateAllCsrfInputs(token) {
+    var inputs = document.querySelectorAll('input[name="csrf_token"]');
+    for (var i = 0; i < inputs.length; i++) { inputs[i].value = token; }
+}
 </script>
-<script src="assets/chat.js?v=20260610_2"></script>
+<script>
+// ── Detección global de sesión expirada (401) ──
+// Si cualquier API devuelve 401, redirige al login automáticamente.
+(function() {
+    var _origFetch = window.fetch;
+    window.fetch = function(url, init) {
+        return _origFetch.call(window, url, init).then(function(r) {
+            if (r.status === 401) { window.location.href = 'login'; }
+            return r;
+        });
+    };
+})();
+</script>
+<script src="assets/chat.js?v=20260614_1"></script>
 <script>
 var _csrf = <?php echo json_encode(generateCsrfToken()); ?>;
+// ── Keepalive de sesión + CSRF refresh: ping cada 5 min ──
+setInterval(function() {
+    fetch(apiUrl('api/csrf-token.php'), {credentials: 'same-origin'}).then(function(r) {
+        if (r.status === 401) { window.location.href = 'login'; return; }
+        return r.json();
+    }).then(function(d) {
+        if (d && d.ok && d.token) {
+            if (typeof _apiToken !== 'undefined') _apiToken = d.token;
+            if (typeof _csrf !== 'undefined') _csrf = d.token;
+            updateAllCsrfInputs(d.token);
+        }
+    }).catch(function(){});
+}, 300000);
+
 var _defaultTarifas = <?php echo json_encode($distTarifas); ?>;
 
 // ── Preview builder ──
@@ -1417,37 +1770,36 @@ function buildPreview() {
 
 // ── Líneas WhatsApp ──
 function loadLines() {
-    fetch(apiUrl('api/lines.php?action=list')).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/lines.php?action=list'), {credentials: 'same-origin'}).then(r=>r.json()).then(d=>{
         if (!d.ok) return;
         var html = '';
         if (d.lines.length === 0) {
-            html = '<p style="color:var(--text-muted);text-align:center;padding:20px">No hay líneas configuradas. Añade tu primer número arriba.</p>';
+            html = '<p class="empty-state">No hay líneas configuradas. Añade tu primer número arriba.</p>';
         } else {
-            html = '<table class="memory-table" style="font-size:.83rem"><thead><tr><th>Línea</th><th>Teléfono</th><th>Puerto</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
+            html = '<div class="table-responsive"><table class="memory-table" style="font-size:.83rem"><thead><tr><th>Línea</th><th>Teléfono</th><th>Puerto</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
             d.lines.forEach(function(l) {
                 var st = l.health_status || '?';
-                var statusIcon = {'WORKING':'🟢 ONLINE','STARTING':'🟡 CONECTANDO','SCAN_QR':'📱 QR PENDIENTE','starting':'🟡 ARRANCANDO','down':'🔴 CAÍDA','pending':'⚪ PENDIENTE'}[st] || ('⚪ '+(st||'?'));
+                var statusIcon = {'WORKING':'🟢 ONLINE','STARTING':'🟡 CONECTANDO','SCAN_QR':'📱 QR PENDIENTE','starting':'🟡 ARRANCANDO','FAILED':'🔴 FALLIDA','STOPPED':'⏸️ PARADA','down':'🔴 CAÍDA','pending':'⚪ PENDIENTE','unknown':'⚪ DESCONOCIDO'}[st] || ('⚪ '+(st||'?'));
                 var phoneDisp = l.health_phone ? l.health_phone : (l.last9||l.phone);
                 html += '<tr><td><strong>'+escHtml(l.label)+'</strong></td><td class="mono">'+escHtml(phoneDisp)+'</td><td>'+l.port+'</td><td>'+statusIcon+'</td>';
                 html += '<td style="white-space:nowrap">';
                 if (st === 'WORKING') {
                     html += '<span style="color:var(--ok);font-size:.8rem;margin-right:6px">✅ Conectada</span>';
+                    html += '<button type="button" onclick="showTest('+l.id+')" class="btn btn-sm" style="background:var(--info);color:var(--text-bright);margin-right:3px">Test</button>';
+                    html += '<button type="button" onclick="checkLineStatus('+l.id+')" class="btn btn-sm" style="background:var(--ok);color:var(--text-bright);margin-right:3px">✓</button>';
                 } else {
                     html += '<button type="button" onclick="showQR('+l.id+')" class="btn btn-sm btn-primary" style="margin-right:3px">QR</button>';
-                }
-                html += '<button type="button" onclick="showTest('+l.id+')" class="btn btn-sm" style="background:var(--info);color:#fff;margin-right:3px">Test</button>';
-                if (st === 'WORKING') {
-                    html += '<button type="button" onclick="checkLineStatus('+l.id+')" class="btn btn-sm" style="background:var(--ok);color:#fff;margin-right:3px">✓</button>';
                 }
                 html += '<button type="button" onclick="deleteLine('+l.id+')" class="btn btn-sm btn-danger">🗑</button>';
                 html += '</td></tr>';
             });
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
         }
         document.getElementById('lines-container').innerHTML = html;
-    }).catch(function(){ document.getElementById('lines-container').innerHTML = '<p style="color:var(--danger)">Error al cargar líneas</p>'; });
+    }).catch(function(){ document.getElementById('lines-container').innerHTML = '<p class="empty-state" style="color:var(--danger)">Error al cargar líneas</p>'; });
 }
 function addLine() {
+    if (IS_DEMO) { showDemoToast(); return; }
     var phone = document.getElementById('new-line-phone').value.trim();
     var label = document.getElementById('new-line-label').value.trim();
     if (!phone) return alert('Introduce un número de teléfono');
@@ -1456,31 +1808,40 @@ function addLine() {
     btn.disabled = true; btn.textContent = '⏳ Creando...';
     statusEl.textContent = '⏳ Creando instancia WAHA... (puede tardar 10-15 segundos)';
     var fd = new FormData(); fd.append('phone', phone); fd.append('label', label); fd.append('csrf_token', _csrf);
-    fetch('api/lines.php?action=add', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-        if (d.ok) {
+    fetch('api/lines.php?action=add', {method:'POST',body:fd,credentials:'same-origin'}).then(r=>r.json()).then(d=>{
+        if (d.extra_line_payment) {
+            // Extra line requires payment — redirect to payment page
+            showToast('💡 Línea extra: +' + d.price + '€/sem. Redirigiendo al pago...', 'info');
+            setTimeout(function(){ window.location.href = 'pago'; }, 1000);
+        } else if (d.ok) {
             statusEl.textContent = '✅ Instancia creada en puerto '+(d.line?d.line.port:'?')+'. Usa el botón QR para vincular WhatsApp.';
             document.getElementById('new-line-phone').value='';
             document.getElementById('new-line-label').value='';
             loadLines();
+            showToast('✅ Línea creada correctamente', 'success');
         } else {
-            statusEl.textContent = '❌ '+(d.error||'Error al crear');
+            statusEl.innerHTML = d.trial_limit
+                ? '❌ ' + escHtml(d.error) + ' <a href="pago" style="color:var(--accent);font-weight:600;text-decoration:underline">Activar plan →</a>'
+                : '❌ ' + escHtml(d.error||'Error al crear');
+            showToast('❌ '+(d.error||'Error al crear la línea'), 'error');
         }
         btn.disabled = false; btn.textContent = 'Crear línea';
     }).catch(function(){
         statusEl.textContent = '❌ Error de conexión';
+        showToast('❌ Error de conexión al crear la línea', 'error');
         btn.disabled = false; btn.textContent = 'Crear línea';
     });
 }
 var currentQrLineId = 0;
 function showQR(lineId) {
     currentQrLineId = lineId;
-    document.getElementById('qr-modal').style.display = 'flex';
+    document.getElementById('qr-modal').classList.add('open');
     document.getElementById('qr-image').src = '';
     document.getElementById('qr-status').textContent = 'Cargando QR...';
     fetchQR(lineId);
 }
 function fetchQR(lineId) {
-    fetch(apiUrl('api/lines.php?action=qr&line_id='+lineId)).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/lines.php?action=qr&line_id='+lineId), {credentials: 'same-origin'}).then(r=>r.json()).then(d=>{
         if (d.ok && d.qr_base64) {
             document.getElementById('qr-image').src = 'data:image/png;base64,'+d.qr_base64;
             document.getElementById('qr-status').textContent = d.warning || 'Escanea con WhatsApp → Vincular dispositivo';
@@ -1492,12 +1853,13 @@ function fetchQR(lineId) {
     });
 }
 function regenerateQR() {
+    if (IS_DEMO) { showDemoToast(); return; }
     if (!currentQrLineId) return;
     document.getElementById('qr-status').textContent = 'Generando nuevo QR...';
     fetchQR(currentQrLineId);
 }
 function checkLineStatus(lineId) {
-    fetch(apiUrl('api/lines.php?action=status')).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/lines.php?action=status'), {credentials: 'same-origin'}).then(r=>r.json()).then(d=>{
         if (d.ok && d.statuses) {
             var st = d.statuses[lineId] || 'unknown';
             alert('Estado de la línea: ' + st);
@@ -1506,18 +1868,19 @@ function checkLineStatus(lineId) {
 }
 
 function showTest(lineId) {
-    document.getElementById('test-modal').style.display = 'flex';
+    document.getElementById('test-modal').classList.add('open');
     document.getElementById('test-line-id').value = lineId;
     document.getElementById('test-phone').value = '';
     document.getElementById('test-result').textContent = '';
 }
 function sendTestMessage() {
+    if (IS_DEMO) { showDemoToast(); return; }
     var lineId = document.getElementById('test-line-id').value;
     var phone = document.getElementById('test-phone').value.trim();
     if (!phone) return alert('Introduce un número de teléfono');
     var fd = new FormData(); fd.append('line_id', lineId); fd.append('test_phone', phone); fd.append('csrf_token', _csrf);
     document.getElementById('test-result').textContent = 'Enviando...';
-    fetch('api/lines.php?action=test', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+    fetch('api/lines.php?action=test', {method:'POST',body:fd,credentials:'same-origin'}).then(r=>r.json()).then(d=>{
         if (d.ok) {
             document.getElementById('test-result').textContent = '✅ Mensaje enviado (HTTP '+d.http_code+')';
         } else {
@@ -1527,10 +1890,14 @@ function sendTestMessage() {
     });
 }
 function deleteLine(lineId) {
+    if (IS_DEMO) { showDemoToast(); return; }
     if (!confirm('¿Eliminar esta línea? Se desvinculará del bot.')) return;
     var fd = new FormData(); fd.append('line_id', lineId); fd.append('csrf_token', _csrf);
-    fetch('api/lines.php?action=delete', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-        if (d.ok) loadLines(); else alert('Error: '+(d.error||'Desconocido'));
+    fetch('api/lines.php?action=delete', {method:'POST',body:fd,credentials:'same-origin'}).then(r=>r.json()).then(d=>{
+        if (d.ok) { loadLines(); showToast('🗑️ Línea eliminada', 'success'); }
+        else { showToast('❌ Error: '+(d.error||'Desconocido'), 'error'); }
+    }).catch(function(e) {
+        showToast('❌ Error de conexión al eliminar la línea', 'error');
     });
 }
 
@@ -1538,35 +1905,37 @@ function deleteLine(lineId) {
 var linePollInterval;
 function startLinePolling() { linePollInterval = setInterval(function() {
     if (document.getElementById('tab-lineas') && document.getElementById('tab-lineas').classList.contains('active')) {
-        fetch(apiUrl('api/lines.php?action=status')).then(r=>r.json()).then(d=>{
-            if (!d.ok || !d.statuses) return;
-            var rows = document.querySelectorAll('#lines-container tbody tr');
-            rows.forEach(function(tr, i) {
-                // las filas se cargan con loadLines, el id está en el onclick
-            });
-        });
+        loadLines();
     }
 }, 60000); }
 startLinePolling();
 
 // ── Chicas ──
 var _allGirls = [];
+// Helper: convierte URLs compartir.site (shortlink) a URL directa de imagen
+function getDirectImageUrl(url) {
+    if (!url) return '';
+    var m = url.match(/^https?:\/\/(?:[^\/]*\.)?compartir\.site\/([a-z0-9]+)\/?$/i);
+    if (m) return 'https://compartir.site/' + m[1] + '/' + m[1] + '.jpg';
+    return url;
+}
 function loadGirls() {
     var container = document.getElementById('girls-container');
     if (!container) return;
-    container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px">Cargando chicas...</p>';
-    fetch(apiUrl('api/girls.php?action=list')).then(r=>r.json()).then(d=>{
+    container.innerHTML = '<p class="empty-state">Cargando chicas...</p>';
+    fetch(apiUrl('api/girls.php?action=list'), {credentials: 'same-origin'}).then(r=>r.json()).then(d=>{
         if (!d.ok) { container.innerHTML = '<p style="color:var(--danger);text-align:center;padding:20px">Error al cargar chicas.</p>'; return; }
         _allGirls = d.girls;
         var html = '';
         if (d.girls.length === 0) {
-            html = '<p style="color:var(--text-muted);text-align:center;padding:20px">No hay chicas configuradas. Añade la primera arriba.</p>';
+            html = '<p class="empty-state">No hay chicas configuradas. Añade la primera arriba.</p>';
         } else {
             html = '<div class="girls-grid">';
             d.girls.forEach(function(g) {
                 var fotoCount = (g.fotos||[]).length;
                 var heroImg = (g.fotos||[]).length > 0 ? g.fotos[0] : '';
-                var heroStyle = heroImg ? 'background-image:url('+escHtml(heroImg)+');background-size:cover;background-position:center top' : '';
+                var displayImg = getDirectImageUrl(heroImg);
+                var heroStyle = displayImg ? 'background-image:url('+escHtml(displayImg)+');background-size:cover;background-position:center top' : '';
                 var activeColor = g.activa ? 'var(--ok)' : 'var(--text-muted)';
                 html += '<div class="girl-card'+(g.activa?' girl-card--active':'')+'">';
                 // Hero image
@@ -1600,9 +1969,10 @@ function loadGirls() {
     });
 }
 function saveGirl() {
+    if (IS_DEMO) { showDemoToast(); return; }
     var id = document.getElementById('girl-edit-id').value;
     var nombre = document.getElementById('girl-nombre').value.trim();
-    if (!nombre) return alert('El nombre es obligatorio.');
+    if (!nombre) { showToast('El nombre es obligatorio.', 'warning'); return; }
     var btn = document.getElementById('btn-guardar-chica');
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando...'; }
     var fd = new FormData();
@@ -1616,7 +1986,7 @@ function saveGirl() {
     for (var i = 0; i < selectedPhotos.length; i++) {
         fd.append('photos[]', selectedPhotos[i]);
     }
-    fetch('api/girls.php?action=save', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+    fetch('api/girls.php?action=save', {method:'POST',body:fd,credentials:'same-origin'}).then(r=>r.json()).then(d=>{
         if (d.ok) {
             document.getElementById('girl-edit-id').value='';
             document.getElementById('girl-nombre').value='';
@@ -1624,10 +1994,11 @@ function saveGirl() {
             document.getElementById('girl-form-title').textContent='➕ Nueva chica';
             clearPhotoPreviews();
             loadGirls();
-        } else { alert('Error: '+(d.error||'Desconocido')); }
+            showToast('✅ Chica guardada correctamente', 'success');
+        } else { showToast('❌ Error: '+(d.error||'Desconocido'), 'error'); }
         if (btn) { btn.disabled = false; btn.textContent = '💾 Guardar'; }
     }).catch(function(){
-        alert('Error de conexión al guardar.');
+        showToast('❌ Error de conexión al guardar la chica', 'error');
         if (btn) { btn.disabled = false; btn.textContent = '💾 Guardar'; }
     });
 }
@@ -1680,7 +2051,7 @@ function renderExistingPhotos(photos, girlId) {
             (idx === 0
                 ? '<span class="primary-star" title="Foto principal">⭐</span>'
                 : '<span class="set-primary-btn" onclick="event.stopPropagation();setAsPrimary(\''+escHtml(girlId)+'\','+idx+')" title="Marcar como principal">☆</span>') +
-            '<img src="'+url+'" style="object-fit:cover;width:100%;height:100%" draggable="false">' +
+            '<img src="'+getDirectImageUrl(url)+'" style="object-fit:cover;width:100%;height:100%" draggable="false">' +
             '<button type="button" onclick="event.stopPropagation();removeExistingPhoto(\''+escHtml(girlId)+'\','+idx+')" title="Eliminar esta foto">✕</button>';
         container.appendChild(wrapper);
     });
@@ -1709,6 +2080,7 @@ function handlePhotoDragLeave(e) {
     this.classList.remove('drag-over');
 }
 function handlePhotoDrop(e) {
+    if (IS_DEMO) { showDemoToast(); return; }
     e.preventDefault();
     e.stopPropagation();
     this.classList.remove('drag-over');
@@ -1743,18 +2115,19 @@ function setAsPrimary(girlId, idx) {
 
 // ── Persist photo order to server ──
 function savePhotoOrder(girlId, fotos) {
+    if (IS_DEMO) { showDemoToast(); return; }
     var fd = new FormData();
     fd.append('id', girlId);
     fd.append('order', JSON.stringify(fotos));
     fd.append('csrf_token', (typeof _csrf !== 'undefined' ? _csrf : ''));
-    fetch('api/girls.php?action=reorder_photos', { method: 'POST', body: fd }).then(function(r) { return r.json(); }).then(function(d) {
+    fetch('api/girls.php?action=reorder_photos', { method: 'POST', body: fd, credentials: 'same-origin' }).then(function(r) { return r.json(); }).then(function(d) {
         if (!d.ok) {
             // Reload to recover correct state on error
             loadGirls();
             // Refresh edit form if still editing
             var currentEditId = document.getElementById('girl-edit-id').value;
             if (currentEditId) {
-                return fetch(apiUrl('api/girls.php?action=list')).then(function(r) { return r.json(); }).then(function(data) {
+                return fetch(apiUrl('api/girls.php?action=list'), {credentials: 'same-origin'}).then(function(r) { return r.json(); }).then(function(data) {
                     if (data && data.ok) {
                         _allGirls = data.girls;
                         var girl = _allGirls.find(function(g) { return g.id === currentEditId; });
@@ -1768,15 +2141,16 @@ function savePhotoOrder(girlId, fotos) {
 
 // ── Remove an existing photo from a girl (server-side) ──
 function removeExistingPhoto(girlId, photoIndex) {
+    if (IS_DEMO) { showDemoToast(); return; }
     if (!confirm('¿Eliminar esta foto?')) return;
     var fd = new FormData();
     fd.append('id', girlId);
     fd.append('photo_index', photoIndex);
     fd.append('csrf_token', (typeof _csrf!=='undefined'?_csrf:''));
-    fetch('api/girls.php?action=remove_photo', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+    fetch('api/girls.php?action=remove_photo', {method:'POST',body:fd,credentials:'same-origin'}).then(r=>r.json()).then(d=>{
         if (!d.ok) { alert('Error: '+(d.error||'No se pudo eliminar la foto')); return; }
         // Reload girls data and refresh both the card grid and the edit form
-        return fetch(apiUrl('api/girls.php?action=list')).then(r=>r.json());
+        return fetch(apiUrl('api/girls.php?action=list'), {credentials: 'same-origin'}).then(r=>r.json());
     }).then(function(d) {
         if (!d || !d.ok) return;
         _allGirls = d.girls;
@@ -1852,39 +2226,64 @@ function clearPhotoPreviews() {
     if (fileInput) { fileInput.style.display = ''; fileInput.value = ''; }
 }
 function toggleGirl(id) {
+    if (IS_DEMO) { showDemoToast(); return; }
     var fd = new FormData();
     fd.append('id', id);
     fd.append('csrf_token', (typeof _csrf!=='undefined'?_csrf:''));
-    fetch('api/girls.php?action=toggle', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-        if (d.ok) { loadGirls(); } else { alert('Error: '+(d.error||'Desconocido')); }
+    fetch('api/girls.php?action=toggle', {method:'POST',body:fd,credentials:'same-origin'}).then(r=>r.json()).then(d=>{
+        if (d.ok) { loadGirls(); } else { showToast('❌ Error: '+(d.error||'Desconocido'), 'error'); }
     }).catch(function(e){
-        alert('Error de conexión al cambiar estado: '+(e.message||'sin conexión'));
+        showToast('❌ Error de conexión al cambiar estado', 'error');
     });
 }
 function deleteGirl(id) {
+    if (IS_DEMO) { showDemoToast(); return; }
     if (!confirm('¿Eliminar esta chica? Esta acción no se puede deshacer.')) return;
     var fd = new FormData();
     fd.append('id', id);
     fd.append('csrf_token', (typeof _csrf!=='undefined'?_csrf:''));
-    fetch('api/girls.php?action=delete', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-        if (d.ok) { loadGirls(); } else { alert('Error: '+(d.error||'No se pudo eliminar')); }
+    fetch('api/girls.php?action=delete', {method:'POST',body:fd,credentials:'same-origin'}).then(r=>r.json()).then(d=>{
+        if (d.ok) { loadGirls(); showToast('🗑️ Chica eliminada', 'success'); }
+        else { showToast('❌ Error: '+(d.error||'No se pudo eliminar'), 'error'); }
     }).catch(function(e){
-        alert('Error de conexión al eliminar: '+(e.message||'sin conexión'));
+        showToast('❌ Error de conexión al eliminar', 'error');
     });
 }
 
 // ── Estados ──
 function loadEstadosConfig() {
-    fetch(apiUrl('api/estados.php?action=config')).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/estados.php?action=config'), {credentials: 'same-origin'}).then(r=>r.json()).then(d=>{
         if (!d.ok) return;
         var c = d.config;
         document.getElementById('estados-enabled').checked = !!c.enabled;
         document.getElementById('estados-freq-tipo').value = c.frecuencia_tipo || 'cada_x_horas';
         document.getElementById('estados-freq-valor').value = c.frecuencia_valor || 6;
-        document.getElementById('estados-formato').value = c.formato || 'mix_aleatorio';
+        // Populate format dropdown from API
+        if (c.format_options) {
+            var sel = document.getElementById('estados-formato');
+            var current = c.formato || 'mix_aleatorio';
+            sel.innerHTML = '<option value="mix_aleatorio">🎲 Mix aleatorio (recomendado)</option>';
+            // Group formats
+            var individuales = ['chica_del_dia','tentacion_del_dia','dulce_prohibido','ven_ya','susurro','confesion',
+                'frase_del_dia','solo_valientes','cita_a_ciegas','regalo_sorpresa','amiga_recomienda','la_nueva'];
+            var varias = ['chicas_de_hoy','duo_sexy','estrella_grupo','trio_tentador','puertas_abiertas',
+                'antojos','el_equipo','frescas','catalogo_rapido','juego_parejas','el_casting','modo_finde'];
+            var especial = ['oferta_flash'];
+            sel.innerHTML += '<optgroup label="── Individual (1 chica) ──"></optgroup>';
+            var og1 = sel.querySelector('optgroup:last-of-type');
+            individuales.forEach(function(f){ if(c.format_options[f]){ og1.innerHTML += '<option value="'+f+'">'+escHtml(c.format_options[f])+'</option>'; } });
+            sel.innerHTML += '<optgroup label="── Varias chicas ──"></optgroup>';
+            var og2 = sel.querySelector('optgroup:last-of-type');
+            varias.forEach(function(f){ if(c.format_options[f]){ og2.innerHTML += '<option value="'+f+'">'+escHtml(c.format_options[f])+'</option>'; } });
+            sel.innerHTML += '<optgroup label="── Especial ──"></optgroup>';
+            var og3 = sel.querySelector('optgroup:last-of-type');
+            especial.forEach(function(f){ if(c.format_options[f]){ og3.innerHTML += '<option value="'+f+'">'+escHtml(c.format_options[f])+'</option>'; } });
+            sel.value = current;
+        } else {
+            document.getElementById('estados-formato').value = c.formato || 'mix_aleatorio';
+        }
         document.getElementById('estados-hora-inicio').value = c.hora_inicio || '08:00';
         document.getElementById('estados-hora-fin').value = c.hora_fin || '23:00';
-        // Lines checkboxes
         var lcb = document.getElementById('estados-lines-checkboxes');
         lcb.innerHTML = (c.available_lines||[]).map(function(l){
             var checked = (c.lineas||[]).indexOf(l.id) !== -1 ? 'checked' : '';
@@ -1893,6 +2292,7 @@ function loadEstadosConfig() {
     });
 }
 function saveEstadosConfig() {
+    if (IS_DEMO) { showDemoToast(); return; }
     var fd = new FormData();
     fd.append('csrf_token', _csrf);
     if (document.getElementById('estados-enabled').checked) fd.append('enabled','1');
@@ -1903,33 +2303,35 @@ function saveEstadosConfig() {
     fd.append('hora_fin', document.getElementById('estados-hora-fin').value);
     var checks = document.querySelectorAll('#estados-lines-checkboxes input[type=checkbox]:checked');
     checks.forEach(function(c){ fd.append('lineas[]', c.value); });
-    fetch(apiUrl('api/estados.php?action=config'), {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-        document.getElementById('estados-status').textContent = d.ok ? '✅ Configuración guardada' : '❌ Error al guardar: '+(d.error||'desconocido');
-        setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 3000);
+    showToast('⏳ Guardando configuración...', 'info');
+    fetch(apiUrl('api/estados.php?action=config'), {method:'POST',body:fd,credentials:'same-origin'}).then(r=>r.json()).then(d=>{
+        if (d.ok) {
+            showToast('✅ Configuración guardada correctamente', 'success');
+        } else {
+            showToast('❌ Error al guardar: '+(d.error||'desconocido'), 'error');
+        }
     }).catch(function(e){
-        document.getElementById('estados-status').textContent = '❌ Error de red: '+(e.message||'sin conexión');
-        setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 4000);
+        showToast('❌ Error de red: '+(e.message||'sin conexión'), 'error');
     });
 }
 function publishEstado() {
-    document.getElementById('estados-status').textContent = '⏳ Publicando...';
+    if (IS_DEMO) { showDemoToast(); return; }
+    showToast('⏳ Publicando estado...', 'info');
     var fd = new FormData(); fd.append('csrf_token', _csrf);
-    fetch(apiUrl('api/estados.php?action=publish'), {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/estados.php?action=publish'), {method:'POST',body:fd,credentials:'same-origin'}).then(r=>r.json()).then(d=>{
         if (d.ok) {
             var oks = d.results.filter(function(r){return r.ok;}).length;
-            document.getElementById('estados-status').textContent = '✅ Publicado en '+oks+'/'+d.results.length+' líneas';
+            showToast('✅ Publicado en '+oks+'/'+d.results.length+' líneas', 'success');
             loadEstadosHistory();
         } else {
-            document.getElementById('estados-status').textContent = '❌ '+(d.error||'Error');
+            showToast('❌ '+(d.error||'Error al publicar'), 'error');
         }
-        setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 5000);
     }).catch(function(e){
-        document.getElementById('estados-status').textContent = '❌ Error de red: '+(e.message||'sin conexión');
-        setTimeout(function(){ document.getElementById('estados-status').textContent = ''; }, 4000);
+        showToast('❌ Error de red: '+(e.message||'sin conexión'), 'error');
     });
 }
 function loadEstadosHistory() {
-    fetch(apiUrl('api/estados.php?action=history')).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/estados.php?action=history'), {credentials: 'same-origin'}).then(r=>r.json()).then(d=>{
         if (!d.ok) return;
         var html = d.log.slice(0,10).map(function(e){
             var date = e.published_at ? new Date(e.published_at).toLocaleString('es-ES') : '?';
@@ -1939,19 +2341,41 @@ function loadEstadosHistory() {
     });
 }
 
-// ── Helper ──
+// ── Helpers ──
 function escHtml(s) { var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// ── Toast Notification System ──
+function showToast(message, type) {
+    type = type || 'info';
+    var container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        document.body.appendChild(container);
+    }
+    var icons = {success:'✅', error:'❌', warning:'⚠️', info:'ℹ️', loading:'⏳'};
+    var toast = document.createElement('div');
+    toast.className = 'toast toast--' + type;
+    toast.innerHTML = '<span class="toast-icon">'+(icons[type]||icons.info)+'</span><span class="toast-message">'+escHtml(message)+'</span>';
+    container.appendChild(toast);
+    // Auto-dismiss: success/warning/info 3.5s, error 6s
+    var duration = type === 'error' ? 6000 : 3500;
+    setTimeout(function(){
+        toast.classList.add('toast--removing');
+        setTimeout(function(){ if (toast.parentNode) toast.remove(); }, 300);
+    }, duration);
+}
 
 // ── Clientes ──
 function loadClientes() {
-    fetch(apiUrl('api/clientes.php?action=list')).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/clientes.php?action=list'), {credentials: 'same-origin'}).then(r=>r.json()).then(d=>{
         if (!d.ok) return;
         var html = '';
         if (d.leads.length === 0) {
-            html = '<p style="color:var(--text-muted);text-align:center;padding:20px">No hay leads registrados todavía.</p>';
+            html = '<p class="empty-state">No hay leads registrados todavía.</p>';
         } else {
             html = '<div style="display:flex;gap:8px;margin-bottom:12px"><span style="color:var(--text-muted);font-size:.8rem">'+d.total+' leads</span></div>';
-            html += '<table class="memory-table" style="font-size:.82rem"><thead><tr><th>Fecha</th><th>Teléfono</th><th>Línea</th><th>Confianza</th><th>¿Llegó?</th></tr></thead><tbody>';
+            html += '<div class="table-responsive"><table class="memory-table" style="font-size:.82rem"><thead><tr><th>Fecha</th><th>Teléfono</th><th>Línea</th><th>Confianza</th><th>¿Llegó?</th></tr></thead><tbody>';
             d.leads.forEach(function(l){
                 var arrivedIcon = l.arrived ? '✅ Sí' : '❌ No';
                 var arrivedBtn = l.arrived
@@ -1960,17 +2384,110 @@ function loadClientes() {
                 var confColor = parseInt(l.confidence) > 80 ? 'color:var(--ok)' : (parseInt(l.confidence) > 50 ? 'color:var(--warn)' : 'color:var(--text-muted)');
                 html += '<tr><td class="mono">'+escHtml(l.ts)+'</td><td class="mono">'+escHtml(l.phone)+'</td><td>'+escHtml(l.line_label)+'</td><td style="'+confColor+'">'+l.confidence+'</td><td>'+arrivedBtn+'</td></tr>';
             });
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
         }
         document.getElementById('clientes-table-container').innerHTML = html;
     });
 }
 function markLeadArrived(threadId, arrived) {
+    if (IS_DEMO) { showDemoToast(); return; }
     var fd = new FormData(); fd.append('csrf_token', _csrf); fd.append('thread_id', threadId);
     if (arrived) fd.append('arrived', '1'); else fd.append('arrived', '0');
-    fetch('api/clientes.php?action=mark_arrived', {method:'POST',body:fd}).then(r=>r.json()).then(d=>{
-        if (d.ok) loadClientes(); else alert('Error: '+(d.error||'Desconocido'));
+    fetch('api/clientes.php?action=mark_arrived', {method:'POST',body:fd,credentials:'same-origin'}).then(r=>r.json()).then(d=>{
+        if (d.ok) { loadClientes(); showToast('✅ Lead actualizado', 'success'); }
+        else { showToast('❌ Error: '+(d.error||'Desconocido'), 'error'); }
     });
+}
+
+// ── Aprendizaje ──
+function loadAprendizaje() {
+    // Stats + playbook
+    fetch(apiUrl('api/aprendizaje.php?action=stats'), {credentials: 'same-origin'}).then(function(r){return r.json();}).then(function(d){
+        if (!d.ok) return;
+        var s = d.stats;
+
+        // Stats cards
+        var html = '';
+        function card(num, label, color) {
+            html += '<div style="flex:1;min-width:105px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center">';
+            html += '<div style="font-size:1.5rem;font-weight:700;color:'+color+'">'+num+'</div>';
+            html += '<div style="font-size:.7rem;color:var(--text-muted);margin-top:2px">'+label+'</div></div>';
+        }
+        card(s.total_classified, 'Analizadas', 'var(--primary)');
+        card(s.leads, 'Leads', 'var(--ok)');
+        card(s.mareador, 'Mareadores', 'var(--warn)');
+        card(s.lead_ghosted, 'Ghosteos', 'var(--danger)');
+        card(s.pending_review, 'Pendientes', 'var(--info)');
+        document.getElementById('learning-stats').innerHTML = html;
+
+        // Playbook
+        var pb = document.getElementById('learning-playbook');
+        var ps = document.getElementById('playbook-status');
+        if (s.playbook_exists) {
+            ps.innerHTML = '<span style="color:var(--ok)">✅ Activo</span> <span style="color:var(--text-muted);font-size:.78rem;margin-left:8px">Actualizado: '+escHtml(s.playbook_updated)+'</span>';
+        } else {
+            ps.innerHTML = '<span style="color:var(--danger)">❌ No generado</span>';
+        }
+        pb.style.display = 'block';
+    });
+
+    // Outcomes
+    fetch(apiUrl('api/aprendizaje.php?action=outcomes'), {credentials: 'same-origin'}).then(function(r){return r.json();}).then(function(d){
+        if (!d.ok) return;
+        document.getElementById('outcomes-count').textContent = d.total + ' conversaciones clasificadas';
+        var tbody = document.getElementById('outcomes-tbody');
+        if (d.outcomes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text-muted)">No hay conversaciones clasificadas todavía.</td></tr>';
+            return;
+        }
+        var oc = {
+            'lead_probable':    'var(--info)',
+            'lead_confirmado':  'var(--ok)',
+            'lead_ghosted':     'var(--warn)',
+            'mareador':         '#f59e0b',
+            'hostil':           'var(--danger)',
+            'muerta':           'var(--text-muted)',
+            'indeterminado':    'var(--text-muted)'
+        };
+        var html = '';
+        d.outcomes.forEach(function(o){
+            var color = oc[o.outcome] || 'var(--text-muted)';
+            var label = o.human_confirmed ? (o.outcome + ' ✓') : o.outcome;
+            var btns = '';
+            if (o.outcome === 'lead_probable' || o.outcome === 'lead_detectado') {
+                btns = '<button class="btn btn-sm" onclick="confirmOutcome(\''+escHtml(o.thread_id)+'\',\'lead_confirmado\')" style="background:var(--ok-bg);color:var(--ok);margin:2px">✅ Vino</button>' +
+                       '<button class="btn btn-sm" onclick="confirmOutcome(\''+escHtml(o.thread_id)+'\',\'lead_ghosted\')" style="background:var(--warn-bg);color:var(--warn);margin:2px">❌ No vino</button>';
+            }
+            html += '<tr style="border-bottom:1px solid var(--border)">';
+            html += '<td style="padding:8px;font-family:monospace;font-size:.75rem">'+escHtml(o.phone)+'</td>';
+            html += '<td style="padding:8px"><span style="color:'+color+';font-weight:600">'+escHtml(label)+'</span></td>';
+            html += '<td style="padding:8px">'+(o.message_count||0)+'</td>';
+            html += '<td style="padding:8px;font-size:.75rem;color:var(--text-muted)">'+escHtml((o.classified_at||'').substring(0,10))+'</td>';
+            html += '<td style="padding:8px">'+btns+'</td>';
+            html += '</tr>';
+        });
+        tbody.innerHTML = html;
+    });
+}
+
+function confirmOutcome(threadId, newOutcome) {
+    if (IS_DEMO) { showDemoToast(); return; }
+    fetch(apiUrl('api/aprendizaje.php?action=confirm_outcome'), {
+        method: 'POST',
+        body: JSON.stringify({thread_id: threadId, outcome: newOutcome}),
+        credentials: 'same-origin'
+    }).then(function(r){return r.json();    }).then(function(d){ if (d.ok) { loadAprendizaje(); showToast('✅ Clasificación actualizada', 'success'); } });
+}
+
+function viewPlaybook() {
+    var preview = document.getElementById('playbook-preview');
+    if (preview.style.display === 'block') { preview.style.display = 'none'; return; }
+    preview.style.display = 'block';
+    preview.textContent = 'Cargando…';
+    fetch(apiUrl('api/aprendizaje.php?action=playbook'), {credentials: 'same-origin'}).then(function(r){return r.json();}).then(function(d){
+        if (d.ok) preview.textContent = d.content || '(playbook vacío)';
+        else preview.textContent = 'Error: '+(d.error||'desconocido');
+    }).catch(function(){ preview.textContent = 'Error al cargar el playbook.'; });
 }
 
 // ── Mensajes (via ChatApp modal) ──
@@ -1980,8 +2497,26 @@ function markLeadArrived(threadId, arrived) {
 
 // ── Estadísticas ──
 function loadEstadisticas() {
-    fetch(apiUrl('api/stats.php')).then(r=>r.json()).then(d=>{
-        if (!d.ok) { document.getElementById('estadisticas-container').innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:30px">Error al cargar estadísticas.</p>'; return; }
+    var container = document.getElementById('estadisticas-container');
+    if (!container) return;
+    container.innerHTML = '<div style="text-align:center;padding:40px"><p style="color:var(--text-muted);font-size:1.1rem">⏳ Cargando estadísticas…</p></div>';
+
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 15000);
+
+    fetch(apiUrl('api/stats.php'), {credentials: 'same-origin', signal: controller.signal})
+    .then(function(r) {
+        clearTimeout(timeoutId);
+        if (!r.ok) { throw new Error('HTTP ' + r.status + ' ' + r.statusText); }
+        return r.json();
+    })
+    .then(function(d) {
+        if (!d.ok) {
+            var errMsg = d.error || 'Error desconocido';
+            container.innerHTML = '<p class="empty-state empty-state--large">⚠️ Error al cargar estadísticas: ' + escHtml(errMsg) + '</p>';
+            if (window.console) console.warn('[stats] API returned ok:false:', errMsg);
+            return;
+        }
         var s = d.stats;
 
         // Hero stat: arrival rate with progress ring
@@ -2006,18 +2541,18 @@ function loadEstadisticas() {
         // Quick stats
         html += '<div style="flex:2;min-width:300px">';
         html += '<div class="stats-grid">';
-        html += '<div class="stat-card"><div class="stat-num" style="color:var(--info)">'+s.conversations_total+'</div><div class="stat-label">💬 Conversaciones</div><div class="stat-sub">'+s.conversations_today+' hoy</div></div>';
-        html += '<div class="stat-card"><div class="stat-num" style="color:var(--ok)">'+s.leads_total+'</div><div class="stat-label">🎯 Leads</div><div class="stat-sub">'+s.leads_today+' hoy</div></div>';
-        html += '<div class="stat-card"><div class="stat-num" style="color:#a78bfa">'+s.leads_arrived+'</div><div class="stat-label">✅ Llegaron</div><div class="stat-sub">'+s.leads_pending+' pendientes</div></div>';
-        html += '<div class="stat-card"><div class="stat-num" style="color:var(--accent)">'+s.girls_active+'</div><div class="stat-label">👩 Chicas</div><div class="stat-sub">Activas</div></div>';
-        html += '<div class="stat-card"><div class="stat-num" style="color:var(--accent2)">'+s.lines_active+'</div><div class="stat-label">📱 Líneas</div><div class="stat-sub">Vinculadas</div></div>';
-        html += '<div class="stat-card"><div class="stat-num" style="color:var(--money)">'+s.conversations_week+'</div><div class="stat-label">📅 Esta semana</div><div class="stat-sub">Conversaciones</div></div>';
+        html += '<div class="stat-card"><div class="stat-num stat-num--info">'+s.conversations_total+'</div><div class="stat-label">💬 Conversaciones</div><div class="stat-sub">'+s.conversations_today+' hoy</div></div>';
+        html += '<div class="stat-card"><div class="stat-num stat-num--ok">'+s.leads_total+'</div><div class="stat-label">🎯 Leads</div><div class="stat-sub">'+s.leads_today+' hoy</div></div>';
+        html += '<div class="stat-card"><div class="stat-num stat-num--accent2">'+s.leads_arrived+'</div><div class="stat-label">✅ Llegaron</div><div class="stat-sub">'+s.leads_pending+' pendientes</div></div>';
+        html += '<div class="stat-card"><div class="stat-num stat-num--accent">'+s.girls_active+'</div><div class="stat-label">👩 Chicas</div><div class="stat-sub">Activas</div></div>';
+        html += '<div class="stat-card"><div class="stat-num stat-num--accent2">'+s.lines_active+'</div><div class="stat-label">📱 Líneas</div><div class="stat-sub">Vinculadas</div></div>';
+        html += '<div class="stat-card"><div class="stat-num stat-num--ok">'+s.conversations_week+'</div><div class="stat-label">📅 Esta semana</div><div class="stat-sub">Conversaciones</div></div>';
         html += '</div>';
         html += '</div></div>';
 
         // 7-day chart
         var maxVal = Math.max.apply(null, d.stats.daily_graph.map(function(g){ return Math.max(g.conversations, g.leads); })) || 1;
-        var colors = ['var(--info)','var(--accent)','var(--ok)','var(--money)','var(--accent2)','#a78bfa','#f97316'];
+        var colors = ['var(--info)','var(--accent)','var(--ok)','var(--money)','var(--accent2)','var(--accent2)','var(--warn)'];
         html += '<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px;margin-bottom:16px">';
         html += '<h3 style="margin-bottom:14px">📊 Actividad últimos 7 días</h3>';
         html += '<div style="display:flex;align-items:flex-end;height:130px;gap:4px;padding:0 2px">';
@@ -2042,19 +2577,26 @@ function loadEstadisticas() {
         var ratio = s.leads_total > 0 && s.conversations_total > 0 ? (s.leads_total/s.conversations_total*100).toFixed(1) : 0;
         html += '<div style="display:flex;flex-wrap:wrap;gap:20px;justify-content:center;font-size:.82rem">';
         html += '<div><span style="color:var(--text-muted)">Conversión:</span> <strong style="color:var(--accent)">'+ratio+'%</strong> de conversaciones generan lead</div>';
-        html += '<div><span style="color:var(--text-muted)">Efectividad:</span> <strong style="color:var(--ok)">'+(s.leads_arrived>0&&s.leads_total>0?(s.leads_arrived/s.leads_total*100).toFixed(0):0)+'%</strong> de leads llegaron</div>';
+        html += '<div><span style="color:var(--text-muted)">Efectividad:</span> <strong class="rec-label">'+(s.leads_arrived>0&&s.leads_total>0?(s.leads_arrived/s.leads_total*100).toFixed(0):0)+'%</strong> de leads llegaron</div>';
         html += '<div><span style="color:var(--text-muted)">Promedio diario:</span> <strong style="color:var(--info)">'+(s.leads_week>0?(s.leads_week/7).toFixed(1):0)+'</strong> leads/día</div>';
         html += '</div></div>';
 
-        document.getElementById('estadisticas-container').innerHTML = html;
-    }).catch(function(){
-        document.getElementById('estadisticas-container').innerHTML = '<div style="text-align:center;padding:40px"><p style="color:var(--text-muted);font-size:1.1rem">📊 Sin datos todavía</p><p style="color:var(--text-muted);margin-top:4px">Las estadísticas aparecerán cuando el bot empiece a recibir mensajes.</p></div>';
+        container.innerHTML = html;
+    })
+    .catch(function(err) {
+        clearTimeout(timeoutId);
+        if (window.console) console.error('[stats] Fetch error:', err);
+        if (err && err.name === 'AbortError') {
+            container.innerHTML = '<div style="text-align:center;padding:40px"><p style="color:var(--warn);font-size:1.1rem">⏱️ La carga de estadísticas tardó demasiado</p><p style="color:var(--text-muted);margin-top:4px">Inténtalo de nuevo en unos segundos.</p><button class="btn btn-primary" style="margin-top:12px" onclick="loadedTabs[\'tab-estadisticas\']=false;loadEstadisticas();">Reintentar</button></div>';
+        } else {
+            container.innerHTML = '<div style="text-align:center;padding:40px"><p style="color:var(--warn);font-size:1.1rem">⚠️ No se pudieron cargar las estadísticas</p><p style="color:var(--text-muted);margin-top:4px;font-size:.85rem">Error: ' + escHtml((err && err.message) || 'Conexión fallida') + '</p><button class="btn btn-primary" style="margin-top:12px" onclick="loadedTabs[\'tab-estadisticas\']=false;loadEstadisticas();">Reintentar</button></div>';
+        }
     });
 }
 
 // ── Registro (Logs) ──
 function loadRegistro() {
-    fetch(apiUrl('api/logs.php')).then(r=>r.json()).then(d=>{
+    fetch(apiUrl('api/logs.php'), {credentials: 'same-origin'}).then(r=>r.json()).then(d=>{
         if (d.ok) {
             document.getElementById('registro-pre').textContent = d.log || '(sin actividad todavía)';
         } else {
@@ -2067,19 +2609,139 @@ function loadRegistro() {
     });
 }
 
+// ── Dashboard refresh ──
+function loadDashboard() {
+    fetch(apiUrl('api/stats.php'), {credentials: 'same-origin'})
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(d) {
+        if (!d.ok) return;
+        var s = d.stats;
+        var p = d.setup;
+
+        // ── Progress bar ──
+        var progEl = document.getElementById('dashboard-progress');
+        if (progEl) {
+            if (p.progress_pct < 100) {
+                progEl.innerHTML =
+                    '<div class="progress-bar-wrap">' +
+                    '<div class="progress-bar">' +
+                    '<span>⚙️ Configuración: ' + p.progress_done + '/' + p.progress_total + '</span>' +
+                    '<div class="progress-bar-track">' +
+                    '<div class="progress-bar-fill" style="width:' + p.progress_pct + '%"></div>' +
+                    '</div>' +
+                    '<span>' + p.progress_pct + '%</span>' +
+                    '</div></div>';
+            } else {
+                progEl.innerHTML = '';
+            }
+        }
+
+        // ── Build dynamic dashboard HTML ──
+        var botStatusClass = p.bot_status === 'start' ? 'status-on' : (p.bot_status === 'stop' ? 'status-off' : 'status-unknown');
+        var botStatusLabel = p.bot_status === 'start' ? 'ENCENDIDO' : (p.bot_status === 'stop' ? 'APAGADO' : 'DESCONOCIDO');
+
+        var heroHtml = '';
+        if (p.progress_pct < 100) {
+            heroHtml =
+                '<div class="dashboard-hero">' +
+                '<div class="dashboard-hero-inner">' +
+                '<span class="dh-emoji">🚀</span>' +
+                '<div class="dh-body">' +
+                '<strong class="dh-title">Completa estos simples pasos para poner en marcha tu bot ya mismo</strong>' +
+                '<p class="dh-desc">Muy fácil de usar. <strong>CasaWasap</strong>, tu asistente que te ayuda a comunicarte y fidelizar clientes.</p>' +
+                '</div></div></div>';
+        } else {
+            heroHtml =
+                '<div class="dashboard-hero dashboard-hero--done">' +
+                '<div class="dashboard-hero-inner">' +
+                '<span class="dh-emoji">✅</span>' +
+                '<div class="dh-body">' +
+                '<strong class="dh-title">¡Todo listo! Has completado todos los pasos de configuración</strong>' +
+                '<p class="dh-desc">Tu bot ya está en marcha. Si quieres modificar algo, vuelve a las pestañas de configuración cuando quieras.</p>' +
+                '</div></div></div>';
+        }
+
+        var cards = [
+            {id:'lineas', icon:'📱', title:'Vincular WhatsApp', ok: p.lines_linked, okText:'Conectado', failText:'Pendiente', hint:'Vincula tus números en Líneas', tab:'tab-lineas'},
+            {id:'tarifas', icon:'💰', title:'Configurar tarifas', ok: p.tarifas_configured, okText:'Configuradas', failText:'Sin definir', hint:'Define tus precios en Personalidad', tab:'tab-personalidad'},
+            {id:'chicas', icon:'👩', title:'Chicas activas', ok: p.girls_active_bool, okText: s.girls_active + ' activa' + (s.girls_active !== 1 ? 's' : ''), failText:'Ninguna', hint:'Añade tu catálogo en Chicas', tab:'tab-chicas'},
+            {id:'avisos', icon:'📬', title:'Configurar avisos', ok: p.notifications_configured, okText:'Activados', failText:'Sin avisos', hint:'Configura Telegram o WhatsApp en Notificaciones', tab:'tab-clientes'}
+        ];
+        var cardsHtml = '<div class="setup-grid">';
+        cards.forEach(function(c) {
+            var cls = c.ok ? 'setup-card--ok' : 'setup-card--fail';
+            var badgeCls = c.ok ? 'setup-badge--ok' : 'setup-badge--fail';
+            cardsHtml +=
+                '<div class="setup-card ' + cls + '" onclick="switchTab(\'' + c.tab + '\')">' +
+                '<span class="setup-icon">' + c.icon + '</span>' +
+                '<span class="setup-title">' + c.title + '</span>' +
+                '<span class="setup-badge ' + badgeCls + '">' + (c.ok ? '✅ ' + c.okText : '❌ ' + c.failText) + '</span>';
+            if (!c.ok) cardsHtml += '<span class="setup-hint">' + c.hint + '</span>';
+            cardsHtml += '</div>';
+        });
+        cardsHtml += '</div>';
+
+        var ctaHtml = '';
+        if (p.progress_pct >= 100 && !p.bot_ever_on) {
+            ctaHtml =
+                '<div class="setup-cta">' +
+                '<div class="cta-icon">🚀</div>' +
+                '<div class="cta-title">¡Todo listo!</div>' +
+                '<div class="cta-sub">Enciende tu bot con el botón ▶ ENCENDER de arriba y empieza a recibir clientes automáticamente.</div>' +
+                '</div>';
+        }
+
+        var ratioVal = s.conversations_total > 0 ? Math.round(s.conversations_total / Math.max(s.leads_total, 1) * 10) / 10 : 0;
+
+        var statsHtml =
+            '<div class="card">' +
+            '<h2>Estadísticas</h2>' +
+            '<div class="stats-grid">' +
+            '<div class="stat-card"><div class="stat-num stat-num--info">' + s.conversations_total + '</div><div class="stat-label">Conversaciones totales</div></div>' +
+            '<div class="stat-card"><div class="stat-num stat-num--accent">' + s.conversations_today + '</div><div class="stat-label">Conversaciones hoy</div></div>' +
+            '<div class="stat-card"><div class="stat-num stat-num--ok">' + s.leads_total + '</div><div class="stat-label">Leads totales</div></div>' +
+            '<div class="stat-card"><div class="stat-num stat-num--ok">' + s.leads_today + '</div><div class="stat-label">Leads hoy</div></div>' +
+            '<div class="stat-card"><div class="stat-num stat-num--accent2">' + s.lines_active + '</div><div class="stat-label">Líneas WhatsApp</div><div class="stat-sub">Vinculadas al bot</div></div>' +
+            '<div class="stat-card"><div class="stat-num stat-num--accent2">' + s.girls_active + '</div><div class="stat-label">Chicas activas</div><div class="stat-sub">En catálogo</div></div>' +
+            '<div class="stat-card"><div class="stat-num stat-num--ok">' + (s.leads_arrived || 0) + '</div><div class="stat-label">Clientes recibidos</div><div class="stat-sub">Marcados como llegados</div></div>' +
+            '<div class="stat-card"><div class="stat-num stat-num--warn">' + ratioVal + '</div><div class="stat-label">Ratio conv/lead</div><div class="stat-sub">Conversaciones por lead</div></div>' +
+            '</div></div>';
+
+        var dynEl = document.getElementById('dashboard-dynamic');
+        if (dynEl) {
+            dynEl.innerHTML =
+                '<div class="card bot-status-bar">' +
+                '<span class="bot-emoji">🤖</span>' +
+                '<span class="bot-label">Estado del Bot</span>' +
+                '<span class="bot-indicator ' + botStatusClass + '"></span>' +
+                '<span class="bot-status-text">' + botStatusLabel + '</span>' +
+                '</div>' +
+                heroHtml + cardsHtml + ctaHtml + statsHtml;
+        }
+    })
+    .catch(function() { /* silent fail — server-rendered HTML is the fallback */ });
+}
+
 // ── Load data when tabs become active ──
 var tabLoaders = {
+    'tab-dashboard': loadDashboard,
     'tab-lineas': loadLines,
     'tab-chicas': loadGirls,
     'tab-estados': function() { loadEstadosConfig(); loadEstadosHistory(); },
     'tab-clientes': loadClientes,
-    'tab-mensajes': function() { if (typeof ChatApp !== 'undefined') { setTimeout(function() { ChatApp.open(); }, 50); } }, // ChatApp modal — direct open
+    'tab-mensajes': function() { if (typeof ChatApp !== 'undefined') { ChatApp.open(); } }, // Always re-open (user may have closed)
     'tab-estadisticas': loadEstadisticas,
+    'tab-learning': loadAprendizaje,
 };
 var loadedTabs = {};
 document.querySelectorAll('#tabNav button[data-tab]').forEach(function(btn){
     btn.addEventListener('click', function(){
         var tabId = btn.getAttribute('data-tab');
+        // Dashboard and Chat always refresh (data may have changed)
+        if (tabId === 'tab-dashboard' || tabId === 'tab-mensajes') {
+            if (tabLoaders[tabId]) tabLoaders[tabId]();
+            return;
+        }
         if (tabLoaders[tabId] && !loadedTabs[tabId]) { loadedTabs[tabId]=true; tabLoaders[tabId](); }
     });
 });
@@ -2150,7 +2812,7 @@ document.querySelectorAll('#tabNav button[data-tab]').forEach(function(btn){
         function row(icon, label, value, ok, extra) {
             var color = ok ? 'var(--ok)' : 'var(--warn)';
             var icon2 = ok ? '✅' : '⚠️';
-            var bg = ok ? 'rgba(45,212,191,.04)' : 'rgba(251,191,36,.04)';
+            var bg = ok ? 'var(--ok-bg)' : 'var(--warn-bg)';
             var extraHtml = extra ? '<span style="display:block;font-size:.7rem;color:var(--text-muted);margin-top:1px">'+escHtml(extra)+'</span>' : '';
             return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:5px;background:'+bg+';border-radius:6px;border-left:3px solid '+color+'">'+
                 '<span style="font-size:1.1rem;flex-shrink:0;width:28px;text-align:center">'+icon+'</span>'+
@@ -2181,6 +2843,102 @@ document.querySelectorAll('#tabNav button[data-tab]').forEach(function(btn){
     });
 })();
 </script>
+
+<?php if ($isDirectAccess): ?>
+<!-- ── App Backdrop (for mobile popovers) ── -->
+<div id="appBackdrop" hidden></div>
+
+<!-- ── Mobile Bottom Area (CTA bar + nav) ── -->
+<div class="mobile-bottom-area">
+<?php if ($isDemo): ?>
+<div class="demo-cta-bar">
+    <span class="demo-cta-bar-icon">👁️</span>
+    <div class="demo-cta-bar-body">
+        <strong>¿Te gusta CasaWasap?</strong>
+        <span>Pruébalo en tu casa 10 días gratis, sin tarjeta.</span>
+    </div>
+    <a href="https://casawasap.com/#registro" class="btn-demo-cta" target="_blank" rel="noopener">Empezar gratis →</a>
+</div>
+<script>document.body.classList.add('has-demo-cta');</script>
+<?php endif; ?>
+
+<!-- ── Mobile Bottom Navigation ── -->
+<nav class="mobile-bottom-nav" id="mobileBottomNav">
+    <!-- 1. Inicio -->
+    <button type="button" class="mobile-nav-item is-active"
+            data-activate-tab="tab-dashboard" aria-label="Inicio">
+        <span class="mobile-nav-icon">📊</span>
+        <span class="mobile-nav-label">Inicio</span>
+    </button>
+
+    <!-- 2. Chat -->
+    <button type="button" class="mobile-nav-item"
+            data-activate-tab="tab-mensajes" aria-label="Chat">
+        <span class="mobile-nav-icon">💬</span>
+        <span class="mobile-nav-label">Chat</span>
+    </button>
+
+    <!-- 3. Config básica → dropdown -->
+    <button type="button" class="mobile-nav-item mobile-nav-drop"
+            id="dropConfigBtn" aria-expanded="false" aria-controls="dropConfigPop" aria-label="Configuración">
+        <span class="mobile-nav-icon">⚙️</span>
+        <span class="mobile-nav-label">Config</span>
+    </button>
+    <div class="mobile-nav-popover" id="dropConfigPop" hidden>
+        <button type="button" class="mobile-nav-popover-link" data-activate-tab="tab-personalidad">
+            🎭 Personalidad
+        </button>
+        <button type="button" class="mobile-nav-popover-link" data-activate-tab="tab-lineas">
+            📱 Líneas
+        </button>
+        <button type="button" class="mobile-nav-popover-link" data-activate-tab="tab-chicas">
+            👩 Chicas
+        </button>
+        <button type="button" class="mobile-nav-popover-link" data-activate-tab="tab-clientes">
+            🔔 Notificaciones
+        </button>
+    </div>
+
+    <!-- 4. Fidelizar → dropdown -->
+    <button type="button" class="mobile-nav-item mobile-nav-drop"
+            id="dropFidelBtn" aria-expanded="false" aria-controls="dropFidelPop" aria-label="Fidelizar">
+        <span class="mobile-nav-icon">💝</span>
+        <span class="mobile-nav-label">Fideliz.</span>
+    </button>
+    <div class="mobile-nav-popover" id="dropFidelPop" hidden>
+        <button type="button" class="mobile-nav-popover-link" data-activate-tab="tab-estados">
+            📢 Estados
+        </button>
+        <button type="button" class="mobile-nav-popover-link" data-activate-tab="tab-seguimiento">
+            📨 Seguimiento
+        </button>
+    </div>
+
+    <!-- 5. Stats -->
+    <button type="button" class="mobile-nav-item"
+            data-activate-tab="tab-estadisticas" aria-label="Estadísticas">
+        <span class="mobile-nav-icon">📈</span>
+        <span class="mobile-nav-label">Stats</span>
+    </button>
+
+    <!-- 6. Ajustes y Salir → dropdown -->
+    <button type="button" class="mobile-nav-item mobile-nav-drop"
+            id="dropAjustesBtn" aria-expanded="false" aria-controls="dropAjustesPop" aria-label="Ajustes">
+        <span class="mobile-nav-icon">🧠</span>
+        <span class="mobile-nav-label">Ajustes</span>
+    </button>
+    <div class="mobile-nav-popover" id="dropAjustesPop" hidden>
+        <button type="button" class="mobile-nav-popover-link" data-activate-tab="tab-learning">
+            🧠 Aprendizaje
+        </button>
+        <button type="button" class="mobile-nav-popover-link" data-activate-tab="tab-ajustes">
+            ⚙️ Ajustes
+        </button>
+        <a href="logout" class="mobile-nav-popover-link">🚪 Salir</a>
+    </div>
+</nav>
+</div><!-- .mobile-bottom-area -->
+<?php endif; ?>
 
 </body>
 </html>

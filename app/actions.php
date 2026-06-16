@@ -2036,6 +2036,23 @@ function action_convert_casawasap_cliente() {
     redirect_to('index.php?page=casawasap&edit=' . urlencode($id));
 }
 
+/**
+ * Notifica un nuevo pago de Casawasap al admin vía Telegram.
+ */
+function crm_notificar_telegram_pago(array $pago, array $cliente): void {
+    $token = '7455622229:AAG7qFKsNS52Xn7WkWdxgshqriTZCVQedNE';
+    $chatId = '6755848011';
+    $msg  = "NUEVO PAGO Casawasap\n";
+    $msg .= "Cliente: " . ($cliente['nombre'] ?? '?') . "\n";
+    $msg .= "Importe: " . number_format((float) ($pago['importe'] ?? 0), 2) . " EUR\n";
+    $msg .= "Fecha: " . ($pago['fecha_hora'] ?? '?') . "\n";
+    if (!empty($pago['observaciones'])) {
+        $msg .= "Notas: " . $pago['observaciones'] . "\n";
+    }
+    $url = 'https://api.telegram.org/bot' . $token . '/sendMessage?chat_id=' . $chatId . '&text=' . urlencode($msg);
+    @file_get_contents($url);
+}
+
 function action_casawasap_add_pago() {
     $clienteId = trim(request_post('cliente_id'));
     $cliente = storage_find_by_id('casawasap_contactos.json', $clienteId);
@@ -2057,6 +2074,10 @@ function action_casawasap_add_pago() {
     );
 
     storage_upsert('casawasap_pagos.json', $row);
+
+    // Notificar a Telegram
+    crm_notificar_telegram_pago($row, $cliente);
+
     set_flash('ok', 'Pago registrado: +' . euro($row['importe']), 'money');
     redirect_to('index.php?page=casawasap&edit=' . urlencode($clienteId));
 }

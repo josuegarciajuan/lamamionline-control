@@ -21,6 +21,7 @@ if (empty($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['o
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $action = (string) ($_GET['action'] ?? 'list');
 $userId = (int) ($_SESSION['user_id'] ?? 0);
+$isDemo = (($_SESSION['username'] ?? '') === 'demo');
 if (($_SESSION['role']??'') === 'admin' && !empty($_SESSION['suplantar_user_id'])) {
     $userId = (int) $_SESSION['suplantar_user_id'];
 }
@@ -32,10 +33,14 @@ function requireValidCsrf(): void {
     if (strlen($secret) < 32) $secret = bin2hex(random_bytes(32));
     $token = (string) ($_POST['csrf_token'] ?? '');
     $userId = (int) ($_SESSION['user_id'] ?? 0);
-    $current = hash_hmac('sha256', $userId . '|' . date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
-    $prevSlot = max(0, floor((int) date('i') / 10) - 1);
-    $prev = hash_hmac('sha256', $userId . '|' . date('Y-m-d-H') . $prevSlot, $secret);
-    if ($token === '' || (!hash_equals($current, $token) && !hash_equals($prev, $token))) {
+    $now = time();
+    $valid = false;
+    for ($offset = 0; $offset <= 5; $offset++) {
+        $t = $now - ($offset * 600);
+        $expected = hash_hmac('sha256', $userId . '|' . date('Y-m-d-H', $t) . (int) floor((int) date('i', $t) / 10), $secret);
+        if (hash_equals($expected, $token)) { $valid = true; break; }
+    }
+    if ($token === '' || !$valid) {
         http_response_code(403); echo json_encode(['ok'=>false,'error'=>'CSRF invalid']); exit;
     }
 }
@@ -78,6 +83,7 @@ try {
             break;
 
         case 'mark_arrived':
+            if ($isDemo) { http_response_code(403); echo json_encode(['ok'=>false,'error'=>'Modo demo: solo lectura']); break; }
             if ($method !== 'POST') { echo json_encode(['ok'=>false,'error'=>'POST required']); break; }
             requireValidCsrf();
             $threadId = trim((string) ($_POST['thread_id'] ?? ''));

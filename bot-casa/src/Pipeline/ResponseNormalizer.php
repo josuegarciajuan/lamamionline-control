@@ -181,6 +181,52 @@ final class ResponseNormalizer implements PipelineStageInterface
                     $ctx['ya_enviado'] = filter_var($inner['ya_enviado'], FILTER_VALIDATE_BOOLEAN);
                 }
             }
+
+            // ── NUEVOS CAMPOS SEMÁNTICOS (reemplazan regex por comprensión LLM) ──
+
+            // --- mentioned_girl: nombre de la chica mencionada (según el LLM) ---
+            if (!empty($inner['mentioned_girl']) && is_string($inner['mentioned_girl'])) {
+                $ctx['__llm_mentioned_girl'] = trim($inner['mentioned_girl']);
+            }
+
+            // --- girl_selection_intent: si el cliente eligió chica para servicio ---
+            if (isset($inner['girl_selection_intent'])) {
+                $ctx['__llm_girl_selection_intent'] = filter_var($inner['girl_selection_intent'], FILTER_VALIDATE_BOOLEAN);
+            }
+
+            // --- conversation_health: alive | fading | dead ---
+            if (!empty($inner['conversation_health']) && is_string($inner['conversation_health'])) {
+                $health = strtolower(trim($inner['conversation_health']));
+                if (in_array($health, ['alive', 'fading', 'dead'], true)) {
+                    $ctx['__llm_conversation_health'] = $health;
+                }
+            }
+
+            // --- tarifa_elegida (desde el LLM) ---
+            if (isset($inner['tarifa_elegida']) && is_string($inner['tarifa_elegida'])) {
+                $tarifa = trim($inner['tarifa_elegida']);
+                if (in_array($tarifa, ['40', '50', '100'], true)) {
+                    $ctx['__llm_tarifa_elegida'] = $tarifa;
+                }
+            }
+
+            // --- buying_intent: none | exploring | strong ---
+            if (!empty($inner['buying_intent']) && is_string($inner['buying_intent'])) {
+                $intent = strtolower(trim($inner['buying_intent']));
+                if (in_array($intent, ['none', 'exploring', 'strong'], true)) {
+                    $ctx['__llm_buying_intent'] = $intent;
+                }
+            }
+
+            // --- wants_more_girls (el LLM puede refinar el flag del regex) ---
+            if (isset($inner['wants_more_girls'])) {
+                $ctx['wants_more_girls'] = filter_var($inner['wants_more_girls'], FILTER_VALIDATE_BOOLEAN);
+            }
+
+            // --- hot_curious: contenido sexual/picante ---
+            if (isset($inner['hot_curious'])) {
+                $ctx['__llm_hot_curious'] = filter_var($inner['hot_curious'], FILTER_VALIDATE_BOOLEAN);
+            }
         }
 
         // Fallback: if we couldn't parse JSON, use raw content
@@ -205,6 +251,22 @@ final class ResponseNormalizer implements PipelineStageInterface
         }
 
         $ctx['output_text'] = $userVisibleReply;
+
+        // ── Repair truncated compartir.site URLs ──
+        // The LLM sometimes outputs "site/pnb8l/" instead of the full
+        // "https://compartir.site/pnb8l/". Restore the missing prefix.
+        // Uses only fixed-width lookbehinds (PCRE-compatible).
+        // @-suppressed + null-guard so a regex compile error never corrupts output_text.
+        if ($ctx['output_text'] !== '') {
+            $replaced = @preg_replace(
+                '#(?<![\.\/])site/([a-z0-9]{5})/?(?=\s|$|[\n.,;!?])#i',
+                'https://compartir.site/$1/',
+                $ctx['output_text']
+            );
+            if ($replaced !== null) {
+                $ctx['output_text'] = $replaced;
+            }
+        }
 
         return $ctx;
     }

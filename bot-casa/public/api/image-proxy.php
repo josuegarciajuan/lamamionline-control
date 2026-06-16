@@ -72,8 +72,8 @@ if ($uid <= 0 || $img === '') {
 }
 
 // ── Path traversal protection ──
-// Only allow safe characters: a-z, 0-9, /, .
-if (preg_match('/[^a-z0-9\/\.\-]/i', $img)) {
+// Only allow safe characters: a-z, 0-9, /, ., -, _
+if (preg_match('/[^a-z0-9\/\.\-_]/i', $img)) {
     http_response_code(403);
     header('Content-Type: text/plain');
     echo 'Forbidden: invalid characters in img path';
@@ -150,8 +150,8 @@ if ($fileSize === false || $fileSize === 0) {
     exit;
 }
 
-// Cache headers (1 day for static images)
-$cacheSeconds = 86400;
+// Cache headers (1 hour for static images — allows updates without stale cache)
+$cacheSeconds = 3600;
 header('Content-Type: ' . $mimeMap[$ext]);
 header('Content-Length: ' . $fileSize);
 header('Cache-Control: public, max-age=' . $cacheSeconds);

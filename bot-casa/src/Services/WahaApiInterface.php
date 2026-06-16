@@ -24,5 +24,8 @@ interface WahaApiInterface
         array $delayConfig,
         string $incomingText = '',
         int $turnCount = 1,
+        float $userResponseTimeSec = 60.0,
+        bool $isBurst = false,
+        bool $isUrgent = false,
     ): bool;
 }

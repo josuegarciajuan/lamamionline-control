@@ -22,10 +22,10 @@ if (empty($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['o
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $action = (string) ($_GET['action'] ?? 'list');
 $userId = (int) ($_SESSION['user_id'] ?? 0);
+$isDemo = (($_SESSION['username'] ?? '') === 'demo');
 if (($_SESSION['role']??'') === 'admin' && !empty($_SESSION['suplantar_user_id'])) {
     $userId = (int) $_SESSION['suplantar_user_id'];
 }
-
 
 
 function requireValidCsrf(): void {
@@ -35,10 +35,14 @@ function requireValidCsrf(): void {
     if (strlen($secret) < 32) $secret = bin2hex(random_bytes(32));
     $token = (string) ($_POST['csrf_token'] ?? '');
     $userId = (int) ($_SESSION['user_id'] ?? 0);
-    $current = hash_hmac('sha256', $userId . '|' . date('Y-m-d-H') . floor((int) date('i') / 10), $secret);
-    $prevSlot = max(0, floor((int) date('i') / 10) - 1);
-    $prev = hash_hmac('sha256', $userId . '|' . date('Y-m-d-H') . $prevSlot, $secret);
-    if ($token === '' || (!hash_equals($current, $token) && !hash_equals($prev, $token))) {
+    $now = time();
+    $valid = false;
+    for ($offset = 0; $offset <= 5; $offset++) {
+        $t = $now - ($offset * 600);
+        $expected = hash_hmac('sha256', $userId . '|' . date('Y-m-d-H', $t) . (int) floor((int) date('i', $t) / 10), $secret);
+        if (hash_equals($expected, $token)) { $valid = true; break; }
+    }
+    if ($token === '' || !$valid) {
         http_response_code(403); echo json_encode(['ok'=>false,'error'=>'CSRF invalid']); exit;
     }
 }
@@ -52,20 +56,89 @@ function readNdjson(string $path): array {
     return $recs;
 }
 
+/**
+ * Returns the canonical read_status path for the current user.
+ * Per-user (userId>1): data/users/{userId}/read_status.json
+ * Admin/legacy (userId<=1): data/read_status.json (global)
+ */
+function readStatusPath(): string {
+    global $userId;
+    if ($userId > 1) {
+        return \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'read_status.json');
+    }
+    return WASAPBOT_ROOT . '/data/read_status.json';
+}
+
+/**
+ * Reads read_status from the canonical path.
+ * If the per-user file doesn't exist yet, seeds it from the global file
+ * so that future reads/writes stay on the same path (avoids race conditions).
+ */
 function readReadStatus(): array {
-    $path = WASAPBOT_ROOT . '/data/read_status.json';
-    if (!file_exists($path)) return [];
-    $raw = @file_get_contents($path);
-    if ($raw === false) return [];
-    $data = json_decode($raw, true);
-    return is_array($data) ? $data : [];
+    $path = readStatusPath();
+
+    // Direct hit: file already exists
+    if (file_exists($path)) {
+        $raw = @file_get_contents($path);
+        if ($raw !== false) {
+            $data = json_decode($raw, true);
+            if (is_array($data)) return $data;
+        }
+        // Corrupt file → fall through to seed
+    }
+
+    // Per-user file missing → seed from global (first-time migration)
+    global $userId;
+    if ($userId > 1) {
+        $globalPath = WASAPBOT_ROOT . '/data/read_status.json';
+        if (file_exists($globalPath)) {
+            $raw = @file_get_contents($globalPath);
+            if ($raw !== false) {
+                $data = json_decode($raw, true);
+                if (is_array($data)) {
+                    $dir = dirname($path);
+                    if (!is_dir($dir)) @mkdir($dir, 0700, true);
+                    @file_put_contents($path, json_encode($data, JSON_UNESCAPED_UNICODE), LOCK_EX);
+                    return $data;
+                }
+            }
+        }
+    }
+
+    return [];
 }
 
 function saveReadStatus(array $data): void {
-    $path = WASAPBOT_ROOT . '/data/read_status.json';
+    $path = readStatusPath();
     $dir = dirname($path);
-    if (!is_dir($dir)) @mkdir($dir, 0700, true);
-    @file_put_contents($path, json_encode($data, JSON_UNESCAPED_UNICODE), LOCK_EX);
+    if (!is_dir($dir)) {
+        if (!@mkdir($dir, 0700, true) && !is_dir($dir)) {
+            error_log('saveReadStatus: cannot create directory ' . $dir);
+            return;
+        }
+    }
+
+    // Self-heal: if file exists but is owned by another user (e.g. root),
+    // unlink it so the next write recreates it as www-data.
+    // www-data owns the parent directory, so unlink + recreate is allowed.
+    if (file_exists($path) && !is_writable($path)) {
+        if (!@unlink($path)) {
+            error_log('saveReadStatus: cannot unlink unwritable file ' . $path);
+            return;
+        }
+        clearstatcache(true, $path);
+    }
+
+    $json = json_encode($data, JSON_UNESCAPED_UNICODE);
+    if ($json === false) {
+        error_log('saveReadStatus: json_encode failed: ' . json_last_error_msg());
+        return;
+    }
+
+    $written = @file_put_contents($path, $json, LOCK_EX);
+    if ($written === false) {
+        error_log('saveReadStatus: file_put_contents failed for ' . $path . ' (dir writable: ' . (is_writable($dir) ? 'yes' : 'no') . ')');
+    }
 }
 
 /**
@@ -100,18 +173,63 @@ function wahaPost(string $url, string $headers, string $payload): array
     ];
 }
 
+/**
+ * Resolve the last9 for a given WAHA port by reading the user's lines.json.
+ * Falls back to root config routing.lines for admin (userId<=1) or if
+ * lines.json doesn't exist. This avoids the Config(userId) bug where
+ * Config's constructor ignores the second argument and always loads
+ * root config, whose routing.lines doesn't contain per-user lines.
+ */
+function resolveLast9FromPort(int $userId, string $port): string
+{
+    // Per-user: read lines.json (where api/lines.php stores line data)
+    if ($userId > 1) {
+        $linesPath = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'lines.json');
+        if (file_exists($linesPath)) {
+            $lines = @json_decode((string) @file_get_contents($linesPath), true);
+            if (is_array($lines)) {
+                foreach ($lines as $line) {
+                    if (is_array($line) && (string) ($line['port'] ?? '') === $port) {
+                        return (string) ($line['last9'] ?? '');
+                    }
+                }
+            }
+        }
+    }
+    // Fallback: root config routing.lines (admin or legacy)
+    $cfg = new \WasapBot\Core\Config(WASAPBOT_ROOT);
+    $routingLines = (array) $cfg->get('routing.lines', []);
+    foreach ($routingLines as $rl) {
+        if (is_array($rl) && (string) ($rl['port'] ?? '') === $port) {
+            return (string) ($rl['last9'] ?? '');
+        }
+    }
+    return '';
+}
+
 header('Content-Type: application/json; charset=utf-8');
 
+// ── Demo mode: block all mutations ──
+if ($isDemo && $method === 'POST') {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Modo demo: solo lectura']);
+    exit;
+}
+
 try {
-    $rootCfg = new \WasapBot\Core\Config(WASAPBOT_ROOT);
-    $baseMemory = (string) $rootCfg->get('files.session_memory', WASAPBOT_ROOT . '/public/data/session_memory.ndjson');
-    $baseLeads  = (string) $rootCfg->get('files.leads', WASAPBOT_ROOT . '/public/data/leads.ndjson');
+    // Resolve session_memory and leads paths the same way webhook.php does:
+    // load the user's config (which has paths resolved by Bot::bootstrap)
+    // and pass them through resolveUserDataPath for environment-independent resolution.
+    // This ensures chat reads from the EXACT same file the webhook writes to.
     if ($userId > 1) {
-        $memoryFile = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, basename($baseMemory));
-        $leadsFile  = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, basename($baseLeads));
+        $userConfigDir = \WasapBot\Bot::resolveUserConfigDir(WASAPBOT_ROOT, $userId);
+        $userCfg = new \WasapBot\Core\Config($userConfigDir);
+        $memoryFile = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, (string) $userCfg->get('files.session_memory', 'data/session_memory.ndjson'));
+        $leadsFile  = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, (string) $userCfg->get('files.leads', 'data/leads.ndjson'));
     } else {
-        $memoryFile = $baseMemory;
-        $leadsFile  = $baseLeads;
+        $rootCfg = new \WasapBot\Core\Config(WASAPBOT_ROOT);
+        $memoryFile = (string) $rootCfg->get('files.session_memory', WASAPBOT_ROOT . '/public/data/session_memory.ndjson');
+        $leadsFile  = (string) $rootCfg->get('files.leads', WASAPBOT_ROOT . '/public/data/leads.ndjson');
     }
     switch ($action) {
         case 'threads':
@@ -357,17 +475,8 @@ try {
             if (preg_match('/^(\d+)@/', $chatId, $m)) {
                 $phone = $m[1];
             }
-            // Determine thread_id from chatId phone + discover line last9 from routing
-            $last9 = '';
-            $cfg2 = new \WasapBot\Core\Config(WASAPBOT_ROOT, $userId);
-            $routingLines = (array) $cfg2->get('routing.lines', []);
-            foreach ($routingLines as $rl) {
-                $rlPort = (string) ($rl['port'] ?? '');
-                if ($rlPort === $port) {
-                    $last9 = (string) ($rl['last9'] ?? '');
-                    break;
-                }
-            }
+            // Resolve line last9 from user's lines.json (not root config routing.lines)
+            $last9 = resolveLast9FromPort($userId, $port);
             $threadId = ($last9 !== '' ? $last9 . '_' : '') . $phone;
 
             $record = [
@@ -483,15 +592,7 @@ try {
             // ── 5. Save to session_memory ─────────────────────────────
             $phone = '';
             if (preg_match('/^(\d+)@/', $chatId, $m)) { $phone = $m[1]; }
-            $last9 = '';
-            $cfgL = new \WasapBot\Core\Config(WASAPBOT_ROOT, $userId);
-            $routingLines = (array) $cfgL->get('routing.lines', []);
-            foreach ($routingLines as $rl) {
-                if ((string)($rl['port'] ?? '') === $port) {
-                    $last9 = (string)($rl['last9'] ?? '');
-                    break;
-                }
-            }
+            $last9 = resolveLast9FromPort($userId, $port);
             $threadId = ($last9 !== '' ? $last9 . '_' : '') . $phone;
 
             $record = [
@@ -542,7 +643,10 @@ try {
                 break;
             }
 
-            $pausedFile = WASAPBOT_ROOT . '/data/paused_threads.ndjson';
+            // Per-user paused threads for isolated users, global for admin/legacy
+            $pausedFile = ($userId > 1)
+                ? \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'paused_threads.ndjson')
+                : WASAPBOT_ROOT . '/data/paused_threads.ndjson';
             $dirP = dirname($pausedFile);
             if (!is_dir($dirP)) @mkdir($dirP, 0700, true);
 
@@ -611,8 +715,10 @@ try {
             break;
 
         case 'paused_list':
-            // List all paused threads (for initializing UI state)
-            $pausedFile = WASAPBOT_ROOT . '/data/paused_threads.ndjson';
+            // List all paused threads (for initializing UI state) — per-user aware
+            $pausedFile = ($userId > 1)
+                ? \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'paused_threads.ndjson')
+                : WASAPBOT_ROOT . '/data/paused_threads.ndjson';
             $paused = [];
             if (file_exists($pausedFile)) {
                 $lines = @file($pausedFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
@@ -702,15 +808,13 @@ try {
             $threadId = trim((string) ($_POST['thread_id'] ?? ''));
             if ($threadId === '') { echo json_encode(['ok'=>false,'error'=>'thread_id required']); break; }
 
-            // Get last message timestamp for this thread
-            $records = readNdjson($memoryFile);
-            $lastTs = '';
-            foreach ($records as $r) {
-                if (((string)($r['thread_id']??'')) === $threadId) {
-                    $ts = (string)($r['ts']??'');
-                    if ($ts > $lastTs) $lastTs = $ts;
-                }
-            }
+            // Use current server time (+10s buffer) as the read marker.
+            // This avoids reading the potentially huge session_memory.ndjson file,
+            // eliminates the risk of empty $lastTs triggering backfill, and
+            // dramatically reduces the race-condition window with concurrent
+            // threads/threads_summary writes.
+            // All messages with ts <= now will be considered read.
+            $lastTs = gmdate('Y-m-d\TH:i:s\Z', time() + 10);
 
             $readStatus = readReadStatus();
             $readStatus[$threadId] = $lastTs;
