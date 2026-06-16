@@ -6,12 +6,77 @@ function render_global_ui() {
     echo '<div id="appBackdrop" class="app-backdrop" hidden></div>';
     echo '<div id="voiceCommandBackdrop" class="voice-command-backdrop" hidden></div>';
     echo '<div class="app-shell-tools">';
-    echo '<button type="button" id="mobileMenuToggle" class="app-shell-btn app-shell-btn-mobile" aria-expanded="false" aria-controls="appSidebar">☰ Menú</button>';
-    echo '<button type="button" id="mobileAvisosToggle" class="app-shell-btn app-shell-btn-mobile" aria-expanded="false" aria-controls="avisosPanel">⚠ Avisos</button>';
-    echo '<button type="button" id="voiceCommandToggle" class="app-shell-btn app-shell-btn-voice" aria-expanded="false" aria-controls="voiceCommandPanel">🎙 Voz CRM</button>';
-    echo '<button type="button" id="appFullscreenToggle" class="app-shell-btn">⛶ Pantalla completa</button>';
+    $avisosCount = count(avisos_get_active());
+    $avisosBtnClass = $avisosCount > 0 ? ' app-shell-btn-avisos-active' : '';
+    echo '<button type="button" id="mobileAvisosToggle" class="app-shell-btn app-shell-btn-mobile' . $avisosBtnClass . '" aria-expanded="false" aria-controls="avisosPanel">⚠ Avisos' . ($avisosCount > 0 ? ' (' . $avisosCount . ')' : '') . '</button>';
+    echo '<button type="button" id="voiceCommandToggleMobile" class="app-shell-btn app-shell-btn-mobile app-shell-btn-mic" data-voice-command-toggle aria-expanded="false" aria-controls="voiceCommandPanel" aria-label="Abrir voz CRM" title="Abrir voz CRM">🎙</button>';
     echo '</div>';
 
+    // ── Bottom Navigation Bar (mobile only) — 4 tabs + hamburger "Más" ──
+    // Bloques lógicos: Home, Negocio (leads/ingresos), Comercial (automatización), Bot (chat)
+    $isHome      = in_array($page, ['dashboard', 'avisos']);
+    $isNegocio   = in_array($page, ['lamami','interesadas','clientas','lamamibot','jostal','gastos','casawasap','informes','gridmensual']);
+    $isComercial = in_array($page, ['comercial','publicista','bots']);
+    $isBot       = in_array($page, ['bot-casa']);
+
+    $navTabs = [
+        ['page' => 'dashboard', 'icon' => '📊', 'label' => 'Home',    'active' => $isHome],
+        ['page' => 'lamami',    'icon' => '💰', 'label' => 'Negocio', 'active' => $isNegocio],
+        ['page' => 'comercial', 'icon' => '📋', 'label' => 'Comerc.', 'active' => $isComercial],
+        ['page' => 'bot-casa',  'icon' => '🤖', 'label' => 'Bot',     'active' => $isBot],
+    ];
+
+    echo '<nav class="mobile-bottom-nav" id="mobileBottomNav">';
+    foreach ($navTabs as $tab) {
+        $cls = $tab['active'] ? ' is-active' : '';
+        echo '<a href="index.php?page=' . e($tab['page']) . '" class="mobile-nav-item' . $cls . '">';
+        echo '<span class="mobile-nav-icon">' . $tab['icon'] . '</span>';
+        echo '<span class="mobile-nav-label">' . $tab['label'] . '</span>';
+        echo '</a>';
+    }
+    // Hamburger "Más"
+    $isMas = in_array($page, ['josue']) ? ' is-active' : '';
+    echo '<button type="button" class="mobile-nav-item mobile-nav-mas' . $isMas . '" id="mobileMasToggle" aria-expanded="false" aria-haspopup="true">';
+    echo '<span class="mobile-nav-icon">☰</span>';
+    echo '<span class="mobile-nav-label">Más</span>';
+    echo '</button>';
+    echo '</nav>';
+
+    // ── "Más" bottom sheet ──
+    echo '<div class="mobile-mas-sheet" id="mobileMasSheet" hidden>';
+    echo '<div class="mobile-mas-sheet-backdrop" id="mobileMasBackdrop"></div>';
+    echo '<div class="mobile-mas-sheet-panel">';
+    echo '<div class="mobile-mas-sheet-handle"></div>';
+    echo '<div class="mobile-mas-sheet-title">Más opciones</div>';
+
+    $masGroups = [
+        ['title' => 'Gestión', 'links' => [
+            ['page' => 'jostal', 'label' => '💶 Jostal — Ingresos'],
+            ['page' => 'gastos', 'label' => '💸 Gastos'],
+            ['page' => 'informes', 'label' => '📈 Informes'],
+            ['page' => 'casawasap', 'label' => '📱 Casawasap — Líneas'],
+        ]],
+        ['title' => 'Herramientas', 'links' => [
+            ['page' => 'publicista', 'label' => '📢 Publicista'],
+            ['page' => 'bots', 'label' => '🤖 Bots'],
+            ['page' => 'avisos', 'label' => '⚠️ Avisos'],
+        ]],
+        ['title' => 'Sistema', 'links' => [
+            ['page' => 'josue', 'label' => '🔧 Josué'],
+            ['page' => 'logout', 'label' => '🚪 Cerrar sesión'],
+        ]],
+    ];
+
+    foreach ($masGroups as $group) {
+        echo '<div class="mobile-mas-group">';
+        echo '<div class="mobile-mas-group-title">' . e($group['title']) . '</div>';
+        foreach ($group['links'] as $link) {
+            echo '<a href="index.php?page=' . e($link['page']) . '" class="mobile-mas-link">' . $link['label'] . '</a>';
+        }
+        echo '</div>';
+    }
+    echo '</div>';
+    echo '</div>';
     echo '<section id="voiceCommandPanel" class="voice-command-panel" hidden aria-hidden="true">';
     echo '<div class="voice-command-head">';
     echo '<div>';
