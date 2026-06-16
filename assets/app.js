@@ -651,6 +651,7 @@
         var appBackdrop = document.getElementById('appBackdrop');
         var sidebar = document.getElementById('appSidebar');
         var appMain = document.getElementById('appMain');
+        var mobileMenuToggle = document.getElementById('mobileMenuToggle');
         var mobileAvisosToggle = document.getElementById('mobileAvisosToggle');
         var avisosPanel = document.getElementById('avisosPanel');
         var isMobile = window.matchMedia('(max-width: 767px)').matches;
@@ -659,9 +660,9 @@
         function closeMobilePanels() {
             document.body.classList.remove('mobile-nav-open');
             document.body.classList.remove('mobile-avisos-open');
+            if (mobileMenuToggle) mobileMenuToggle.setAttribute('aria-expanded', 'false');
             if (mobileAvisosToggle) mobileAvisosToggle.setAttribute('aria-expanded', 'false');
             if (appBackdrop) appBackdrop.hidden = true;
-            // Close any open form sheets and "Más" sheet on desktop resize
             document.querySelectorAll('.mobile-form-sheet').forEach(function(s) {
                 if (!s.hidden) { s.hidden = true; }
             });
@@ -674,9 +675,18 @@
             appBackdrop.hidden = !open;
         }
 
+        if (mobileMenuToggle && sidebar) {
+            mobileMenuToggle.addEventListener('click', function () {
+                var open = document.body.classList.toggle('mobile-nav-open');
+                document.body.classList.remove('mobile-avisos-open');
+                mobileMenuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                if (mobileAvisosToggle) mobileAvisosToggle.setAttribute('aria-expanded', 'false');
+                syncBackdrop();
+            });
+        }
+
         if (mobileAvisosToggle) {
             mobileAvisosToggle.addEventListener('click', function () {
-                // Empty or hidden panel: redirect to full avisos page
                 if (!avisosPanel || !avisosPanel.children.length || avisosPanel.textContent.trim() === '') {
                     window.location.href = 'index.php?page=avisos';
                     return;
@@ -684,6 +694,7 @@
                 var open = document.body.classList.toggle('mobile-avisos-open');
                 document.body.classList.remove('mobile-nav-open');
                 mobileAvisosToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                if (mobileMenuToggle) mobileMenuToggle.setAttribute('aria-expanded', 'false');
                 syncBackdrop();
             });
         }
@@ -2342,52 +2353,48 @@
         convertTablesToCards();
         setupSubtabOverflow();
 
-        // ── "Más" bottom sheet toggle (MOBILE-REDESIGN-V2) ──
-        var masToggle = document.getElementById('mobileMasToggle');
-        var masSheet = document.getElementById('mobileMasSheet');
-        var masBackdrop = document.getElementById('mobileMasBackdrop');
+        // ── Dropdown popover toggles (MOBILE-REDESIGN: replaces Más sheet) ──
+        var dropIds = ['dropCtrl', 'dropNeg', 'dropCom', 'dropSis'];
+        var activePop = null;
 
-        function openMasSheet() {
-            if (!masSheet) return;
-            masSheet.hidden = false;
-            document.body.style.overflow = 'hidden';
-            if (masToggle) masToggle.setAttribute('aria-expanded', 'true');
+        function closeAllPops() {
+            dropIds.forEach(function (id) {
+                var pop = document.getElementById(id + 'Pop');
+                var btn = document.getElementById(id);
+                if (pop) pop.hidden = true;
+                if (btn) btn.setAttribute('aria-expanded', 'false');
+            });
+            activePop = null;
         }
 
-        function closeMasSheet() {
-            if (!masSheet) return;
-            masSheet.hidden = true;
-            document.body.style.overflow = '';
-            if (masToggle) masToggle.setAttribute('aria-expanded', 'false');
-        }
+        dropIds.forEach(function (id) {
+            var btn = document.getElementById(id);
+            var pop = document.getElementById(id + 'Pop');
+            if (!btn || !pop) return;
 
-        if (masToggle) {
-            masToggle.addEventListener('click', function (e) {
+            btn.addEventListener('click', function (e) {
                 e.stopPropagation();
-                if (masSheet && !masSheet.hidden) {
-                    closeMasSheet();
+                if (activePop === id) {
+                    closeAllPops();
                 } else {
-                    openMasSheet();
+                    closeAllPops();
+                    pop.hidden = false;
+                    btn.setAttribute('aria-expanded', 'true');
+                    activePop = id;
                 }
             });
-        }
 
-        if (masBackdrop) {
-            masBackdrop.addEventListener('click', closeMasSheet);
-        }
-
-        // Close "Más" sheet when any link inside is clicked
-        if (masSheet) {
-            masSheet.querySelectorAll('.mobile-mas-link').forEach(function (link) {
-                link.addEventListener('click', closeMasSheet);
+            // Close when clicking a link inside the popover
+            pop.querySelectorAll('.mobile-nav-popover-link').forEach(function (link) {
+                link.addEventListener('click', function () {
+                    closeAllPops();
+                });
             });
-        }
+        });
 
-        // Escape key closes "Más" sheet
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && masSheet && !masSheet.hidden) {
-                closeMasSheet();
-            }
+        // Click outside closes any open popover
+        document.addEventListener('click', function () {
+            if (activePop) closeAllPops();
         });
     });
 })();
