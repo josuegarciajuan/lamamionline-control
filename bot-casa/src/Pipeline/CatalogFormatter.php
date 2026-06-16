@@ -73,6 +73,17 @@ final class CatalogFormatter implements PipelineStageInterface
         $selectedGirlName = (string) ($ctx['selected_girl_name'] ?? '');
         $selectedGirl     = $this->findGirlByName($girlsConfig, $selectedGirlName);
 
+        // If no selected girl in context, try to detect one from the output text.
+        // When the LLM talks about a specific girl by name, we should send
+        // photos of THAT girl, not the full catalog of all active girls.
+        if ($selectedGirl === null) {
+            $detected = $this->detectSingleGirlInOutput($outputText, $girlsConfig);
+            if ($detected !== null) {
+                $selectedGirl     = $detected;
+                $selectedGirlName = (string) ($detected['nombre'] ?? '');
+            }
+        }
+
         // --- Detect if user asks for MORE photos of selected girl ---
         $morePhotosResult = ['matched' => false, 'has_possessive' => false];
         if ($selectedGirl !== null) {
@@ -83,6 +94,16 @@ final class CatalogFormatter implements PipelineStageInterface
         // → let the LLM handle it ("solo tengo esas cari") — don't add photos.
         if ($morePhotosResult['matched'] && $morePhotosResult['has_possessive']) {
             return $ctx;
+        }
+
+        // ── FIX: when LLM sets photo_action='catalog' but there IS a selected_girl ──
+        // The LLM may say "te las mando otra vez" and set photo_action='catalog'
+        // (generic), but with a selected girl the bot should send ALL photos of
+        // THAT specific girl (selected_all), not the full catalog of all girls.
+        // Override photo_action to 'selected_all' to prevent catalog-priority bug.
+        if ($photoAction === 'catalog' && $selectedGirl !== null) {
+            $photoAction = 'selected_all';
+            $llmWantsPhotos = true;
         }
 
         // --- Determine mode and build photo list ---
@@ -278,6 +299,34 @@ final class CatalogFormatter implements PipelineStageInterface
         }
         $n = preg_replace('/[\x{0300}-\x{036f}]/u', '', $n) ?? $n;
         return mb_strtolower(trim((string) $n));
+    }
+
+    /**
+     * Detect if the output text mentions exactly ONE girl by name.
+     * Returns the girl record if exactly 1 is detected, null otherwise
+     * (0 or multiple matches).
+     *
+     * @param array<int, array<string, mixed>> $girls
+     * @return array<string, mixed>|null
+     */
+    private function detectSingleGirlInOutput(string $outputText, array $girls): ?array
+    {
+        if ($outputText === '' || $girls === []) {
+            return null;
+        }
+        $found = [];
+        $outputNorm = $this->normalizeStr($outputText);
+        foreach ($girls as $girl) {
+            if (!is_array($girl)) continue;
+            $name = (string) ($girl['nombre'] ?? '');
+            if ($name === '') continue;
+            $nameNorm = $this->normalizeStr($name);
+            if ($nameNorm !== '' && str_contains($outputNorm, $nameNorm)) {
+                $found[] = $girl;
+            }
+        }
+        // Only act if EXACTLY one girl is mentioned — avoid ambiguity
+        return count($found) === 1 ? $found[0] : null;
     }
 
     private function detectsGirls(string $normalizedText): bool

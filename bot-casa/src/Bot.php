@@ -134,7 +134,7 @@ final class Bot implements BotInterface
             if (isset($this->processors[0]) && $this->processors[0]->name() === 'ContextAssembler') {
                 $ctx = $this->processors[0]->process($ctx);
                 if ($ctx === null) {
-                    return null; // conversation_dead — stop, no OpenAI call
+                    return null; // ContextAssembler detected an error state
                 }
             }
 
@@ -340,7 +340,7 @@ final class Bot implements BotInterface
 
             // ── 10. Call AI chat completion (OpenAI or DeepSeek) ──────
             $systemPrompt = $this->buildSystemPrompt($ctx);
-            $userMessage  = $ctx['user_message'] ?? $messageText;
+            $userMessage  = $ctx['__llm_user_message'] ?? $ctx['user_message'] ?? $messageText;
 
             // Build multi-turn chat history from session memory
             $history = $this->buildChatHistory($ctx);
@@ -391,7 +391,13 @@ final class Bot implements BotInterface
                 $ctx['output_text'] = $openaiResponse['choices'][0]['message']['content'] ?? '';
             }
 
-            // ── 11b. Fallback: if LLM returned empty, send contingency text ──
+            // ── 11b. POST-LLM: apply LLM-derived semantic fields ───────
+            // The LLM now handles conversation understanding (girl matching,
+            // conversation health, buying intent, etc.). These fields override
+            // or supplement the regex-derived defaults from ContextAssembler.
+            $this->applyLlmSemanticFields($ctx);
+
+            // ── 11c. Fallback: if LLM returned empty, send contingency text ──
             if (trim((string) ($ctx['output_text'] ?? '')) === '') {
                 // ── DIAGNÓSTICO: loggear estado del raw response ──
                 $raw = $ctx['openai_raw_response'] ?? null;
@@ -418,7 +424,7 @@ final class Bot implements BotInterface
                 ]);
             }
 
-            // ── 11c. POST-AI guard: strip "todas comparten casita" ───
+            // ── 11d. POST-AI guard: strip "todas comparten casita" ───
             // The LLM sometimes mentions that all girls share the same
             // house even when the client didn't ask about independence.
             // This guard strips those phrases unless the client explicitly
@@ -1004,6 +1010,42 @@ final class Bot implements BotInterface
             }
         }
 
+        // ── SEMANTIC FIELDS: the LLM now handles conversation understanding ──
+        // These fields replace regex-based dead detection, girl matching,
+        // intent classification, and filler detection. The LLM sees the full
+        // conversation history and the list of active girls, so it can make
+        // better decisions than hardcoded patterns.
+        $base .= "\n\n### CAMPOS SEMÁNTICOS ADICIONALES (añadir al JSON de respuesta)\n"
+               . "Además de los campos obligatorios, incluye estos campos en tu JSON:\n\n"
+               . "- mentioned_girl: string | null. Nombre EXACTO de la chica mencionada en el mensaje del cliente.\n"
+               . "  Usa los nombres de CHICAS ACTIVAS que ves en el contexto. Si el cliente dice 'la rubia',\n"
+               . "  'ella', 'esa', o menciona un nombre con typo (ej: 'carima' por 'carina'), identifica a qué\n"
+               . "  chica se refiere. Si no menciona ninguna, pon null.\n\n"
+               . "- girl_selection_intent: boolean. true si el cliente está eligiendo explícitamente a una chica\n"
+               . "  para el servicio (ej: 'me quedo con sandra', 'prefiero a la rubia', 'pues carina',\n"
+               . "  'la sandra mejor'). false si solo menciona un nombre de pasada o no menciona ninguna.\n\n"
+                . "- conversation_health: 'alive' | 'fading' | 'dead'. Evalúa si la conversación sigue viva.\n"
+                . "  'alive': el cliente muestra interés genuino. 'fading': el cliente está perdiendo interés\n"
+                . "  (muchos monosílabos, respuestas cortas sin preguntas). 'dead': el cliente claramente\n"
+                . "  no va a convertir (se despidió, es hostil, solo hace preguntas sin intención real).\n"
+                . "  Si el cliente acaba de escribir un mensaje nuevo después de días de silencio,\n"
+                . "  trata la conversación como 'alive' — es un retorno, no una conversación muerta.\n"
+                . "  ⚠️ IMPORTANTE: Si el cliente pide fotos (normales o normales), precios, ubicación,\n"
+                . "  o cualquier información del servicio, la conversación NO está 'fading' ni 'dead'.\n"
+                . "  Pedir fotos/INFO es interés real. 'fading' solo aplica cuando el cliente lleva\n"
+                . "  varios mensajes diciendo solo 'vale', 'ok', 'gracias', 'jeje' o monosílabos\n"
+                . "  SIN ninguna pregunta ni petición de información.\n\n"
+               . "- tarifa_elegida: null | '40' | '50' | '100'. Si el cliente ha elegido una tarifa,\n"
+               . "  extráela. '40' para rapidito/10min, '50' para media hora, '100' para 1h o más.\n\n"
+               . "- buying_intent: 'none' | 'exploring' | 'strong'. Intención de compra del cliente.\n"
+               . "  'strong': dice que viene, da ETA, pide ubicación para venir ya.\n"
+               . "  'exploring': pregunta precios, servicios, fotos pero sin confirmar.\n"
+               . "  'none': solo saluda, smalltalk, o claramente no va a comprar.\n\n"
+               . "- wants_more_girls: boolean. true si el cliente pide ver más chicas o el catálogo completo.\n\n"
+               . "- hot_curious: boolean. true si el mensaje tiene contenido sexual/picante (no confundir\n"
+               . "  'fotos' normales con contenido sexual — 'tienes fotos?' NO es picante,\n"
+               . "  'que tetas mas buenas' o 'me pones cachondo' SÍ lo es).\n\n";
+
         return $base;
     }
 
@@ -1142,6 +1184,108 @@ final class Bot implements BotInterface
     }
 
     /**
+     * Apply LLM-derived semantic fields to the pipeline context AFTER the LLM
+     * has responded. These fields replace or supplement regex-based decisions
+     * made earlier in ContextAssembler.
+     *
+     * The LLM sees the full conversation history and the list of active girls,
+     * so its judgments about girl matching, conversation health, buying intent,
+     * etc. are more accurate than regex patterns.
+     *
+     * @param array<string, mixed> $ctx  Pipeline context (modified in-place)
+     */
+    private function applyLlmSemanticFields(array &$ctx): void
+    {
+        // ── mentioned_girl: override selected_girl if LLM identified a girl ──
+        $llmGirl = (string) ($ctx['__llm_mentioned_girl'] ?? '');
+        if ($llmGirl !== '') {
+            // Find the girl in girls_config to get her ID
+            $girlsConfig = (array) ($ctx['girls_config'] ?? []);
+            $girlId = '';
+            foreach ($girlsConfig as $g) {
+                $name = trim((string) ($g['nombre'] ?? ''));
+                if ($name !== '' && mb_strtolower($name, 'UTF-8') === mb_strtolower($llmGirl, 'UTF-8')) {
+                    $girlId = (string) ($g['id'] ?? '');
+                    break;
+                }
+            }
+            // If LLM identified a girl AND sets selection intent, update selected_girl
+            $hasSelectionIntent = !empty($ctx['__llm_girl_selection_intent']);
+            $currentSelected = (string) ($ctx['selected_girl_name'] ?? '');
+
+            if ($hasSelectionIntent && mb_strtolower($llmGirl, 'UTF-8') !== mb_strtolower($currentSelected, 'UTF-8')) {
+                $ctx['selected_girl_name'] = $llmGirl;
+                if ($girlId !== '') {
+                    $ctx['selected_girl_id'] = $girlId;
+                }
+                // If no speaker yet, this becomes the speaker too
+                if (empty($ctx['speaker_girl_name'])) {
+                    $ctx['speaker_girl_name'] = $llmGirl;
+                    if ($girlId !== '') {
+                        $ctx['speaker_girl_id'] = $girlId;
+                    }
+                    $ctx['speaker_mode'] = 'chica';
+                }
+                if (isset($this->logger)) {
+                    $this->logger->info('Bot::applyLlmSemanticFields — LLM identified girl selection', [
+                        'girl'  => $llmGirl,
+                        'phone' => $ctx['from_phone'] ?? '?',
+                    ]);
+                }
+            } elseif ($currentSelected === '' && $girlId !== '') {
+                // No current selection → pick up the LLM's girl mention
+                $ctx['selected_girl_name'] = $llmGirl;
+                $ctx['selected_girl_id']   = $girlId;
+                if (empty($ctx['speaker_girl_name'])) {
+                    $ctx['speaker_girl_name'] = $llmGirl;
+                    $ctx['speaker_girl_id']   = $girlId;
+                    $ctx['speaker_mode'] = 'chica';
+                }
+            }
+        }
+
+        // ── conversation_health: handle dead/fading conversations ────
+        $health = (string) ($ctx['__llm_conversation_health'] ?? '');
+        if ($health === 'dead') {
+            // LLM says conversation is dead → set ended flag
+            $ctx['__conversation_ended'] = true;
+            $ctx['lead_detected'] = false; // Dead conversation can't be a lead
+            if (isset($this->logger)) {
+                $this->logger->info('Bot::applyLlmSemanticFields — LLM marked conversation as dead', [
+                    'phone'     => $ctx['from_phone'] ?? '?',
+                    'thread_id' => $ctx['thread_id'] ?? '?',
+                ]);
+            }
+        } elseif ($health === 'fading') {
+            // Conversation is fading → let the LLM's reply handle it naturally
+            // The LLM already wrote a short/closing reply in user_visible_reply
+            if (isset($this->logger)) {
+                $this->logger->info('Bot::applyLlmSemanticFields — LLM marked conversation as fading', [
+                    'phone'     => $ctx['from_phone'] ?? '?',
+                    'thread_id' => $ctx['thread_id'] ?? '?',
+                ]);
+            }
+        }
+
+        // ── tarifa_elegida: use LLM's price extraction ───────────────
+        $llmTarifa = (string) ($ctx['__llm_tarifa_elegida'] ?? '');
+        if ($llmTarifa !== '' && empty($ctx['tarifa_elegida'])) {
+            $ctx['tarifa_elegida'] = $llmTarifa;
+        }
+
+        // ── buying_intent: override regex-based interes_fuerte ───────
+        $llmIntent = (string) ($ctx['__llm_buying_intent'] ?? '');
+        if ($llmIntent === 'strong') {
+            $ctx['interes_fuerte'] = true;
+        }
+
+        // ── hot_curious: use LLM's judgment instead of word list ─────
+        if (isset($ctx['__llm_hot_curious'])) {
+            $ctx['hot_curious_chat_current'] = (bool) $ctx['__llm_hot_curious'];
+        }
+    }
+
+    /**
      * Build a multi-turn chat history array from session memory.
      *
      * Reads the last N conversation turns from session memory for the current
@@ -1212,6 +1356,13 @@ final class Bot implements BotInterface
             $history[] = ['role' => 'assistant', 'content' => '✓'];
         }
 
+        // ── Confusion pattern: detect when bot said "no entiendo" ────
+        // If the LLM sees its own confusion in history, it replicates
+        // the pattern. Replace with neutral "ok" to break the loop.
+        $confusionRegex = '/\b(?:no\s+(?:entiendo|te\s+entiendo|te\s+he\s+entendido|s[eé]\b|se\b|se\s+que|tengo\s+ni\s+idea)|'
+            . 'eso\s+no\s+(?:es\s+lo\s+m[ií]o|te\s+lo\s+s[eé])|'
+            . 'de\s+eso\s+no\s+(?:entiendo|s[eé]|tengo\s+ni\s+idea))\b/iu';
+
         foreach ($recent as $rec) {
             $userMsg = (string) ($rec['user_msg'] ?? '');
             $botMsg  = (string) ($rec['bot_reply'] ?? '');
@@ -1220,7 +1371,13 @@ final class Bot implements BotInterface
                 $history[] = ['role' => 'user', 'content' => $userMsg];
             }
             if ($botMsg !== '') {
-                $history[] = ['role' => 'assistant', 'content' => $botMsg];
+                // Filter out confusion patterns from history — prevents
+                // the LLM from learning and repeating "no entiendo"
+                if (preg_match($confusionRegex, $botMsg)) {
+                    $history[] = ['role' => 'assistant', 'content' => 'ok'];
+                } else {
+                    $history[] = ['role' => 'assistant', 'content' => $botMsg];
+                }
             }
         }
 
@@ -1252,16 +1409,20 @@ final class Bot implements BotInterface
         // Find key state decisions in the summary window
         $lastSpeaker  = '';
         $lastSelected = '';
+        $speakerMode  = '';
         $sentPhotos   = false;
         $sentPrices   = false;
         $sentMaps     = false;
         $gaveEta      = false;
+        $lastUserQuestion = '';  // última pregunta sustantiva del cliente
 
         foreach ($turns as $rec) {
             $sn = trim((string) ($rec['speaker_girl_name'] ?? ''));
             $sel = trim((string) ($rec['selected_girl_name'] ?? ''));
+            $sm = (string) ($rec['speaker_mode'] ?? '');
             if ($sn !== '') $lastSpeaker = $sn;
             if ($sel !== '') $lastSelected = $sel;
+            if ($sm !== '') $speakerMode = $sm;
 
             $ya = (array) ($rec['ya_enviado'] ?? []);
             if (in_array('fotos', $ya, true)) $sentPhotos = true;
@@ -1269,10 +1430,18 @@ final class Bot implements BotInterface
             if (in_array('ubicacion', $ya, true) || in_array('ubicacion_precisa', $ya, true)) $sentMaps = true;
 
             if (!empty($rec['eta_from_user_flag'])) $gaveEta = true;
+
+            // Track last substantive question from user (not filler)
+            $um = trim((string) ($rec['user_msg'] ?? ''));
+            $umLen = mb_strlen($um);
+            if ($umLen > 10 && !preg_match('/^(ok|vale|oka|oki|vle|okey|gracias|genial|dime|dimelo|si|no|jj|jeje|mmm|ah|ya)[\s!😊😘😏🔥]*$/iu', $um)) {
+                $lastUserQuestion = $umLen > 80 ? (mb_substr($um, 0, 80) . '…') : $um;
+            }
         }
 
         if ($lastSpeaker !== '') {
-            $parts[] = "chica que habla: {$lastSpeaker}";
+            $modeLabel = ($speakerMode === 'chica') ? ' (eres ella)' : ' (encargada)';
+            $parts[] = "chica que habla: {$lastSpeaker}{$modeLabel}";
         }
         if ($lastSelected !== '' && $lastSelected !== $lastSpeaker) {
             $parts[] = "cliente eligió a: {$lastSelected}";
@@ -1286,6 +1455,11 @@ final class Bot implements BotInterface
         if ($sentMaps)   $sent[] = 'mapa';
         if ($sent !== []) $parts[] = 'enviado: ' . implode(', ', $sent);
         if ($gaveEta) $parts[] = 'cliente dio ETA';
+
+        // Include last substantive user question so the LLM keeps the thread
+        if ($lastUserQuestion !== '') {
+            $parts[] = "última pregunta del cliente: \"{$lastUserQuestion}\"";
+        }
 
         return implode(' | ', $parts) . '.';
     }
@@ -1840,15 +2014,8 @@ final class Bot implements BotInterface
             return $ctx;
         }
 
-        // Skip if photos were already sent and client hasn't insisted yet
-        $yaEnviado = (array) ($ctx['ya_enviado'] ?? []);
-        $photoInsistCount = (int) ($ctx['photo_insist_count'] ?? 0);
-        if (in_array('fotos', $yaEnviado, true) && $photoInsistCount < 1) {
-            // Photos already sent and client hasn't insisted 2+ times → skip
-            return $ctx;
-        }
-
-        // Check if the AI output contains photo-promising language
+        // Check if the AI output contains photo-promising language FIRST
+        // (before the ya_enviado guard, so explicit promises always trigger injection)
         $promisePatterns = [
             '/te\s*paso\s*fotos?\b/iu',
             '/te\s*(?:las\s*)?(?:mando|env[ií]o|ense[ñn]o)\s*fotos?\b/iu',
@@ -1875,41 +2042,91 @@ final class Bot implements BotInterface
             return $ctx;
         }
 
+        // Skip if photos were already sent, client hasn't insisted 2+ times,
+        // AND there is NO selected girl (the promise is about a specific girl's
+        // photos, not generic catalog). When selected_girl is set, the client
+        // is asking about THAT girl's photos specifically — inject them.
+        $yaEnviado = (array) ($ctx['ya_enviado'] ?? []);
+        $photoInsistCount = (int) ($ctx['photo_insist_count'] ?? 0);
+        $hasSelectedGirl = !empty($ctx['selected_girl_name']);
+        if (in_array('fotos', $yaEnviado, true) && $photoInsistCount < 1 && !$hasSelectedGirl) {
+            // Generic photos already sent and no specific girl request → skip
+            return $ctx;
+        }
+
         // Must have girls configured
         $girlsConfig = $ctx['girls_config'] ?? [];
         if (!is_array($girlsConfig) || $girlsConfig === []) {
             return $ctx;
         }
 
-        // Build catalog: 1 random photo per active girl
+        // Build photos: if selected_girl is set → ALL her photos; else → catalog
         $sentUrls = $ctx['sent_photo_urls'] ?? [];
         $lines = [];
-        foreach ($girlsConfig as $girl) {
-            if (!is_array($girl)) continue;
-            $photos = $girl['fotos'] ?? [];
-            if (!is_array($photos) || $photos === []) continue;
 
-            // Filter already-sent URLs
-            $available = array_filter($photos, static function ($p) use ($sentUrls): bool {
-                $p = trim((string) $p);
-                if ($p === '') return false;
-                return !in_array($p, $sentUrls, true);
-            });
-            if ($available === []) {
-                $available = array_filter($photos, static fn($p): bool => trim((string) $p) !== '');
+        if ($hasSelectedGirl) {
+            // Find the selected girl in girls_config and use ALL her photos
+            $selectedGirlName = (string) ($ctx['selected_girl_name'] ?? '');
+            $selectedGirl = null;
+            foreach ($girlsConfig as $girl) {
+                if (!is_array($girl)) continue;
+                if (mb_strtolower(trim((string) ($girl['nombre'] ?? '')), 'UTF-8') === mb_strtolower($selectedGirlName, 'UTF-8')) {
+                    $selectedGirl = $girl;
+                    break;
+                }
             }
-            // Exclude maps URLs
-            $available = array_filter($available, function ($u): bool {
-                $u = (string) $u;
-                return !str_contains($u, 'maps.google')
-                    && !str_contains($u, 'maps.app.goo.gl')
-                    && !str_contains($u, 'goo.gl/maps');
-            });
-            if ($available === []) continue;
+            if ($selectedGirl !== null) {
+                $photos = $selectedGirl['fotos'] ?? [];
+                if (is_array($photos) && $photos !== []) {
+                    foreach ($photos as $photo) {
+                        $photo = trim((string) $photo);
+                        if ($photo === '') continue;
+                        if (str_contains($photo, 'maps.google') || str_contains($photo, 'maps.app.goo.gl') || str_contains($photo, 'goo.gl/maps')) continue;
+                        // Filter already-sent
+                        if (in_array($photo, $sentUrls, true)) continue;
+                        $lines[] = $photo;
+                    }
+                    // If all photos were already sent, include them anyway (client insists)
+                    if ($lines === [] && $photoInsistCount >= 1) {
+                        foreach ($photos as $photo) {
+                            $photo = trim((string) $photo);
+                            if ($photo === '') continue;
+                            $lines[] = $photo;
+                        }
+                    }
+                }
+            }
+        }
 
-            $photo = $available[array_rand($available)];
-            if (is_string($photo) && $photo !== '') {
-                $lines[] = $photo;
+        // Fallback: if no selected girl or her photos failed, build catalog
+        if ($lines === [] && !$hasSelectedGirl) {
+            foreach ($girlsConfig as $girl) {
+                if (!is_array($girl)) continue;
+                $photos = $girl['fotos'] ?? [];
+                if (!is_array($photos) || $photos === []) continue;
+
+                // Filter already-sent URLs
+                $available = array_filter($photos, static function ($p) use ($sentUrls): bool {
+                    $p = trim((string) $p);
+                    if ($p === '') return false;
+                    return !in_array($p, $sentUrls, true);
+                });
+                if ($available === []) {
+                    $available = array_filter($photos, static fn($p): bool => trim((string) $p) !== '');
+                }
+                // Exclude maps URLs
+                $available = array_filter($available, function ($u): bool {
+                    $u = (string) $u;
+                    return !str_contains($u, 'maps.google')
+                        && !str_contains($u, 'maps.app.goo.gl')
+                        && !str_contains($u, 'goo.gl/maps');
+                });
+                if ($available === []) continue;
+
+                $photo = $available[array_rand($available)];
+                if (is_string($photo) && $photo !== '') {
+                    $lines[] = $photo;
+                }
             }
         }
 
@@ -1956,10 +2173,11 @@ final class Bot implements BotInterface
         $ctx['splitted_messages'] = $messages;
         $ctx['output_text'] = $newOutput;
 
-        $this->logger->info('Bot::injectPhotoUrls — injected catalog photos as safety net', [
+        $this->logger->info('Bot::injectPhotoUrls — injected photos as safety net', [
             'phone'     => $ctx['from_phone'] ?? '?',
             'thread_id' => $ctx['thread_id'] ?? '?',
             'num_photos' => count($lines),
+            'selected_girl' => $hasSelectedGirl ? ($ctx['selected_girl_name'] ?? '?') : 'none',
         ]);
 
         return $ctx;
@@ -2026,11 +2244,27 @@ final class Bot implements BotInterface
         }
         $coalescedText = implode(' | ', $coalescedParts);
 
+        // ── Build LLM-friendly structured message ─────────────────
+        // When messages are coalesced, the LLM has recency bias and
+        // tends to respond to the LAST message. We structure the
+        // prompt so the first (original) message is the PRIMARY one
+        // and subsequent messages are just additional context.
+        $llmMessage = $originalText;
+        if (count($coalescedParts) > 1) {
+            $additional = array_slice($coalescedParts, 1);
+            $llmMessage  = "[MENSAJE PRINCIPAL]: {$originalText}\n\n";
+            $llmMessage .= "[MENSAJES ADICIONALES DEL CLIENTE (llegaron mientras procesabas — NO respondas a estos como mensaje principal, solo tenlos en cuenta como contexto)]:\n";
+            foreach ($additional as $i => $add) {
+                $llmMessage .= "- {$add}\n";
+            }
+        }
+
         // Update context with coalesced message
-        $ctx['message_text']        = $coalescedText;
-        $ctx['__coalesced_text']    = $coalescedText;
-        $ctx['__reprocess_depth']   = $depth + 1;
-        $ctx['__is_reprocess']      = true;
+        $ctx['message_text']           = $coalescedText;
+        $ctx['__coalesced_text']       = $coalescedText;
+        $ctx['__llm_user_message']     = $llmMessage;
+        $ctx['__reprocess_depth']      = $depth + 1;
+        $ctx['__is_reprocess']         = true;
         $ctx['__reprocess_pending_count'] = count($pending);
 
         // ── Re-run LLM pipeline steps ────────────────────────────────
@@ -2059,7 +2293,7 @@ final class Bot implements BotInterface
 
         // Step 10: re-run LLM call with coalesced message
         $systemPrompt = $this->buildSystemPrompt($ctx);
-        $userMessage  = $ctx['user_message'] ?? $messageText;
+        $userMessage  = $ctx['__llm_user_message'] ?? $ctx['user_message'] ?? $messageText;
 
         // Build fresh chat history (includes the previous messages now)
         $history = $this->buildChatHistory($ctx);

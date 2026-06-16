@@ -224,6 +224,21 @@ final class ToneBuilder implements PipelineStageInterface
         }
 
         // ------------------------------------------------------------------ //
+        //  5d. Bot confusion loop — si ya has mostrado confusión antes      //
+        // ------------------------------------------------------------------ //
+        $botConfusionCount = (int) ($ctx['__bot_confusion_count'] ?? 0);
+        if ($botConfusionCount >= 1) {
+            $directives[] = '⚠️ ANTI-CONFUSIÓN: Ya has mostrado confusión antes en esta conversación. '
+                . 'PROHIBIDO TOTAL decir "no entiendo", "no sé", "no te entiendo", '
+                . '"eso no es lo mío", "de eso no entiendo", "no te lo sé", '
+                . 'ni frases que expresen confusión. '
+                . 'Si el mensaje del cliente no está claro, reformula con UNA pregunta concreta: '
+                . '"a q te refieres cari?", "explicame mejor eso amor", "q quieres decir cielo?". '
+                . 'Si ya llevas 2+ confusiones, mejor responde con un cierre suave '
+                . '("vale papi, hablamos 😘") y no alargues.';
+        }
+
+        // ------------------------------------------------------------------ //
         //  6. Conversation state flags                                        //
         // ------------------------------------------------------------------ //
         if (!empty($ctx['conversation_dead'])) {
@@ -246,12 +261,24 @@ final class ToneBuilder implements PipelineStageInterface
                     . 'Muestra las chicas que AÚN NO se han mostrado (unshown_girls). '
                     . 'NO repitas las mismas fotos.';
             } else {
-                $directives[] = "Ya se mandaron fotos antes, pero el cliente las pide otra vez. "
-                    . 'Sé amable: dile algo natural como "te las vuelvo a pasar amor 😘" '
-                    . 'y pon photo_action="catalog" o "selected_all" para que el sistema las reenvíe. '
-                    . 'NO le digas que mire arriba ni que scrollee. '
-                    . 'Pásaselas de nuevo, igual no las encontró. '
-                    . 'Si piden MÁS fotos o chicas nuevas: muéstralas también.';
+                // Si el cliente YA ha elegido una chica concreta, usa selected_all
+                // para enviar TODAS las fotos de ESA chica, no el catálogo general.
+                $selectedForDirective = trim((string) ($ctx['selected_girl_name'] ?? ''));
+                if ($selectedForDirective !== '') {
+                    $directives[] = "Ya se mandaron fotos antes, pero el cliente pide fotos específicas de {$selectedForDirective}. "
+                        . 'Sé amable: dile algo natural como "te las vuelvo a pasar amor 😘" '
+                        . 'y pon photo_action="selected_all" para que el sistema reenvíe TODAS las fotos de esta chica. '
+                        . 'NO uses photo_action="catalog" (eso muestra otras chicas, y el cliente ya eligió). '
+                        . 'NO le digas que mire arriba ni que scrollee. '
+                        . 'Pásaselas de nuevo, igual no las encontró.';
+                } else {
+                    $directives[] = "Ya se mandaron fotos antes, pero el cliente las pide otra vez. "
+                        . 'Sé amable: dile algo natural como "te las vuelvo a pasar amor 😘" '
+                        . 'y pon photo_action="catalog" o "selected_all" para que el sistema las reenvíe. '
+                        . 'NO le digas que mire arriba ni que scrollee. '
+                        . 'Pásaselas de nuevo, igual no las encontró. '
+                        . 'Si piden MÁS fotos o chicas nuevas: muéstralas también.';
+                }
             }
         }
 
@@ -423,7 +450,7 @@ final class ToneBuilder implements PipelineStageInterface
         //  16. Generic human-voice directives                                  //
         // ------------------------------------------------------------------ //
         $directives[] = 'Saludo minimalista: Saludo MÁX 4 palabras. No preguntes "cómo estás" ni similares.';
-        $directives[] = 'Reactivo: Responde SOLO lo que preguntan. NO hagas preguntas de follow-up. NO sondees.';
+        $directives[] = 'Reactivo: Responde SOLO lo que preguntan. NO hagas preguntas genéricas de follow-up ni sondeos. EXCEPCIÓN: si toca pedir ETA (post-maps) o necesitas aclarar un mensaje confuso del cliente, haz UNA pregunta concreta y corta. Pero NUNCA preguntes "q buscas", "q te apetece saber" ni similares.';
         $directives[] = 'Sin auto-identificación: NUNCA digas "soy la encargada", "atiendo yo", "soy la que está aquí", "no soy [nombre]", "yo no soy", ni similares.';
         $directives[] = 'Sin signos de apertura (¿ ¡) y faltas de ortografía leves para sonar humana.';
         $directives[] = 'Emojis: usa 1 emoji en ~2 de cada 3 mensajes, como parte natural de la conversación. Si el anterior tuyo llevó, este puede llevarlo o no. Lo importante es no forzar: a veces sí, a veces no.';
