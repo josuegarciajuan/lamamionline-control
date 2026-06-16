@@ -1,3 +1,5 @@
+<?php
+
 function render_global_ui($page = '') {
     echo '<div id="floatingToast" class="floating-toast"></div>';
     echo '<div id="moneyRain" class="money-rain"></div>';
@@ -63,6 +65,7 @@ function render_global_ui($page = '') {
             echo '<span class="mobile-nav-icon">' . $tab['icon'] . '</span>';
             echo '<span class="mobile-nav-label">' . $tab['label'] . '</span>';
             echo '</button>';
+            // Dropdown popover
             echo '<div class="mobile-nav-popover" id="' . $dropId . 'Pop" hidden>';
             foreach ($tab['links'] as $link) {
                 echo '<a href="index.php?page=' . e($link['page']) . '" class="mobile-nav-popover-link">' . e($link['label']) . '</a>';
@@ -76,7 +79,6 @@ function render_global_ui($page = '') {
     echo '<div class="voice-command-head">';
     echo '<div>';
     echo '<h2>Órdenes por voz</h2>';
-    echo '<p>Habla o escribe una orden para el CRM.</p>';
     echo '</div>';
     echo '<button type="button" id="voiceCommandClose" class="voice-command-close" aria-label="Cerrar panel de voz">✕</button>';
     echo '</div>';
@@ -92,7 +94,6 @@ function render_global_ui($page = '') {
     echo '<div class="field full">';
     echo '<label for="voiceCommandInput">Texto de la orden</label>';
     echo '<textarea id="voiceCommandInput" class="voice-command-input" placeholder="Ejemplo: muéstrame estadísticas de esta clienta"></textarea>';
-    echo '<div class="field-help">Puedes corregir el texto antes de enviarlo.</div>';
     echo '</div>';
 
     echo '<div class="voice-command-meta">';
@@ -101,7 +102,7 @@ function render_global_ui($page = '') {
     echo '</div>';
 
     echo '<div class="voice-command-submit-row">';
-    echo '<button type="button" id="voiceSendButton" class="btn-primary">Enviar orden</button>';
+    echo '<button type="button" id="voiceSendButton" class="btn-primary">Enviar manualmente</button>';
     echo '</div>';
 
     echo '<div id="voiceCommandResponse" class="voice-command-response" aria-live="polite"></div>';
@@ -109,6 +110,7 @@ function render_global_ui($page = '') {
     echo '</section>';
 }
 
+function render_flash() {
     $flash = get_flash();
     if (!$flash) return;
     $fx = isset($flash['fx']) ? $flash['fx'] : '';
@@ -7838,195 +7840,6 @@ function render_josue_page() {
             echo nl2br(e($text));
             echo '</div>';
         }
-    } elseif ($tab === 'sendtaxs') {
-        echo '<div class="sendtaxs-tool">';
-        echo '<div class="sendtaxs-head">';
-        echo '<h2>Ajustador de Porcentajes y Tasas de Envío</h2>';
-        echo '<p>Ingresa los porcentajes deseados. Puedes editarlos libremente aunque no sumen 100%. Usa "Normalizar a 100%" para escalar proporcionalmente, o pulsa "Calcular" y se normalizará automáticamente antes de generar los ajustes.</p>';
-        echo '</div>';
-
-        echo '<div class="sendtaxs-grid">';
-        echo '  <div class="field"><label>Porcentaje Plaza</label><input type="number" id="porc_plaza" value="' . e($sendtaxsDefaults['porc_plaza']) . '" min="0" max="100" step="0.1"></div>';
-        echo '  <div class="field"><label>Porcentaje Lamami</label><input type="number" id="porc_publi_sched" value="' . e($sendtaxsDefaults['porc_publi_sched']) . '" min="0" max="100" step="0.1"></div>';
-        echo '  <div class="field"><label>Porcentaje Publicista</label><input type="number" id="porc_publipub" value="' . e($sendtaxsDefaults['porc_publipub']) . '" min="0" max="100" step="0.1"></div>';
-        echo '  <div class="field"><label>Porcentaje Casawasap</label><input type="number" id="porc_pubcasas" value="' . e($sendtaxsDefaults['porc_pubcasas']) . '" min="0" max="100" step="0.1"></div>';
-        echo '</div>';
-
-        echo '<div class="sendtaxs-toolbar">';
-        echo '  <button type="button" class="btn-secondary-mini" onclick="sendtaxsNormalizar()">Normalizar a 100%</button>';
-        echo '</div>';
-
-        echo '<div class="sendtaxs-grid sendtaxs-grid-single">';
-        echo '  <div class="field"><label>Total mensajes diarios deseado</label><input type="number" id="total_deseado" value="' . e($sendtaxsDefaults['total_deseado']) . '" min="1" step="1"></div>';
-        echo '</div>';
-
-        echo '<div class="sendtaxs-toolbar">';
-        echo '  <button type="button" class="btn-primary" onclick="sendtaxsCalcular()">Calcular envíos y ajustes</button>';
-        echo '</div>';
-
-        echo '<div id="sendtaxs_resultados" class="sendtaxs-resultados"></div>';
-        echo '</div>';
-
-        echo <<<'HTML'
-<script>
-(function () {
-    const sendtaxsEnvActual = { plaza: 14, publi_sched: 12.6, publipub: 9.3, pubcasas: 8.5 };
-    const sendtaxsRangosActual = {
-        plaza_pico_min: 2300, plaza_pico_max: 5000, plaza_resto_min: 3000, plaza_resto_max: 6000,
-        publi_pico_min: 2300, publi_pico_max: 5200, publi_resto_min: 5300, publi_resto_max: 6300,
-        publipub_min: 45, publipub_max: 90,
-        pubcasas_min: 90, pubcasas_max: 120
-    };
-
-    function sendtaxsGetIds() {
-        return ["porc_plaza", "porc_publi_sched", "porc_publipub", "porc_pubcasas"];
-    }
-
-    window.sendtaxsNormalizar = function () {
-        const ids = sendtaxsGetIds();
-        let suma = 0;
-        ids.forEach(function (id) {
-            const el = document.getElementById(id);
-            suma += parseFloat(el ? el.value : 0) || 0;
-        });
-        if (suma === 0) return;
-
-        ids.forEach(function (id) {
-            const el = document.getElementById(id);
-            const val = parseFloat(el ? el.value : 0) || 0;
-            const nuevoVal = (val / suma) * 100;
-            if (el) el.value = nuevoVal.toFixed(1);
-        });
-    };
-
-    window.sendtaxsCalcular = function () {
-        const ids = sendtaxsGetIds();
-        let suma = 0;
-        ids.forEach(function (id) {
-            const el = document.getElementById(id);
-            suma += parseFloat(el ? el.value : 0) || 0;
-        });
-
-        if (Math.abs(suma - 100) > 0.1) {
-            window.sendtaxsNormalizar();
-        }
-
-        const porcPlazaEl = document.getElementById("porc_plaza");
-        const porcPubliSchedEl = document.getElementById("porc_publi_sched");
-        const porcPublipubEl = document.getElementById("porc_publipub");
-        const porcPubcasasEl = document.getElementById("porc_pubcasas");
-        const totalEl = document.getElementById("total_deseado");
-        const resultadosEl = document.getElementById("sendtaxs_resultados");
-
-        if (!porcPlazaEl || !porcPubliSchedEl || !porcPublipubEl || !porcPubcasasEl || !totalEl || !resultadosEl) {
-            return;
-        }
-
-        const porcs = {
-            plaza: (parseFloat(porcPlazaEl.value) || 0) / 100,
-            publi_sched: (parseFloat(porcPubliSchedEl.value) || 0) / 100,
-            publipub: (parseFloat(porcPublipubEl.value) || 0) / 100,
-            pubcasas: (parseFloat(porcPubcasasEl.value) || 0) / 100
-        };
-
-        const total = parseFloat(totalEl.value) || 0;
-        if (total <= 0) {
-            resultadosEl.innerHTML = '<div class="sendtaxs-card"><strong>Indica un total válido mayor que 0.</strong></div>';
-            return;
-        }
-
-        const envNuevos = {
-            plaza: (total * porcs.plaza).toFixed(1),
-            publi_sched: (total * porcs.publi_sched).toFixed(1),
-            publipub: (total * porcs.publipub).toFixed(1),
-            pubcasas: (total * porcs.pubcasas).toFixed(1)
-        };
-
-        const plazaVal = parseFloat(envNuevos.plaza);
-        const publiSchedVal = parseFloat(envNuevos.publi_sched);
-        const publipubVal = parseFloat(envNuevos.publipub);
-        const pubcasasVal = parseFloat(envNuevos.pubcasas);
-
-        const scales = {
-            plaza: plazaVal > 0 ? (sendtaxsEnvActual.plaza / plazaVal) : 0,
-            publi_sched: publiSchedVal > 0 ? (sendtaxsEnvActual.publi_sched / publiSchedVal) : 0,
-            publipub: publipubVal > 0 ? (sendtaxsEnvActual.publipub / publipubVal) : 0,
-            pubcasas: pubcasasVal > 0 ? (sendtaxsEnvActual.pubcasas / pubcasasVal) : 0
-        };
-
-        let html = "";
-        html += `<div class="sendtaxs-card">`;
-        html += `<h3>Envíos diarios calculados</h3>`;
-        html += `<ul class="sendtaxs-list">`;
-        html += `<li><strong>Plaza:</strong> ${envNuevos.plaza} mensajes/día</li>`;
-        html += `<li><strong>Lamami:</strong> ${envNuevos.publi_sched} mensajes/día</li>`;
-        html += `<li><strong>Publicista:</strong> ${envNuevos.publipub} mensajes/día</li>`;
-        html += `<li><strong>Casawasap:</strong> ${envNuevos.pubcasas} mensajes/día</li>`;
-        html += `</ul>`;
-        html += `</div>`;
-
-        html += `<div class="sendtaxs-card">`;
-        html += `<h3>Ajustes en scripts</h3>`;
-
-        html += `<div class="sendtaxs-block">`;
-        html += `<strong>Plaza_scheduler.sh</strong><br>`;
-        html += `<span class="muted">/var/www/html/jostal/plaza_scheduler.sh</span><br><br>`;
-        html += `Pico (15-19): min_s=${Math.round(sendtaxsRangosActual.plaza_pico_min * scales.plaza)}, max_s=${Math.round(sendtaxsRangosActual.plaza_pico_max * scales.plaza)}<br>`;
-        html += `Resto: min_s=${Math.round(sendtaxsRangosActual.plaza_resto_min * scales.plaza)}, max_s=${Math.round(sendtaxsRangosActual.plaza_resto_max * scales.plaza)}`;
-        html += `</div>`;
-
-        html += `<div class="sendtaxs-block">`;
-        html += `<strong>Publicidad_scheduler.sh (Lamami)</strong><br>`;
-        html += `<span class="muted">/var/www/html/atupuerta/publicidad_scheduler.sh</span><br><br>`;
-        html += `Pico (13-19): min_s=${Math.round(sendtaxsRangosActual.publi_pico_min * scales.publi_sched)}, max_s=${Math.round(sendtaxsRangosActual.publi_pico_max * scales.publi_sched)}<br>`;
-        html += `Resto: min_s=${Math.round(sendtaxsRangosActual.publi_resto_min * scales.publi_sched)}, max_s=${Math.round(sendtaxsRangosActual.publi_resto_max * scales.publi_sched)}`;
-        html += `</div>`;
-
-        html += `<div class="sendtaxs-block">`;
-        html += `<strong>enviar-publicistas.php (Publicista)</strong><br>`;
-        html += `<span class="muted">/var/www/html/wasapbot/botPubli/enviar-publicistas.php</span><br>`;
-        html += `<span class="muted">/var/www/html/wasapbot/botPubli/enviar-publicistas2.php</span><br><br>`;
-        html += `MIN_WAIT_MINUTES=${Math.round(sendtaxsRangosActual.publipub_min * scales.publipub)}<br>`;
-        html += `MAX_WAIT_MINUTES=${Math.round(sendtaxsRangosActual.publipub_max * scales.publipub)}`;
-        html += `</div>`;
-
-        html += `<div class="sendtaxs-block">`;
-        html += `<strong>enviar.php (Casawasap)</strong><br>`;
-        html += `<span class="muted">/var/www/html/wasapbot/botPubli/enviar.php</span><br>`;
-        html += `<span class="muted">/var/www/html/wasapbot/botPubli/enviar2.php</span><br><br>`;
-        html += `MIN_WAIT_MINUTES=${Math.round(sendtaxsRangosActual.pubcasas_min * scales.pubcasas)}<br>`;
-        html += `MAX_WAIT_MINUTES=${Math.round(sendtaxsRangosActual.pubcasas_max * scales.pubcasas)}`;
-        html += `</div>`;
-
-        html += `</div>`;
-
-        resultadosEl.innerHTML = html;
-
-        fetch('index.php?page=josue&tab=sendtaxs', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-            },
-            body: new URLSearchParams({
-                action: 'save_sendtaxs_state',
-                porc_plaza: porcPlazaEl.value,
-                porc_publi_sched: porcPubliSchedEl.value,
-                porc_publipub: porcPublipubEl.value,
-                porc_pubcasas: porcPubcasasEl.value,
-                total_deseado: totalEl.value
-            })
-        }).catch(function () {});
-
-    };
-})();
-</script>
-HTML;
-
-if (!empty($sendtaxsState)) {
-    echo '<script>window.sendtaxsCalcular && window.sendtaxsCalcular();</script>';
-}
-
-/*
     }
 
     echo '</div>';
