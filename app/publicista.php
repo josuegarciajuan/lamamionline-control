@@ -3644,16 +3644,21 @@ function publicista_build_pollo_compact_erotic_prompt($job) {
     // ── Build sections ──
     $sections = array();
 
-    // [FORMATO]
-    $sections[] = '[FORMATO] 1 sola fotografía real — NUNCA 2 fotos juntas, NUNCA collage, NUNCA diptych, NUNCA mosaico.';
+    // [FORMATO] — COMPLETO (igual que el capado) + NEGATIVOS CRÍTICOS dentro.
+    //   fit_budget NUNCA recorta [FORMATO]. Al meter aquí NO collage/diptych/2_fotos,
+    //   garantizamos que el modelo SIEMPRE los ve, sin depender de [NEG] (que sí se recorta).
+    $sections[] = '[FORMATO] 1 sola fotografía — NUNCA 2 fotos juntas, NUNCA collage, '
+        . 'NUNCA diptych, NUNCA mosaico de imágenes, NUNCA antes/después, '
+        . 'NUNCA montaje de varias tomas. El archivo debe contener UNA única foto. '
+        . '1 mujer, 1 encuadre, 1 escena, 1 archivo = 1 foto. '
+        . 'NO 2_fotos_juntas NO diptych NO mosaico NO collage NO antes_despues '
+        . 'NO dibujo NO ilustracion NO texto NO marca_agua NO deformidad NO doble_cara '
+        . 'NO objetos_flotantes NO manos_deformes NO estudio NO ciclorama';
 
     // [REAL] — mismo que capado
     $sections[] = publicista_build_compact_realism_block();
 
-    // [SIMILITUD] — forzar identidad ANTES de las instrucciones de ropa
-    $sections[] = '[SIMILITUD] La mujer debe ser EXACTAMENTE la misma persona que la foto de referencia. CONSERVA su rostro exacto, tono de piel exacto, complexión exacta y tipo de pelo exacto. La unica diferencia permitida es la ropa y el fondo. NO cambies rasgos faciales. NO cambies el volumen corporal.';
-
-    // [IMG1]...[IMG4] — outfits cortos
+    // [IMG1]...[IMG4] — outfits cortos, poses con cara visible
     for ($i = 0; $i < $count; $i++) {
         $isSelfie = $selfieUse && ($i === 1);
         $shot = $isSelfie ? 'selfie_movil_brazo_visible' : $shots[$i % count($shots)];
@@ -3666,16 +3671,10 @@ function publicista_build_pollo_compact_erotic_prompt($job) {
         $sections[] = $line;
     }
 
-    // [EXTRA] — mínimo
-    $sections[] = '[EXTRA] luz_tenue_calida exp:magnética_atractiva maq_intenso';
+    // [EXTRA] — mínimo (sin esto fit_budget no llega a recortar [ID])
+    $sections[] = '[EXTRA] luz_tenue exp:magnética';
 
-    // [NEG]
-    $sections[] = '[NEG] NO dibujo NO ilustracion NO texto NO marca_agua NO manos_deformes NO deformidad NO doble_cara NO objetos_flotantes NO 2_fotos_juntas NO diptych NO mosaico NO collage NO estudio NO ciclorama NO bokeh_falso NO neón_colores NO ropa_de_calle';
-
-    // [ID] — AL FINAL como refuerzo (NUNCA se recorta)
-    //   El fit_budget empieza recortando [NEG], luego [EXTRA], luego [IMG] y solo en
-    //   último recurso [ID]. Poniendo [ID] al final, budget NUNCA llega a recortarlo
-    //   porque antes recorta [NEG] y las líneas [IMG].
+    // [ID] — AL FINAL como refuerzo (inrecortable porque antes recorta [EXTRA])
     $sections[] = '[ID] ' . $identityBlock;
 
     $prompt = trim(implode("\n", $sections));
@@ -3686,7 +3685,7 @@ function publicista_build_pollo_compact_erotic_prompt($job) {
 
 /**
  * Compact erotic regeneration prompt — para regenerar UNA sola candidata erotica.
- * Misma estrategia: [ID] al final, poses con cara visible.
+ * Misma estrategia: negativos en [FORMATO], sin [SIMILITUD] ni [NEG] separado.
  */
 function publicista_build_pollo_compact_erotic_regeneration_prompt($job, $targetIndex, $refineText = '') {
     $refineText = trim((string)$refineText);
@@ -3718,12 +3717,16 @@ function publicista_build_pollo_compact_erotic_regeneration_prompt($job, $target
     $pose = $poses[$targetIndex % count($poses)];
 
     $sections = array();
-    $sections[] = '[FORMATO] 1 sola fotografía real — NUNCA 2 fotos juntas, NUNCA collage, NUNCA diptych.';
+    $sections[] = '[FORMATO] 1 sola fotografía — NUNCA 2 fotos juntas, NUNCA collage, '
+        . 'NUNCA diptych, NUNCA mosaico de imágenes, NUNCA antes/después, '
+        . 'NUNCA montaje de varias tomas. El archivo debe contener UNA única foto. '
+        . '1 mujer, 1 encuadre, 1 escena, 1 archivo = 1 foto. '
+        . 'NO 2_fotos_juntas NO diptych NO mosaico NO collage NO antes_despues '
+        . 'NO dibujo NO ilustracion NO texto NO marca_agua NO deformidad NO doble_cara '
+        . 'NO objetos_flotantes NO manos_deformes NO estudio NO ciclorama';
     $sections[] = publicista_build_compact_realism_block();
-    $sections[] = '[SIMILITUD] La mujer debe ser EXACTAMENTE la misma persona que la foto de referencia. Conserva su rostro, tono de piel, complexión y tipo de pelo. La unica diferencia es la ropa y el fondo.';
     $sections[] = '[IMG1] fondo:' . $bg . ' | ropa:' . $outfit . ' | enc:' . $shot . ' | pose:' . $pose;
-    $sections[] = '[EXTRA] luz_tenue_calida exp:magnética_atractiva maq_intenso';
-    $sections[] = '[NEG] NO dibujo NO ilustracion NO texto NO marca_agua NO manos_deformes NO deformidad NO doble_cara NO objetos_flotantes NO 2_fotos_juntas NO diptych NO mosaico NO collage NO estudio NO ciclorama NO ropa_de_calle';
+    $sections[] = '[EXTRA] luz_tenue exp:magnética';
     $sections[] = '[ID] ' . $identityBlock;
 
     $prompt = trim(implode("\n", $sections));
