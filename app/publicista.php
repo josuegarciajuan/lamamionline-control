@@ -3589,94 +3589,96 @@ function publicista_build_pollo_compact_prompt($job) {
 /**
  * Compact erotic prompt builder — MISMOS [FORMATO]+[REAL]+[ID] que el capado,
  * pero SIN safety lines, outfits eroticos, fondos bedroom, y NEG sin restricción de desnudo.
+ * 
+ * DIFERENCIA CLAVE vs capado: [ID] va AL FINAL como refuerzo (no recortable por budget),
+ * y las poses son sensuales pero con cara visible para mantener identidad.
  */
 function publicista_build_pollo_compact_erotic_prompt($job) {
-    $count = 4; // Pollo siempre 4 imágenes
+    $count = 4;
 
     // ── Identity block (mismo que el capado) ──
     $identityBlock = publicista_build_compact_identity_block($job);
 
-    // ── OUTFITS Y FONDOS EROTICOS ──
-    $outfits = array();
-    if (function_exists('publicista_pick_erotic_outfits_for_images')) {
-        $outfits = publicista_pick_erotic_outfits_for_images($count);
-    }
-    if (empty($outfits)) {
-        // Fallback básico erotic
-        $outfits = array('conjunto lencería negra encaje', 'bikini hilo ajustado', 'body de gasa transparente', 'corset con ligas y medias');
-    }
+    // ── OUTFITS CORTOS (uso interno, no el pool largo) ──
+    $shortOutfits = array(
+        'lenceria negra encaje sujetador+tanga',
+        'bikini hilo minimo color carne',
+        'body gasa transparente negro',
+        'corset saten rojo con ligas',
+        'babydoll encaje blanco abierto',
+        'conjunto lenceria roja saten',
+        'microbikini cintas doradas',
+        'camison seda corto tirantes',
+    );
+    shuffle($shortOutfits);
+    $outfits = array_slice($shortOutfits, 0, $count);
 
-    $backgrounds = array();
-    if (function_exists('publicista_erotic_background_pool')) {
-        $bgPool = publicista_erotic_background_pool();
-        $bgKeys = array_keys($bgPool);
-        $picked = array();
-        for ($i = 0; $i < $count; $i++) {
-            if (empty($bgKeys)) { $bgKeys = array_keys($bgPool); }
-            $k = array_rand($bgKeys);
-            $picked[] = $bgPool[$bgKeys[$k]];
-            unset($bgKeys[$k]);
-            $bgKeys = array_values($bgKeys);
-        }
-        $backgrounds = $picked;
-    }
-    if (empty($backgrounds)) {
-        $backgrounds = array('dormitorio cama grande luz cálida', 'sofá cuero negro penumbra', 'cama satén rojo almohadas mullidas', 'alfombra piel blanca luz suave');
-    }
+    // ── FONDOS CORTOS ──
+    $shortBgs = array(
+        'cama grande sabana blanca',
+        'sofa terciopelo rojo oscuro',
+        'dormitorio luz vela tenue',
+        'alfombra pelo blanco suelo',
+        'cama saten burdeos cojines',
+        'espejo vertical dormitorio',
+    );
+    shuffle($shortBgs);
+    $backgrounds = array_slice($shortBgs, 0, $count);
+
+    // ── Poses sensuales con cara visible ── (nada de tumbada/a 4 patas)
+    $shots = array(
+        'cuerpo_entero_de_pie_sensual',
+        'tres_cuartos_ligero_giro',
+        'cintura_arriba_favorecedor',
+        'sentada_borde_cama',
+    );
+    $poses = array(
+        'de_pie_cadera_marcada_mirada_directa',
+        'apoyada_pared_cabeza_ladeada',
+        'mano_en_pelo_mirada_camara',
+        'sentada_piernas_cruzadas_sonrisa',
+    );
+
+    $selfieUse = mt_rand(0, 1) === 1; // 50% de incluir un selfie
 
     // ── Build sections ──
     $sections = array();
 
-    // [FORMATO] — mismo que el capado
-    $sections[] = '[FORMATO] 1 sola fotografía — NUNCA 2 fotos juntas, NUNCA collage, '
-        . 'NUNCA diptych, NUNCA mosaico de imágenes, NUNCA antes/después, '
-        . 'NUNCA montaje de varias tomas. El archivo debe contener UNA única foto. '
-        . '1 mujer, 1 encuadre, 1 escena, 1 archivo = 1 foto.';
+    // [FORMATO]
+    $sections[] = '[FORMATO] 1 sola fotografía real — NUNCA 2 fotos juntas, NUNCA collage, NUNCA diptych, NUNCA mosaico.';
 
-    // [REAL] — mismo realismo que el capado
+    // [REAL] — mismo que capado
     $sections[] = publicista_build_compact_realism_block();
 
-    // [ID] — misma identidad de la chica
-    $sections[] = '[ID] ' . $identityBlock;
+    // [SIMILITUD] — forzar identidad ANTES de las instrucciones de ropa
+    $sections[] = '[SIMILITUD] La mujer debe ser EXACTAMENTE la misma persona que la foto de referencia. CONSERVA su rostro exacto, tono de piel exacto, complexión exacta y tipo de pelo exacto. La unica diferencia permitida es la ropa y el fondo. NO cambies rasgos faciales. NO cambies el volumen corporal.';
 
-    // ── Per-image shots ── (poses más provocativas, tumbada, cama, etc.)
-    $shots = array(
-        'cuerpo_entero_pose_provocativa',
-        'tumbada_cama_sensual',
-        'sentada_cama_piernas_abiertas',
-        'arrodillada_cama_sensual',
-    );
-    $poses = array(
-        'tumbada_espalda_piernas_flexionadas_sensual',
-        'a_cuatro_patas_mirando_camara',
-        'sentada_cama_piernas_separadas',
-        'arrodillada_manos_muslos_pose_sexual',
-    );
-
+    // [IMG1]...[IMG4] — outfits cortos
     for ($i = 0; $i < $count; $i++) {
-        $shot = $shots[$i % count($shots)];
+        $isSelfie = $selfieUse && ($i === 1);
+        $shot = $isSelfie ? 'selfie_movil_brazo_visible' : $shots[$i % count($shots)];
         $pose = $poses[$i % count($poses)];
-        $outfit = isset($outfits[$i]) ? $outfits[$i] : $outfits[$i % count($outfits)];
-        $bg = isset($backgrounds[$i]) ? $backgrounds[$i] : $backgrounds[$i % count($backgrounds)];
+        $outfit = isset($outfits[$i]) ? $outfits[$i] : 'lenceria negra encaje';
+        $bg = isset($backgrounds[$i]) ? $backgrounds[$i] : 'dormitorio luz calida';
 
         $line = '[IMG' . ($i + 1) . '] fondo:' . $bg . ' | ropa:' . $outfit
               . ' | enc:' . $shot . ' | pose:' . $pose;
         $sections[] = $line;
     }
 
-    // [EXTRA] — iluminación tenue, erotica
-    $sections[] = '[EXTRA] luz_tenue_calida ambiente_intimo exp:magnética_atractiva maq_intenso';
+    // [EXTRA] — mínimo
+    $sections[] = '[EXTRA] luz_tenue_calida exp:magnética_atractiva maq_intenso';
 
-    // [NEG] — SEXY: SIN restricción de desnudo ni lencería — solo anti-artefactos
-    $negBlock = '[NEG] NO dibujo NO ilustracion NO texto NO marca_agua NO manos_deformes '
-        . 'NO deformidad NO doble_cara NO objetos_flotantes '
-        . 'NO 2_fotos_juntas NO diptych NO mosaico NO collage NO antes_despues '
-        . 'NO estudio NO ciclorama NO bokeh_falso NO neón_colores';
-    $sections[] = $negBlock;
+    // [NEG]
+    $sections[] = '[NEG] NO dibujo NO ilustracion NO texto NO marca_agua NO manos_deformes NO deformidad NO doble_cara NO objetos_flotantes NO 2_fotos_juntas NO diptych NO mosaico NO collage NO estudio NO ciclorama NO bokeh_falso NO neón_colores NO ropa_de_calle';
+
+    // [ID] — AL FINAL como refuerzo (NUNCA se recorta)
+    //   El fit_budget empieza recortando [NEG], luego [EXTRA], luego [IMG] y solo en
+    //   último recurso [ID]. Poniendo [ID] al final, budget NUNCA llega a recortarlo
+    //   porque antes recorta [NEG] y las líneas [IMG].
+    $sections[] = '[ID] ' . $identityBlock;
 
     $prompt = trim(implode("\n", $sections));
-
-    // ── Fit to budget ──
     $prompt = publicista_compact_prompt_fit_budget($prompt, 2000);
 
     return $prompt;
@@ -3684,47 +3686,45 @@ function publicista_build_pollo_compact_erotic_prompt($job) {
 
 /**
  * Compact erotic regeneration prompt — para regenerar UNA sola candidata erotica.
+ * Misma estrategia: [ID] al final, poses con cara visible.
  */
 function publicista_build_pollo_compact_erotic_regeneration_prompt($job, $targetIndex, $refineText = '') {
     $refineText = trim((string)$refineText);
 
-    // ── Identity block ──
     $identityBlock = publicista_build_compact_identity_block($job);
-
-    // ── Inject refine_text ──
     if ($refineText !== '') {
         $identityBlock = '[REFINO: ' . $refineText . '] | ' . $identityBlock;
     }
 
-    // ── Pick outfit + background ──
-    $outfits = array();
-    if (function_exists('publicista_pick_erotic_outfits_for_images')) {
-        $outfits = publicista_pick_erotic_outfits_for_images(4);
-    }
-    $backgrounds = array();
-    if (function_exists('publicista_erotic_background_pool')) {
-        $bgPool = publicista_erotic_background_pool();
-        $bgVals = array_values($bgPool);
-        $backgrounds = $bgVals;
-    }
+    $shortOutfits = array(
+        'lenceria negra encaje sujetador+tanga',
+        'bikini hilo minimo color carne',
+        'body gasa transparente negro',
+        'corset saten rojo con ligas',
+    );
+    $shortBgs = array(
+        'cama grande sabana blanca',
+        'sofa terciopelo rojo oscuro',
+        'dormitorio luz vela tenue',
+        'alfombra pelo blanco suelo',
+    );
 
-    $outfit = isset($outfits[$targetIndex]) ? $outfits[$targetIndex] : 'conjunto lencería negra encaje';
-    $bg     = isset($backgrounds[$targetIndex]) ? $backgrounds[$targetIndex] : 'dormitorio cama grande luz cálida';
+    $shots = array('cuerpo_entero_de_pie_sensual', 'tres_cuartos_ligero_giro', 'cintura_arriba_favorecedor', 'sentada_borde_cama');
+    $poses = array('de_pie_cadera_marcada_mirada_directa', 'apoyada_pared_cabeza_ladeada', 'mano_en_pelo_mirada_camara', 'sentada_piernas_cruzadas_sonrisa');
 
-    // ── Shot rotation ──
-    $shots = array('cuerpo_entero_pose_provocativa', 'tumbada_cama_sensual', 'sentada_cama_piernas_abiertas', 'arrodillada_cama_sensual');
-    $poses = array('tumbada_espalda_piernas_flexionadas_sensual', 'a_cuatro_patas_mirando_camara', 'sentada_cama_piernas_separadas', 'arrodillada_manos_muslos_pose_sexual');
+    $outfit = isset($shortOutfits[$targetIndex]) ? $shortOutfits[$targetIndex] : $shortOutfits[0];
+    $bg = isset($shortBgs[$targetIndex]) ? $shortBgs[$targetIndex] : $shortBgs[0];
     $shot = $shots[$targetIndex % count($shots)];
     $pose = $poses[$targetIndex % count($poses)];
 
-    // ── Build sections ──
     $sections = array();
-    $sections[] = '[FORMATO] 1 sola fotografía — NUNCA 2 fotos juntas, NUNCA collage, NUNCA diptych, NUNCA mosaico. El archivo debe contener UNA única foto.';
+    $sections[] = '[FORMATO] 1 sola fotografía real — NUNCA 2 fotos juntas, NUNCA collage, NUNCA diptych.';
     $sections[] = publicista_build_compact_realism_block();
-    $sections[] = '[ID] ' . $identityBlock;
+    $sections[] = '[SIMILITUD] La mujer debe ser EXACTAMENTE la misma persona que la foto de referencia. Conserva su rostro, tono de piel, complexión y tipo de pelo. La unica diferencia es la ropa y el fondo.';
     $sections[] = '[IMG1] fondo:' . $bg . ' | ropa:' . $outfit . ' | enc:' . $shot . ' | pose:' . $pose;
-    $sections[] = '[EXTRA] luz_tenue_calida ambiente_intimo exp:magnética_atractiva maq_intenso';
-    $sections[] = '[NEG] NO dibujo NO ilustracion NO texto NO marca_agua NO manos_deformes NO deformidad NO doble_cara NO objetos_flotantes NO 2_fotos_juntas NO diptych NO mosaico NO collage NO estudio NO ciclorama';
+    $sections[] = '[EXTRA] luz_tenue_calida exp:magnética_atractiva maq_intenso';
+    $sections[] = '[NEG] NO dibujo NO ilustracion NO texto NO marca_agua NO manos_deformes NO deformidad NO doble_cara NO objetos_flotantes NO 2_fotos_juntas NO diptych NO mosaico NO collage NO estudio NO ciclorama NO ropa_de_calle';
+    $sections[] = '[ID] ' . $identityBlock;
 
     $prompt = trim(implode("\n", $sections));
     $prompt = publicista_compact_prompt_fit_budget($prompt, 2000);
@@ -5584,10 +5584,10 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
             // Si es error de watermark, probar con prompt más suave
             if ($eroticBatchAttempts < $maxEroticAttempts && is_string($eroticBatchOrError)) {
                 if (stripos($eroticBatchOrError, 'watermark') !== false || stripos($eroticBatchOrError, 'marca de agua') !== false || stripos($eroticBatchOrError, 'sin watermark') !== false) {
-                    // Reconstruir prompt con menos ropa explícita
+                    // Reconstruir prompt con ropa más cubriente y poses aún más neutras
                     $eroticPrompt = str_replace(
-                        array('tumbada_cama_sensual', 'a_cuatro_patas_mirando_camara', 'arrodillada_cama_sensual', 'tumbada_espalda_piernas_flexionadas_sensual', 'a_cuatro_patas_mirando_camara', 'sentada_cama_piernas_separadas', 'arrodillada_manos_muslos_pose_sexual'),
-                        array('sentada_borde_cama', 'de_rodillas_cama_natural', 'sentada_sofá_sensual', 'recostada_lado_cama', 'sentada_borde_cama_sonrisa', 'de_pie_cama_pose_segura', 'sentada_sofá_piernas_cruzadas'),
+                        array('lenceria negra encaje sujetador+tanga', 'bikini hilo minimo color carne', 'body gasa transparente negro','corset saten rojo con ligas', 'babydoll encaje blanco abierto', 'conjunto lenceria roja saten', 'microbikini cintas doradas', 'camison seda corto tirantes', 'de_pie_cadera_marcada_mirada_directa', 'apoyada_pared_cabeza_ladeada', 'cuerpo_entero_de_pie_sensual'),
+                        array('body lencero negro escotado opaco', 'bikini blanco palabra honor', 'top tirantes + short vaquero minimo', 'vestido punto ceñido muy corto', 'camiseta lencera blanca opaca', 'mono escotado ceñido corto', 'body palabra honor sin tirantes', 'top halter + minifalda tubo', 'de_pie_mano_cadera_segura', 'apoyada_pared_brazo_cruzado', 'cuerpo_entero_postura_natural'),
                         $eroticPrompt
                     );
                     publicista_job_log_write($jobId, 'erotic_batch_watermark_retry', array('attempt' => $eroticBatchAttempts));
