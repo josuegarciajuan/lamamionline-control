@@ -211,6 +211,17 @@ final class Bot implements BotInterface
                     }
                 }
 
+                // ── Bot-mode re-check: stop if bot was turned off during pipeline ──
+                if (!$this->isRunning()) {
+                    $this->logger->info('Bot::handleWebhook — bot stopped before send (IntentRouter)', [
+                        'phone' => $fromPhone,
+                    ]);
+                    $ctx['_cancelled'] = true;
+                    $ctx['_send_ok']   = false;
+                    \WasapBot\Pipeline\InflightGate::cleanup($inflightLockDir, $fromPhone, $lineLast9);
+                    return $ctx;
+                }
+
                 $ctx['_send_ok'] = true;
                 $this->sendMessages($ctx, [$ctx['output_text'] ?? '']);
 
@@ -252,6 +263,17 @@ final class Bot implements BotInterface
                 $this->logger->info('Bot::handleWebhook — audio auto-reply sent', [
                     'phone' => $fromPhone,
                 ]);
+
+                // ── Bot-mode re-check: stop if bot was turned off during pipeline ──
+                if (!$this->isRunning()) {
+                    $this->logger->info('Bot::handleWebhook — bot stopped before send (audio)', [
+                        'phone' => $fromPhone,
+                    ]);
+                    $ctx['_cancelled'] = true;
+                    $ctx['_send_ok']   = false;
+                    \WasapBot\Pipeline\InflightGate::cleanup($inflightLockDir, $fromPhone, $lineLast9);
+                    return $ctx;
+                }
 
                 // Send the audio reply
                 $ctx['_send_ok'] = true;
@@ -296,6 +318,17 @@ final class Bot implements BotInterface
                     'phone'     => $fromPhone,
                     'thread_id' => $ctx['thread_id'] ?? '?',
                 ]);
+
+                // ── Bot-mode re-check: stop if bot was turned off during pipeline ──
+                if (!$this->isRunning()) {
+                    $this->logger->info('Bot::handleWebhook — bot stopped before send (first-contact)', [
+                        'phone' => $fromPhone,
+                    ]);
+                    $ctx['_cancelled'] = true;
+                    $ctx['_send_ok']   = false;
+                    \WasapBot\Pipeline\InflightGate::cleanup($inflightLockDir, $fromPhone, $lineLast9);
+                    return $ctx;
+                }
 
                 $ctx['_send_ok'] = true;
                 $this->sendMessages($ctx, [$greeting]);
@@ -542,6 +575,17 @@ final class Bot implements BotInterface
             $messages = $ctx['splitted_messages'] ?? [$ctx['output_text'] ?? ''];
 
             // ── 15. Send via WAHA with humanization ──────────────────
+            // ── Bot-mode re-check: stop if bot was turned off during pipeline ──
+            if (!$this->isRunning()) {
+                $this->logger->info('Bot::handleWebhook — bot stopped before send (LLM path)', [
+                    'phone' => $fromPhone,
+                ]);
+                $ctx['_cancelled'] = true;
+                $ctx['_send_ok']   = false;
+                \WasapBot\Pipeline\InflightGate::cleanup($inflightLockDir, $fromPhone, $lineLast9);
+                return $ctx;
+            }
+
             $ctx['_send_ok'] = true;
             $this->sendMessages($ctx, (array) $messages, $inflightLockDir, $fromPhone);
 
@@ -626,7 +670,7 @@ final class Bot implements BotInterface
         }
 
         $content = trim((string) @file_get_contents($modeFile));
-        return $content !== 'stop';
+        return mb_strtolower($content) !== 'stop';
     }
 
     public function getConfig(): ConfigInterface
@@ -656,13 +700,28 @@ final class Bot implements BotInterface
      * user has a data directory at data/users/{userId}/, return the
      * user-specific path. Otherwise return the legacy root-level path.
      *
+     * The $relative path may optionally include a leading "data/" prefix
+     * (e.g. "data/.bot_mode" from config). This prefix is automatically
+     * stripped to prevent double-nesting like data/users/{id}/data/....
+     *
      * @param string $rootDir   Project root (WASAPBOT_ROOT)
      * @param int    $userId    User ID (0 = legacy / default)
-     * @param string $relative  Relative path from data/ (e.g. "session_memory.ndjson")
+     * @param string $relative  Relative path, optionally with "data/" prefix
      * @return string Absolute path
      */
     public static function resolveUserDataPath(string $rootDir, int $userId, string $relative): string
     {
+        // ── Strip leading "data/" prefix from relative path ────────────────
+        // Config values use data-prefixed paths (e.g. "data/.bot_mode",
+        // "data/session_memory.ndjson") because they are relative to the
+        // project root. But this function already prefixes with either
+        // data/users/{id}/ or data/, so we must strip the extra data/
+        // to prevent double-nesting (data/users/{id}/data/.bot_mode).
+        $relative = ltrim($relative, '/');
+        if (str_starts_with($relative, 'data/')) {
+            $relative = substr($relative, 5); // Remove "data/" prefix
+        }
+
         // For non-admin users (ID > 1), ALWAYS use user-specific path
         // to prevent data mixing between users
         if ($userId > 1) {
@@ -1503,6 +1562,16 @@ final class Bot implements BotInterface
             return;
         }
 
+        // ── Bot-mode re-check: abort send if bot was stopped mid-pipeline ──
+        if (!$this->isRunning()) {
+            $this->logger->info('Bot::sendMessages — bot stopped, aborting send', [
+                'thread_id' => $threadId,
+            ]);
+            $ctx['_cancelled'] = true;
+            $ctx['_send_ok']   = false;
+            return;
+        }
+
         // ── Anti-metralleta: last-moment check BEFORE typing simulation ──
         // Catches messages that arrived during the LLM call + pipeline processing
         // but before we committed to sending via WAHA.
@@ -1603,6 +1672,15 @@ final class Bot implements BotInterface
                     'thread_id' => $threadId,
                 ]);
                 $pauseGate->clearCancelRequest($threadId);
+                $ctx['_cancelled'] = true;
+                $ctx['_send_ok']   = false;
+                break;
+            }
+            // ── Intra-loop bot-mode check: bot may have been stopped during typing ──
+            if (!$this->isRunning()) {
+                $this->logger->info('Bot::sendMessages — bot stopped mid-send, aborting', [
+                    'thread_id' => $threadId,
+                ]);
                 $ctx['_cancelled'] = true;
                 $ctx['_send_ok']   = false;
                 break;
