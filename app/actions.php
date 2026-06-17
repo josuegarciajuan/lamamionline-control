@@ -393,6 +393,9 @@ function handle_post_actions() {
         case 'regenerate_publicista_candidate':
             action_regenerate_publicista_candidate();
             break;
+        case 'regenerate_publicista_sexy_candidate':
+            action_regenerate_publicista_sexy_candidate();
+            break;
         case 'poll_publicista_regen_status':
             action_poll_publicista_regen_status();
             break;
@@ -753,6 +756,46 @@ function action_regenerate_publicista_candidate() {
     exit;
 }
 
+
+function action_regenerate_publicista_sexy_candidate() {
+    $id = trim((string)request_post('id'));
+    $candidateId = trim((string)request_post('candidate_id'));
+    $refineText = trim((string)request_post('refine_text'));
+    if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+        if (mb_strlen($refineText) > 1200) {
+            $refineText = mb_substr($refineText, 0, 1200);
+        }
+    } else {
+        if (strlen($refineText) > 1200) {
+            $refineText = substr($refineText, 0, 1200);
+        }
+    }
+    $job = $id !== '' ? publicista_job_get($id) : null;
+    if ($job && function_exists('publicista_pipeline_is_running') && publicista_pipeline_is_running($job)) {
+        set_flash('ok', 'La generación sigue en curso. Espera a que termine antes de regenerar una candidata erótica.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
+    set_flash('ok', 'Regeneración erótica lanzada en segundo plano.');
+    $targetUrl = publicista_tab_url(array('job' => $id));
+    publicista_finish_redirect_response($targetUrl);
+
+    try {
+        list($ok, $result) = publicista_regenerate_sexy_candidate($id, $candidateId, $refineText);
+        $latestJob = publicista_job_get($id) ?: $job;
+        if (function_exists('publicista_notify_candidate_regeneration_finished')) {
+            publicista_notify_candidate_regeneration_finished($latestJob, $candidateId, $ok, $result);
+        }
+    } catch (Throwable $e) {
+        if (function_exists('bootstrap_runtime_log_exception')) {
+            bootstrap_runtime_log_exception('action_regenerate_publicista_sexy_candidate_background', $e);
+        }
+    }
+
+    exit;
+}
+
+
 /**
  * Endpoint de polling ligero. Devuelve JSON con:
  * - queue: estado de la cola de regeneraciones (queued/running/done/error por candidateId)
@@ -791,6 +834,24 @@ function action_poll_publicista_regen_status() {
             'error'       => trim((string)($cand['error'] ?? '')),
         );
     }
+    // Add sexy candidates
+    $sexyCandidates = is_array($job['sexy_candidates'] ?? null) ? $job['sexy_candidates'] : array();
+    $sexyCandidatesOut = array();
+    foreach ($sexyCandidates as $cand) {
+        $candId = trim((string)($cand['id'] ?? ''));
+        if ($candId === '') continue;
+        $squarePath = trim((string)($cand['square_path'] ?? ''));
+        $fsPath = $squarePath !== '' ? BASE_PATH . '/' . ltrim($squarePath, '/') : '';
+        $mtime = ($fsPath !== '' && file_exists($fsPath)) ? (int)filemtime($fsPath) : 0;
+        $sexyCandidatesOut[$candId] = array(
+            'square_path' => $squarePath,
+            'mtime'       => $mtime,
+            'src'         => $mtime > 0 ? $squarePath . '?t=' . $mtime : $squarePath,
+            'status'      => trim((string)($cand['status'] ?? '')),
+            'round'       => trim((string)($cand['round'] ?? '')),
+            'error'       => trim((string)($cand['error'] ?? '')),
+        );
+    }
     // Avisos activos recientes (últimos 30 min)
     $avisosCount = 0;
     if (function_exists('avisos_get_active')) {
@@ -805,11 +866,12 @@ function action_poll_publicista_regen_status() {
         }
     }
     echo json_encode(array(
-        'ok'           => true,
-        'queue'        => $queue,
-        'candidates'   => $candidatesOut,
-        'avisos_count' => $avisosCount,
-        'ts'           => time(),
+        'ok'              => true,
+        'queue'           => $queue,
+        'candidates'      => $candidatesOut,
+        'sexy_candidates' => $sexyCandidatesOut,
+        'avisos_count'    => $avisosCount,
+        'ts'              => time(),
     ), JSON_UNESCAPED_UNICODE);
     exit;
 }

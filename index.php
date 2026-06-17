@@ -41,7 +41,7 @@ header('X-Frame-Options: DENY');
     <link rel="manifest" href="manifest.json?v=20260611_1">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="assets/tokens.css?v=20260616_4">
-    <link rel="stylesheet" href="assets/style.css?v=20260616_4">
+    <link rel="stylesheet" href="assets/style.css?v=20260617_1">
     <link rel="stylesheet" href="assets/theme.css?v=20260616_4">
     <style>
     /* ═══ INLINE OVERRIDE: Pink→Gold + Mobile compaction ═══
@@ -156,6 +156,6 @@ header('X-Frame-Options: DENY');
         </main>
     </div>
 <?php endif; ?>
-<script src="assets/app.js?v=20260616_4"></script>
+<script src="assets/app.js?v=20260617_1"></script>
 </body>
 </html>

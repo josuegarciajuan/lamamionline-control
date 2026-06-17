@@ -2693,6 +2693,8 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     $pipeline = is_array($selectedJob['pipeline'] ?? null) ? $selectedJob['pipeline'] : array();
     $candidates = is_array($selectedJob['candidates'] ?? null) ? $selectedJob['candidates'] : array();
     $finalImages = is_array($selectedJob['final_images'] ?? null) ? $selectedJob['final_images'] : array();
+    $sexyCandidates = is_array($selectedJob['sexy_candidates'] ?? null) ? $selectedJob['sexy_candidates'] : array();
+    $sexyFinalImages = is_array($selectedJob['sexy_final_images'] ?? null) ? $selectedJob['sexy_final_images'] : array();
     $workflow = function_exists('publicista_job_workflow') ? publicista_job_workflow($selectedJob) : array();
     $copyPack = function_exists('publicista_job_copy_pack') ? publicista_job_copy_pack($selectedJob) : array();
     $currentCopyVersion = function_exists('publicista_current_copy_version') ? publicista_current_copy_version($selectedJob) : null;
@@ -2706,7 +2708,7 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     $hasPendingBatch = function_exists('publicista_pipeline_has_pending_batch') ? publicista_pipeline_has_pending_batch($selectedJob) : false;
     $batchStatusLabel = function_exists('publicista_batch_status_label') ? publicista_batch_status_label($batchState['status'] ?? '') : '-';
     $isPipelineRunning = function_exists('publicista_pipeline_is_running') ? publicista_pipeline_is_running($selectedJob) : (($selectedJob['estado'] ?? '') === 'processing');
-    $pipelineButtonLabel = $hasPendingBatch ? 'Relanzar generación' : 'Generar / regenerar 6 candidatas';
+    $pipelineButtonLabel = $hasPendingBatch ? 'Relanzar generación' : 'Generar / regenerar candidatas';
     $pipelineWaitingLabel = $hasPendingBatch ? 'Generación en curso / esperando resultado' : 'Generación en curso';
     $pipelineStartedLabel = !empty($processing['last_started_at']) ? format_created_at($processing['last_started_at']) : '';
     $canCloseProfileAsFinished = (count($finalImages) >= 4) && !empty($currentCopyVersion) && empty($workflow['pack_final']);
@@ -3051,6 +3053,63 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     }
     echo '</section>';
 
+    // ───────────────────────────────────────────────────────────────────────
+    // SECCIÓN 2b: CANDIDATAS EROTICAS
+    // ───────────────────────────────────────────────────────────────────────
+    echo '<section class="panel panel-space" id="publicistaSexyCandidates">';
+    echo '<div class="branch-panel-head"><h3>②b Candidatas eróticas <span style="font-size:11px;background:#fce7f3;color:#be185d;padding:2px 8px;border-radius:4px;margin-left:8px;">+18</span></h3><span class="summary-badge">' . e((string)count($sexyCandidates)) . '</span></div>';
+    if (!empty($sexyCandidates)) {
+        echo '<div class="cards two" style="margin-top:14px;">';
+        foreach ($sexyCandidates as $cand) {
+            $isSelected = !empty($cand['selected']);
+            $cardBorder = $isSelected ? 'border:2px solid #ec4899;' : '';
+            echo '<div class="panel" style="padding:12px;' . $cardBorder . '" data-candidate-id="' . e($cand['id'] ?? '') . '" data-candidate-type="sexy">';
+            echo '<div class="branch-panel-head"><h4 style="margin:0;">' . e($cand['id'] ?? 'sexy') . ($isSelected ? ' <span style="color:#ec4899;font-size:11px;">★ TOP 4 ERÓTICO</span>' : '') . '</h4><span class="summary-badge">' . e((string)($cand['effective_score'] ?? 0)) . '</span></div>';
+            $imgToShow = '';
+            if (!empty($cand['square_path'])) $imgToShow = $cand['square_path'];
+            elseif (!empty($cand['preview_path'])) $imgToShow = $cand['preview_path'];
+            elseif (!empty($cand['raw_path'])) $imgToShow = $cand['raw_path'];
+            if ($imgToShow !== '') {
+                publicista_render_job_image_card($imgToShow, 'Sin blur');
+            }
+            if (!empty($cand['evaluation']) && is_array($cand['evaluation'])) {
+                $ev = $cand['evaluation'];
+                echo '<div class="info-strip" style="margin-top:8px;font-size:12px;"><strong>Scores:</strong> Semejanza ' . e((string)($ev['likeness_score'] ?? 0)) . ' · Calidad ' . e((string)($ev['quality_score'] ?? 0)) . ' · Global ' . e((string)($ev['overall_score'] ?? 0)) . '</div>';
+                $boolFields = array(
+                    'hands_ok' => 'Manos', 'anatomy_ok' => 'Anatomía', 'single_face_clear' => 'Cara única',
+                    'body_proportions_match' => 'Complexión', 'skin_texture_ok' => 'Piel real',
+                    'mirror_coherent' => 'Espejo OK', 'background_ok' => 'Fondo',
+                );
+                $pills = array();
+                foreach ($boolFields as $field => $lbl) {
+                    if (!array_key_exists($field, $ev)) continue;
+                    $ok = !empty($ev[$field]);
+                    $pills[] = '<span style="font-size:11px;padding:2px 5px;border-radius:4px;background:' . ($ok ? '#dcfce7' : '#fee2e2') . ';color:' . ($ok ? '#15803d' : '#b91c1c') . ';">' . ($ok ? '✓' : '✗') . ' ' . e($lbl) . '</span>';
+                }
+                if (!empty($pills)) echo '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:3px;">' . implode('', $pills) . '</div>';
+                if (!empty($ev['issues']) && is_array($ev['issues'])) {
+                    echo '<div style="margin-top:6px;font-size:11px;color:#b45309;"><strong>Issues:</strong> ' . e(implode(' · ', $ev['issues'])) . '</div>';
+                }
+            }
+            if (!empty($cand['error'])) {
+                echo '<div class="info-strip" style="margin-top:8px;color:#b91c1c;font-size:12px;"><strong>Error:</strong> ' . e($cand['error']) . '</div>';
+            }
+            echo '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">';
+            if ($isPipelineRunning) {
+                echo '<span class="info-strip" style="font-size:12px;background:#f8fafc;">Generación en curso: espera a que termine para regenerar candidatas manualmente.</span>';
+            } else {
+                echo '<button type="button" class="btn-secondary-mini js-open-regenerate-sexy-candidate-modal" data-job-id="' . e($selectedJob['id'] ?? '') . '" data-candidate-id="' . e($cand['id'] ?? '') . '" style="background:#fce7f3;border-color:#f9a8d4;color:#9d174d;">Regenerar esta</button>';
+            }
+            echo '</div>';
+            echo '<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;color:#9ca3af;">Ver prompt erótico</summary><pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;">' . e($cand['prompt'] ?? '') . '</pre></details>';
+            echo '</div>';
+        }
+        echo '</div>';
+    } else {
+        echo '<div class="empty">' . ($isPipelineRunning ? 'La generación está en curso. Esta ficha se actualizará sola cuando entren las candidatas eróticas.' : 'Aún no hay candidatas eróticas generadas. Activa el checkbox "Generar variante erótica" en el formulario o pulsa el botón de generar arriba.') . '</div>';
+    }
+    echo '</section>';
+
     // -----------------------------------------------------------------------
     // SECCIÓN 3: FINALES DEL PACK — sin blur + con blur manual
     // -----------------------------------------------------------------------
@@ -3149,6 +3208,44 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     }
     echo '</section>';
 
+// ───────────────────────────────────────────────────────────────────────
+// SECCIÓN 3b: DEFINITIVAS EROTICAS
+// ───────────────────────────────────────────────────────────────────────
+echo '<section class="panel panel-space" id="publicistaSexyFinals">';
+echo '<div class="branch-panel-head"><h3>③b Definitivas eróticas <span style="font-size:11px;background:#fce7f3;color:#be185d;padding:2px 8px;border-radius:4px;margin-left:8px;">+18</span></h3><span class="summary-badge">' . e((string)count($sexyFinalImages)) . '</span></div>';
+if (!empty($sexyFinalImages)) {
+    echo '<p style="font-size:13px;color:#6b7280;margin:4px 0 14px;">Las definitivas eróticas arrancan siendo copia de las candidatas eróticas. Puedes aplicar <strong style="color:#7c3aed;">blur manual</strong> para tapar la cara.</p>';
+    echo '<div class="cards two">';
+    foreach ($sexyFinalImages as $finalRow) {
+        $fId = $finalRow['id'] ?? '';
+        $blurSrc = !empty($finalRow['final_path']) ? $finalRow['final_path'] : (!empty($finalRow['square_path']) ? $finalRow['square_path'] : '');
+        $bustSrc = function($p) { if ($p === '') return ''; $fs = BASE_PATH . '/' . ltrim($p, '/'); $m = @filemtime($fs); return ($m > 0) ? $p . '?t=' . $m : $p; };
+        $blurSrcBust = $bustSrc($blurSrc);
+        echo '<div class="panel" style="padding:12px;" id="sexyfinalCard_' . e($fId) . '">';
+        $manualBlurApplied = !empty($finalRow['manual_blur_applied']);
+        $manualBlurIntensity = (int)($finalRow['manual_blur_intensity'] ?? 0);
+        echo '<div class="branch-panel-head" style="margin-bottom:8px;"><strong>' . e($fId ?: 'Sexy Final') . '</strong><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><span class="summary-badge">Score ' . e((string)($finalRow['evaluation_score'] ?? 0)) . '</span><span id="sexyfinalBlurStatus_' . e($fId) . '" class="summary-badge" style="background:' . ($manualBlurApplied ? '#ede9fe' : '#f3f4f6') . ';color:' . ($manualBlurApplied ? '#6d28d9' : '#6b7280') . ';">' . e($manualBlurApplied ? ('Blur manual · ' . $manualBlurIntensity . '/20') : 'Sin blur manual') . '</span>';
+        echo '</div></div>';
+        if ($blurSrc !== '') {
+            echo '<img id="sexyfinalBlurImg_' . e($fId) . '" src="' . e($blurSrcBust) . '" alt="Definitiva erotica" style="width:100%;border-radius:8px;border:1px solid #e5e7eb;display:block;">';
+        }
+        echo '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">';
+        if ($blurSrc !== '') {
+            echo '<button type="button" class="btn-primary js-manual-blur-sexy-btn" style="background:#7c3aed;border-color:#7c3aed;" '
+                . 'data-job-id="' . e($selectedJob['id'] ?? '') . '" '
+                . 'data-sexyfinal-id="' . e($fId) . '" '
+                . 'data-square-src="' . e($blurSrc) . '" '
+                . 'data-intensity="' . e((string)((int)($finalRow['manual_blur_intensity'] ?? 8))) . '">✏ Blur manual</button>';
+        }
+        echo '</div>';
+        echo '</div>';
+    }
+    echo '</div>';
+} else {
+    echo '<div class="empty">Finales eróticas pendientes. Se crean automáticamente al completar el pipeline de imágenes si la opción erótica está activada.</div>';
+}
+echo '</section>';
+
 // -----------------------------------------------------------------------
 // SECCIÓN 4: FOTOS REALES SUBIDAS
 // -----------------------------------------------------------------------
@@ -3221,6 +3318,7 @@ echo '</section>';
 // -----------------------------------------------------------------------
 $allPhotosForSelection = array_merge(
     is_array($selectedJob['final_images'] ?? null) ? $selectedJob['final_images'] : array(),
+    is_array($selectedJob['sexy_final_images'] ?? null) ? $selectedJob['sexy_final_images'] : array(),
     is_array($selectedJob['real_photos'] ?? null) ? $selectedJob['real_photos'] : array()
 );
 $platformPhotos = is_array($selectedJob['platform_photos'] ?? null) ? $selectedJob['platform_photos'] : array(
@@ -3266,9 +3364,13 @@ if (empty($allPhotosForSelection)) {
             $checked = in_array($pId, $selectedIds, true) ? ' checked' : '';
             $isReal = strpos($pId, 'real_') === 0;
             $isFinal = strpos($pId, 'final_') === 0;
+            $isSexyFinal = strpos($pId, 'sexyfinal_') === 0;
             if ($isReal) {
                 $label = '📸 ' . e($photo['original_filename'] ?? $pId);
                 $typeBadge = ' <span style="font-size:9px;background:#fef3c7;color:#92400e;padding:1px 4px;border-radius:3px;">REAL</span>';
+            } elseif ($isSexyFinal) {
+                $label = 'Erótica #' . substr($pId, 10);
+                $typeBadge = ' <span style="font-size:9px;background:#fce7f3;color:#9d174d;padding:1px 4px;border-radius:3px;">ERO</span>';
             } elseif ($isFinal) {
                 $label = 'Definitiva #' . substr($pId, 6);
                 $typeBadge = ' <span style="font-size:9px;background:#dbeafe;color:#1e40af;padding:1px 4px;border-radius:3px;">DEF</span>';
@@ -3490,19 +3592,19 @@ echo '</section>';
 <div id="regenerateCandidateModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:10000;align-items:center;justify-content:center;flex-direction:column;">
   <div style="background:#fff;border-radius:14px;padding:20px;max-width:720px;width:96vw;max-height:90vh;overflow:auto;box-shadow:0 8px 40px rgba(0,0,0,0.35);">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;">
-      <strong style="font-size:16px;">Regenerar candidata con refinado</strong>
+      <strong style="font-size:16px;" id="regenerateCandidateModalTitle">Regenerar candidata con refinado</strong>
       <button type="button" onclick="closeRegenerateCandidateModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;">&times;</button>
     </div>
     <p style="margin:0 0 10px;font-size:13px;color:#6b7280;">Se reutiliza el prompt base de esta candidata y se añade tu texto de refinado para regenerarla.</p>
     <form method="post" id="regenerateCandidateForm">
-      <input type="hidden" name="action" value="regenerate_publicista_candidate">
+      <input type="hidden" name="action" value="regenerate_publicista_candidate" id="regenCandidateAction">
       <input type="hidden" name="id" id="regenCandidateJobId" value="">
       <input type="hidden" name="candidate_id" id="regenCandidateId" value="">
       <label for="regenCandidateRefineText" style="display:block;font-size:13px;color:#374151;margin-bottom:6px;">Texto de refinado (opcional)</label>
       <textarea name="refine_text" id="regenCandidateRefineText" rows="6" maxlength="1200" placeholder="Ejemplo: mantener la misma pose y complexión, mejorar manos, cara más nítida, fondo más natural..." style="width:100%;"></textarea>
       <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-        <button type="submit" class="btn-primary">Regenerar candidata</button>
-        <button type="button" class="btn-secondary" onclick="closeRegenerateCandidateModal()">Cancelar</button>
+        <button type="submit" class="btn-primary" id="regenCandidateSubmitBtn">Regenerar candidata</button>
+        <button type="button" class="btn-secondary" onclick="closeRegenerateCandidateModal();closeRegenerateSexyCandidateModal();">Cancelar</button>
         <span style="font-size:12px;color:#6b7280;">Si esta candidata está en TOP 6, las finales se recomponen automáticamente.</span>
       </div>
     </form>
@@ -3563,6 +3665,24 @@ echo '</section>';
 
   window.closeRegenerateCandidateModal = function() {
     document.getElementById('regenerateCandidateModal').style.display = 'none';
+  };
+
+  // ── Sexy candidate regeneration modal ──
+  window.openRegenerateSexyCandidateModal = function(jobId, candidateId) {
+    document.getElementById('regenCandidateJobId').value = jobId || '';
+    document.getElementById('regenCandidateId').value = candidateId || '';
+    document.getElementById('regenCandidateRefineText').value = '';
+    document.getElementById('regenCandidateAction').value = 'regenerate_publicista_sexy_candidate';
+    document.getElementById('regenerateCandidateModalTitle').innerHTML = 'Regenerar candidata <span style="font-size:11px;background:#fce7f3;color:#be185d;padding:2px 6px;border-radius:4px;">ERÓTICA</span>';
+    document.getElementById('regenerateCandidateModal').style.display = 'flex';
+    document.getElementById('regenCandidateRefineText').focus();
+  };
+
+  window.closeRegenerateSexyCandidateModal = function() {
+    document.getElementById('regenerateCandidateModal').style.display = 'none';
+    // Restaurar título por defecto
+    document.getElementById('regenerateCandidateModalTitle').innerHTML = 'Regenerar candidata';
+    document.getElementById('regenCandidateAction').value = 'regenerate_publicista_candidate';
   };
 
   window.syncManualBlurIntensity = function(value) {
@@ -3712,6 +3832,31 @@ echo '</section>';
       openRegenerateCandidateModal(
         regenBtn.getAttribute('data-job-id') || '',
         regenBtn.getAttribute('data-candidate-id') || ''
+      );
+      return;
+    }
+    // Sexy candidate regeneration
+    var sexyRegenBtn = e.target.closest ? e.target.closest('.js-open-regenerate-sexy-candidate-modal') : null;
+    if (sexyRegenBtn) {
+      e.preventDefault();
+      openRegenerateSexyCandidateModal(
+        sexyRegenBtn.getAttribute('data-job-id') || '',
+        sexyRegenBtn.getAttribute('data-candidate-id') || ''
+      );
+      return;
+    }
+    // Sexy final blur
+    var sexyBlurBtn = e.target.closest ? e.target.closest('.js-manual-blur-sexy-btn') : null;
+    if (sexyBlurBtn) {
+      e.preventDefault();
+      var sexyIntensity = parseInt(sexyBlurBtn.getAttribute('data-intensity') || '8', 10);
+      if (!isFinite(sexyIntensity)) sexyIntensity = 8;
+      window.openManualBlurModal(
+        sexyBlurBtn.getAttribute('data-job-id') || '',
+        sexyBlurBtn.getAttribute('data-sexyfinal-id') || '',
+        sexyBlurBtn.getAttribute('data-square-src') || '',
+        sexyIntensity,
+        'final'  // tratamos sexyfinal como tipo 'final' para el blur worker
       );
       return;
     }
@@ -4096,6 +4241,16 @@ function publicista_render_production_params_fields($params) {
     }
     echo '</select>';
     echo '<div class="field-help">Discreto = apto para webs estrictas. Sexy = por defecto, equilibrado. Muy sugerente = máximo sin desnudo.</div>';
+    echo '</div>';
+
+    // EROTIC MODE — checkbox para generar variante erotica adicional
+    $eroticChecked = !empty($params['erotic_mode']) ? ' checked' : '';
+    echo '<div class="field full" style="margin-top:10px;">';
+    echo '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">';
+    echo '<input type="checkbox" name="erotic_mode" value="1"' . $eroticChecked . ' style="width:18px;height:18px;">';
+    echo '<span>Generar también <strong style="color:#e11d48;">variante erótica</strong> (4 candidatas subidas de tono: lencería, bikinis, poses sensuales)</span>';
+    echo '</label>';
+    echo '<div class="field-help">Actívalo si el perfil va a publicarse en portales para adultos que admiten contenido erótico. Las 4 candidatas normales se generan siempre; con esta opción se añaden 4 más de tipo sexual.</div>';
     echo '</div>';
 
     // AJUSTE

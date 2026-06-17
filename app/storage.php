@@ -7966,6 +7966,7 @@ function publicista_job_fs_paths($id) {
         'originals_dir' => $base . '/original',
         'candidates_dir' => $base . '/candidates',
         'finals_dir' => $base . '/finals',
+        'sexy_finals_dir' => $base . '/sexy_finals',
         'meta_dir' => $base . '/meta',
         'logs_dir' => $base . '/logs',
         'reals_dir' => $base . '/reals',
@@ -8149,6 +8150,8 @@ function publicista_job_defaults($id = '') {
         ),
         'candidates' => array(),
         'final_images' => array(),
+        'sexy_candidates' => array(),
+        'sexy_final_images' => array(),
         'created_at' => '',
         'updated_at' => '',
     );

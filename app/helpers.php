@@ -562,6 +562,90 @@ function publicista_cheap_sexy_outfit_pool() {
     );
 }
 
+/**
+ * Pool de outfits eroticos para la variante subida de tono.
+ * Estructura: [key => [level, category, desc_corta]]
+ * Nivel 'erotico' — lencería, bikinis, transparencias, ropa sexual sugerente.
+ */
+function publicista_erotic_outfit_pool() {
+    return array(
+        // ═══ LENCERIA ═══
+        'lenceria_negra_encaje'        => ['erotico','lenceria',        'conjunto lencería negra encaje, sujetador push-up balconette + tanga + liguero'],
+        'lenceria_roja_saten'          => ['erotico','lenceria',        'conjunto lencería roja satén, sujetador copa media + culotte + medias'],
+        'lenceria_blanca_virginal'     => ['erotico','lenceria',        'conjunto lencería blanca gasa, bralette delicado + tanga brasileña'],
+        'lenceria_purpura_transparencia'=>['erotico','lenceria',        'conjunto lencería púrpura microfibra traslúcida con apliques florales'],
+        'body_lencero_negro'           => ['erotico','body',            'body lencero negro de encaje abierto en el escote, cierre de corchetes delantero'],
+        'corset_ligas'                 => ['erotico','corset',          'corset de satén burdeos con ballenas, ligas colgantes y medias de red'],
+
+        // ═══ BIKINIS ═══
+        'bikini_hilo_playa'            => ['erotico','bikini',          'bikini brasileño hilo dental, parte superior triángulo mínimo, caderas al aire'],
+        'bikini_blanco_ajustado'       => ['erotico','bikini',          'bikini blanco minimalista, top palabra de honor sin tirantes, braguita brasileña'],
+        'bikini_metalizado'            => ['erotico','bikini',          'bikini dorado metalizado brillante, top con aro bajo y tanga cintura baja'],
+
+        // ═══ TRANSPARENCIAS ═══
+        'body_transparente_gasa'       => ['erotico','transparente',    'body de gasa negra totalmente transparente — pezones y zonas íntimas visibles — espalda descubierta'],
+        'vestido_malla_transparente'   => ['erotico','transparente',    'vestido corto de malla de red totalmente transparente, cuerpo desnudo visible — solo malla cubriendo'],
+        'top_sheer_humo'               => ['erotico','transparente',    'top de tul transparente color humo, pezones visibles a través, sin nada debajo + minifalda cuerina'],
+
+        // ═══ ROPA SEXUAL / FETICHISTA (sin ser porno explícito) ═══
+        'latex_ceñido_negro'           => ['erotico','fetichista',      'conjunto látex negro brillante extremadamente ceñido, body escotado + cinturón metal'],
+        'cuero_arnes'                  => ['erotico','fetichista',      'arnés de cuero negro sobre pecho desnudo, pantalón cuero ajustado, tachuelas metálicas'],
+        'microbikini_cintas'           => ['erotico','minimo',          'microbikini de solo cintas negras — cubre lo mínimo legal, pezones al borde, tanga hilo'],
+        'conjunto_cama_saten'          => ['erotico','cama',            'camisón corto de satén rosa con tirantes finos caídos sobre un hombro, escote profundo'],
+        'babydoll_transparente'        => ['erotico','cama',            'babydoll transparente de encaje blanco abierto por delante, tetas visibles, tanga a juego'],
+    );
+}
+
+/**
+ * Fondo sexual/erotico — dormitorio, cama, sofa, luces tenues.
+ */
+function publicista_erotic_background_pool() {
+    return array(
+        'dormitorio_luz_tenue'        => 'dormitorio cama grande sábanas revueltas luz cálida lámpara mesilla',
+        'cama_saten_rojo'             => 'cama satén rojo almohadas mullidas iluminación tenue íntima',
+        'sofa_cuero_negro'            => 'sofá cuero negro ambiente penumbra reflejos brillo luz baja',
+        'espejo_suelo'                => 'espejo de cuerpo entero apoyado en suelo dormitorio alfombra mullida',
+        'ventana_luz_lunar'           => 'ventanal luz de luna silueta cortinas gasa traslúcida ambiente nocturno',
+        'silla_terciopelo'            => 'silla terciopelo burdeos respaldo alto luz dirigida sombras marcadas',
+        'alfombra_piel_estudio'       => 'alfombra piel sintética blanca suelo madera oscura luz suave cenital',
+    );
+}
+
+/**
+ * Selecciona N outfits del pool erotico para la variante subida de tono.
+ * Similar a publicista_pick_outfits_for_images pero sin filtro de nivel —
+ * todo el pool es erotico.
+ */
+function publicista_pick_erotic_outfits_for_images($count = 4) {
+    $pool = publicista_erotic_outfit_pool();
+    $colors = array('negro', 'rojo', 'blanco', 'burdeos', 'dorado', 'púrpura');
+
+    $usedCategories = array();
+    $outfits = array();
+
+    for ($i = 0; $i < $count; $i++) {
+        $filtered = array();
+        foreach ($pool as $key => $entry) {
+            if (!is_array($entry)) continue;
+            if (in_array($entry[1], $usedCategories, true)) continue;
+            $filtered[] = array('key' => $key, 'level' => $entry[0], 'category' => $entry[1], 'desc' => $entry[2]);
+        }
+        if (empty($filtered)) {
+            // permitir repetir categoria si ya usamos todas
+            foreach ($pool as $key => $entry) {
+                if (!is_array($entry)) continue;
+                $filtered[] = array('key' => $key, 'level' => $entry[0], 'category' => $entry[1], 'desc' => $entry[2]);
+            }
+        }
+        $pick = $filtered[array_rand($filtered)];
+        $usedCategories[] = $pick['category'];
+        // No forzar color — dejar que el outfit dicte su propio color
+        $outfits[] = mb_substr($pick['desc'], 0, 70);
+    }
+
+    return $outfits;
+}
+
 function publicista_pick_random_outfits($count = 4) {
     $pool = publicista_cheap_sexy_outfit_pool();
     $keys = array_keys($pool);
@@ -982,6 +1066,9 @@ function publicista_normalize_outfit_params($raw) {
     $out['copy_angles'] = array_values(array_filter($rawAngles, function($v) use ($allowedAngles) {
         return in_array(trim((string)$v), $allowedAngles, true);
     }));
+
+    // Variante erotica: activada por checkbox en el form
+    $out['erotic_mode'] = !empty($raw['erotic_mode']) ? 1 : 0;
 
     return $out;
 }
