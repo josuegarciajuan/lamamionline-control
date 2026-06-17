@@ -3932,11 +3932,15 @@ echo '</section>';
               badge.style.color = '#6d28d9';
             }
           } else {
-            var img = document.getElementById('finalBlurImg_' + _mbFinalId);
+            // Detectar si es final erotica o capada por el prefijo del ID
+            var isSexyFinal = _mbFinalId.indexOf('sexyfinal_') === 0;
+            var imgPrefix = isSexyFinal ? 'sexyfinalBlurImg_' : 'finalBlurImg_';
+            var badgePrefix = isSexyFinal ? 'sexyfinalBlurStatus_' : 'finalBlurStatus_';
+            var img = document.getElementById(imgPrefix + _mbFinalId);
             if (img && data.final_path) {
               img.src = data.final_path + '?t=' + Date.now();
             }
-            var badge = document.getElementById('finalBlurStatus_' + _mbFinalId);
+            var badge = document.getElementById(badgePrefix + _mbFinalId);
             if (badge) {
               var intensityText = (data.manual_blur_intensity || intensity) + '/20';
               badge.textContent = 'Blur manual · ' + intensityText;
