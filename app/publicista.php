@@ -5326,6 +5326,8 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
     $job['workflow'] = $workflow;
     $job['candidates'] = array();
     $job['final_images'] = array();
+    $job['sexy_candidates'] = array();
+    $job['sexy_final_images'] = array();
     publicista_job_save($job);
 
     list($okPrep, $prepOrError) = publicista_prepare_job_engine($jobId, null);
