@@ -5561,11 +5561,43 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
     $eroticSummaryExtra = '';
 
     if ($eroticMode && $usePollo) {
+        // Esperar 30s entre batches para evitar rate-limiting y saturación de Pollo.ai
+        sleep(30);
+
         $eroticPrompt = publicista_build_pollo_compact_erotic_prompt($job);
 
-        list($okEroticBatch, $eroticBatchOrError) = publicista_generate_candidate_images_pollo_batch(
-            $jobId, 4, $eroticPrompt, $pipelineImageModel, $job, 'erotic'
-        );
+        // 2 intentos para el batch erótico (el segundo reintenta con prompt más suave si falla)
+        $eroticBatchAttempts = 0;
+        $maxEroticAttempts = 2;
+        $okEroticBatch = false;
+        $eroticBatchOrError = '';
+
+        while ($eroticBatchAttempts < $maxEroticAttempts) {
+            $eroticBatchAttempts++;
+            list($okEroticBatch, $eroticBatchOrError) = publicista_generate_candidate_images_pollo_batch(
+                $jobId, 4, $eroticPrompt, $pipelineImageModel, $job, 'erotic'
+            );
+            if ($okEroticBatch) break;
+
+            // Si es error de watermark, probar con prompt más suave
+            if ($eroticBatchAttempts < $maxEroticAttempts && is_string($eroticBatchOrError)) {
+                if (stripos($eroticBatchOrError, 'watermark') !== false || stripos($eroticBatchOrError, 'marca de agua') !== false || stripos($eroticBatchOrError, 'sin watermark') !== false) {
+                    // Reconstruir prompt con menos ropa explícita
+                    $eroticPrompt = str_replace(
+                        array('tumbada_cama_sensual', 'a_cuatro_patas_mirando_camara', 'arrodillada_cama_sensual', 'tumbada_espalda_piernas_flexionadas_sensual', 'a_cuatro_patas_mirando_camara', 'sentada_cama_piernas_separadas', 'arrodillada_manos_muslos_pose_sexual'),
+                        array('sentada_borde_cama', 'de_rodillas_cama_natural', 'sentada_sofá_sensual', 'recostada_lado_cama', 'sentada_borde_cama_sonrisa', 'de_pie_cama_pose_segura', 'sentada_sofá_piernas_cruzadas'),
+                        $eroticPrompt
+                    );
+                    publicista_job_log_write($jobId, 'erotic_batch_watermark_retry', array('attempt' => $eroticBatchAttempts));
+                    sleep(20);
+                    continue;
+                }
+                // Otro error transitorio: reintentar
+                sleep(15);
+                continue;
+            }
+            break;
+        }
 
         if ($okEroticBatch) {
             $eroticBatchMeta = is_array($eroticBatchOrError) ? $eroticBatchOrError : array();
@@ -5710,7 +5742,76 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
             );
             $eroticSummaryExtra = ' + 4 candidatas eroticas generadas y ' . count($sexyFinalImages) . ' definitivas eroticas.';
         } else {
-            $eroticSummaryExtra = ' | ATENCION: Fallo la generacion de las 4 candidatas eroticas: ' . (is_string($eroticBatchOrError) ? $eroticBatchOrError : 'error desconocido');
+            // Fallback: mirar si se guardaron archivos parciales de batch en candidates_dir
+            $partialCount = 0;
+            $candDir = publicista_job_fs_paths($jobId)['candidates_dir'];
+            $partialBatchFiles = (array)glob($candDir . '/pollo_batch_*.jpg');
+            $partialBatchFiles = array_merge($partialBatchFiles, (array)glob($candDir . '/pollo_batch_*.png'));
+            if (!empty($partialBatchFiles)) {
+                sort($partialBatchFiles);
+                foreach ($partialBatchFiles as $i => $batchFile) {
+                    if ($i >= 4) break;
+                    $sexyIndex = $i + 1;
+                    $sexyId = 'sexy_' . str_pad((string)$sexyIndex, 2, '0', STR_PAD_LEFT);
+                    $targetSquare = $candDir . '/' . $sexyId . '_square.jpg';
+                    if (@copy($batchFile, $targetSquare)) {
+                        $sexyRow = array(
+                            'id' => $sexyId,
+                            'prompt' => trim((string)$eroticPrompt),
+                            'base_prompt' => trim((string)$eroticPrompt),
+                            'generation' => array('mode' => 'pollo_batch_partial_fallback'),
+                            'raw_path' => '',
+                            'square_path' => publicista_path_to_web($targetSquare),
+                            'preview_path' => '',
+                            'face_blur_path' => '',
+                            'analysis_json_path' => '',
+                            'worker_result' => array('mode' => 'partial_fallback'),
+                            'evaluation' => array(),
+                            'effective_score' => 50,
+                            'selected' => false,
+                            'status' => 'needs_review',
+                            'error' => 'Imagen recuperada de batch parcial (watermark fallback)',
+                            'round' => 'erotic_partial',
+                            'manual_blur_applied' => 0,
+                            'manual_blur_intensity' => 0,
+                            'manual_blur_shape' => array(),
+                        );
+                        // Generar preview rápido
+                        if (function_exists('imagecreatefromstring') && file_exists($targetSquare)) {
+                            $rawBytes = (filesize($targetSquare) <= (10*1024*1024)) ? file_get_contents($targetSquare) : false;
+                            if ($rawBytes !== false) {
+                                $imgInfo = @getimagesizefromstring($rawBytes);
+                                if ($imgInfo && ($imgInfo[0] * $imgInfo[1] <= 50000000)) {
+                                    $src = @imagecreatefromstring($rawBytes);
+                                    if ($src !== false) {
+                                        $previewTarget = $candDir . '/' . $sexyId . '_preview.jpg';
+                                        $sw = imagesx($src); $sh = imagesy($src);
+                                        $maxSide = 320;
+                                        $ratio = min($maxSide / $sw, $maxSide / $sh);
+                                        $pw = max(1, (int)round($sw * $ratio));
+                                        $ph = max(1, (int)round($sh * $ratio));
+                                        $preview = imagecreatetruecolor($pw, $ph);
+                                        imagecopyresampled($preview, $src, 0, 0, 0, 0, $pw, $ph, $sw, $sh);
+                                        imagejpeg($preview, $previewTarget, 85);
+                                        imagedestroy($preview); imagedestroy($src);
+                                        $sexyRow['preview_path'] = publicista_path_to_web($previewTarget);
+                                    }
+                                }
+                            }
+                        }
+                        $sexyCandidates[] = $sexyRow;
+                        $partialCount++;
+                    }
+                }
+            }
+            if ($partialCount > 0) {
+                list($sexyCandidates, $sexyFinalImages, $sexySelectedIds) = publicista_rebuild_erotic_finals(
+                    $jobId, $sexyCandidates, $job
+                );
+                $eroticSummaryExtra = ' + ' . $partialCount . ' candidatas eroticas recuperadas de batch parcial (watermark fail salvado) y ' . count($sexyFinalImages) . ' definitivas eroticas.';
+            } else {
+                $eroticSummaryExtra = ' | ATENCION: Fallo la generacion de las 4 candidatas eroticas: ' . (is_string($eroticBatchOrError) ? $eroticBatchOrError : 'error desconocido');
+            }
         }
     }
     // ═══════════════════════════════════════════════════════════════
