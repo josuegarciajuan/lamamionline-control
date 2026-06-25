@@ -58,7 +58,8 @@ final class PauseGate implements PipelineStageInterface
             $lineLast9 = (string) ($ctx['line_last9'] ?? '');
             $fromPhone = (string) ($ctx['from_phone'] ?? '');
             if ($fromPhone !== '') {
-                $threadId = ($lineLast9 !== '' ? $lineLast9 . '_' : '') . $fromPhone;
+                // Match ContextAssembler format: when line_last9 is empty, just use phone (no leading underscore)
+                $threadId = $lineLast9 !== '' ? ($lineLast9 . '_' . $fromPhone) : $fromPhone;
             }
         }
 

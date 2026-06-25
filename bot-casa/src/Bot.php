@@ -134,6 +134,7 @@ final class Bot implements BotInterface
             if (isset($this->processors[0]) && $this->processors[0]->name() === 'ContextAssembler') {
                 $ctx = $this->processors[0]->process($ctx);
                 if ($ctx === null) {
+                    \WasapBot\Pipeline\InflightGate::cleanup($inflightLockDir, $fromPhone, $lineLast9);
                     return null; // ContextAssembler detected an error state
                 }
             }
@@ -161,6 +162,7 @@ final class Bot implements BotInterface
             if (isset($this->processors[1]) && $this->processors[1]->name() === 'IntentRouter') {
                 $ctx = $this->processors[1]->process($ctx);
                 if ($ctx === null) {
+                    \WasapBot\Pipeline\InflightGate::cleanup($inflightLockDir, $fromPhone, $lineLast9);
                     return null;
                 }
             }
@@ -290,6 +292,7 @@ final class Bot implements BotInterface
                     );
                 }
 
+                \WasapBot\Pipeline\InflightGate::cleanup($inflightLockDir, $fromPhone, $lineLast9);
                 return $ctx;
             }
 
@@ -1418,9 +1421,9 @@ final class Bot implements BotInterface
         // ── Confusion pattern: detect when bot said "no entiendo" ────
         // If the LLM sees its own confusion in history, it replicates
         // the pattern. Replace with neutral "ok" to break the loop.
-        $confusionRegex = '/\b(?:no\s+(?:entiendo|te\s+entiendo|te\s+he\s+entendido|s[eé]\b|se\b|se\s+que|tengo\s+ni\s+idea)|'
+        $confusionRegex = '/\b(?:no\s+(?:entiendo|entend[ií]|te\s+entiendo|te\s+entend[ií]|te\s+he\s+entendido|s[eé]\b|se\b|se\s+que|tengo\s+ni\s+idea)|'
             . 'eso\s+no\s+(?:es\s+lo\s+m[ií]o|te\s+lo\s+s[eé])|'
-            . 'de\s+eso\s+no\s+(?:entiendo|s[eé]|tengo\s+ni\s+idea))\b/iu';
+            . 'de\s+eso\s+no\s+(?:entiendo|entend[ií]|s[eé]|tengo\s+ni\s+idea))\b/iu';
 
         foreach ($recent as $rec) {
             $userMsg = (string) ($rec['user_msg'] ?? '');
@@ -1601,6 +1604,24 @@ final class Bot implements BotInterface
                         }
                     }
                     $ctx['splitted_messages'] = $messages;
+
+                    // ── Guard: re-verificar estado tras merge sin LLM ──
+                    // Cubre el gap entre el top-check (línea 1553) y el intra-loop (línea 1670)
+                    if ($threadId !== '' && $pauseGate !== null && $pauseGate->hasCancelRequest($threadId)) {
+                        $this->logger->info('Bot::sendMessages — cancelled mid-merge by user pause');
+                        $pauseGate->clearCancelRequest($threadId);
+                        $ctx['_cancelled'] = true;
+                        $ctx['_send_ok']   = false;
+                        $sendDepth--;
+                        return;
+                    }
+                    if (!$this->isRunning()) {
+                        $this->logger->info('Bot::sendMessages — bot stopped mid-merge');
+                        $ctx['_cancelled'] = true;
+                        $ctx['_send_ok']   = false;
+                        $sendDepth--;
+                        return;
+                    }
                     // Don't recurse — fall through to send current + appended messages
                 } else {
                     $this->logger->info('Bot::sendMessages — new messages arrived before send, re-processing', [
@@ -1706,6 +1727,7 @@ final class Bot implements BotInterface
                     (float) ($ctx['user_response_time_sec'] ?? 60),
                     (bool)  ($ctx['__is_burst'] ?? false),
                     (bool)  ($ctx['__is_urgent'] ?? false),
+                    (bool)  ($ctx['__is_reprocess'] ?? false),
                 );
             }
 
@@ -1714,7 +1736,16 @@ final class Bot implements BotInterface
             }
 
             // Inter-message delay between split messages (presend_sleep_sec seconds)
+            // Apply burst and urgent factors so inter-message pauses also speed up
             $presendSleep = (float) $this->config->get('human_delays.presend_sleep_sec', 4);
+            if ($ctx['__is_burst'] ?? false) {
+                $burstCfg = $humanDelays['burst'] ?? [];
+                $presendSleep *= (float) ($burstCfg['rapid_factor'] ?? 0.33);
+            }
+            if ($ctx['__is_urgent'] ?? false) {
+                $urgentCfg = $humanDelays['urgent'] ?? [];
+                $presendSleep *= (float) ($urgentCfg['factor'] ?? 0.25);
+            }
             if ($presendSleep > 0) {
                 usleep((int) ($presendSleep * 1_000_000));
             }
@@ -1976,6 +2007,31 @@ final class Bot implements BotInterface
         $locationWords = '/(?:te\s*paso\s*(?:la\s*)?ubicaci[oó]n|te\s*paso\s*(?:el|la)\s*(?:maps?\b|mapa\b|gps\b|direcci[oó]n|dire\b|ubicacion\b|ubicación\b)|aqui\s*(?:va|tienes|esta|tiene)\s*(?:el|la)\s*(?:mapa|ubicaci[oó]n|direcci[oó]n|gps|ubicacion|dire\b)|te\s*(?:mando|env[ií]o)\s*(?:la\s*)?(?:ubicaci[oó]n|direcci[oó]n|mapa|gps|ubicacion|dire\b)|ubicaci[oó]n\s*exacta|punto\s*exacto|te\s*env[ií]o\s*(?:el|la)\s*(?:mapa|ubicaci[oó]n|direcci[oó]n|dire\b|ubicacion\b)|directo\s+al\s+grano|ah[ií]\s+te\s+va|toma\s+la\s+(?:ubicaci[oó]n|direcci[oó]n|dire\b|ubicacion\b))/iu';
         // Also trigger if the context flags predict maps is being sent now (deterministic fallback)
         $mapsBeingSentNow = !empty($ctx['maps_being_sent_now']);
+
+        // ── NOVA SAFETY 2026-06-17: bloqueo anti-non-sequitur ──────────
+        // Si el usuario está haciendo una pregunta (lleva '?') sobre algo que
+        // NO es ubicación, y el LLM ha decidido enviar mapa de todas formas,
+        // bloqueamos la inyección para no ignorar la pregunta del cliente.
+        if (!preg_match($locationWords, $outputText) && $mapsBeingSentNow) {
+            $userMsg = (string) ($ctx['message_text'] ?? '');
+            $hasQuestion = (mb_strpos($userMsg, '?') !== false);
+            $userAsksLocation = (bool) preg_match(
+                '/(?:d[oó]nde|ubicaci[oó]n|direcci[oó]n|mapa|dire\b|calle|plaza|zona|piso|sitio|lugar)/iu',
+                $userMsg
+            );
+            // Si el usuario preguntó algo que NO es ubicación, no inyectar mapa
+            if ($hasQuestion && !$userAsksLocation) {
+                if ($this->logger !== null) {
+                    $this->logger->info('Bot::injectLocationUrl — blocked maps (user asking non-location question)', [
+                        'phone'     => $ctx['from_phone'] ?? '?',
+                        'thread_id' => $ctx['thread_id'] ?? '?',
+                        'user_msg'  => mb_substr($userMsg, 0, 80),
+                    ]);
+                }
+                return $ctx;
+            }
+        }
+
         if (!preg_match($locationWords, $outputText) && !$mapsBeingSentNow) {
             return $ctx; // Neither text pattern nor deterministic flag → skip
         }
@@ -2291,6 +2347,33 @@ final class Bot implements BotInterface
      */
     private function handleIncomingWhileProcessing(array $ctx, string $lockDir, string $fromPhone): array
     {
+        // ── Escenario 1: bot parado globalmente ──
+        if (!$this->isRunning()) {
+            $this->logger->info('Bot::handleIncomingWhileProcessing — bot stopped globally, aborting reprocess');
+            $ctx['_cancelled'] = true;
+            $ctx['_send_ok']   = false;
+            return $ctx;
+        }
+
+        // ── Escenario 2 y 3: conversación pausada o cancelada mid-generación ──
+        $threadId = (string) ($ctx['thread_id'] ?? $ctx['__thread_id'] ?? '');
+        $pauseGate = $this->getPauseGate();
+        if ($threadId !== '' && $pauseGate !== null) {
+            if ($pauseGate->hasCancelRequest($threadId)) {
+                $this->logger->info('Bot::handleIncomingWhileProcessing — cancelled by user pause, aborting reprocess');
+                $pauseGate->clearCancelRequest($threadId);
+                $ctx['_cancelled'] = true;
+                $ctx['_send_ok']   = false;
+                return $ctx;
+            }
+            if ($pauseGate->isThreadPaused($threadId)) {
+                $this->logger->info('Bot::handleIncomingWhileProcessing — thread paused, aborting reprocess');
+                $ctx['_cancelled'] = true;
+                $ctx['_send_ok']   = false;
+                return $ctx;
+            }
+        }
+
         $depth = (int) ($ctx['__reprocess_depth'] ?? 0);
         if ($depth >= 3) {
             return $ctx; // Max recursion depth reached
