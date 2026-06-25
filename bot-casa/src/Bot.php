@@ -1552,17 +1552,29 @@ final class Bot implements BotInterface
 
     private function sendMessages(array &$ctx, array $messages, string $lockDir = '', string $fromPhone = ''): void
     {
-        // ── Cancel check: if user paused this thread mid-generation, abort send ──
+        // ── Cancel + pause check: if user paused this thread, abort send ──
         $threadId = (string) ($ctx['thread_id'] ?? $ctx['__thread_id'] ?? '');
         $pauseGate = $this->getPauseGate();
-        if ($threadId !== '' && $pauseGate !== null && $pauseGate->hasCancelRequest($threadId)) {
-            $this->logger->info('Bot::sendMessages — response cancelled by user pause', [
-                'thread_id' => $threadId,
-            ]);
-            $pauseGate->clearCancelRequest($threadId);
-            $ctx['_cancelled'] = true;
-            $ctx['_send_ok']   = false;
-            return;
+        if ($threadId !== '' && $pauseGate !== null) {
+            // Single-use cancel file (created at pause moment, consumed once)
+            if ($pauseGate->hasCancelRequest($threadId)) {
+                $this->logger->info('Bot::sendMessages — response cancelled by user pause', [
+                    'thread_id' => $threadId,
+                ]);
+                $pauseGate->clearCancelRequest($threadId);
+                $ctx['_cancelled'] = true;
+                $ctx['_send_ok']   = false;
+                return;
+            }
+            // Persistent pause flag — survives cancel file consumption
+            if ($pauseGate->isThreadPaused($threadId)) {
+                $this->logger->info('Bot::sendMessages — thread is paused, aborting send', [
+                    'thread_id' => $threadId,
+                ]);
+                $ctx['_cancelled'] = true;
+                $ctx['_send_ok']   = false;
+                return;
+            }
         }
 
         // ── Bot-mode re-check: abort send if bot was stopped mid-pipeline ──
@@ -1607,13 +1619,23 @@ final class Bot implements BotInterface
 
                     // ── Guard: re-verificar estado tras merge sin LLM ──
                     // Cubre el gap entre el top-check (línea 1553) y el intra-loop (línea 1670)
-                    if ($threadId !== '' && $pauseGate !== null && $pauseGate->hasCancelRequest($threadId)) {
-                        $this->logger->info('Bot::sendMessages — cancelled mid-merge by user pause');
-                        $pauseGate->clearCancelRequest($threadId);
-                        $ctx['_cancelled'] = true;
-                        $ctx['_send_ok']   = false;
-                        $sendDepth--;
-                        return;
+                    if ($threadId !== '' && $pauseGate !== null) {
+                        $sendAborted = false;
+                        if ($pauseGate->hasCancelRequest($threadId)) {
+                            $this->logger->info('Bot::sendMessages — cancelled mid-merge by user pause');
+                            $pauseGate->clearCancelRequest($threadId);
+                            $sendAborted = true;
+                        }
+                        if (!$sendAborted && $pauseGate->isThreadPaused($threadId)) {
+                            $this->logger->info('Bot::sendMessages — thread paused mid-merge, aborting');
+                            $sendAborted = true;
+                        }
+                        if ($sendAborted) {
+                            $ctx['_cancelled'] = true;
+                            $ctx['_send_ok']   = false;
+                            $sendDepth--;
+                            return;
+                        }
                     }
                     if (!$this->isRunning()) {
                         $this->logger->info('Bot::sendMessages — bot stopped mid-merge');
@@ -1687,15 +1709,27 @@ final class Bot implements BotInterface
                 continue;
             }
 
-            // ── Intra-loop cancel check: user may have paused during typing simulation ──
-            if ($threadId !== '' && $pauseGate !== null && $pauseGate->hasCancelRequest($threadId)) {
-                $this->logger->info('Bot::sendMessages — response cancelled mid-send by user pause', [
-                    'thread_id' => $threadId,
-                ]);
-                $pauseGate->clearCancelRequest($threadId);
-                $ctx['_cancelled'] = true;
-                $ctx['_send_ok']   = false;
-                break;
+            // ── Intra-loop cancel/pause check: user may have paused during typing ──
+            if ($threadId !== '' && $pauseGate !== null) {
+                $aborted = false;
+                if ($pauseGate->hasCancelRequest($threadId)) {
+                    $this->logger->info('Bot::sendMessages — response cancelled mid-send by user pause', [
+                        'thread_id' => $threadId,
+                    ]);
+                    $pauseGate->clearCancelRequest($threadId);
+                    $aborted = true;
+                }
+                if (!$aborted && $pauseGate->isThreadPaused($threadId)) {
+                    $this->logger->info('Bot::sendMessages — thread paused mid-send, aborting', [
+                        'thread_id' => $threadId,
+                    ]);
+                    $aborted = true;
+                }
+                if ($aborted) {
+                    $ctx['_cancelled'] = true;
+                    $ctx['_send_ok']   = false;
+                    break;
+                }
             }
             // ── Intra-loop bot-mode check: bot may have been stopped during typing ──
             if (!$this->isRunning()) {

@@ -30,8 +30,14 @@ final class PauseGate implements PipelineStageInterface
         $pausedFromConfig = ($this->config !== null)
             ? (string) $this->config->get('files.paused_threads', '')
             : '';
-        if ($pausedFromConfig !== '' && file_exists(dirname($pausedFromConfig))) {
-            $this->pausedFile = $pausedFromConfig;
+        if ($pausedFromConfig !== '') {
+            // Normalize to absolute — eliminates CWD dependency that caused
+            // PauseGate to silently read from the wrong file for admin (userId=1).
+            // For multi-user: config value is already absolute (resolved by bootstrap).
+            // For admin/legacy: config value is relative → prepend rootDir.
+            $this->pausedFile = str_starts_with($pausedFromConfig, '/')
+                ? $pausedFromConfig
+                : $rootDir . '/' . ltrim($pausedFromConfig, '/');
         } else {
             $this->pausedFile = $rootDir . '/data/paused_threads.ndjson';
         }
