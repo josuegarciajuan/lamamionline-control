@@ -67,9 +67,26 @@ final class ContextAssembler implements PipelineStageInterface
         }
         $ctx['bot_msg_count_recent'] = $botMsgCount;
 
+        // ── NOVA 2026-06-17: human_msg_count (total de mensajes del humano en el hilo) ──
+        // Se calcula más abajo, después de obtener $history filtrado.
+        // Inicializado aquí para que esté disponible en todo el pipeline.
+
         // --- message text ---
         $messageText = (string) ($ctx['message_text'] ?? '');
         $normalizedText = mb_strtolower(trim($messageText), 'UTF-8');
+
+        // ── NOVA: el cliente envió su ubicación (mensaje de tipo location) ──
+        // El MessageExtractor fija is_location_i=1 y message_text='📍 Ubicación'.
+        // Forzamos el tópico 'ubicacion' para que el flujo maps/ETA
+        // (maps_being_sent_now + injectLocationUrl) se dispare de forma
+        // determinista: enviar el mapa equivale a "quiero ir, dime dónde".
+        $isLocationMsg = ((int) ($ctx['is_location_i'] ?? 0) === 1)
+            || !empty($ctx['is_location']);
+        if ($isLocationMsg) {
+            $ctx['is_location']   = true;
+            $ctx['is_location_i'] = 1;
+            $normalizedText       = 'ubicacion';
+        }
 
         // --- Coalesced text (burst) detection ---
         $coalesced = $ctx['__coalesced_text'] ?? '';
@@ -91,6 +108,16 @@ final class ContextAssembler implements PipelineStageInterface
         $history = array_values(array_filter($history, static function (array $rec): bool {
             return empty($rec['_pending']);
         }));
+
+        // ── NOVA 2026-06-17: contar mensajes reales del humano (no pending, no vacíos) ──
+        $humanMsgCount = 0;
+        foreach ($history as $rec) {
+            if (!empty(trim((string) ($rec['user_msg'] ?? '')))) {
+                $humanMsgCount++;
+            }
+        }
+        // +1 por el mensaje actual que está siendo procesado
+        $ctx['__human_msg_count'] = $humanMsgCount + 1;
 
         // --- Filtrado temporal (últimas 6h) ---
         $recentWindowH = (int) $this->config->get('memory.recent_window_hours', 6);
@@ -347,13 +374,19 @@ final class ContextAssembler implements PipelineStageInterface
 
         // ── NOVA: maps_being_sent_now ────────────────────────────────────
         // Predict if maps is being sent in THIS response (preemptive ETA mode).
-        // Conditions: girl selected, user asks for location, maps not sent yet.
+        // NOVA FIX 2026-06-17: añadir PRECONDICIÓN de que ya se hayan enviado
+        // fotos O precios antes de permitir enviar el mapa. Evita que el bot
+        // suelte la dirección en el 2º o 3º mensaje sin haber mostrado nada.
+        $photosSent = in_array('fotos', $yaEnviado, true);
+        $pricesSent = in_array('precios', $yaEnviado, true);
         $mapsBeingSentNow = false;
         if (!$exactLocationSent && $selectedGirlName !== '') {
             $userAsksLocation = $ctx['topic_actual'] === 'ubicacion'
                 || !empty($ctx['ubicacion_pedida_fuerte'])
                 || $this->userWantsMapWords($normalizedText);
-            if ($userAsksLocation) {
+            // ⛔ Solo activar si el cliente YA ha recibido fotos o precios.
+            //    Si no se ha enviado nada, no activar el flag (el LLM decidirá).
+            if ($userAsksLocation && ($photosSent || $pricesSent)) {
                 $mapsBeingSentNow = true;
             }
         }
@@ -993,9 +1026,9 @@ final class ContextAssembler implements PipelineStageInterface
     private function countBotConfusion(array $history): int
     {
         $count = 0;
-        $confusionRegex = '/\b(?:no\s+(?:entiendo|te\s+entiendo|te\s+he\s+entendido|s[eé]\b|se\b|se\s+que|tengo\s+ni\s+idea)|'
+        $confusionRegex = '/\b(?:no\s+(?:entiendo|entend[ií]|te\s+entiendo|te\s+entend[ií]|te\s+he\s+entendido|s[eé]\b|se\b|se\s+que|tengo\s+ni\s+idea)|'
             . 'eso\s+no\s+(?:es\s+lo\s+m[ií]o|te\s+lo\s+s[eé])|'
-            . 'de\s+eso\s+no\s+(?:entiendo|s[eé]|tengo\s+ni\s+idea))\b/iu';
+            . 'de\s+eso\s+no\s+(?:entiendo|entend[ií]|s[eé]|tengo\s+ni\s+idea))\b/iu';
 
         // Scan from most recent backwards, count consecutive confusion
         for ($i = count($history) - 1; $i >= 0; $i--) {
@@ -1459,7 +1492,12 @@ final class ContextAssembler implements PipelineStageInterface
 
         if ($bestRec === null) return null;
 
-        // Merge context fields
+        // Merge context fields — NOVA FIX 2026-06-17:
+        // Solo heredamos speaker_girl (identidad) y shown/unshown (catálogo).
+        // NO heredamos selected_girl (el cliente debe reconfirmar su elección
+        // en este hilo nuevo), NO heredamos ya_enviado (son acciones que no
+        // ocurrieron en este hilo), y NO forzamos speaker_mode='chica' si el
+        // hilo es nuevo (debe arrancar en modo encargada para saludar bien).
         $merged = false;
         $speakerName = (string) ($bestRec['speaker_girl_name'] ?? '');
         $speakerId   = (string) ($bestRec['speaker_girl_id'] ?? '');
@@ -1469,22 +1507,29 @@ final class ContextAssembler implements PipelineStageInterface
         $shownGirls   = (array) ($bestRec['shown_girls'] ?? []);
         $unshownGirls = (array) ($bestRec['unshown_girls'] ?? []);
 
+        // Only inherit speaker identity — NOT selected girl
         if ($speakerName !== '' && ($ctx['speaker_girl_name'] ?? '') === '') {
             $ctx['speaker_girl_name'] = $speakerName;
             $ctx['speaker_girl_id']   = $speakerId;
-            $ctx['speaker_mode']      = 'chica';
+            // IMPORTANTE: mantener speaker_mode='encargada' si es hilo nuevo
+            // (__is_new_conversation). Así el bot saluda sin saltar a modo chica.
+            // La sticky state fallback (más abajo) pondrá modo chica cuando toque.
+            $isNew = !empty($ctx['__is_new_conversation']);
+            if (!$isNew) {
+                $ctx['speaker_mode'] = 'chica';
+            }
             $merged = true;
         }
-        if ($selectedName !== '' && ($ctx['selected_girl_name'] ?? '') === '') {
-            $ctx['selected_girl_name'] = $selectedName;
-            $ctx['selected_girl_id']   = $selectedId;
-            $merged = true;
-        }
-        if (!empty($yaEnviado)) {
-            $currentYa = (array) ($ctx['ya_enviado'] ?? []);
-            $ctx['ya_enviado'] = array_unique(array_merge($currentYa, $yaEnviado));
-            $merged = true;
-        }
+        // ⛔ NO heredar selected_girl_name/selected_girl_id entre hilos distintos.
+        //    El cliente debe reconfirmar su elección en el nuevo hilo.
+        //    Si heredamos selected_girl, el bot arranca enviando la dirección
+        //    en el primer mensaje (ver caso 34619045690).
+
+        // ⛔ NO heredar ya_enviado entre hilos — son acciones per-thread.
+        //    Si el hilo B hereda que "ya se enviaron fotos" del hilo A, el bot
+        //    se salta el flujo de mostrar fotos/precios y va directo a mapa.
+
+        // ✅ Catalog state: still useful to share across lines
         if (!empty($shownGirls)) {
             $ctx['shown_girls'] = $shownGirls;
             $merged = true;
@@ -1498,8 +1543,8 @@ final class ContextAssembler implements PipelineStageInterface
             $this->logger->info('ContextAssembler::mergeContextFromOtherLines — merged context from other line', [
                 'phone'      => $fromPhone,
                 'speaker'    => $speakerName,
-                'selected'   => $selectedName,
-                'ya_enviado' => $ctx['ya_enviado'] ?? [],
+                'is_new'     => $isNew ?? true,
+                'selected'   => 'NOT inherited (cross-line)',
             ]);
         }
 

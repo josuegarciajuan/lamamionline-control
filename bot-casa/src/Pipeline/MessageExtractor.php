@@ -83,6 +83,7 @@ final readonly class MessageExtractor implements PipelineStageInterface
             // ── Media detection ───────────────────────────────────────
             $isAudio = $this->detectAudio($ctx, $msg, $payload);
             $isImage = $this->detectImage($ctx, $msg, $payload);
+            $isLocation = $this->detectLocation($ctx, $msg, $payload);
 
             // Determine message type
             $messageType = '';
@@ -99,6 +100,9 @@ final readonly class MessageExtractor implements PipelineStageInterface
             if ($messageType === '' && $isImage) {
                 $messageType = 'image';
             }
+            if ($messageType === '' && $isLocation) {
+                $messageType = 'location';
+            }
             if ($messageType === '') {
                 $messageType = 'text';
             }
@@ -108,6 +112,14 @@ final readonly class MessageExtractor implements PipelineStageInterface
                 $text = (string) $this->config->get(
                     'message_variants.audio_placeholder',
                     '[AUDIO]'
+                );
+            } elseif ($isLocation) {
+                // El cliente envió su ubicación: usamos un placeholder
+                // significativo (no [SIN_TEXTO]) para que el pipeline lo
+                // reconozca como petición de ubicación/maps.
+                $text = (string) $this->config->get(
+                    'message_variants.location_placeholder',
+                    '📍 Ubicación'
                 );
             } elseif ($text === '' && !$isAudio) {
                 $text = (string) $this->config->get(
@@ -128,8 +140,10 @@ final readonly class MessageExtractor implements PipelineStageInterface
             $ctx['message_type'] = $messageType;
             $ctx['is_audio_i'] = $isAudio ? 1 : 0;
             $ctx['is_image_i'] = $isImage ? 1 : 0;
+            $ctx['is_location_i'] = $isLocation ? 1 : 0;
             $ctx['is_audio']   = $isAudio;
             $ctx['is_image']   = $isImage;
+            $ctx['is_location'] = $isLocation;
             $ctx['from_phone'] = $fromPhone;
             $ctx['message_id'] = $messageId;
             $ctx['timestamp']  = $timestamp;
@@ -574,6 +588,64 @@ final readonly class MessageExtractor implements PipelineStageInterface
             );
 
             return !$hasText;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Detect whether the message is a shared location (WhatsApp location / live location).
+     *
+     * Checks the WAHA payload.location object, the GOWS _data.Message.locationMessage
+     * struct, and the type field.
+     *
+     * @param array<string, mixed>    $ctx
+     * @param array<string, mixed>|null $msg
+     * @param array<string, mixed>    $payload
+     */
+    private function detectLocation(array $ctx, ?array $msg, array $payload): bool
+    {
+        try {
+            // Check pre-existing flag
+            if (isset($ctx['__is_location']) && $ctx['__is_location']) {
+                return true;
+            }
+            if (isset($ctx['is_location']) && $ctx['is_location']) {
+                return true;
+            }
+
+            // Direct location object (WAHA: payload.location = {latitude, longitude, name, address})
+            if (isset($payload['location']) && is_array($payload['location']) && $payload['location'] !== []) {
+                return true;
+            }
+            if ($msg !== null && isset($msg['location']) && is_array($msg['location']) && $msg['location'] !== []) {
+                return true;
+            }
+
+            // GOWS engine: _data.Message.locationMessage
+            $data = [];
+            if (isset($payload['_data']) && is_array($payload['_data'])) {
+                $data = $payload['_data'];
+            }
+            $msgObj = [];
+            if (isset($data['Message']) && is_array($data['Message'])) {
+                $msgObj = $data['Message'];
+            }
+            if (isset($msgObj['locationMessage']) && is_array($msgObj['locationMessage'])) {
+                return true;
+            }
+
+            // Type field
+            $type = mb_strtolower((string) (
+                (is_array($msg) ? ($msg['type'] ?? '') : '')
+                ?: ($payload['type'] ?? '')
+                ?: ($data['type'] ?? '')
+            ));
+            if ($type === 'location' || $type === 'live_location') {
+                return true;
+            }
+
+            return false;
         } catch (\Throwable) {
             return false;
         }

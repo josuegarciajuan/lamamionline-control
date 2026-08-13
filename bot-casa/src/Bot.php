@@ -1592,12 +1592,17 @@ final class Bot implements BotInterface
         // but before we committed to sending via WAHA.
         static $sendDepth = 0;
         $sendDepth++;
-        if ($sendDepth > 5) {
+        $hitDepthLimit = ($sendDepth > 5);
+        if ($hitDepthLimit) {
+            $this->logger->warning('Bot::sendMessages — depth limit reached, sending current messages without further re-processing', [
+                'send_depth' => $sendDepth,
+                'phone'      => $fromPhone,
+            ]);
             $sendDepth = 0;
-            return; // Safety valve
+            // fall through to send below, but skip drainPending to avoid more recursion
         }
 
-        if ($lockDir !== '' && $fromPhone !== '') {
+        if (!$hitDepthLimit && $lockDir !== '' && $fromPhone !== '') {
             $lineLast9 = (string) ($ctx['line_last9'] ?? '');
             $pending = \WasapBot\Pipeline\InflightGate::drainPending($lockDir, $fromPhone, $lineLast9);
             if ($pending !== []) {
@@ -2196,6 +2201,13 @@ final class Bot implements BotInterface
             '/mira\s*te\s*las?\s*(?:mando|paso|ense[ñn]o)\s*otra\s*vez\b/iu',
             '/toma\s*te\s*las?\s*paso\b/iu',
             '/todas\s*est[aá]n\s*bien\s*papi\b/iu', // "todas estan bien papi" con contexto de fotos
+            // ── NOVA: promesas condicionales de "más fotos" que el LLM usa ──
+            '/te\s*ense[ñn]o\s*(?:m[aá]s|otras?)\s*fotos?\b/iu',
+            '/tendr[ií]a\s+(?:m[aá]s|otras?)\s+fotos?\b/iu',
+            '/(?:tengo|hay|tiene)\s+(?:m[aá]s|otras?)\s+fotos?\b/iu',
+            '/te\s*(?:mando|paso|env[ií]o|ense[ñn]o)\s+(?:m[aá]s|otras?)\s+fotos?\b/iu',
+            '/si\s+quieres\s+te\s+(?:mando|paso|env[ií]o|ense[ñn]o)\s+(?:m[aá]s|otras?)\s+fotos?\b/iu',
+            '/a[uú]n\s+tengo\s+(?:m[aá]s|otras?)\s+fotos?\b/iu',
         ];
 
         $hasPromise = false;
@@ -2207,6 +2219,15 @@ final class Bot implements BotInterface
         }
 
         if (!$hasPromise) {
+            return $ctx;
+        }
+
+        // ── NOVA: si el texto es una NEGACIÓN de fotos ("no tengo más fotos",
+        // "solo tengo esas"), NO es una promesa → no inyectar nada. ──
+        if (preg_match(
+            '/(?:no\s+tengo\s+(?:m[aá]s|otras?)\s+fotos?|no\s+(?:hay|tengo|mando|paso|env[ií]o)\s+(?:m[aá]s\s+)?fotos?|solo\s+tengo\s+(?:esas|estas|una|dos|tres|pocas)\s+fotos?)/iu',
+            $outputText
+        )) {
             return $ctx;
         }
 
@@ -2254,8 +2275,9 @@ final class Bot implements BotInterface
                         if (in_array($photo, $sentUrls, true)) continue;
                         $lines[] = $photo;
                     }
-                    // If all photos were already sent, include them anyway (client insists)
-                    if ($lines === [] && $photoInsistCount >= 1) {
+                    // If all photos were already sent, include them anyway
+                    // (client insists OR the bot itself promised photos).
+                    if ($lines === [] && ($photoInsistCount >= 1 || $hasPromise)) {
                         foreach ($photos as $photo) {
                             $photo = trim((string) $photo);
                             if ($photo === '') continue;
