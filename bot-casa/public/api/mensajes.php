@@ -47,6 +47,39 @@ function requireValidCsrf(): void {
     }
 }
 
+/**
+ * Auto-pause: añade un thread a la lista de pausados si no está ya.
+ * Usado cuando un humano responde desde el panel o desde WA nativo.
+ */
+function autoPauseThread(int $userId, string $threadId): void {
+    if ($threadId === '') return;
+    $pausedFile = ($userId > 1)
+        ? \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'paused_threads.ndjson')
+        : WASAPBOT_ROOT . '/data/paused_threads.ndjson';
+    $dirP = dirname($pausedFile);
+    if (!is_dir($dirP)) @mkdir($dirP, 0700, true);
+
+    // Check if already paused
+    $existing = [];
+    if (file_exists($pausedFile)) {
+        $lines = @file($pausedFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ((array) $lines as $l) {
+            $r = json_decode($l, true);
+            if (is_array($r) && isset($r['thread_id'])) {
+                $existing[] = (string) $r['thread_id'];
+            }
+        }
+    }
+    if (!in_array($threadId, $existing, true)) {
+        $cancelDir = WASAPBOT_ROOT . '/data/cancel';
+        if (!is_dir($cancelDir)) @mkdir($cancelDir, 0700, true);
+        $cancelHash = hash('sha256', $threadId);
+        @file_put_contents($cancelDir . '/' . $cancelHash . '.cancel', gmdate('c'), LOCK_EX);
+        $rec = json_encode(['thread_id' => $threadId, 'paused_at' => gmdate('c')], JSON_UNESCAPED_UNICODE);
+        @file_put_contents($pausedFile, $rec . "\n", FILE_APPEND | LOCK_EX);
+    }
+}
+
 function readNdjson(string $path): array {
     if (!file_exists($path)) return [];
     $lines = @file($path, FILE_IGNORE_NEW_LINES|FILE_SKIP_EMPTY_LINES);
@@ -119,11 +152,11 @@ function saveReadStatus(array $data): void {
     }
 
     // Self-heal: if file exists but is owned by another user (e.g. root),
-    // unlink it so the next write recreates it as www-data.
-    // www-data owns the parent directory, so unlink + recreate is allowed.
+    // try to fix permissions in-place (chmod) instead of deleting.
+    // NEVER destroy data — the file content is valuable.
     if (file_exists($path) && !is_writable($path)) {
-        if (!@unlink($path)) {
-            error_log('saveReadStatus: cannot unlink unwritable file ' . $path);
+        if (!@chmod($path, 0664)) {
+            error_log('saveReadStatus: read_status not writable and chmod failed for ' . $path);
             return;
         }
         clearstatcache(true, $path);
@@ -237,7 +270,12 @@ try {
             $last9  = trim((string) ($_GET['last9'] ?? ''));
             $last9Prefix = ($last9 !== '') ? $last9 . '_' : '';
             $records = readNdjson($memoryFile);
+
+            // ── Pass 1 (O(n)): build per-thread aggregates in a single scan.
+            // Also capture the earliest ts per thread (first_ts) so the
+            // read_status backfill below does NOT need to re-scan records.
             $threads = [];
+            $firstTs = []; // thread_id => earliest ts
             foreach ($records as $r) {
                 $tid = (string) ($r['thread_id'] ?? '');
                 if ($tid === '') continue;
@@ -253,10 +291,12 @@ try {
                         'phone'      => $phone,
                         'sender_lid' => $senderLid,
                         'count'      => 0,
-                        'last_ts' => '',
-                        'first_msg' => '',
-                        'last_msg' => '',
+                        'last_ts'    => '',
+                        'first_msg'  => '',
+                        'last_msg'   => '',
+                        'unread'     => 0,
                     ];
+                    $firstTs[$tid] = '';
                 }
                 $threads[$tid]['count']++;
                 // Propagate sender_lid from any record (not just the first)
@@ -265,6 +305,11 @@ try {
                     if ($sl !== '') $threads[$tid]['sender_lid'] = $sl;
                 }
                 $ts = (string) ($r['ts'] ?? '');
+                if ($ts !== '') {
+                    if ($firstTs[$tid] === '' || $ts < $firstTs[$tid]) {
+                        $firstTs[$tid] = $ts;
+                    }
+                }
                 if ($ts > $threads[$tid]['last_ts']) {
                     $threads[$tid]['last_ts'] = $ts;
                     // Prefer user_msg (what the customer said) over bot_reply.
@@ -277,64 +322,55 @@ try {
                 }
             }
 
-            // Filter by search
+            // Filter by search (same order as before: search filter before backfill,
+            // so filtered-out threads are not backfilled into read_status).
             if ($search !== '') {
                 $threads = array_filter($threads, function($t) use ($search) {
                     return strpos($t['phone'], $search) !== false || strpos($t['thread_id'], $search) !== false;
                 });
             }
 
-            // Compute unread counts — backfill unseen threads on first access
+            // ── Backfill read_status for unseen threads (O(threads), no record re-scan) ──
             $readStatus = readReadStatus();
             $dirtyReadStatus = false;
             $now = time();
-            foreach ($threads as $tid => &$t) {
-                $lastRead = $readStatus[$tid] ?? '';
-                if ($lastRead === '') {
-                    // Thread never seen before.
-                    // If last activity is within 30 min → genuinely new thread → mark as unread.
-                    // Otherwise → pre-existing legacy thread → backfill as fully read.
-                    $lastTsUnix = strtotime($t['last_ts']);
-                    $isRecent = ($lastTsUnix !== false && ($now - $lastTsUnix) < 1800);
+            foreach ($threads as $tid => $t) {
+                if (($readStatus[$tid] ?? '') !== '') continue;
+                // Thread never seen before.
+                // If last activity is within 30 min → genuinely new thread → mark as unread.
+                // Otherwise → pre-existing legacy thread → backfill as fully read.
+                $lastTsUnix = strtotime($t['last_ts']);
+                $isRecent = ($lastTsUnix !== false && ($now - $lastTsUnix) < 1800);
 
-                    if ($isRecent) {
-                        // Genuinely new: set read marker to just before the first message
-                        // so all messages in this thread appear as unread.
-                        $firstTs = null;
-                        foreach ($records as $r) {
-                            if (((string)($r['thread_id']??'')) === $tid) {
-                                $rts = (string)($r['ts']??'');
-                                if ($rts !== '' && ($firstTs === null || $rts < $firstTs)) {
-                                    $firstTs = $rts;
-                                }
-                            }
-                        }
-                        $firstUnix = $firstTs ? strtotime($firstTs) : $now;
-                        $readStatus[$tid] = gmdate('Y-m-d\TH:i:s\Z', max(0, (int)$firstUnix - 1));
-                    } else {
-                        // Legacy thread: backfill as read up to the last message
-                        $readStatus[$tid] = $t['last_ts'];
-                    }
-                    $dirtyReadStatus = true;
-                    $lastRead = $readStatus[$tid];
+                if ($isRecent) {
+                    // Genuinely new: set read marker to just before the first message
+                    // so all messages in this thread appear as unread.
+                    $first = $firstTs[$tid] ?? '';
+                    $firstUnix = $first !== '' ? strtotime($first) : $now;
+                    $readStatus[$tid] = gmdate('Y-m-d\TH:i:s\Z', max(0, (int)$firstUnix - 1));
+                } else {
+                    // Legacy thread: backfill as read up to the last message
+                    $readStatus[$tid] = $t['last_ts'];
                 }
-
-                // Count messages with ts > lastRead
-                $unread = 0;
-                foreach ($records as $r) {
-                    if (((string)($r['thread_id']??'')) === $tid) {
-                        $ts = (string)($r['ts']??'');
-                        if ($ts > $lastRead) $unread++;
-                    }
-                }
-                $t['unread'] = $unread;
+                $dirtyReadStatus = true;
             }
-            unset($t);
             if ($dirtyReadStatus) saveReadStatus($readStatus);
+
+            // ── Pass 2 (O(n)): count unread in a single scan over records ──
+            // ts > lastRead (after backfill) → unread. Threads filtered out by
+            // search are skipped via isset() because they are absent from $threads.
+            foreach ($records as $r) {
+                $tid = (string) ($r['thread_id'] ?? '');
+                if ($tid === '' || !isset($threads[$tid])) continue;
+                $lastRead = $readStatus[$tid] ?? '';
+                $ts = (string) ($r['ts'] ?? '');
+                if ($ts > $lastRead) $threads[$tid]['unread']++;
+            }
 
             // Sort by last_ts desc
             uasort($threads, fn($a,$b) => $b['last_ts'] <=> $a['last_ts']);
             $threads = array_values($threads);
+
             echo json_encode(['ok' => true, 'threads' => $threads, 'total' => count($threads)]);
             break;
 
@@ -352,6 +388,7 @@ try {
                         'speaker_girl' => (string) ($r['speaker_girl_name'] ?? $r['selected_girl_name'] ?? ''),
                         '_pending' => (bool) ($r['_pending'] ?? false),
                         'sender_lid' => (string) ($r['sender_lid'] ?? ''),
+                        'from_me'    => (bool) ($r['from_me'] ?? false),
                     ];
                 }
             }
@@ -385,6 +422,22 @@ try {
                     if ($skip) continue;
 
                     $seenPendingMsgs[$umsg] = true;
+                }
+                // Defense-in-depth: also skip incomplete records (no bot_reply, _pending=false)
+                // when a complete version (with bot_reply) exists later.
+                // Handles edge cases where the immediate webhook write has _pending=false
+                // but a full pipeline record follows.
+                if (!$isPending && $umsg !== '' && $breply === '') {
+                    $skip = false;
+                    for ($j = $i + 1; $j < $total; $j++) {
+                        $nxt = $conv[$j];
+                        if (mb_strpos(trim((string)($nxt['user_msg']??'')), $umsg) !== false
+                            && trim((string)($nxt['bot_reply']??'')) !== '') {
+                            $skip = true;
+                            break;
+                        }
+                    }
+                    if ($skip) continue;
                 }
                 // Also skip duplicate FULL records (same user_msg + same bot_reply, same ts)
                 // This handles the edge case where the pipeline writes the full record twice
@@ -510,6 +563,9 @@ try {
             }
             @file_put_contents($memoryFile, json_encode($record, JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND | LOCK_EX);
 
+            // Auto-pause: human replied from panel → stop bot for this conversation
+            autoPauseThread($userId, $threadId);
+
             echo json_encode(['ok' => true, 'sent' => true]);
             break;
 
@@ -622,6 +678,9 @@ try {
                 $record['_seq'] = 1;
             }
             @file_put_contents($memoryFile, json_encode($record, JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND | LOCK_EX);
+
+            // Auto-pause: human replied from panel → stop bot for this conversation
+            autoPauseThread($userId, $threadId);
 
             echo json_encode([
                 'ok'        => true,
@@ -821,6 +880,35 @@ try {
             saveReadStatus($readStatus);
 
             echo json_encode(['ok' => true, 'thread_id' => $threadId, 'last_read_ts' => $lastTs]);
+            break;
+
+        case 'mark_all_read':
+            // Mark every conversation (optionally filtered by line last9) as read.
+            // last9 empty → mark ALL lines (global "marcar todo" button).
+            if ($method !== 'POST') { echo json_encode(['ok'=>false,'error'=>'POST required']); break; }
+            requireValidCsrf();
+            $last9 = trim((string) ($_POST['last9'] ?? ''));
+
+            // Same buffer as mark_read so messages up to "now" count as read.
+            $lastTs = gmdate('Y-m-d\TH:i:s\Z', time() + 10);
+
+            $records = readNdjson($memoryFile);
+            $readStatus = readReadStatus();
+            $prefix = ($last9 !== '') ? $last9 . '_' : '';
+            $marked = 0;
+            $seen = [];
+            foreach ($records as $r) {
+                $tid = (string) ($r['thread_id'] ?? '');
+                if ($tid === '') continue;
+                if ($prefix !== '' && strpos($tid, $prefix) !== 0) continue;
+                if (isset($seen[$tid])) continue;
+                $seen[$tid] = true;
+                $readStatus[$tid] = $lastTs;
+                $marked++;
+            }
+            saveReadStatus($readStatus);
+
+            echo json_encode(['ok' => true, 'last9' => $last9, 'marked' => $marked]);
             break;
 
         default:
