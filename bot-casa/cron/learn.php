@@ -553,9 +553,12 @@ echo "\n── Computing personality weights ──\n";
 // Autoload PersonalityTracker if not already available
 $trackerFile = $phpBotRoot . '/src/SideEffects/PersonalityTracker.php';
 if (file_exists($trackerFile)) {
+    require_once $phpBotRoot . '/src/Core/LoggerInterface.php';
+    require_once $phpBotRoot . '/src/Core/Logger.php';
     require_once $trackerFile;
     try {
-        $personalityTracker = new \WasapBot\SideEffects\PersonalityTracker($config, null);
+        $logger = new \WasapBot\Core\Logger();
+        $personalityTracker = new \WasapBot\SideEffects\PersonalityTracker($config, $logger);
         $weights = $personalityTracker->getWeights();
 
         echo "  Personality conversion weights:\n";
