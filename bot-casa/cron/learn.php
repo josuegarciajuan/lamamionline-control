@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 // Allow long execution for DeepSeek API calls
-set_time_limit(300);
+set_time_limit(600);
 
 /**
  * Bot Learning Engine — Cron Job
@@ -432,7 +432,7 @@ $body = json_encode([
         ['role' => 'user', 'content' => $fullPrompt],
     ],
     'temperature' => $temperature,
-    'max_tokens'  => 16384,
+    'max_tokens'  => 32768,
     'thinking'        => ['type' => 'enabled'],
     'reasoning_effort' => 'high',
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -446,7 +446,7 @@ curl_setopt_array($ch, [
         'Content-Type: application/json',
     ],
     CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_TIMEOUT        => 180,
+    CURLOPT_TIMEOUT        => 300,
     CURLOPT_CONNECTTIMEOUT => 15,
 ]);
 
