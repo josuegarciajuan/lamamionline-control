@@ -501,6 +501,7 @@ function comercial_default_process_seed($slug) {
         'conversation_max_auto_turns' => 999, // AGENT V2: sin límite efectivo
         'escalation_score_threshold' => 70,     // AGENT V2: threshold más sensible (era 78)
         'ia_learning_enabled' => 1,
+        'ia_opener_enabled' => 0,               // opener LLM personalizado (OFF por defecto)
         'auto_notify_operator' => 1,
         'auto_followup' => 1,
         'auto_create_lead' => 0,
@@ -946,6 +947,7 @@ function comercial_normalize_process($row) {
     $out['conversation_max_auto_turns'] = max(0, (int)($out['conversation_max_auto_turns'] ?? 2));
     $out['escalation_score_threshold'] = max(0, min(100, (int)($out['escalation_score_threshold'] ?? 78)));
     $out['ia_learning_enabled'] = !empty($out['ia_learning_enabled']) ? 1 : 0;
+    $out['ia_opener_enabled'] = !empty($out['ia_opener_enabled']) ? 1 : 0;
     $out['auto_notify_operator'] = !empty($out['auto_notify_operator']) ? 1 : 0;
     $out['assigned_line_ids'] = array_values(array_unique(array_filter(array_map('strval', (array)$out['assigned_line_ids']))));
     $out['last_target_phone'] = comercial_only_digits((string)($out['last_target_phone'] ?? ''));
@@ -6302,6 +6304,25 @@ function comercial_run_tick($forceProcessId = '') {
             $message = 'Hola 👋';
         }
 
+        // ── Opener LLM personalizado (solo si el proceso lo tiene habilitado) ──
+        // Fallback seguro: si el LLM falla o devuelve vacío, se usa la plantilla.
+        if (!empty($process['ia_opener_enabled'])) {
+            $openerThread = comercial_normalize_thread(array(
+                'process_id' => (string)$process['id'],
+                'process_slug' => (string)$process['slug'],
+                'target_phone' => $targetPhone,
+                'conversation_phase' => 'SALUDO_INICIAL',
+            ));
+            $ai = comercial_agent_process($openerThread, (string)$process['slug'], 'opener', array());
+            if (!empty($ai['ok']) && trim((string)($ai['text'] ?? '')) !== '') {
+                $message = trim((string)$ai['text']);
+                comercial_event_append('opener_llm_generated', array(
+                    'process_slug' => (string)$process['slug'],
+                    'target_phone' => $targetPhone,
+                ));
+            }
+        }
+
         $send = comercial_send_process_message_with_fallback($process, $targetPhone, $message);
         $line = (array)($send['line'] ?? $orderedLines[0]);
         $process['last_line_id'] = (string)($line['id'] ?? '');
@@ -7609,6 +7630,7 @@ function render_comercial_page() {
             echo '<div class="field-help" style="margin-top:-6px; margin-bottom:12px;">Número máximo de respuestas automáticas consecutivas antes de pedir intervención humana. | Si el score de interés supera este valor, se notifica al operador humano.</div>';
             echo '<div class="commercial-inline-checks">';
             echo '<label><input type="checkbox" name="ia_learning_enabled" value="1"' . (!empty($selectedProcess['ia_learning_enabled']) ? ' checked' : '') . '> Aprendizaje IA activo</label>';
+            echo '<label><input type="checkbox" name="ia_opener_enabled" value="1"' . (!empty($selectedProcess['ia_opener_enabled']) ? ' checked' : '') . '> Aperturas personalizadas con IA</label>';
             echo '<label><input type="checkbox" name="auto_notify_operator" value="1"' . (!empty($selectedProcess['auto_notify_operator']) ? ' checked' : '') . '> Notificar automáticamente al detectar lead caliente</label>';
             echo '</div>';
             echo '<div class="field-help" style="margin-top:-6px; margin-bottom:12px;">El bot aprende de las respuestas humanas exitosas y las usa como referencia. | Al detectar un lead con score alto, se notifica automáticamente al operador.</div>';

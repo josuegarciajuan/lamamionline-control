@@ -376,7 +376,9 @@ function comercial_agent_generate_opener(array $thread, string $processSlug, str
         "- Si hay precios, menciónalos sin que suene a catálogo.\n" .
         "- RESPONDE ÚNICAMENTE con el texto del mensaje. Nada más.";
 
-    return comercial_agent_call_llm($prompt, $model, $cfg, 400);
+    // reasoning_effort low: el opener de campaña no es hot-path (se envía por cron),
+    // así que primamos rapidez para no ralentizar el tick.
+    return comercial_agent_call_llm($prompt, $model, $cfg, 400, 'low');
 }
 
 // ═══════════════════════════════════════════════════════════════

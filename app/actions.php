@@ -4834,6 +4834,7 @@ function action_save_comercial_process() {
     $row['auto_followup'] = request_post('auto_followup') ? 1 : 0;
     $row['auto_create_lead'] = request_post('auto_create_lead') ? 1 : 0;
     $row['ia_learning_enabled'] = request_post('ia_learning_enabled') ? 1 : 0;
+    $row['ia_opener_enabled'] = request_post('ia_opener_enabled') ? 1 : 0;
     $row['auto_notify_operator'] = request_post('auto_notify_operator') ? 1 : 0;
     comercial_upsert_process($row);
     set_flash('ok', 'Proceso comercial guardado.');
