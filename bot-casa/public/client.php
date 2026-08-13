@@ -502,7 +502,7 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
 <?php endif; ?>
 <title>bot-casa — <?php echo $clientName; ?></title>
 <link rel="stylesheet" href="assets/style.css?v=20260614_1">
-<link rel="stylesheet" href="assets/chat.css?v=20260614_1">
+<link rel="stylesheet" href="assets/chat.css?v=20260629_1">
 <?php if ($isDirectAccess): ?>
 <script src="assets/pwa.js?v=20260613_1"></script>
 <?php endif; ?>
@@ -1602,11 +1602,11 @@ function dismissWizard() {
                 <p style="color:var(--text-muted);font-size:.78rem;margin:10px 0 6px">
                     Variantes para pedir la hora de llegada (ETA). El bot las rota.
                     <button type="button" class="btn btn-sm" style="margin-left:8px;background:var(--input-bg);color:var(--text-muted);font-size:.65rem"
-                        onclick="if(confirm('¿Restaurar frases por defecto?'))this.parentElement.nextElementSibling.value='cuanto tardas amor?\navisame cuando salgas\nen cuantos min vienes?\ncuando llegas papi?\nme dices cuanto tardas?\nsal y avisame que te espero'">🔄 Restaurar</button>
+                        onclick="if(confirm('¿Restaurar frases por defecto?'))this.parentElement.nextElementSibling.value='cuanto tardas amor?\navisame cuando salgas\nen cuantos min vienes?\ncuando llegas amor?\nme dices cuanto tardas?\nsal y avisame que te espero'">🔄 Restaurar</button>
                 </p>
                 <textarea name="message_variants[eta_request_variants]" rows="3" class="code-area" spellcheck="false"><?php
                     $etaVal = trim(cv('message_variants.eta_request_variants'));
-                    echo $etaVal !== '' ? $etaVal : "cuanto tardas amor?\navisame cuando salgas\nen cuantos min vienes?\ncuando llegas papi?\nme dices cuanto tardas?\nsal y avisame que te espero";
+                    echo $etaVal !== '' ? $etaVal : "cuanto tardas amor?\navisame cuando salgas\nen cuantos min vienes?\ncuando llegas amor?\nme dices cuanto tardas?\nsal y avisame que te espero";
                 ?></textarea>
             </div>
         </details>
@@ -1678,7 +1678,7 @@ function updateAllCsrfInputs(token) {
     };
 })();
 </script>
-<script src="assets/chat.js?v=20260614_1"></script>
+<script src="assets/chat.js?v=20260629_1"></script>
 <script>
 var _csrf = <?php echo json_encode(generateCsrfToken()); ?>;
 // ── Keepalive de sesión + CSRF refresh: ping cada 5 min ──

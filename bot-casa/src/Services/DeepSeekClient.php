@@ -38,8 +38,8 @@ final class DeepSeekClient implements OpenAiClientInterface
      */
     public function chat(string $systemPrompt, string $userMessage, array $context = [], string $model = null, array $history = []): array
     {
-        $model       ??= $this->config->get('deepseek.chat_model', 'deepseek-v4-flash');
-        $chatUrl       = $this->config->get('deepseek.chat_url', 'https://api.deepseek.com/v1/chat/completions');
+        $model       ??= $this->config->get('deepseek.chat_model', 'deepseek-v4-pro');
+        $chatUrl       = $this->config->get('deepseek.chat_url', 'https://api.deepseek.com/chat/completions');
         $temperature   = (float) $this->config->get('deepseek.temperature', 0.7);
 
         $userContent = $userMessage;
@@ -67,6 +67,8 @@ final class DeepSeekClient implements OpenAiClientInterface
             'response_format' => ['type' => 'json_object'],
             'messages'        => $messages,
             'temperature'     => $temperature,
+            'thinking'        => ['type' => 'enabled'],
+            'reasoning_effort' => 'high',
         ];
 
         $headers = $this->buildAuthHeaders();
@@ -81,7 +83,22 @@ final class DeepSeekClient implements OpenAiClientInterface
                 $this->lastRawResponse = ['http_code' => $httpCode, 'body' => $rawBody];
 
                 if ($httpCode >= 200 && $httpCode < 300) {
-                    return $this->parseChoicesContent($rawBody);
+                    $parsed = $this->parseChoicesContent($rawBody);
+
+                    // ── Retry on empty / fallback responses ────────────
+                    // When DeepSeek returns 200 but the content is empty,
+                    // whitespace-only, or could not be parsed into a
+                    // valid user_visible_reply, retry instead of sending
+                    // a generic fallback to the user.
+                    $uvr = trim((string) ($parsed['user_visible_reply'] ?? ''));
+                    if ($uvr === '' && $attempt < $maxAttempts) {
+                        $this->logger->warning("DeepSeek chat — empty/invalid user_visible_reply, retrying (attempt {$attempt}/{$maxAttempts})", [
+                            'content_head' => is_string($rawBody) ? mb_substr($rawBody, 0, 150) : 'N/A',
+                        ]);
+                        usleep(500000); // 500ms pause before retry
+                        continue;
+                    }
+                    return $parsed;
                 }
 
                 // Rate limit (429) — honour Retry-After if present, else exponential backoff
@@ -143,7 +160,7 @@ final class DeepSeekClient implements OpenAiClientInterface
     {
         $defaults = ['sentiment' => 'neutral', 'register' => 'coloquial', 'urgency' => 'media'];
 
-        $toneUrl  = $this->config->get('deepseek.chat_url', 'https://api.deepseek.com/v1/chat/completions');
+        $toneUrl  = $this->config->get('deepseek.chat_url', 'https://api.deepseek.com/chat/completions');
         $toneModel = $this->config->get('deepseek.tone_model', 'deepseek-v4-flash');
 
         $body = [
@@ -163,6 +180,7 @@ final class DeepSeekClient implements OpenAiClientInterface
             ],
             'temperature'     => 0.0,
             'max_tokens'      => 80,
+            'thinking'        => ['type' => 'disabled'],
         ];
 
         $headers = $this->buildAuthHeaders();
@@ -237,13 +255,6 @@ final class DeepSeekClient implements OpenAiClientInterface
     {
         $lines = [];
 
-        // ── NOVA: Simplify context when conversation is stalled ─────
-        // If bot confusion or filler loop is high, strip non-essential
-        // flags to reduce LLM saturation and confusion loops.
-        $fillerLoop  = (int) ($ctx['__filler_loop_count'] ?? 0);
-        $botConfused = (int) ($ctx['__bot_confusion_count'] ?? 0);
-        $simplified  = ($fillerLoop >= 3 || $botConfused >= 2);
-
         // ── Identity ──────────────────────────────────────────────────
         $speaker  = trim((string) ($ctx['speaker_girl_name'] ?? ''));
         $selected = trim((string) ($ctx['selected_girl_name'] ?? ''));
@@ -256,116 +267,51 @@ final class DeepSeekClient implements OpenAiClientInterface
         }
 
         if ($selected !== '' && $selected !== $speaker) {
-            $lines[] = "CHICA ELEGIDA POR EL CLIENTE: {$selected} (ella es tu amiga, háblale de ella en 3ª persona)";
+            $lines[] = "CHICA ELEGIDA: {$selected} (ella es tu amiga, háblale de ella en 3ª persona)";
         } elseif ($selected !== '') {
             $lines[] = "CHICA ELEGIDA: {$selected} (el cliente ya eligió, NO ofrezcas otras)";
         }
 
-        // ── Conversation state (skip if simplified) ────────────────────
-        if (!$simplified) {
-            $stateTags = [];
-            $yaEnviado = (array) ($ctx['ya_enviado'] ?? []);
-            if (in_array('fotos', $yaEnviado, true))             $stateTags[] = 'fotos';
-            if (in_array('precios', $yaEnviado, true))           $stateTags[] = 'precios';
-            if (in_array('ubicacion', $yaEnviado, true))         $stateTags[] = 'mapa';
-            if (in_array('ubicacion_precisa', $yaEnviado, true)) $stateTags[] = 'mapa_preciso';
-            if (!empty($ctx['maps_sent']))                        $stateTags[] = 'maps_enviado';
-            if (!empty($ctx['eta_from_user_flag']))               $stateTags[] = 'cliente_dio_ETA';
-            if (!empty($ctx['wants_more_girls']))                 $stateTags[] = 'cliente_pide_mas_chicas';
-            if (!empty($ctx['photo_rejected']))                   $stateTags[] = 'cliente_rechazo_fotos';
-            if (!empty($ctx['__is_new_conversation']))            $stateTags[] = 'primera_vez';
-            if (!empty($ctx['__is_urgent']))                      $stateTags[] = 'URGENTE';
-            if (!empty($ctx['__is_burst']))                       $stateTags[] = 'rafaga_mensajes';
-
-            if ($stateTags !== []) {
-                $lines[] = 'ESTADO: ' . implode(', ', $stateTags);
-            }
-        }
-
-        // ── Catalog info (skip if simplified) ──────────────────────────
-        if (!$simplified) {
-            $catalogCount = (int) ($ctx['catalog_count'] ?? 0);
-            if ($catalogCount > 0) {
-                $lines[] = "CATÁLOGO MOSTRADO: {$catalogCount} veces";
-            }
-
-            $shownGirls = (array) ($ctx['shown_girls'] ?? []);
-            $unshownGirls = (array) ($ctx['unshown_girls'] ?? []);
-            if ($shownGirls !== []) {
-                $lines[] = 'CHICAS MOSTRADAS: ' . implode(', ', $shownGirls);
-            }
-            if ($unshownGirls !== []) {
-                $lines[] = 'CHICAS NO MOSTRADAS AÚN: ' . implode(', ', $unshownGirls);
-            }
-
-            // ── Active girls catalog ───────────────────────────────────
-            $girlsConfig = (array) ($ctx['girls_config'] ?? []);
-            if ($girlsConfig !== []) {
-                $girlNames = [];
-                foreach ($girlsConfig as $g) {
-                    $name = trim((string) ($g['nombre'] ?? ''));
-                    if ($name !== '') {
-                        $girlNames[] = $name;
-                    }
-                }
-                if ($girlNames !== []) {
-                    $lines[] = 'CHICAS ACTIVAS: ' . implode(', ', $girlNames);
+        // ── Active girls for name reference ────────────────────────────
+        $girlsConfig = (array) ($ctx['girls_config'] ?? []);
+        if ($girlsConfig !== []) {
+            $girlNames = [];
+            foreach ($girlsConfig as $g) {
+                $name = trim((string) ($g['nombre'] ?? ''));
+                if ($name !== '') {
+                    $girlNames[] = $name;
                 }
             }
-
-            // ── Conversation metrics ──────────────────────────────────
-            $fillerCount = (int) ($ctx['__filler_loop_count'] ?? 0);
-            if ($fillerCount > 0) {
-                $lines[] = "MONOSÍLABOS CONSECUTIVOS: {$fillerCount}";
-            }
-
-            $chooseLoop = (int) ($ctx['choose_loop_count'] ?? 0);
-            if ($chooseLoop > 0) {
-                $lines[] = "VUELTAS SIN ELEGIR CHICA: {$chooseLoop}";
-            }
-
-            $haggleCount = (int) ($ctx['haggle_count_recent'] ?? 0);
-            if ($haggleCount > 0) {
-                $lines[] = "REGATEOS DEL CLIENTE: {$haggleCount}";
-            }
-
-            $botMsgCount = (int) ($ctx['bot_msg_count_recent'] ?? 0);
-            if ($botMsgCount > 0) {
-                $lines[] = "MENSAJES ENVIADOS POR TI: {$botMsgCount}";
+            if ($girlNames !== []) {
+                $lines[] = 'CHICAS ACTIVAS: ' . implode(', ', $girlNames);
             }
         }
 
-        // ── End intent ────────────────────────────────────────────────
-        if (!empty($ctx['conversation_end_intent'])) {
-            $lines[] = 'ATENCIÓN: el cliente se está despidiendo. Responde MUY corto.';
-        }
-
-        // ── Pending questions from client ─────────────────────────────
+        // ── Pending questions (cliente pidió algo y no se respondió) ───
         $pendingQuestions = (array) ($ctx['preguntas_pendientes'] ?? []);
         if ($pendingQuestions !== []) {
             $readable = [];
             foreach ($pendingQuestions as $q) {
                 $readable[] = match ($q) {
-                    'fotos_pendientes'    => 'pidió fotos/foto normal y NO se las has enviado',
-                    'precios_pendientes'  => 'pidió precios/tarifas y NO se los has dado',
-                    'ubicacion_pendiente' => 'pidió ubicación/dirección y NO se la has enviado',
+                    'fotos_pendientes'    => 'pidió fotos y NO se las has enviado',
+                    'precios_pendientes'  => 'pidió precios y NO se los has dado',
+                    'ubicacion_pendiente' => 'pidió ubicación y NO se la has enviado',
                     default               => $q,
                 };
             }
-            $lines[] = '⚠️ PREGUNTAS PENDIENTES DEL CLIENTE (NO respondidas aún): ' . implode(' | ', $readable);
-            $lines[] = '   → Debes responder a estas preguntas en tu mensaje. NO las ignores aunque el cliente escriba fillers después.';
-        }
-
-        // ── Client profile hint ───────────────────────────────────────
-        $profileHint = trim((string) ($ctx['client_profile_hint'] ?? ''));
-        if ($profileHint !== '') {
-            $lines[] = "PERFIL DEL CLIENTE: {$profileHint}";
+            $lines[] = '⚠️ PREGUNTAS PENDIENTES: ' . implode(' | ', $readable);
         }
 
         // ── Location URL ──────────────────────────────────────────────
         $locationUrl = trim((string) ($ctx['location_url'] ?? ''));
         if ($locationUrl !== '') {
             $lines[] = "MAPS DISPONIBLE: {$locationUrl}";
+        }
+
+        // ── Client profile ─────────────────────────────────────────────
+        $profileHint = trim((string) ($ctx['client_profile_hint'] ?? ''));
+        if ($profileHint !== '') {
+            $lines[] = "PERFIL DEL CLIENTE: {$profileHint}";
         }
 
         return implode("\n", $lines);
@@ -384,7 +330,7 @@ final class DeepSeekClient implements OpenAiClientInterface
             ]);
             // SAFEGUARD: never leak raw API response to the user.
             // Return a safe Spanish fallback instead.
-            return ['user_visible_reply' => 'dime otra vez cari, no te lei bien 😘'];
+            return ['user_visible_reply' => 'dime otra vez cari 😘'];
         }
 
         $content = $apiResponse['choices'][0]['message']['content'] ?? null;
@@ -432,7 +378,7 @@ final class DeepSeekClient implements OpenAiClientInterface
         $this->logger->warning('DeepSeek response — content is not valid JSON and could not be recovered', [
             'content_head' => mb_substr((string) $content, 0, 200),
         ]);
-        return ['user_visible_reply' => 'dime otra vez cari, no te entendi 😘'];
+        return ['user_visible_reply' => 'a ver, dime de nuevo precioso 😘'];
     }
 
     /**

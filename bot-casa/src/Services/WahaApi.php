@@ -123,6 +123,7 @@ final class WahaApi implements WahaApiInterface
         float $userResponseTimeSec = 60.0,
         bool $isBurst = false,
         bool $isUrgent = false,
+        bool $isReprocess = false,
     ): bool {
         // ── Extract feature configs ───────────────────────────────────────
         $paceCfg   = is_array($delayConfig['pace']               ?? null) ? $delayConfig['pace']               : [];
@@ -183,9 +184,12 @@ final class WahaApi implements WahaApiInterface
             }
 
             // ── Combined multipliers ────────────────────────────────────
-            // typing+after: habituation × pace × burst × urgent
-            // seen+read:    urgent only (B10)
+            // typing+after: habituation × pace × burst × urgent × reprocess
+            // seen+read:    urgent × pace (B10)
             $typingMult = $hab * $paceFactor * $burstFactor;
+            if ($isReprocess) {
+                $typingMult *= 0.5;
+            }
             $globalMult = $urgentFactor; // B10 only
             $typingMult *= $globalMult;  // urgent also applies to typing+after
 
@@ -210,8 +214,8 @@ final class WahaApi implements WahaApiInterface
             $readBase = random_int($baseMin, max($baseMin, $baseMax));
             $readRaw  = ($readBase + ($inChars * $perChar));
             $readMs   = (int) max($clampMinR, min($clampMaxR, $readRaw));
-            // Apply urgent multiplier to read
-            $readMs   = (int) max(200, $readMs * $globalMult);
+            // Apply urgent + pace multiplier to read (reprocess halves)
+            $readMs   = (int) max(200, $readMs * $globalMult * $paceFactor * ($isReprocess ? 0.5 : 1.0));
 
             // ── Type delay: start + (chars/cps) + chunk_pauses, clamped ──
             $startMin    = (int)   ($typingCfg['start_min_ms']      ?? 600);
@@ -256,6 +260,10 @@ final class WahaApi implements WahaApiInterface
         // B10: urgent applies to seen too
         if ($isUrgent && isset($urgentCfg) && ($urgentCfg['enabled'] ?? true)) {
             $seenMs = max(200, (int) ($seenMs * (float) ($urgentCfg['factor'] ?? 0.25)));
+        }
+        // Reprocess: halve seen delay when catching up after late-arriving messages
+        if ($isReprocess) {
+            $seenMs = max(200, (int) ($seenMs * 0.5));
         }
 
         // ── B6: Choose sequence pattern ──────────────────────────────────

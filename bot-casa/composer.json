@@ -27,6 +27,7 @@
     "scripts": {
         "phpstan": "phpstan analyse src/ --level=8",
         "test": "phpunit tests/",
+        "test:llm": "phpunit tests/Llm/ --group llm",
         "panel": "php -S localhost:8080 -t public/"
     },
     "config": {

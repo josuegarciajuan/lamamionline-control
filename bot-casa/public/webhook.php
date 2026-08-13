@@ -109,6 +109,14 @@ try {
                 $linesMap = @json_decode((string) @file_get_contents($linesMapPath), true);
                 if (is_array($linesMap) && isset($linesMap[$last9])) {
                     $userId = (int) $linesMap[$last9];
+                } else {
+                    // Line not mapped → the message will be attributed to admin
+                    // and written to root data files. The owning client won't see
+                    // it in their chat. Log a strong warning so this can be
+                    // diagnosed and the lines_map.json can be updated.
+                    if ($last9 !== '') {
+                        error_log('[wasapBot] WARNING: last9 ' . $last9 . ' not found in lines_map.json — message will be attributed to admin (user 1)');
+                    }
                 }
             }
         }
@@ -132,6 +140,31 @@ try {
         $senderPhone = preg_replace('/[^0-9]/', '', (string) $rawFrom);
     }
 
+    // ── Detect fromMe / source / peer phone (native WhatsApp vs bot API) ──
+    $resolved = \WasapBot\Pipeline\FromMeResolver::resolve(
+        is_array($body) ? $body : [],
+        $payload,
+        is_array($dataInfo) ? $dataInfo : [],
+        (string) $senderPhone,
+    );
+    $fromMe      = $resolved['from_me'];
+    $source      = $resolved['source'];
+    $senderPhone = $resolved['sender_phone'];
+
+    // ── Skip our own API-sent messages (source=api) ──
+    // The bot's own replies (sent via WAHA API) are already written to
+    // session_memory by the pipeline. Treating them as native replies here
+    // would double-write them and wrongly auto-pause the thread.
+    if ($source === 'api') {
+        http_response_code(200);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'status'  => 'ok',
+            'message' => 'API-sent message skipped (already persisted by pipeline)',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     $msgText = '';
     $bodyText = $body['body'] ?? $payload['body'] ?? null;
     if (is_string($bodyText)) {
@@ -140,19 +173,62 @@ try {
         $msgText = trim((string) ($bodyText['text']['body'] ?? $bodyText['text'] ?? $bodyText['message'] ?? ''));
     }
 
+    // Detect non-text message type for persistence when bot is stopped.
+    // Text messages are handled normally; non-text (audio, image, sticker,
+    // location, document, video, vCard) get a descriptive placeholder
+    // user_msg so they still appear in the chat UI when the bot is off.
+    $nonTextType = '';
+    if ($senderPhone !== '' && $msgText === '') {
+        $dataInfoFull = $body['_data'] ?? $payload['_data'] ?? [];
+        if (is_array($dataInfoFull)) {
+            $nonTextType = mb_strtolower(trim((string) ($dataInfoFull['MessageType'] ?? '')));
+        }
+        if ($nonTextType === '') {
+            if (!empty($body['media']) || !empty($payload['media']))         { $nonTextType = 'media'; }
+            elseif (!empty($body['location']) || !empty($payload['location'])) { $nonTextType = 'location'; }
+            elseif (!empty($body['vcard']) || !empty($payload['vcard']))       { $nonTextType = 'vcard'; }
+            elseif (!empty($body['document']) || !empty($payload['document'])) { $nonTextType = 'document'; }
+        }
+        // Generic fallback: if the event is 'message' but we have no
+        // extractable text body, it's some unrecognised media type.
+        if ($nonTextType === '' && ($payload['event'] ?? '') === 'message') {
+            $nonTextType = 'media';
+        }
+    }
+
+    // user_msg to show in chat: real text, or descriptive placeholder
+    $displayText = $msgText;
+    if ($displayText === '') {
+        switch ($nonTextType) {
+            case 'audio':    $displayText = '🎤 Audio'; break;
+            case 'image':    $displayText = '🖼️ Imagen'; break;
+            case 'sticker':  $displayText = '🌟 Sticker'; break;
+            case 'location': $displayText = '📍 Ubicación'; break;
+            case 'document': $displayText = '📄 Documento'; break;
+            case 'video':    $displayText = '🎬 Vídeo'; break;
+            case 'vcard':
+            case 'contact':  $displayText = '👤 Contacto'; break;
+            default:         $displayText = '📎 Mensaje'; break;
+        }
+    }
+
+    // Deduplication content: real text if available, otherwise synthetic key.
+    $dedupContent = $msgText !== '' ? $msgText : ($nonTextType !== '' ? ('__' . $nonTextType) : '');
+
     // _pending write is deferred until after isRunning() and thread-pause checks.
     $threadId        = '';
     $senderLid       = '';
     $isWritePending  = false;
+    $threadPaused    = false;
 
-    if ($senderPhone !== '' && $msgText !== '') {
+    if ($senderPhone !== '' && $dedupContent !== '') {
         // Compute threadId early (needed for dedup key AND record writing)
         $threadId = ($last9 !== '' ? $last9 : '000000000') . '_' . $senderPhone;
 
         // Deduplicate webhook deliveries: WAHA may retry if the pipeline
         // takes too long (humanized delays + OpenAI). Skip if the same
         // message was already written within the last 15 seconds.
-        $dedupKey = $threadId . '|' . md5($senderPhone . '|' . $msgText);
+        $dedupKey = $threadId . '|' . md5($senderPhone . '|' . $dedupContent);
         $dedupFile = WASAPBOT_ROOT . '/data/.webhook_dedup.json';
         $dedup = [];
         if (file_exists($dedupFile)) {
@@ -251,10 +327,11 @@ try {
             'ts'         => gmdate('Y-m-d\TH:i:s\Z'),
             'thread_id'  => $threadId,
             'phone'      => $senderPhone,
-            'user_msg'   => $msgText,
-            'bot_reply'  => '',
+            'user_msg'   => $fromMe ? '' : $displayText,
+            'bot_reply'  => $fromMe ? $displayText : '',
             'sender_lid' => $senderLid,
-            '_pending'   => $botIsRunning && !$threadPaused,
+            '_pending'   => $fromMe ? false : ($botIsRunning && !$threadPaused),
+            'from_me'    => $fromMe,
         ];
         try {
             $memPath = (string) $instances['config']->get('files.session_memory', '');
@@ -264,11 +341,80 @@ try {
                 }
                 $memDir = dirname($memPath);
                 if (!is_dir($memDir)) @mkdir($memDir, 0755, true);
-                @file_put_contents($memPath, json_encode($immediateRecord, JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND | LOCK_EX);
+
+                // Self-heal: if the file exists but is owned by another user
+                // (e.g. root), www-data can't FILE_APPEND. Try chmod in-place
+                // — NEVER unlink/destroy conversation history.
+                if (file_exists($memPath) && !is_writable($memPath)) {
+                    if (@chmod($memPath, 0664)) {
+                        clearstatcache(true, $memPath);
+                        $logger->info('webhook.php — self-heal: fixed permissions on session_memory file', [
+                            'path' => $memPath,
+                        ]);
+                    } else {
+                        $logger->warning('webhook.php — self-heal: session_memory not writable and chmod failed, skipping immediate write (history preserved)', [
+                            'path' => $memPath,
+                        ]);
+                        // Cannot write — skip the immediate FILE_APPEND below.
+                        $memPath = '';
+                    }
+                }
+
+                $written = false;
+                if ($memPath !== '') {
+                    $written = @file_put_contents(
+                        $memPath,
+                        json_encode($immediateRecord, JSON_UNESCAPED_UNICODE) . "\n",
+                        FILE_APPEND | LOCK_EX,
+                    );
+                }
+                if ($written === false) {
+                    $logger->error('webhook.php — failed to write immediate record to session_memory', [
+                        'path'          => $memPath,
+                        'thread_id'     => $threadId,
+                        'dir_exists'    => is_dir($memDir) ? 'yes' : 'no',
+                        'dir_writable'  => is_writable($memDir) ? 'yes' : 'no',
+                        'file_exists'   => file_exists($memPath) ? 'yes' : 'no',
+                        'file_writable' => file_exists($memPath) ? (is_writable($memPath) ? 'yes' : 'no') : 'new_file',
+                    ]);
+                }
             }
-        } catch (\Throwable) {
-            // Best-effort: don't block webhook processing if early write fails
+        } catch (\Throwable $e) {
+            $logger->error('webhook.php — exception writing immediate record: ' . $e->getMessage(), [
+                'thread_id' => $threadId ?? '',
+            ]);
         }
+    }
+
+    // ── fromMe bypass: don't run pipeline for messages we sent ourselves ──
+    if ($fromMe && $senderPhone !== '') {
+        // Auto-pause: human replied from native WA → stop bot for this conversation
+        if (!$threadPaused && $threadId !== '') {
+            $pausedFile = WASAPBOT_ROOT . '/data/paused_threads.ndjson';
+            $rec = json_encode(['thread_id' => $threadId, 'paused_at' => gmdate('c')], JSON_UNESCAPED_UNICODE);
+            @file_put_contents($pausedFile, $rec . "\n", FILE_APPEND | LOCK_EX);
+            $logger->info('webhook.php — auto-paused thread after native WA reply', ['thread_id' => $threadId]);
+        }
+        $logger->info('webhook.php — fromMe message persisted, skipping pipeline');
+        http_response_code(200);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'status'  => 'ok',
+            'message' => 'fromMe message saved',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // If this specific thread is paused, exit after persisting — don't run pipeline
+    if ($threadPaused) {
+        $logger->info('webhook.php — thread paused, message persisted, skipping pipeline');
+        http_response_code(200);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'status'  => 'ok',
+            'message' => 'Thread is paused — message saved',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
     }
 
     // If bot is stopped, exit after persisting the message (don't run pipeline)

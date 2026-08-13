@@ -27,5 +27,6 @@ interface WahaApiInterface
         float $userResponseTimeSec = 60.0,
         bool $isBurst = false,
         bool $isUrgent = false,
+        bool $isReprocess = false,
     ): bool;
 }

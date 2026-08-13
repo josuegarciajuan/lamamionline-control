@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <?php if ($page === 'login'): ?>
     <?php render_login_page(); ?>
 <?php else: ?>
-    <?php render_global_ui(); ?>
+    <?php render_global_ui($page, false); ?>
     <div class="layout">
         <?php render_sidebar($page); ?>
         <main class="main">
@@ -760,7 +760,7 @@ PHP;
 $files[$projectName . '/app/views.php'] = <<<'PHP'
 <?php
 
-function render_global_ui() {
+function render_global_ui($page = '', $lite = false) {
     echo '<div id="floatingToast" class="floating-toast"></div>';
     echo '<div id="moneyRain" class="money-rain"></div>';
 }

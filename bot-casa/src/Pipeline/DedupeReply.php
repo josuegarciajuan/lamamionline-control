@@ -94,9 +94,9 @@ final class DedupeReply implements PipelineStageInterface
         // PRIORITY 0 — Bot confusion guard (anti "no entiendo" loop)
         // ----------------------------------------------------------------
         $botConfusionCount = (int) ($ctx['__bot_confusion_count'] ?? 0);
-        $confusionRegex = '/\b(?:no\s+(?:entiendo|te\s+entiendo|te\s+he\s+entendido|s[eé]\b|se\b|se\s+que|tengo\s+ni\s+idea)|'
+        $confusionRegex = '/\b(?:no\s+(?:entiendo|entend[ií]|te\s+entiendo|te\s+entend[ií]|te\s+he\s+entendido|s[eé]\b|se\b|se\s+que|tengo\s+ni\s+idea)|'
             . 'eso\s+no\s+(?:es\s+lo\s+m[ií]o|te\s+lo\s+s[eé])|'
-            . 'de\s+eso\s+no\s+(?:entiendo|s[eé]|tengo\s+ni\s+idea))\b/iu';
+            . 'de\s+eso\s+no\s+(?:entiendo|entend[ií]|s[eé]|tengo\s+ni\s+idea))\b/iu';
 
         if ($botConfusionCount >= 1 && preg_match($confusionRegex, $outputText)) {
             // Bot is repeating confusion — rewrite as clarifying question

@@ -298,6 +298,59 @@ function comercial_page_url($tab = 'resumen', $params = array()) {
     return 'index.php?' . http_build_query($query);
 }
 
+function inbox_page_url($tab = 'conversaciones', $params = array()) {
+    $query = array_merge(array(
+        'page' => 'inbox',
+        'tab' => $tab,
+    ), $params);
+    return 'index.php?' . http_build_query($query);
+}
+
+function inbox_get_settings() {
+    $defaults = array(
+        'replies_enabled' => true,
+        'opener_enabled'  => true,
+    );
+    $stored = storage_read('inbox_settings.json');
+    return is_array($stored) ? array_merge($defaults, $stored) : $defaults;
+}
+
+function inbox_save_settings($settings) {
+    storage_write('inbox_settings.json', (array)$settings);
+}
+
+/**
+ * Devuelve array de line_id que están asignados a algún proceso comercial.
+ */
+function inbox_get_process_line_ids() {
+    $processes = comercial_get_processes();
+    $ids = array();
+    foreach ($processes as $p) {
+        foreach ((array)($p['assigned_line_ids'] ?? array()) as $lid) {
+            $lid = trim((string)$lid);
+            if ($lid !== '' && !in_array($lid, $ids, true)) {
+                $ids[] = $lid;
+            }
+        }
+    }
+    return $ids;
+}
+
+/**
+ * Filtra threads cuyo line_id esté en la lista proporcionada.
+ */
+function inbox_filter_threads_by_lines($threads, $lineIds) {
+    if (empty($lineIds)) return $threads; // sin filtro si no hay líneas definidas
+    $out = array();
+    foreach ($threads as $thread) {
+        $lid = trim((string)($thread['line_id'] ?? ''));
+        if ($lid !== '' && in_array($lid, $lineIds, true)) {
+            $out[] = $thread;
+        }
+    }
+    return $out;
+}
+
 function publicista_clienta_source_label($scope) {
     return $scope === 'jostal' ? 'Jostal' : 'LaMami';
 }
@@ -640,7 +693,16 @@ function publicista_pick_erotic_outfits_for_images($count = 4) {
         $pick = $filtered[array_rand($filtered)];
         $usedCategories[] = $pick['category'];
         // No forzar color — dejar que el outfit dicte su propio color
-        $outfits[] = mb_substr($pick['desc'], 0, 70);
+        // truncar en el último espacio antes de 70 chars para no cortar palabras
+        $outfitDesc = $pick['desc'];
+        if (mb_strlen($outfitDesc) > 70) {
+            $outfitDesc = mb_substr($outfitDesc, 0, 70);
+            $lastSpace = mb_strrpos($outfitDesc, ' ');
+            if ($lastSpace > 20) {
+                $outfitDesc = mb_substr($outfitDesc, 0, $lastSpace);
+            }
+        }
+        $outfits[] = $outfitDesc;
     }
 
     return $outfits;
@@ -737,7 +799,16 @@ function publicista_pick_outfits_for_images($job, $count = 4) {
                     $desc = rtrim($desc, '.') . ', en tonos ' . $colorWord;
                 }
             }
-            $outfits[] = mb_substr($desc, 0, 60); // max 60 chars por outfit
+            // truncar en el último espacio antes de 60 chars para no cortar palabras
+            $outfitDesc = $desc;
+            if (mb_strlen($outfitDesc) > 60) {
+                $outfitDesc = mb_substr($outfitDesc, 0, 60);
+                $lastSpace = mb_strrpos($outfitDesc, ' ');
+                if ($lastSpace > 20) {
+                    $outfitDesc = mb_substr($outfitDesc, 0, $lastSpace);
+                }
+            }
+            $outfits[] = $outfitDesc;
         }
     } else {
         // ── Modo estilo concreto: generar descripciones coherentes con variaciones ──
@@ -2030,6 +2101,565 @@ function jostal_clienta_en_casa($clienta) {
     return empty($ultimo['salida']);
 }
 
+/**
+ * Precio semanal de alquiler de una clienta.
+ *
+ * Resolución por prioridad:
+ *   1. Campo `precio_semanal` de la propia clienta.
+ *   2. `precio_semanal` del contrato asociado (si existe y > 0).
+ *   3. Mapa legacy hardcodeado (clientas históricas que aún no tienen el campo).
+ *
+ * Devuelve float > 0 o null si no hay precio definido.
+ */
+function jostal_precio_semanal($clienta) {
+    $clienta = is_array($clienta) ? $clienta : array();
+
+    $legacy = array(
+        'jcli0013'      => 170,
+        'jcli_2bd0670c' => 130,
+        'jcli_0428b6e4' => 150,
+        'jcli_1e594eda' => 150,
+    );
+
+    $propio = (float)($clienta['precio_semanal'] ?? 0);
+    if ($propio > 0) return $propio;
+
+    $contrato = contrato_find_by_clienta((string)($clienta['id'] ?? ''));
+    if (is_array($contrato)) {
+        $delContrato = (float)($contrato['precio_semanal'] ?? 0);
+        if ($delContrato > 0) return $delContrato;
+    }
+
+    $id = (string)($clienta['id'] ?? '');
+    if ($id !== '' && isset($legacy[$id])) return (float)$legacy[$id];
+
+    return null;
+}
+
+/**
+ * Cambio de precio histórico hardcodeado (para casos puntuales aún no pasados a la ficha).
+ * Estructura: clienta_id => ['anterior' => importe, 'desde' => 'YYYY-MM-DD'].
+ */
+function jostal_precio_historico_legacy($clienta) {
+    $id = (string)($clienta['id'] ?? '');
+    $map = array(
+        'jcli_0428b6e4' => array('anterior' => 130, 'desde' => '2026-08-01'),
+    );
+    return isset($map[$id]) ? $map[$id] : null;
+}
+
+/**
+ * Precio semanal aplicable a una fecha concreta (soporta cambio de precio histórico).
+ * Si la clienta tiene `precio_semanal_anterior` + `precio_semanal_desde`, se usa para
+ * fechas anteriores al cambio. Si no, se usa el mapa legacy hardcodeado.
+ */
+function jostal_precio_por_fecha($clienta, $fecha) {
+    $clienta = is_array($clienta) ? $clienta : array();
+
+    $desde = trim((string)($clienta['precio_semanal_desde'] ?? ''));
+    $anterior = (float)($clienta['precio_semanal_anterior'] ?? 0);
+
+    if ($desde === '' || $anterior <= 0) {
+        $leg = jostal_precio_historico_legacy($clienta);
+        if ($leg) {
+            $desde = (string)$leg['desde'];
+            $anterior = (float)$leg['anterior'];
+        }
+    }
+
+    if ($desde !== '' && $anterior > 0) {
+        $fechaTs = strtotime($fecha . ' 00:00:00');
+        $desdeTs = strtotime($desde . ' 00:00:00');
+        if ($fechaTs !== false && $desdeTs !== false && $fechaTs < $desdeTs) {
+            return $anterior;
+        }
+    }
+
+    return jostal_precio_semanal($clienta);
+}
+
+/**
+ * Pagos de alquiler no registrados como lead (p. ej. reservas por bizum guardadas como venta).
+ * Se inyectan como pagos de alquiler para el cálculo de deuda.
+ * Clave: clienta_id => lista de ['date' => 'Y-m-d', 'amount' => float, 'desc' => '...'].
+ */
+function jostal_pagos_extra() {
+    return array(
+        'jcli_0428b6e4' => array(
+            array('date' => '2026-05-11', 'amount' => 30, 'desc' => 'Reserva bizum (venta)'),
+        ),
+    );
+}
+
+/**
+ * Normaliza un texto para comparación: minúsculas, sin acentos, espacios colapsados.
+ */
+function jostal_normalizar_texto($s) {
+    $s = (string)$s;
+    if (function_exists('mb_strtolower')) {
+        $s = mb_strtolower($s, 'UTF-8');
+    } else {
+        $s = strtolower($s);
+    }
+    $map = array(
+        'á' => 'a', 'à' => 'a', 'ä' => 'a', 'â' => 'a',
+        'é' => 'e', 'è' => 'e', 'ë' => 'e', 'ê' => 'e',
+        'í' => 'i', 'ì' => 'i', 'ï' => 'i', 'î' => 'i',
+        'ó' => 'o', 'ò' => 'o', 'ö' => 'o', 'ô' => 'o',
+        'ú' => 'u', 'ù' => 'u', 'ü' => 'u', 'û' => 'u',
+        'ñ' => 'n', 'ç' => 'c',
+    );
+    $s = strtr($s, $map);
+    $s = preg_replace('/\s+/u', ' ', $s);
+    return trim($s);
+}
+
+/**
+ * Clasifica el concepto de un lead Jostal respecto al alquiler.
+ *
+ * @param string $observacion  Texto del concepto.
+ * @param float  $amount       Importe del lead (para la heurística de "vacío alto").
+ * @return array{string, string}  ['tipo' => 'alquiler'|'no_alquiler'|'dudoso', 'razon' => '...']
+ */
+function jostal_clasificar_concepto($observacion, $amount = 0) {
+    $amount = (float)$amount;
+    $raw = trim((string)$observacion);
+
+    if ($raw === '') {
+        if ($amount > 50) {
+            return array('tipo' => 'dudoso', 'razon' => 'Pago alto sin concepto (' . euro($amount) . ')');
+        }
+        return array('tipo' => 'no_alquiler', 'razon' => 'Sin concepto');
+    }
+
+    $d = jostal_normalizar_texto($raw);
+    if ($d === '') {
+        return $amount > 50
+            ? array('tipo' => 'dudoso', 'razon' => 'Sin concepto legible, importe alto')
+            : array('tipo' => 'no_alquiler', 'razon' => 'Sin concepto');
+    }
+
+    // 1. Stems directos de "alquiler" (y variantes con faltas graves).
+    $stems = array('alquil', 'alqil', 'alqul', 'alqler', 'alkil', 'akquil', 'alquile', 'alkile', 'alquler');
+    foreach ($stems as $stem) {
+        if (mb_strpos($d, $stem) !== false) {
+            return array('tipo' => 'alquiler', 'razon' => 'Contiene "' . $stem . '"');
+        }
+    }
+
+    // 2. Similitud palabra a palabra contra "alquiler" (tolera aliler, alkiler, alquller...).
+    $words = preg_split('/[\s\-\.,\/:;]+/u', $d, -1, PREG_SPLIT_NO_EMPTY);
+    $best = 0;
+    $bestWord = '';
+    foreach ((array)$words as $w) {
+        if (mb_strlen($w) < 3) continue;
+        $dist = levenshtein($w, 'alquiler');
+        similar_text($w, 'alquiler', $pct);
+        if ($dist <= 2 || $pct >= 80) {
+            return array('tipo' => 'alquiler', 'razon' => 'Parecido a "alquiler" ("' . $w . '")');
+        }
+        if ($pct > $best) {
+            $best = $pct;
+            $bestWord = $w;
+        }
+    }
+
+    // 3. Conceptos claramente NO alquiler.
+    $noAlquiler = array('fianza', 'taxi', 'bizum', 'regalo', 'cliente', 'servicio', 'condonad', 'ajuste', 'propina', 'reserva', 'despensa');
+    foreach ($noAlquiler as $kw) {
+        if (mb_strpos($d, $kw) !== false) {
+            return array('tipo' => 'no_alquiler', 'razon' => 'Contiene "' . $kw . '"');
+        }
+    }
+
+    // 4. Zona gris: parecido pero no concluyente.
+    if ($best >= 60) {
+        return array('tipo' => 'dudoso', 'razon' => 'Parecido a "alquiler" pero no claro ("' . $bestWord . '")');
+    }
+
+    // 5. Texto corto no reconocido con importe alto → pedir confirmación.
+    if (mb_strlen($d) <= 12 && $amount > 50) {
+        return array('tipo' => 'dudoso', 'razon' => 'Concepto corto no reconocido con importe alto');
+    }
+
+    return array('tipo' => 'no_alquiler', 'razon' => 'Concepto no relacionado con alquiler');
+}
+
+/**
+ * Tipo de concepto efectivo de un lead: usa la clasificación persistida en BD
+ * (manual o auto) si existe; si no, clasifica automáticamente.
+ */
+function jostal_concepto_tipo_efectivo($lead) {
+    $lead = is_array($lead) ? $lead : array();
+    $persistido = trim((string)($lead['concepto_tipo'] ?? ''));
+    if ($persistido === 'alquiler' || $persistido === 'no_alquiler') {
+        $fuente = (string)($lead['concepto_fuente'] ?? '');
+        return array(
+            'tipo' => $persistido,
+            'razon' => $fuente === 'manual' ? 'Clasificación manual' : 'Clasificación guardada',
+            'persistido' => true,
+        );
+    }
+    return jostal_clasificar_concepto((string)($lead['observacion'] ?? ''), (float)($lead['precio'] ?? 0));
+}
+
+/**
+ * Localiza la línea WAHA "jostal dulce" (desde la que se envían los informes por WhatsApp).
+ * Devuelve el array de línea o null si no está configurada.
+ */
+function jostal_dulce_line() {
+    $lines = comercial_list_lines();
+    foreach ((array)$lines as $line) {
+        $id = (string)($line['id'] ?? '');
+        $nombre = jostal_normalizar_texto((string)($line['nombre'] ?? ''));
+        if ($id === 'tf_de558a13' || mb_strpos($nombre, 'dulce') !== false) {
+            return $line;
+        }
+    }
+    return null;
+}
+
+/**
+ * Calcula la deuda de alquiler de una clienta en casa.
+ *
+ * @param array  $clienta  Ficha de la clienta.
+ * @param array  $leads    Leads de esa clienta (o todos; se filtran por clienta_id).
+ * @return array  Estructura con weeks, totales y dudosos (o ['error' => ...]).
+ */
+function jostal_compute_deuda($clienta, $leads = null) {
+    $clienta = is_array($clienta) ? $clienta : array();
+    $cid = (string)($clienta['id'] ?? '');
+
+    $precio = jostal_precio_semanal($clienta);
+    if ($precio === null || $precio <= 0) {
+        return array('error' => 'sin_precio');
+    }
+
+    $pi = jostal_alquiler_payment_info($clienta, time());
+    if (empty($pi['enabled'])) {
+        return array('error' => 'sin_alquiler_activo');
+    }
+
+    if ($leads === null) {
+        $leads = get_jostal_leads_for_clienta($cid);
+    } else {
+        $leads = array_values(array_filter((array)$leads, function ($l) use ($cid) {
+            return is_array($l) && (string)($l['clienta_id'] ?? '') === $cid;
+        }));
+    }
+
+    $entry_date = (string)$pi['entry_date'];
+    $first_due_date = (string)$pi['first_due_date'];
+    $first_due_ts = strtotime($first_due_date . ' 00:00:00');
+    $today_ts = strtotime(date('Y-m-d') . ' 00:00:00');
+
+    if (!$first_due_ts || $first_due_ts > $today_ts) {
+        return array('error' => 'sin_vencimientos', 'entry_date' => $entry_date);
+    }
+
+    // Vencimientos desde el primero hasta la semana actual (inclusive).
+    // La semana actual es la que tiene el próximo vencimiento todavía en curso (due > hoy).
+    $next_due_ts = strtotime((string)$pi['next_due_date'] . ' 00:00:00');
+    $end_ts = ($next_due_ts && $next_due_ts >= $first_due_ts) ? $next_due_ts : $today_ts;
+
+    $due_dates = array();
+    for ($ts = $first_due_ts; $ts <= $end_ts; $ts = strtotime('+7 day', $ts)) {
+        $due_dates[] = date('Y-m-d', $ts);
+    }
+    $num_weeks = count($due_dates);
+
+    // Clasificar leads.
+    $alquiler_payments = array();
+    $no_alq_payments = array();
+    $dudosos = array();
+
+    foreach ($leads as $lead) {
+        $pdate = substr((string)($lead['created_at'] ?? ''), 0, 10);
+        $amount = (float)($lead['precio'] ?? 0);
+        if ($pdate === '' || $amount <= 0) continue;
+        if ($pdate < $entry_date) continue; // pagos anteriores a la entrada no cuentan
+
+        $clasif = jostal_concepto_tipo_efectivo($lead);
+
+        if ($clasif['tipo'] === 'dudoso') {
+            $dudosos[] = array(
+                'lead_id' => (string)($lead['id'] ?? ''),
+                'date' => $pdate,
+                'amount' => $amount,
+                'concepto' => (string)($lead['observacion'] ?? ''),
+                'razon' => (string)$clasif['razon'],
+            );
+        } elseif ($clasif['tipo'] === 'alquiler') {
+            $alquiler_payments[] = array(
+                'date' => $pdate,
+                'amount' => $amount,
+                'desc' => (string)($lead['observacion'] ?? ''),
+                'lead_id' => (string)($lead['id'] ?? ''),
+            );
+        } else {
+            $no_alq_payments[] = array(
+                'date' => $pdate,
+                'amount' => $amount,
+                'desc' => (string)($lead['observacion'] ?? ''),
+            );
+        }
+    }
+
+    usort($alquiler_payments, function ($a, $b) { return strcmp($a['date'], $b['date']); });
+    usort($no_alq_payments, function ($a, $b) { return strcmp($a['date'], $b['date']); });
+
+    // Inyectar pagos extra no registrados como lead (reservas bizum guardadas como venta, etc.).
+    $pagosExtra = jostal_pagos_extra();
+    if (isset($pagosExtra[$cid])) {
+        foreach ($pagosExtra[$cid] as $pe) {
+            if (($pe['date'] ?? '') >= $entry_date) {
+                $alquiler_payments[] = array(
+                    'date' => (string)$pe['date'],
+                    'amount' => (float)($pe['amount'] ?? 0),
+                    'desc' => (string)($pe['desc'] ?? ''),
+                    'lead_id' => '',
+                );
+            }
+        }
+        usort($alquiler_payments, function ($a, $b) { return strcmp($a['date'], $b['date']); });
+    }
+
+    // Precio por semana (soporta cambio de precio histórico 130 → 150, etc.).
+    $precio_por_semana = array_fill(0, $num_weeks, $precio);
+    for ($w = 0; $w < $num_weeks; $w++) {
+        $ps = ($w === 0) ? $entry_date : $due_dates[$w - 1];
+        $precio_por_semana[$w] = jostal_precio_por_fecha($clienta, $ps);
+    }
+
+    // Asignación FIFO: cada pago cubre la semana más antigua con deuda pendiente.
+    // El sobrante fluye a la semana siguiente; si paga más allá de todas, queda "a favor".
+    $remaining = array_fill(0, $num_weeks, 0.0);
+    $allocated = array_fill(0, $num_weeks, 0.0);
+    $pagos_semana = array_fill(0, $num_weeks, array());
+    for ($w = 0; $w < $num_weeks; $w++) $remaining[$w] = $precio_por_semana[$w];
+
+    $saldo_favor = 0.0;
+    foreach ($alquiler_payments as $p) {
+        $amt = (float)$p['amount'];
+        if ($amt <= 0) continue;
+        for ($w = 0; $w < $num_weeks; $w++) {
+            if ($remaining[$w] <= 0.0005) continue;
+            $take = min($amt, $remaining[$w]);
+            $allocated[$w] += $take;
+            $remaining[$w] -= $take;
+            $amt -= $take;
+            $entrada = $p;
+            $entrada['aplicado'] = $take;
+            $pagos_semana[$w][] = $entrada;
+            if ($amt <= 0.0005) break;
+        }
+        if ($amt > 0.0005) $saldo_favor += $amt;
+    }
+
+    // Otros ingresos por semana (no descuentan deuda, solo informativos).
+    $wnp = array_fill(0, $num_weeks, array());
+    foreach ($no_alq_payments as $p) {
+        for ($w = 0; $w < $num_weeks; $w++) {
+            $ps = ($w === 0) ? $entry_date : $due_dates[$w - 1];
+            $pe = $due_dates[$w];
+            $ok = ($p['date'] >= $ps);
+            if ($w < $num_weeks - 1) {
+                $ok = $ok && ($p['date'] < $pe);
+            } else {
+                $ok = $ok && ($p['date'] <= $pe);
+            }
+            if ($ok) {
+                $wnp[$w][] = $p;
+                break;
+            }
+        }
+    }
+
+    $weeks = array();
+    $running = 0.0;
+    $debe_total = 0.0;
+    $pagado_total = 0.0;
+    $resumen_meses = array();
+    $deuda_vencida = 0.0;
+    $pendiente_actual = 0.0;
+
+    for ($w = 0; $w < $num_weeks; $w++) {
+        $ps = ($w === 0) ? $entry_date : $due_dates[$w - 1];
+        $pe = $due_dates[$w];
+        $debe = $precio_por_semana[$w];
+        $paid = $allocated[$w];
+        $diff = $debe - $paid;
+        $running += $diff;
+        $es_actual = (strtotime($pe . ' 00:00:00') > $today_ts);
+
+        $debe_total += $debe;
+        $pagado_total += $paid;
+
+        if ($es_actual) {
+            $pendiente_actual = $diff > 0 ? $diff : 0.0;
+        } else {
+            $deuda_vencida += $diff;
+        }
+
+        $weeks[] = array(
+            'n' => $w + 1,
+            'ps' => $ps,
+            'pe' => $pe,
+            'due' => $pe,
+            'debe' => $debe,
+            'pagos' => $pagos_semana[$w],
+            'pagado' => $paid,
+            'diff' => $diff,
+            'running' => $running,
+            'otros' => $wnp[$w],
+            'es_actual' => $es_actual,
+        );
+
+        $mes = substr($pe, 0, 7);
+        if (!isset($resumen_meses[$mes])) {
+            $resumen_meses[$mes] = array('debe' => 0.0, 'pagado' => 0.0, 'diff' => 0.0, 'running' => 0.0);
+        }
+        $resumen_meses[$mes]['debe'] += $debe;
+        $resumen_meses[$mes]['pagado'] += $paid;
+        $resumen_meses[$mes]['diff'] += $diff;
+        $resumen_meses[$mes]['running'] = $running;
+    }
+
+    $no_alq_total = 0.0;
+    foreach ($no_alq_payments as $p) $no_alq_total += $p['amount'];
+
+    // Precios distintos usados (para mostrar en cabecera, p. ej. "130€ → 150€").
+    $precios = array();
+    foreach ($precio_por_semana as $pr) {
+        if ($pr > 0) $precios[(string)$pr] = (float)$pr;
+    }
+    $precios = array_values($precios);
+    sort($precios);
+
+    return array(
+        'precio' => $precio,
+        'precios' => $precios,
+        'entry_date' => $entry_date,
+        'first_due_date' => $first_due_date,
+        'due_weekday_label' => (string)$pi['due_weekday_label'],
+        'weeks' => $weeks,
+        'debe_total' => $debe_total,
+        'pagado_total' => $pagado_total,
+        'deuda_total' => $debe_total - $pagado_total,
+        'deuda_vencida' => $deuda_vencida,
+        'pendiente_actual' => $pendiente_actual,
+        'saldo_favor' => $saldo_favor,
+        'no_alq_total' => $no_alq_total,
+        'dudosos' => $dudosos,
+        'num_weeks' => $num_weeks,
+        'resumen_meses' => $resumen_meses,
+    );
+}
+
+/**
+ * Filtra las semanas de un informe de deuda por rango de fechas (para visualización).
+ * El total de deuda es histórico completo; el rango solo recorta el detalle semanal.
+ */
+function jostal_weeks_en_rango($weeks, $desde, $hasta) {
+    $desde = trim((string)$desde);
+    $hasta = trim((string)$hasta);
+    if ($desde === '' && $hasta === '') return $weeks;
+
+    $desdeTs = $desde !== '' ? strtotime($desde . ' 00:00:00') : null;
+    $hastaTs = $hasta !== '' ? strtotime($hasta . ' 00:00:00') : null;
+
+    $out = array();
+    foreach ($weeks as $week) {
+        $dueTs = strtotime($week['due'] . ' 00:00:00');
+        if ($desdeTs !== null && $dueTs < $desdeTs) continue;
+        if ($hastaTs !== null && $dueTs > $hastaTs) continue;
+        $out[] = $week;
+    }
+    return $out;
+}
+
+/**
+ * Construye el texto plano del informe de deuda para enviar por WhatsApp.
+ */
+function jostal_texto_deuda($nombre, $data, $desde = '', $hasta = '') {
+    $nombre = trim((string)$nombre);
+    $precios = (array)($data['precios'] ?? array());
+    $precioLabel = count($precios) > 0 ? implode('€ → ', array_unique(array_map(function ($p) { return (int)round((float)$p); }, $precios))) . '€' : (string)round((float)($data['precio'] ?? 0));
+    $deuda = (float)($data['deuda_vencida'] ?? $data['deuda_total'] ?? 0);
+    $saldoFavor = (float)($data['saldo_favor'] ?? 0);
+    $weeks = jostal_weeks_en_rango((array)($data['weeks'] ?? array()), $desde, $hasta);
+
+    $lineas = array();
+    $lineas[] = '🏠 *Informe de alquiler*';
+    if ($nombre !== '') $lineas[] = '👤 ' . $nombre;
+    $lineas[] = '💰 ' . $precioLabel . '/sem · ' . count($weeks) . ' semana(s)';
+
+    foreach ($weeks as $w) {
+        $debe = (float)$w['debe'];
+        $pagado = (float)$w['pagado'];
+        $run = (float)$w['running'];
+        $dif = (float)$w['diff'];
+        $esActual = !empty($w['es_actual']);
+
+        if ($esActual) {
+            $estado = $dif > 0.005 ? 'pendiente ' . euro($dif) : 'al día esta semana';
+            $lineas[] = '· S' . $w['n'] . ' (' . jostal_fecha_corta($w['ps']) . '–' . jostal_fecha_corta($w['pe']) . ') *en curso*: pagó ' . euro($pagado) . '/' . euro($debe) . ' → ' . $estado;
+        } else {
+            if ($dif > 0.005) {
+                $estado = 'debe ' . euro($dif);
+            } else {
+                $estado = 'ok';
+            }
+            $lineas[] = '· S' . $w['n'] . ' (' . jostal_fecha_corta($w['ps']) . '–' . jostal_fecha_corta($w['pe']) . '): pagó ' . euro($pagado) . '/' . euro($debe) . ' → ' . $estado . ($run > 0.005 ? ' · acum ' . euro($run) : '');
+        }
+    }
+
+    if ($deuda > 0.005) {
+        $lineas[] = '⚠️ *Debe: ' . euro($deuda) . '*';
+    } elseif ($saldoFavor > 0.005) {
+        $lineas[] = '✅ A favor: ' . euro($saldoFavor);
+    } else {
+        $lineas[] = '✅ Al día';
+    }
+
+    return implode("\n", $lineas);
+}
+
+/** Formatea fecha Y-m-d → d/m. */
+function jostal_fecha_corta($date) {
+    $ts = strtotime((string)$date);
+    return $ts ? date('d/m', $ts) : (string)$date;
+}
+
+/** Formatea clave de mes 'Y-m' → 'mes YYYY' (ej. '2026-05' → 'mayo 2026'). */
+function jostal_mes_label($mesKey) {
+    $ts = strtotime((string)$mesKey . '-01');
+    if (!$ts) return (string)$mesKey;
+    static $m = array(1 => 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre');
+    return $m[(int)date('n', $ts)] . ' ' . date('Y', $ts);
+}
+
+/**
+ * Capacidad máxima de la casa Jostal (plazas disponibles para copar aforo).
+ */
+if (!defined('JOSTAL_CASA_CAPACIDAD')) {
+    define('JOSTAL_CASA_CAPACIDAD', 5);
+}
+
+/**
+ * Número de clientas Jostal que están ahora mismo "en casa" (ocupación actual).
+ */
+function jostal_en_casa_count() {
+    $rows = storage_read('jostal_clientas.json');
+    $count = 0;
+    foreach ((array)$rows as $row) {
+        if (is_array($row) && jostal_clienta_en_casa($row)) {
+            $count++;
+        }
+    }
+    return $count;
+}
+
 
 function lamamibot_girlsconf_base_dir() {
     return '/var/www/html/wasapbot/landing/girlsconf_lamamidef';
@@ -2580,4 +3210,931 @@ function contrato_find_by_token($token) {
 function contrato_clienta_tiene_contrato_firmado($clientaId) {
     $contrato = contrato_find_by_clienta($clientaId);
     return $contrato && ($contrato['estado'] ?? '') === 'firmado';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GPS / Rutas — helpers para la sección de tracking
+// ═══════════════════════════════════════════════════════════════════════════════
+
+define('GPS_FILE', __DIR__ . '/../data/gps_positions.jsonl');
+
+/**
+ * Lee el archivo JSONL de posiciones GPS y devuelve un array.
+ * @param int $days  Días hacia atrás (0 = sin límite).
+ * @return array     Array de posiciones ordenadas por timestamp ascendente.
+ */
+function gps_read_positions($days = 30) {
+    $file = GPS_FILE;
+    if (!file_exists($file)) return array();
+
+    $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if (!$lines) return array();
+
+    $cutoff = $days > 0 ? time() - ($days * 86400) : 0;
+    $positions = array();
+
+    foreach ($lines as $line) {
+        $p = json_decode($line, true);
+        if (!$p || empty($p['ts']) || empty($p['lat']) || empty($p['lng'])) continue;
+        $ts = strtotime($p['ts']);
+        if ($ts === false) continue;
+        if ($days > 0 && $ts < $cutoff) continue;
+        $p['_ts'] = $ts;
+        $positions[] = $p;
+    }
+
+    // Ordenar por timestamp ascendente
+    usort($positions, function ($a, $b) { return $a['_ts'] - $b['_ts']; });
+    return $positions;
+}
+
+/**
+ * Agrupa posiciones por día (YYYY-MM-DD).
+ * @return array  [ '2026-07-22' => [pos1, pos2, ...], ... ]
+ */
+function gps_group_by_day($positions) {
+    $days = array();
+    foreach ($positions as $p) {
+        $date = date('Y-m-d', $p['_ts']);
+        $days[$date][] = $p;
+    }
+    ksort($days);
+    return $days;
+}
+
+/**
+ * Distancia entre dos puntos en metros (fórmula Haversine).
+ */
+function gps_distance_m($lat1, $lng1, $lat2, $lng2) {
+    $r = 6371000; // radio Tierra en metros
+    $dLat = deg2rad($lat2 - $lat1);
+    $dLng = deg2rad($lng2 - $lng1);
+    $a = sin($dLat / 2) * sin($dLat / 2) +
+         cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+         sin($dLng / 2) * sin($dLng / 2);
+    $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+    return $r * $c;
+}
+
+/**
+ * Distancia total de una ruta (secuencia ordenada de posiciones).
+ */
+function gps_route_total_km($positions) {
+    $total = 0;
+    $count = count($positions);
+    for ($i = 1; $i < $count; $i++) {
+        $a = $positions[$i - 1];
+        $b = $positions[$i];
+        $total += gps_distance_m($a['lat'], $a['lng'], $b['lat'], $b['lng']);
+    }
+    return round($total / 1000, 1);
+}
+
+/**
+ * Última posición registrada.
+ * @return array|null
+ */
+function gps_last_position() {
+    $positions = gps_read_positions(7);
+    return !empty($positions) ? end($positions) : null;
+}
+
+/**
+ * Formatea minutos a texto legible.
+ */
+function gps_fmt_duration($minutes) {
+    if ($minutes < 1) return 'menos de 1 min';
+    if ($minutes < 60) return round($minutes) . ' min';
+    $h = floor($minutes / 60);
+    $m = round(fmod($minutes, 60));
+    if ($m === 0) return $h . 'h';
+    return $h . 'h ' . $m . 'min';
+}
+
+/**
+ * Resumen KPI para las tarjetas superiores.
+ * @param array  $positions  Todas las posiciones.
+ * @param string $liteUser   Si se pasa, la última posición del coche se filtra por este usuario.
+ */
+function gps_kpi_summary($positions, $liteUser = null) {
+    if (empty($positions)) {
+        return array(
+            'last'             => null,
+            'last_ago'         => '—',
+            'last_user'        => '',
+            'last_active'      => null,
+            'last_active_ago'  => '—',
+            'last_active_user' => '',
+            'today_km'         => 0,
+            'today_trips'      => 0,
+            'today_positions'  => 0,
+            'week_km'          => 0,
+            'week_trips'       => 0,
+            'week_days'        => 0,
+            'week_avg_km'      => 0,
+        );
+    }
+
+    // ── Última posición del coche (solo lite, la que importa para el aparcamiento) ──
+    $lastLite     = null;
+    $lastLiteAgo  = '—';
+    $lastLiteUser = '';
+    if ($liteUser !== null) {
+        $litePositions = array_values(array_filter($positions, function ($p) use ($liteUser) {
+            return ($p['user'] ?? '') === $liteUser;
+        }));
+        if (!empty($litePositions)) {
+            $lastLite     = end($litePositions);
+            $lastLiteAgo  = gps_fmt_duration((time() - $lastLite['_ts']) / 60);
+            $lastLiteUser = $liteUser;
+        }
+    }
+    // Si no hay lite, usamos la última de cualquier cuenta como fallback
+    if ($lastLite === null) {
+        $lastLite     = end($positions);
+        $lastLiteAgo  = gps_fmt_duration((time() - $lastLite['_ts']) / 60);
+        $lastLiteUser = $lastLite['user'] ?? '';
+    }
+
+    // ── Última posición de CUALQUIER cuenta (última activa) ──
+    $lastActive     = end($positions);
+    $lastActiveAgo  = gps_fmt_duration((time() - $lastActive['_ts']) / 60);
+    $lastActiveUser = $lastActive['user'] ?? 'unknown';
+
+    $today        = date('Y-m-d');
+    $todayPos     = array();
+    $todayMarkers = array(); // solo las posiciones "enviadas" (debounced), una por poll
+
+    // Ventana de 7 días para la semana
+    $weekStart = time() - 7 * 86400;
+
+    $weekPos      = array();
+    $weekDaySet   = array();
+
+    foreach ($positions as $p) {
+        $d = date('Y-m-d', $p['_ts']);
+        // Hoy
+        if ($d === $today) {
+            $todayPos[] = $p;
+            // Solo guardamos un punto por minuto (el último de cada minuto) para la ruta
+            $minute = date('Y-m-d H:i', $p['_ts']);
+            $todayMarkers[$minute] = $p;
+        }
+        // Semana (últimos 7 días naturales)
+        if ($p['_ts'] >= $weekStart) {
+            $weekPos[] = $p;
+            $weekDaySet[$d] = true;
+        }
+    }
+
+    $todayMarkers = array_values($todayMarkers);
+
+    // Contar trayectos: un trayecto = secuencia de movimiento (>500m entre puntos consecutivos)
+    $todayTrips = gps_count_trips($todayMarkers);
+    $weekTrips  = gps_count_trips($weekPos);
+
+    $weekDays = count($weekDaySet);
+    $weekKm   = gps_route_total_km($weekPos);
+
+    return array(
+        'last'             => $lastLite,
+        'last_ago'         => $lastLiteAgo,
+        'last_user'        => $lastLiteUser,
+        'last_active'      => $lastActive,
+        'last_active_ago'  => $lastActiveAgo,
+        'last_active_user' => $lastActiveUser,
+        'today_km'         => gps_route_total_km($todayMarkers),
+        'today_trips'      => $todayTrips,
+        'today_positions'  => count($todayPos),
+        'week_km'          => $weekKm,
+        'week_trips'       => $weekTrips,
+        'week_days'        => $weekDays,
+        'week_avg_km'      => $weekDays > 0 ? round($weekKm / $weekDays, 1) : 0,
+    );
+}
+
+/**
+ * Cuenta trayectos: cada vez que hay un salto de >500m entre puntos consecutivos
+ * se considera un nuevo trayecto.
+ */
+function gps_count_trips($positions) {
+    $trips = 0;
+    $started = false;
+    $count = count($positions);
+    for ($i = 1; $i < $count; $i++) {
+        $a = $positions[$i - 1];
+        $b = $positions[$i];
+        $d = gps_distance_m($a['lat'], $a['lng'], $b['lat'], $b['lng']);
+        if ($d > 500) {
+            if ($started) $trips++;
+            $started = true;
+        }
+    }
+    // Contar el último trayecto activo
+    if ($started) $trips++;
+    return $trips;
+}
+
+/**
+ * Genera eventos de timeline para un día.
+ * Cada evento tiene: tipo, hora, descripción, coordenadas.
+ */
+function gps_timeline_for_day($dayPositions) {
+    $events = array();
+    $count  = count($dayPositions);
+    if ($count === 0) return $events;
+
+    $MOVING_THRESHOLD = 100;   // metros: si avanza >100m en el intervalo, está en movimiento
+    $STOP_MIN_MINUTES = 3;     // minutos mínimos parado para considerarlo "aparcado"
+
+    $state     = 'unknown'; // 'moving' | 'stopped'
+    $tripStart = null;
+    $tripStartIdx = null;   // índice en $dayPositions donde empezó el trayecto
+    $stopStart = null;
+    $prev      = null;
+
+    foreach ($dayPositions as $idx => $p) {
+        if ($prev === null) {
+            $prev = $p;
+            continue;
+        }
+
+        $d = gps_distance_m($prev['lat'], $prev['lng'], $p['lat'], $p['lng']);
+        $dt = ($p['_ts'] - $prev['_ts']) / 60; // minutos entre tomas
+
+        if ($d > $MOVING_THRESHOLD) {
+            // En movimiento
+            if ($state !== 'moving') {
+                // Acabamos de empezar a movernos
+                if ($stopStart !== null) {
+                    $events[] = array(
+                        'type'     => 'stop_end',
+                        'ts'       => $prev['_ts'],
+                        'time'     => date('H:i', $prev['_ts']),
+                        'lat'      => $prev['lat'],
+                        'lng'      => $prev['lng'],
+                        'duration' => ($prev['_ts'] - $stopStart['_ts']) / 60,
+                        'label'    => 'Aparcado',
+                    );
+                    $stopStart = null;
+                }
+                $tripStart    = $prev;
+                $tripStartIdx = $idx - 1; // $prev está en idx-1
+                $state        = 'moving';
+            }
+        } else {
+            // Parado
+            if ($state === 'moving' && $tripStart !== null) {
+                // Acabamos de parar — recoger ruta completa
+                $tripDist = gps_distance_m($tripStart['lat'], $tripStart['lng'], $prev['lat'], $prev['lng']);
+                $tripTime = ($prev['_ts'] - $tripStart['_ts']) / 60;
+
+                // Extraer puntos intermedios del trayecto
+                $routePoints = array();
+                for ($ri = $tripStartIdx; $ri <= $idx; $ri++) {
+                    $routePoints[] = array(
+                        'lat' => (float)$dayPositions[$ri]['lat'],
+                        'lng' => (float)$dayPositions[$ri]['lng'],
+                    );
+                }
+
+                $events[] = array(
+                    'type'      => 'trip_end',
+                    'ts'        => $prev['_ts'],
+                    'time'      => date('H:i', $prev['_ts']),
+                    'lat'       => $prev['lat'],
+                    'lng'       => $prev['lng'],
+                    'start_lat' => $tripStart['lat'],
+                    'start_lng' => $tripStart['lng'],
+                    'end_lat'   => $prev['lat'],
+                    'end_lng'   => $prev['lng'],
+                    'duration'  => $tripTime,
+                    'distance'  => round($tripDist / 1000, 1),
+                    'label'     => 'Trayecto',
+                    'route_points' => $routePoints,
+                );
+                $tripStart    = null;
+                $tripStartIdx = null;
+                $stopStart    = $prev;
+                $state        = 'stopped';
+            } elseif ($state !== 'stopped') {
+                $stopStart = $prev;
+                $state     = 'stopped';
+            }
+        }
+        $prev = $p;
+    }
+
+    // Cerrar estado final
+    if ($state === 'moving' && $tripStart !== null) {
+        $tripDist = gps_distance_m($tripStart['lat'], $tripStart['lng'], $prev['lat'], $prev['lng']);
+        $tripTime = ($prev['_ts'] - $tripStart['_ts']) / 60;
+
+        // Extraer puntos intermedios
+        $routePoints = array();
+        for ($ri = $tripStartIdx; $ri < $count; $ri++) {
+            $routePoints[] = array(
+                'lat' => (float)$dayPositions[$ri]['lat'],
+                'lng' => (float)$dayPositions[$ri]['lng'],
+            );
+        }
+
+        $events[] = array(
+            'type'      => 'trip_end',
+            'ts'        => $prev['_ts'],
+            'time'      => date('H:i', $prev['_ts']),
+            'lat'       => $prev['lat'],
+            'lng'       => $prev['lng'],
+            'start_lat' => $tripStart['lat'],
+            'start_lng' => $tripStart['lng'],
+            'end_lat'   => $prev['lat'],
+            'end_lng'   => $prev['lng'],
+            'duration'  => $tripTime,
+            'distance'  => round($tripDist / 1000, 1),
+            'label'     => 'Trayecto',
+            'route_points' => $routePoints,
+        );
+    }
+
+    return $events;
+}
+
+/**
+ * Genera URL de Google Maps para unas coordenadas.
+ */
+function gps_maps_url($lat, $lng) {
+    return 'https://www.google.com/maps?q=' . $lat . ',' . $lng;
+}
+
+/**
+ * Genera URL de Google Maps directions desde origen a destino.
+ */
+function gps_maps_directions_url($fromLat, $fromLng, $toLat, $toLng) {
+    return 'https://www.google.com/maps/dir/' . $fromLat . ',' . $fromLng . '/' . $toLat . ',' . $toLng;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Detección de lugares (Fase 2)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Detecta lugares frecuentes a partir de posiciones GPS usando clustering
+ * online + puntuación por patrones horarios.
+ *
+ * @param array $positions  Array de posiciones (con _ts, lat, lng).
+ * @param int   $min_points Mínimo de puntos para que un clúster sea considerado lugar.
+ * @param int   $radius_m   Radio en metros para agrupar posiciones.
+ * @return array            Lista de lugares con etiqueta, coordenadas, stats.
+ */
+function gps_detect_places($positions, $min_points = 3, $radius_m = 100) {
+    if (count($positions) < $min_points) return array();
+
+    // ── Paso 1: Clustering online (O(n × k)) ──
+    $clusters = array(); // cada cluster: [points => [...], center_lat, center_lng]
+
+    foreach ($positions as $p) {
+        $assigned = false;
+        foreach ($clusters as &$c) {
+            $d = gps_distance_m($c['center_lat'], $c['center_lng'], $p['lat'], $p['lng']);
+            if ($d < $radius_m) {
+                $c['points'][] = $p;
+                // Recalcular centroide como media
+                $sumLat = 0; $sumLng = 0;
+                foreach ($c['points'] as $cp) { $sumLat += $cp['lat']; $sumLng += $cp['lng']; }
+                $n = count($c['points']);
+                $c['center_lat'] = $sumLat / $n;
+                $c['center_lng'] = $sumLng / $n;
+                $assigned = true;
+                break;
+            }
+        }
+        unset($c);
+        if (!$assigned) {
+            $clusters[] = array(
+                'points'     => array($p),
+                'center_lat' => $p['lat'],
+                'center_lng' => $p['lng'],
+            );
+        }
+    }
+
+    // ── Paso 2: Filtrar clústeres con pocos puntos ──
+    $clusters = array_filter($clusters, function ($c) use ($min_points) {
+        return count($c['points']) >= $min_points;
+    });
+    if (empty($clusters)) return array();
+
+    // ── Paso 3: Calcular estadísticas por clúster ──
+    $scored = array();
+    foreach ($clusters as $c) {
+        $pts = $c['points'];
+        $totalMinutes = 0;
+        $nightMinutes = 0;      // 00:00–06:00
+        $weekendMinutes = 0;    // sábado + domingo
+        $daytimeMinutes = 0;    // 08:00–18:00 lun–vie
+        $days = array();
+        $arrivalTimes = array(); // horas de llegada (primer punto de cada visita)
+
+        // Ordenar por timestamp
+        usort($pts, function ($a, $b) { return $a['_ts'] - $b['_ts']; });
+
+        $prev = null;
+        $inVisit = false;
+
+        foreach ($pts as $p) {
+            $h = (int)date('G', $p['_ts']);     // 0-23
+            $w = (int)date('N', $p['_ts']);     // 1=lun … 7=dom
+            $d = date('Y-m-d', $p['_ts']);
+            $days[$d] = true;
+
+            // Acumular minutos entre puntos consecutivos dentro del clúster
+            if ($prev !== null) {
+                $gap = ($p['_ts'] - $prev['_ts']) / 60;
+                if ($gap > 0 && $gap < 120) { // ignorar gaps >2h (no es tiempo real en el lugar)
+                    $totalMinutes += $gap;
+                    if ($h >= 0 && $h < 6)  $nightMinutes += $gap;
+                    if ($w >= 6)             $weekendMinutes += $gap;
+                    if ($h >= 8 && $h < 18 && $w <= 5) $daytimeMinutes += $gap;
+
+                    // Detectar llegadas: gap > 5min desde el punto anterior
+                    if (!$inVisit && $gap > 5) {
+                        $arrivalTimes[] = $h + ((int)date('i', $p['_ts']) / 60);
+                        $inVisit = true;
+                    }
+                    if ($gap > 60) $inVisit = false; // break >1h = nueva visita
+                }
+            }
+            $prev = $p;
+        }
+
+        // Regularidad horaria: desviación estándar de las horas de llegada
+        $regularity = 0;
+        if (count($arrivalTimes) >= 3) {
+            $avg = array_sum($arrivalTimes) / count($arrivalTimes);
+            $variance = 0;
+            foreach ($arrivalTimes as $t) { $variance += pow($t - $avg, 2); }
+            $stdDev = sqrt($variance / count($arrivalTimes));
+            // Regularidad alta = desviación baja → puntuación alta
+            // Si stdDev < 0.5h → muy regular, si >2h → nada regular
+            $regularity = max(0, 10 - ($stdDev * 5));
+        }
+
+        $scored[] = array(
+            'center_lat'      => round($c['center_lat'], 6),
+            'center_lng'      => round($c['center_lng'], 6),
+            'points'          => count($pts),
+            'days'            => count($days),
+            'total_hours'     => round($totalMinutes / 60, 1),
+            'night_hours'     => round($nightMinutes / 60, 1),
+            'weekend_hours'   => round($weekendMinutes / 60, 1),
+            'daytime_hours'   => round($daytimeMinutes / 60, 1),
+            'regularity'      => round($regularity, 1),
+            'arrival_count'   => count($arrivalTimes),
+            'last_ts'         => $prev ? $prev['_ts'] : time(),
+            // Scores
+            'score_casa'      => 0,
+            'score_trabajo'   => 0,
+            'label'           => '',
+            'confidence'      => '',
+        );
+    }
+
+    // ── Paso 4: Cargar nombres personalizados y ocultos ──
+    $custom = gps_get_place_names();
+    $hidden = gps_get_hidden_places();
+
+    // ── Paso 5: Fuzzy matching (nombres → clústeres) ──
+    // Iteramos NOMBRES, no clústeres. Cada nombre busca su clúster más cercano.
+    // Así un nombre siempre cae en el clúster que realmente le corresponde
+    // y el clúster B no puede "robar" el nombre del clúster A.
+    $FUZZY_R = 100;  // mismo radio que el clustering
+    $namedPlaces      = array();
+    $assignedIndices  = array();  // índices de clústeres ya emparejados
+
+    foreach ($custom as $key => $name) {
+        if (trim($name) === '') continue;
+        $parts = explode(',', $key);
+        if (count($parts) !== 2) continue;
+        $savedLat = (float)$parts[0];
+        $savedLng = (float)$parts[1];
+
+        // Buscar el clúster MÁS CERCANO a este nombre guardado
+        $bestIdx  = -1;
+        $bestDist = $FUZZY_R;
+        foreach ($scored as $idx => $s) {
+            if (isset($assignedIndices[$idx])) continue;
+            $dist = gps_distance_m($savedLat, $savedLng, $s['center_lat'], $s['center_lng']);
+            if ($dist < $bestDist) {
+                $bestDist = $dist;
+                $bestIdx  = $idx;
+            }
+        }
+
+        if ($bestIdx >= 0) {
+            $scored[$bestIdx]['label']       = $name;
+            $scored[$bestIdx]['confidence']  = 'personalizada';
+            $scored[$bestIdx]['score_casa']  = 0;
+            $scored[$bestIdx]['score_trabajo'] = 0;
+            $assignedIndices[$bestIdx] = true;
+            $namedPlaces[] = $scored[$bestIdx];
+        }
+    }
+
+    // Los no emparejados → pasan a auto-etiquetado
+    $unlabeled      = array();
+    $hasCustomCasa  = false;
+    foreach ($scored as $idx => $s) {
+        if (isset($assignedIndices[$idx])) {
+            if ($s['label'] === 'Casa') $hasCustomCasa = true;
+            continue;
+        }
+        $unlabeled[] = $s;
+    }
+    if (!empty($unlabeled)) {
+        foreach ($unlabeled as &$s) {
+            $s['score_casa']    = $s['night_hours'] * 3 + $s['weekend_hours'] * 2 + $s['total_hours'] * 0.5;
+            $s['score_trabajo'] = $s['daytime_hours'] * 3 + $s['regularity'] * 2 + $s['total_hours'] * 0.3;
+        }
+        unset($s);
+
+        if (!$hasCustomCasa) {
+            // Determinar casa: mayor score_casa
+            usort($unlabeled, function ($a, $b) { return $b['score_casa'] <=> $a['score_casa']; });
+            $casaIdx = 0;
+            $unlabeled[0]['label'] = '🏠 Casa';
+        } else {
+            usort($unlabeled, function ($a, $b) { return $b['total_hours'] <=> $a['total_hours']; });
+            $casaIdx = -1; // no hay casa auto-detectada
+        }
+
+        // Determinar trabajo: mayor score_trabajo entre los restantes
+        $bestTrabajoIdx = -1;
+        $bestTrabajoScore = -1;
+        foreach ($unlabeled as $i => $s) {
+            if ($i === $casaIdx) continue;
+            if ($s['score_trabajo'] > $bestTrabajoScore) {
+                $bestTrabajoScore = $s['score_trabajo'];
+                $bestTrabajoIdx = $i;
+            }
+        }
+
+        if ($bestTrabajoIdx >= 0 && $unlabeled[$bestTrabajoIdx]['daytime_hours'] >= 3 && $unlabeled[$bestTrabajoIdx]['days'] >= 2) {
+            $unlabeled[$bestTrabajoIdx]['label'] = '🏢 Trabajo';
+        }
+
+        // El resto: 📍 Lugar N
+        $lugarN = 1;
+        foreach ($unlabeled as $i => &$s) {
+            if ($s['label'] === '') {
+                $s['label'] = '📍 Lugar ' . $lugarN;
+                $lugarN++;
+            }
+            if ($s['days'] >= 10 && $s['total_hours'] >= 50) {
+                $s['confidence'] = 'alta';
+            } elseif ($s['days'] >= 4 && $s['total_hours'] >= 10) {
+                $s['confidence'] = 'media';
+            } elseif ($s['days'] >= 2) {
+                $s['confidence'] = 'baja';
+            } else {
+                $s['confidence'] = 'mínima';
+            }
+        }
+        unset($s);
+    }
+
+    // ── Paso 7: Fusionar ──
+    $scored = array_merge($namedPlaces, $unlabeled);
+
+    // ── Paso 8: Filtrar lugares ocultos y obsoletos ──
+    $now = time();
+    $scored = array_filter($scored, function ($s) use ($now, $hidden, $FUZZY_R) {
+        // Lugares con nombre personalizado: siempre se mantienen
+        if ($s['confidence'] === 'personalizada') return true;
+        // Filtrar lugares ocultos manualmente (fuzzy match)
+        foreach ($hidden as $hkey => $dummy) {
+            $parts = explode(',', $hkey);
+            if (count($parts) !== 2) continue;
+            $dist = gps_distance_m($s['center_lat'], $s['center_lng'], (float)$parts[0], (float)$parts[1]);
+            if ($dist < $FUZZY_R) return false; // oculto por el usuario
+        }
+        // Recencia
+        $daysAgo = round(($now - $s['last_ts']) / 86400, 1);
+        if ($s['days'] <= 2 && $daysAgo > 14) return false;
+        if ($daysAgo > 60) return false;
+        return true;
+    });
+
+    // Reordenar por total_hours descendente
+    usort($scored, function ($a, $b) { return $b['total_hours'] <=> $a['total_hours']; });
+
+    return $scored;
+}
+
+/**
+ * Busca el lugar más cercano a unas coordenadas (para enriquecer timeline).
+ * @return array|null  El lugar o null si no hay ninguno a <200m.
+ */
+function gps_match_position_to_place($lat, $lng, $places, $max_distance_m = 200) {
+    $best = null;
+    $bestDist = $max_distance_m;
+    foreach ($places as $place) {
+        $d = gps_distance_m($lat, $lng, $place['center_lat'], $place['center_lng']);
+        if ($d < $bestDist) {
+            $bestDist = $d;
+            $best = $place;
+        }
+    }
+    return $best;
+}
+
+/**
+ * Carga nombres personalizados de lugares desde settings.json.
+ * @return array  [ '39.833,-0.192' => 'Casa', ... ]
+ */
+function gps_get_place_names() {
+    $settings = storage_read('settings.json');
+    return isset($settings['rutas_place_names']) && is_array($settings['rutas_place_names'])
+        ? $settings['rutas_place_names']
+        : array();
+}
+
+/**
+ * Carga lugares ocultos manualmente desde settings.json.
+ * @return array  [ '39.833,-0.192' => true, ... ]
+ */
+function gps_get_hidden_places() {
+    $settings = storage_read('settings.json');
+    return isset($settings['rutas_hidden_places']) && is_array($settings['rutas_hidden_places'])
+        ? $settings['rutas_hidden_places']
+        : array();
+}
+
+/**
+ * Calcula cuántos días distintos de datos hay para un usuario concreto.
+ */
+function gps_days_for_user($positions, $user = null) {
+    $days = array();
+    foreach ($positions as $p) {
+        if ($user !== null && ($p['user'] ?? '') !== $user) continue;
+        $days[date('Y-m-d', $p['_ts'])] = true;
+    }
+    return count($days);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Curiosidades y estadísticas (Fase 3)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Calcula rachas: días consecutivos yendo a un lugar (ej: trabajo).
+ * @return array  [ 'current' => N, 'longest' => N, 'place' => '🏢 Trabajo' ]
+ */
+function gps_calculate_streaks($positions, $places) {
+    if (empty($places) || empty($positions)) {
+        return array('current' => 0, 'longest' => 0, 'place' => null);
+    }
+
+    // Buscar el lugar "Trabajo" (o el segundo lugar si no hay etiquetado como trabajo)
+    $workPlace = null;
+    foreach ($places as $p) {
+        if (strpos($p['label'], 'Trabajo') !== false || strpos($p['label'], '🏢') !== false) {
+            $workPlace = $p;
+            break;
+        }
+    }
+    if (!$workPlace && count($places) >= 2) {
+        $workPlace = $places[1]; // segundo lugar más frecuente = probable trabajo
+    }
+    if (!$workPlace) {
+        return array('current' => 0, 'longest' => 0, 'place' => null);
+    }
+
+    // Días en los que el coche estuvo en ese lugar
+    $grouped = gps_group_by_day($positions);
+    $daysAtPlace = array();
+    foreach ($grouped as $date => $dayPositions) {
+        foreach ($dayPositions as $p) {
+            $d = gps_distance_m($p['lat'], $p['lng'], $workPlace['center_lat'], $workPlace['center_lng']);
+            if ($d < 200) {
+                $daysAtPlace[$date] = true;
+                break;
+            }
+        }
+    }
+
+    $dates = array_keys($daysAtPlace);
+    sort($dates);
+    if (empty($dates)) return array('current' => 0, 'longest' => 0, 'place' => $workPlace['label']);
+
+    // Calcular rachas
+    $current = 0;
+    $longest = 0;
+    $streak = 1;
+    $today = date('Y-m-d');
+    $yesterday = date('Y-m-d', strtotime('-1 day'));
+
+    for ($i = 1; $i < count($dates); $i++) {
+        $prev = $dates[$i - 1];
+        $curr = $dates[$i];
+        $expected = date('Y-m-d', strtotime($prev . ' +1 day'));
+
+        if ($curr === $expected) {
+            $streak++;
+        } else {
+            $longest = max($longest, $streak);
+            $streak = 1;
+        }
+    }
+    $longest = max($longest, $streak);
+
+    // Racha actual: ¿el último día con visita fue ayer u hoy?
+    $lastDate = end($dates);
+    if ($lastDate === $today || $lastDate === $yesterday) {
+        // Contar hacia atrás desde el último día
+        $current = 1;
+        for ($i = count($dates) - 2; $i >= 0; $i--) {
+            $expected = date('Y-m-d', strtotime($dates[$i + 1] . ' -1 day'));
+            if ($dates[$i] === $expected) {
+                $current++;
+            } else {
+                break;
+            }
+        }
+    }
+
+    return array(
+        'current' => $current,
+        'longest' => $longest,
+        'place'   => $workPlace['label'],
+    );
+}
+
+/**
+ * Comparativa mensual: km de este mes vs mes pasado.
+ * @return array  [ 'this_month_km' => float, 'last_month_km' => float, 'pct_change' => float|null ]
+ */
+function gps_monthly_comparison($positions) {
+    $now         = time();
+    $thisMonth   = date('Y-m', $now);
+    $lastMonth   = date('Y-m', strtotime('-1 month', $now));
+
+    $thisMonthPos = array();
+    $lastMonthPos = array();
+
+    foreach ($positions as $p) {
+        $ym = date('Y-m', $p['_ts']);
+        if ($ym === $thisMonth) {
+            $thisMonthPos[] = $p;
+        } elseif ($ym === $lastMonth) {
+            $lastMonthPos[] = $p;
+        }
+    }
+
+    $thisKm   = gps_route_total_km($thisMonthPos);
+    $lastKm   = gps_route_total_km($lastMonthPos);
+    $pct      = $lastKm > 0 ? round((($thisKm - $lastKm) / $lastKm) * 100) : null;
+
+    $thisTrips = gps_count_trips($thisMonthPos);
+    $lastTrips = gps_count_trips($lastMonthPos);
+
+    return array(
+        'this_month_km'    => $thisKm,
+        'last_month_km'    => $lastKm,
+        'pct_change'       => $pct,
+        'this_month_trips' => $thisTrips,
+        'last_month_trips' => $lastTrips,
+        'this_month_days'  => count(gps_group_by_day($thisMonthPos)),
+        'last_month_days'  => count(gps_group_by_day($lastMonthPos)),
+    );
+}
+
+/**
+ * Detecta las horas punta de llegada/salida a un lugar.
+ * @return array  [ 'avg_arrival' => '08:15', 'avg_departure' => '13:42', 'place' => '🏢 Trabajo' ]
+ */
+function gps_peak_hours($positions, $places) {
+    if (empty($places) || count($places) < 2) return null;
+
+    // Usar el lugar #2 (probable trabajo)
+    $workPlace = null;
+    foreach ($places as $p) {
+        if (strpos($p['label'], 'Trabajo') !== false || strpos($p['label'], '🏢') !== false) {
+            $workPlace = $p;
+            break;
+        }
+    }
+    if (!$workPlace && count($places) >= 2) $workPlace = $places[1];
+    if (!$workPlace) return null;
+
+    $grouped = gps_group_by_day($positions);
+    $arrivals   = array(); // minutos desde medianoche de cada llegada
+    $departures = array();
+
+    foreach ($grouped as $date => $dayPositions) {
+        $inPlace    = false;
+        $arrivedAt  = null;
+
+        for ($i = 1; $i < count($dayPositions); $i++) {
+            $prev = $dayPositions[$i - 1];
+            $curr = $dayPositions[$i];
+
+            $dPrev = gps_distance_m($prev['lat'], $prev['lng'], $workPlace['center_lat'], $workPlace['center_lng']);
+            $dCurr = gps_distance_m($curr['lat'], $curr['lng'], $workPlace['center_lat'], $workPlace['center_lng']);
+
+            if ($dCurr < 200 && !$inPlace) {
+                // Llegada
+                $h = (int)date('G', $curr['_ts']);
+                $m = (int)date('i', $curr['_ts']);
+                $arrivals[] = $h * 60 + $m;
+                $inPlace = true;
+                $arrivedAt = $curr['_ts'];
+            } elseif ($dCurr >= 200 && $inPlace) {
+                // Salida
+                if ($arrivedAt !== null) {
+                    $h = (int)date('G', $prev['_ts']);
+                    $m = (int)date('i', $prev['_ts']);
+                    $departures[] = $h * 60 + $m;
+                }
+                $inPlace = false;
+                $arrivedAt = null;
+            }
+        }
+    }
+
+    if (count($arrivals) < 2 || count($departures) < 2) return null;
+
+    $avgArrival   = round(array_sum($arrivals) / count($arrivals));
+    $avgDeparture = round(array_sum($departures) / count($departures));
+
+    return array(
+        'avg_arrival'    => sprintf('%02d:%02d', floor($avgArrival / 60), $avgArrival % 60),
+        'avg_departure'  => sprintf('%02d:%02d', floor($avgDeparture / 60), $avgDeparture % 60),
+        'arrival_range'  => sprintf('%02d:%02d–%02d:%02d',
+            floor(min($arrivals) / 60), min($arrivals) % 60,
+            floor(max($arrivals) / 60), max($arrivals) % 60),
+        'departure_range'=> sprintf('%02d:%02d–%02d:%02d',
+            floor(min($departures) / 60), min($departures) % 60,
+            floor(max($departures) / 60), max($departures) % 60),
+        'sample_size'    => count($arrivals),
+        'place'          => $workPlace['label'],
+    );
+}
+
+/**
+ * Estadísticas generales de curiosidades.
+ */
+function gps_curiosities($positions, $places) {
+    $streaks     = gps_calculate_streaks($positions, $places);
+    $comparison  = gps_monthly_comparison($positions);
+    $peakHours   = gps_peak_hours($positions, $places);
+
+    // Dato curioso: día con más km
+    $maxKmDay = null;
+    $grouped = gps_group_by_day($positions);
+    foreach ($grouped as $date => $dayPositions) {
+        $km = gps_route_total_km($dayPositions);
+        if ($maxKmDay === null || $km > $maxKmDay['km']) {
+            $maxKmDay = array('date' => $date, 'km' => $km);
+        }
+    }
+
+    // Dato curioso: porcentaje de tiempo en cada lugar
+    $totalHours = 0;
+    $placeHours = array();
+    if (!empty($places)) {
+        foreach ($places as $pl) {
+            $totalHours += $pl['total_hours'];
+        }
+
+        // Tiempo conduciendo = tiempo total entre primer y última posición - tiempo en lugares
+        $firstTs = $positions[0]['_ts'] ?? 0;
+        $lastTs  = end($positions)['_ts'] ?? 0;
+        $totalSpanHours = ($lastTs - $firstTs) / 3600;
+        $drivingHours = max(0, $totalSpanHours - $totalHours);
+
+        foreach ($places as $pl) {
+            $pct = $totalSpanHours > 0 ? round(($pl['total_hours'] / $totalSpanHours) * 100) : 0;
+            $placeHours[] = array(
+                'label'     => $pl['label'],
+                'hours'     => $pl['total_hours'],
+                'pct'       => $pct,
+            );
+        }
+        if ($drivingHours > 0.5) {
+            $placeHours[] = array(
+                'label' => '🚗 Conduciendo',
+                'hours' => round($drivingHours, 1),
+                'pct'   => $totalSpanHours > 0 ? round(($drivingHours / $totalSpanHours) * 100) : 0,
+            );
+        }
+    }
+
+    return array(
+        'streaks'      => $streaks,
+        'comparison'   => $comparison,
+        'peak_hours'   => $peakHours,
+        'max_km_day'   => $maxKmDay,
+        'place_hours'  => $placeHours,
+        'total_days'   => count($grouped),
+    );
 }

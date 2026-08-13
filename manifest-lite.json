@@ -1,0 +1,24 @@
+{
+  "name": "Bienvenido Josué",
+  "short_name": "Josué",
+  "start_url": "/control/index.php?lite=1&page=josue&tab=reproductor",
+  "scope": "/control/",
+  "display": "standalone",
+  "background_color": "#060c16",
+  "theme_color": "#060c16",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,25 +1,67 @@
 <?php
 
-function render_global_ui($page = '') {
+function render_global_ui($page = '', $lite = false) {
     echo '<div id="floatingToast" class="floating-toast"></div>';
     echo '<div id="moneyRain" class="money-rain"></div>';
     echo '<div id="appBackdrop" class="app-backdrop" hidden></div>';
     echo '<div id="voiceCommandBackdrop" class="voice-command-backdrop" hidden></div>';
+    echo '<div id="voiceReminderBanner" class="voice-reminder-banner" hidden>';
+    echo '<span id="voiceReminderText" class="voice-reminder-text">🔔 Recordatorio</span>';
+    echo '<button type="button" id="voiceReminderPlay" class="voice-reminder-play" aria-label="Reproducir recordatorio">🔊</button>';
+    echo '<button type="button" id="voiceReminderClose" class="voice-reminder-close" aria-label="Cerrar">✕</button>';
+    echo '</div>';
     echo '<div id="voiceProcessingOverlay" class="voice-processing-overlay" hidden aria-hidden="true">';
     echo '<div class="voice-processing-card">';
-    echo '<div class="voice-processing-orb"></div>';
-    echo '<div class="voice-processing-title">Maestro procesando solicitud</div>';
-    echo '<div id="voiceProcessingText" class="voice-processing-text">Interpretando tu orden dentro del CRM…</div>';
+    echo '<div class="voice-processing-brain">🧠</div>';
+    echo '<div class="voice-processing-rings">';
+    echo '<div class="voice-processing-ring ring-1"></div>';
+    echo '<div class="voice-processing-ring ring-2"></div>';
+    echo '<div class="voice-processing-ring ring-3"></div>';
+    echo '</div>';
+    echo '<div class="voice-processing-title">Procesando su orden</div>';
+    echo '<div id="voiceProcessingText" class="voice-processing-text">El maestro está pensando…</div>';
     echo '</div>';
     echo '</div>';
     echo '<div class="app-shell-tools">';
     echo '<button type="button" id="mobileMenuToggle" class="app-shell-btn app-shell-btn-mobile" aria-expanded="false" aria-controls="appSidebar">☰ Menú</button>';
+    if (!$lite):
     $avisosCount = count(avisos_get_active());
     $avisosBtnClass = $avisosCount > 0 ? ' app-shell-btn-avisos-active' : '';
     echo '<button type="button" id="mobileAvisosToggle" class="app-shell-btn app-shell-btn-mobile' . $avisosBtnClass . '" aria-expanded="false" aria-controls="avisosPanel">⚠ Avisos' . ($avisosCount > 0 ? ' (' . $avisosCount . ')' : '') . '</button>';
+    endif;
     echo '<button type="button" id="voiceCommandToggleMobile" class="app-shell-btn app-shell-btn-mobile app-shell-btn-mic" data-voice-command-toggle aria-expanded="false" aria-controls="voiceCommandPanel" aria-label="Abrir voz CRM" title="Abrir voz CRM">🎙</button>';
     echo '</div>';
+?>
 
+<?php if ($lite): ?>
+    <?php
+    // ── Lite Bottom Nav: 5 items optimizado para coche ──
+    $currentTab = $_GET['tab'] ?? '';
+    $tabs = [
+        ['type' => 'voice', 'icon' => '💬', 'label' => 'Voz',   'id' => 'liteVoiceBtn', 'active' => false],
+        ['type' => 'link',  'url'  => 'index.php?lite=1&page=josue&tab=reproductor', 'icon' => '▶', 'label' => 'Repro', 'active' => ($page === 'josue' && $currentTab === 'reproductor')],
+        ['type' => 'link',  'url'  => 'index.php?lite=1&page=josue&tab=rutas',       'icon' => '📍', 'label' => 'Rutas', 'active' => ($page === 'josue' && $currentTab === 'rutas')],
+        ['type' => 'link',  'url'  => 'index.php?lite=1&page=dashboard',              'icon' => '📊', 'label' => 'Dash',  'active' => ($page === 'dashboard')],
+        ['type' => 'drop',  'id'   => 'liteMas', 'icon' => '➕', 'label' => 'Más',
+            'active' => (!in_array($page, ['dashboard']) || ($page === 'josue' && $currentTab !== '' && $currentTab !== 'reproductor' && $currentTab !== 'rutas')),
+            'links' => [
+                ['page' => 'josue',       'label' => 'Josué'],
+                ['page' => 'bot-casa',    'label' => 'Bot Casa'],
+                ['page' => 'jostal',      'label' => 'Jostal'],
+                ['page' => 'informes',    'label' => 'Informes'],
+                ['page' => 'gastos',      'label' => 'Gastos'],
+                ['page' => 'lamami',      'label' => 'LaMami'],
+                ['page' => 'casawasap',   'label' => 'Casawasap'],
+                ['page' => 'comercial',   'label' => 'Comercial'],
+                ['page' => 'publicista',  'label' => 'Publicista'],
+                ['page' => 'avisos',      'label' => 'Avisos'],
+                ['page' => 'bots',        'label' => 'Bots'],
+                ['page' => 'logout',      'label' => 'Salir'],
+            ]],
+    ];
+    ?>
+    <?php else: ?>
+    <?php
     // ── Bottom Navigation Bar (mobile only) — 8 items ──
     $tabs = [
         ['type' => 'link',  'page' => 'dashboard', 'icon' => '📊', 'label' => 'Dash',  'active' => in_array($page, ['dashboard'])],
@@ -51,30 +93,38 @@ function render_global_ui($page = '') {
             ]],
         ['type' => 'link',  'page' => 'logout',     'icon' => '🚪', 'label' => 'Salir', 'active' => false],
     ];
-    echo '<nav class="mobile-bottom-nav" id="mobileBottomNav">';
-    foreach ($tabs as $tab) {
-        $cls = $tab['active'] ? ' is-active' : '';
-        if ($tab['type'] === 'link') {
-            echo '<a href="index.php?page=' . e($tab['page']) . '" class="mobile-nav-item' . $cls . '">';
-            echo '<span class="mobile-nav-icon">' . $tab['icon'] . '</span>';
-            echo '<span class="mobile-nav-label">' . $tab['label'] . '</span>';
-            echo '</a>';
-        } else {
-            $dropId = $tab['id'];
-            echo '<button type="button" class="mobile-nav-item mobile-nav-drop' . $cls . '" id="' . $dropId . '" aria-expanded="false" aria-haspopup="true">';
-            echo '<span class="mobile-nav-icon">' . $tab['icon'] . '</span>';
-            echo '<span class="mobile-nav-label">' . $tab['label'] . '</span>';
-            echo '</button>';
-            // Dropdown popover
-            echo '<div class="mobile-nav-popover" id="' . $dropId . 'Pop" hidden>';
-            foreach ($tab['links'] as $link) {
-                echo '<a href="index.php?page=' . e($link['page']) . '" class="mobile-nav-popover-link">' . e($link['label']) . '</a>';
-            }
-            echo '</div>';
-        }
-    }
-    echo '</nav>';
+    ?>
+    <?php endif; ?>
+    <nav class="mobile-bottom-nav" id="mobileBottomNav">
+    <?php foreach ($tabs as $tab_item): ?>
+        <?php $cls = ($tab_item['active'] ?? false) ? ' is-active' : ''; ?>
+        <?php if (($tab_item['type'] ?? '') === 'voice'): ?>
+            <button type="button" class="mobile-nav-item mobile-nav-voice<?= $cls ?>" id="<?= e($tab_item['id']) ?>" data-voice-lite-toggle aria-label="Activar voz" title="Pulsar para hablar">
+                <span class="mobile-nav-icon"><?= $tab_item['icon'] ?></span>
+                <span class="mobile-nav-label"><?= e($tab_item['label']) ?></span>
+            </button>
+        <?php elseif (($tab_item['type'] ?? '') === 'link'): ?>
+            <?php $linkUrl = isset($tab_item['url']) ? $tab_item['url'] : ('index.php?page=' . e($tab_item['page'])); ?>
+            <a href="<?= $linkUrl ?>" class="mobile-nav-item<?= $cls ?>">
+                <span class="mobile-nav-icon"><?= $tab_item['icon'] ?></span>
+                <span class="mobile-nav-label"><?= e($tab_item['label']) ?></span>
+            </a>
+        <?php else: ?>
+            <?php $dropId = $tab_item['id']; ?>
+            <button type="button" class="mobile-nav-item mobile-nav-drop<?= $cls ?>" id="<?= $dropId ?>" aria-expanded="false" aria-haspopup="true">
+                <span class="mobile-nav-icon"><?= $tab_item['icon'] ?></span>
+                <span class="mobile-nav-label"><?= e($tab_item['label']) ?></span>
+            </button>
+            <div class="mobile-nav-popover" id="<?= $dropId ?>Pop" hidden>
+            <?php foreach ($tab_item['links'] as $link): ?>
+                <a href="index.php?<?= $lite ? 'lite=1&amp;' : '' ?>page=<?= e($link['page']) ?>" class="mobile-nav-popover-link"><?= e($link['label']) ?></a>
+            <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    <?php endforeach; ?>
+    </nav>
 
+    <?php
     echo '<section id="voiceCommandPanel" class="voice-command-panel" hidden aria-hidden="true">';
     echo '<div class="voice-command-head">';
     echo '<div>';
@@ -87,9 +137,13 @@ function render_global_ui($page = '') {
     echo '<div id="voiceCommandSupport" class="voice-command-support">Comprobando reconocimiento de voz…</div>';
     echo '<div class="voice-command-actions">';
     echo '<button type="button" id="voiceStartButton" class="btn-primary voice-command-main-btn">🎙 Escuchar ahora</button>';
+    echo '<button type="button" id="voiceModoEurekaBtn" class="voice-modo-eureka-btn" aria-label="Activar Modo Eureka" title="Activar Modo Eureka: todo lo que digas se guarda como eureka">💡 Modo Eureka</button>';
+    echo '<button type="button" id="voiceTtsToggle" class="voice-tts-toggle active" aria-label="Activar/desactivar voz" title="Voz activada - clic para silenciar">🔊</button>';
     echo '<button type="button" id="voiceStopButton" class="voice-command-secondary-btn" disabled>■ Parar</button>';
     echo '<button type="button" id="voiceClearButton" class="voice-command-secondary-btn">Limpiar</button>';
     echo '</div>';
+
+    echo '<div id="voiceModoEurekaStatus" class="voice-modo-eureka-status"></div>';
 
     echo '<div class="field full">';
     echo '<label for="voiceCommandInput">Texto de la orden</label>';
@@ -108,7 +162,22 @@ function render_global_ui($page = '') {
     echo '<div id="voiceCommandResponse" class="voice-command-response" aria-live="polite"></div>';
     echo '</div>';
     echo '</section>';
+
+    // ── Jefry Whiteboard Overlay ──
+    echo '<div id="jefryWhiteboardOverlay" class="jefry-whiteboard-overlay" hidden aria-hidden="true">';
+    echo '<div class="jefry-whiteboard-card">';
+    echo '<div class="jefry-whiteboard-toolbar" id="jefryWhiteboardToolbar">';
+    echo '<span id="jefryWhiteboardTitle" class="jefry-whiteboard-title"></span>';
+    echo '<button type="button" class="jefry-whiteboard-close" aria-label="Cerrar pizarra">✕</button>';
+    echo '</div>';
+    echo '<div id="jefryWhiteboardContent" class="jefry-whiteboard-content"></div>';
+    echo '<div class="jefry-whiteboard-progress" id="jefryWhiteboardProgress" hidden>';
+    echo '<div class="jefry-whiteboard-progress-bar" id="jefryWhiteboardProgressBar"></div>';
+    echo '</div>';
+    echo '</div>';
+    echo '</div>';
 }
+
 
 function render_flash() {
     $flash = get_flash();
@@ -270,6 +339,12 @@ function render_publicista_strategy_option_detail($option, $isDefault = false) {
 }
 
 function render_avisos_panel() {
+    // En modo lite (coche) no mostrar avisos — distraen al conductor
+    if (isset($_GET['lite']) && $_GET['lite'] === '1') {
+        echo '<section id="avisosPanel" class="panel panel-space avisos-panel" hidden></section>';
+        return;
+    }
+
     $avisos = avisos_get_active();
     if (empty($avisos)) {
         // Always render panel so JS toggle works even with zero avisos
@@ -323,14 +398,21 @@ function render_avisos_panel() {
         echo '</div>';
     }
 
-    if ($newCount > 0) {
+    $totalActive = count($avisos);
+    if ($totalActive > 0) {
+        $isDismiss = ($newCount === 0);
+        $btnLabel = $isDismiss
+            ? 'Descartar ' . e((string)$totalActive) . ' avisos leídos'
+            : 'Marcar ' . e((string)$newCount) . ' nuevos como leídos';
+        $btnScope = $isDismiss ? 'active_all' : 'active_unread';
+
         echo '<div class="aviso-actions" style="margin-top:10px;">';
         echo '<form method="post" class="inline-form js-mark-all-read">';
         echo '<input type="hidden" name="action" value="mark_avisos_read">';
-        echo '<input type="hidden" name="scope" value="active_unread">';
+        echo '<input type="hidden" name="scope" value="' . e($btnScope) . '">';
         echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
         echo '<input type="hidden" name="redirect" value="' . e($_SERVER['REQUEST_URI'] ?? 'index.php?page=dashboard') . '">';
-        echo '<button class="btn-secondary-mini">Marcar ' . e((string)$newCount) . ' nuevos como leídos</button>';
+        echo '<button class="btn-secondary-mini">' . $btnLabel . '</button>';
         echo '</form>';
         echo '</div>';
     }
@@ -563,8 +645,6 @@ function render_publicista_page() {
     $accountsUnlocked = !empty($_SESSION['publicista_accounts_unlocked']);
 
     page_header('Publicista', 'Crea productos publicitarios, calcula estrategia, gestiona cuentas, genera campañas y ejecuta la automatización disponible.');
-
-    publicista_render_intro_guide_panel();
 
     echo '<section class="panel panel-space">';
     echo '<div class="subtabs">';
@@ -2577,22 +2657,35 @@ function render_publicista_crear_perfiles_page($embedded = false) {
             echo '<div class="field-help">Modelos Pollo.ai para generación de imágenes vía texto. Usa la cookie de sesión guardada en ConfigM.</div>';
             echo '</div>';
 
-            // ---- Info cookie Pollo.ai (se muestra al elegir modelo Pollo) ----
-            $polloDays = function_exists('publicista_pollo_cookie_days_remaining') ? publicista_pollo_cookie_days_remaining() : -1;
-            $polloExpires = function_exists('publicista_pollo_cookie_expires') ? publicista_pollo_cookie_expires() : '';
-            if ($polloDays > 30) { $polloBadge = 'OK'; $polloColor = '#059669'; }
-            elseif ($polloDays > 7) { $polloBadge = 'Aviso: menos de 1 mes'; $polloColor = '#d97706'; }
-            elseif ($polloDays > 0) { $polloBadge = 'URGENTE: menos de 1 semana'; $polloColor = '#dc2626'; }
-            else { $polloBadge = 'CADUCADA'; $polloColor = '#dc2626'; }
+            // ---- Info cuentas Pollo.ai (multi-cuenta) ----
+            $polloAccounts = function_exists('publicista_pollo_accounts') ? publicista_pollo_accounts() : array();
+            $polloStatus = function_exists('publicista_pollo_status_read') ? publicista_pollo_status_read() : array();
+            $activeCount = 0;
+            $exhaustedCount = 0;
+            foreach ($polloAccounts as $acc) {
+                $label = trim((string)($acc['label'] ?? ''));
+                if ($label === '') continue;
+                $cookie = trim((string)($acc['cookie'] ?? ''));
+                if ($cookie === '') continue;
+                if (!empty($polloStatus[$label]['credits_exhausted'])) {
+                    $exhaustedCount++;
+                } else {
+                    $activeCount++;
+                }
+            }
 
             echo '<div class="field full" id="pollo_cookie_info_panel" style="display:none;">';
             echo '<div class="info-strip" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px 14px;">';
-            echo '<span style="font-size:13px;"><strong>Cookie Pollo.ai:</strong> <span style="color:' . e($polloColor) . ';font-weight:600;">' . e($polloBadge) . '</span>';
-            if ($polloDays > 0) {
-                echo ' · expira ' . e($polloExpires) . ' (en ' . e((string)$polloDays) . ' días)';
+            echo '<span style="font-size:13px;"><strong>Pollo.ai:</strong> ';
+            if ($activeCount > 0) {
+                echo '<span style="color:#059669;font-weight:600;">' . $activeCount . ' cuenta(s) con créditos</span>';
             } else {
-                echo ' · expiró el ' . e($polloExpires);
+                echo '<span style="color:#dc2626;font-weight:600;">SIN CRÉDITOS</span>';
             }
+            if ($exhaustedCount > 0) {
+                echo ' · <span style="color:#d97706;">' . $exhaustedCount . ' agotada(s)</span>';
+            }
+            echo ' · <span style="color:#6b7280;">elige automáticamente la disponible</span>';
             echo '</span>';
             echo '<button type="button" class="btn-secondary-mini" onclick="document.getElementById(\'polloInstruccionesModal\').showModal()">¿Cómo renovar la cookie?</button>';
             echo '</div>';
@@ -2954,7 +3047,29 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     // Imágenes de origen
     echo '<div>';
     if (!empty($source['stored_path'])) {
-        publicista_render_job_image_card($source['stored_path'], 'Foto original subida');
+        $sourceFs = BASE_PATH . '/' . ltrim((string)$source['stored_path'], '/');
+        $sourceMtime = file_exists($sourceFs) ? filemtime($sourceFs) : 0;
+        $sourceSrcBust = $sourceMtime > 0 ? $source['stored_path'] . '?t=' . $sourceMtime : $source['stored_path'];
+        $sourceBlurApplied = !empty($source['manual_blur_applied']);
+        $sourceBlurIntensity = (int)($source['manual_blur_intensity'] ?? 8);
+        echo '<div class="publicista-preview-card" style="margin-bottom:16px;">';
+        echo '<div class="muted" style="margin-bottom:8px;">Foto original subida</div>';
+        echo '<img id="originalBlurImg_' . e($selectedJob['id'] ?? '') . '" src="' . e($sourceSrcBust) . '" alt="Foto original subida" style="width:100%;max-width:340px;border-radius:12px;border:1px solid #e5e7eb;display:block;">';
+        echo '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">';
+        if ($sourceBlurApplied) {
+            echo '<span id="originalBlurStatus_' . e($selectedJob['id'] ?? '') . '" class="summary-badge" style="background:#ede9fe;color:#6d28d9;">Blur manual · ' . e((string)$sourceBlurIntensity) . '/20</span>';
+        } else {
+            echo '<span id="originalBlurStatus_' . e($selectedJob['id'] ?? '') . '" class="summary-badge" style="background:#f3f4f6;color:#6b7280;">Sin blur manual</span>';
+        }
+        echo '<button type="button" class="btn-primary js-manual-blur-btn"'
+            . ' data-job-id="' . e($selectedJob['id'] ?? '') . '"'
+            . ' data-square-src="' . e($source['stored_path']) . '"'
+            . ' data-intensity="' . e((string)$sourceBlurIntensity) . '"'
+            . ' data-target="source"'
+            . ' title="Aplicar blur manual a la foto original">✏ Blur manual</button>';
+        echo '</div>';
+        echo '<div class="muted small" style="margin-top:8px;word-break:break-all;">' . e($source['stored_path']) . '</div>';
+        echo '</div>';
     }
     if (!empty($localAssets['prepared_square_path'])) {
         publicista_render_job_image_card($localAssets['prepared_square_path'], 'Base 1:1 sin deformar');
@@ -3041,7 +3156,11 @@ function render_publicista_crear_perfiles_page($embedded = false) {
             if ($isPipelineRunning) {
                 echo '<span class="info-strip" style="font-size:12px;background:#f8fafc;">Generación en curso: espera a que termine para regenerar candidatas manualmente.</span>';
             } else {
-                echo '<button type="button" class="btn-secondary-mini js-open-regenerate-candidate-modal" data-job-id="' . e($selectedJob['id'] ?? '') . '" data-candidate-id="' . e($cand['id'] ?? '') . '">Regenerar esta</button>';
+                $queueData = function_exists('publicista_regen_queue_get') ? publicista_regen_queue_get($selectedJob['id'] ?? '') : array();
+                $queueStatus = $queueData[$cand['id'] ?? '']['status'] ?? '';
+                $btnLabel = ($queueStatus === 'queued') ? '⏳ En cola…' : (($queueStatus === 'running') ? '⚙ Generando…' : (($queueStatus === 'waiting_pollo') ? '⏳ Esperando turno Pollo…' : 'Regenerar esta'));
+                $btnDisabled = in_array($queueStatus, array('queued', 'running', 'waiting_pollo'), true) ? ' disabled' : '';
+                echo '<button type="button" class="btn-secondary-mini js-open-regenerate-candidate-modal" data-job-id="' . e($selectedJob['id'] ?? '') . '" data-candidate-id="' . e($cand['id'] ?? '') . '"' . $btnDisabled . '>' . $btnLabel . '</button>';
             }
             echo '</div>';
             echo '<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;color:#9ca3af;">Ver prompt</summary><pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;">' . e($cand['prompt'] ?? '') . '</pre></details>';
@@ -3098,7 +3217,12 @@ function render_publicista_crear_perfiles_page($embedded = false) {
             if ($isPipelineRunning) {
                 echo '<span class="info-strip" style="font-size:12px;background:#f8fafc;">Generación en curso: espera a que termine para regenerar candidatas manualmente.</span>';
             } else {
-                echo '<button type="button" class="btn-secondary-mini js-open-regenerate-sexy-candidate-modal" data-job-id="' . e($selectedJob['id'] ?? '') . '" data-candidate-id="' . e($cand['id'] ?? '') . '" style="background:#fce7f3;border-color:#f9a8d4;color:#9d174d;">Regenerar esta</button>';
+                $queueDataSexy = function_exists('publicista_regen_queue_get') ? publicista_regen_queue_get($selectedJob['id'] ?? '') : array();
+                $sexyQueueKey = 'sexy_' . ($cand['id'] ?? '');
+                $sexyQueueStatus = $queueDataSexy[$sexyQueueKey]['status'] ?? '';
+                $sexyBtnLabel = ($sexyQueueStatus === 'queued') ? '⏳ En cola…' : (($sexyQueueStatus === 'running') ? '⚙ Generando…' : (($sexyQueueStatus === 'waiting_pollo') ? '⏳ Esperando turno Pollo…' : 'Regenerar esta'));
+                $sexyBtnDisabled = in_array($sexyQueueStatus, array('queued', 'running', 'waiting_pollo'), true) ? ' disabled' : '';
+                echo '<button type="button" class="btn-secondary-mini js-open-regenerate-sexy-candidate-modal" data-job-id="' . e($selectedJob['id'] ?? '') . '" data-candidate-id="' . e($cand['id'] ?? '') . '" style="background:#fce7f3;border-color:#f9a8d4;color:#9d174d;"' . $sexyBtnDisabled . '>' . $sexyBtnLabel . '</button>';
             }
             echo '</div>';
             echo '<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;color:#9ca3af;">Ver prompt erótico</summary><pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;">' . e($cand['prompt'] ?? '') . '</pre></details>';
@@ -3596,7 +3720,12 @@ echo '</section>';
       <button type="button" onclick="closeRegenerateCandidateModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;">&times;</button>
     </div>
     <p style="margin:0 0 10px;font-size:13px;color:#6b7280;">Se reutiliza el prompt base de esta candidata y se añade tu texto de refinado para regenerarla.</p>
-    <form method="post" id="regenerateCandidateForm">
+    <div id="regenPolloWarning" style="display:none;margin:0 0 8px;padding:8px 12px;background:#fff3cd;border:1px solid #ffc107;border-radius:6px;font-size:12px;color:#856404;align-items:center;gap:8px;">
+      <span style="font-size:16px;">⚠️</span>
+      <span id="regenPolloWarningText"></span>
+      <button type="button" onclick="sanitizeRegenText()" style="margin-left:auto;border:none;background:#ffc107;color:#664d03;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap;">✏️ Corregir</button>
+    </div>
+    <form method="post" id="regenerateCandidateForm" onsubmit="return validateRegenText()">
       <input type="hidden" name="action" value="regenerate_publicista_candidate" id="regenCandidateAction">
       <input type="hidden" name="id" id="regenCandidateJobId" value="">
       <input type="hidden" name="candidate_id" id="regenCandidateId" value="">
@@ -3640,6 +3769,8 @@ echo '</section>';
   </div>
 </div>
 <script>
+// Cache compartido entre los modales de regeneración y el polling (mismo <script>, var global)
+var _regenQueueCache = {};
 (function() {
   var _mbJobId = '', _mbFinalId = '', _mbTarget = 'final', _mbPhotoId = '', _mbCsrfToken = '<?php echo e(csrf_token()); ?>', _mbEllipse = null, _mbDragging = false, _mbStartX = 0, _mbStartY = 0;
   var _mbImg = new Image();
@@ -3656,6 +3787,18 @@ echo '</section>';
   };
 
   window.openRegenerateCandidateModal = function(jobId, candidateId) {
+    // Guard: no abrir si la candidata ya está en cola
+    var q = _regenQueueCache[candidateId];
+    if (q) {
+      var s = q.status || '';
+      if (s === 'queued' || s === 'running' || s === 'waiting_pollo') {
+        alert('Esta candidata ya está en la cola de regeneración. Espera a que termine.');
+        return;
+      }
+    }
+    // Resetear acción y título al modo normal (por si se usó el modal erótico antes)
+    document.getElementById('regenCandidateAction').value = 'regenerate_publicista_candidate';
+    document.getElementById('regenerateCandidateModalTitle').innerHTML = 'Regenerar candidata con refinado';
     document.getElementById('regenCandidateJobId').value = jobId || '';
     document.getElementById('regenCandidateId').value = candidateId || '';
     document.getElementById('regenCandidateRefineText').value = '';
@@ -3665,10 +3808,20 @@ echo '</section>';
 
   window.closeRegenerateCandidateModal = function() {
     document.getElementById('regenerateCandidateModal').style.display = 'none';
+    document.getElementById('regenPolloWarning').style.display = 'none';
   };
 
   // ── Sexy candidate regeneration modal ──
   window.openRegenerateSexyCandidateModal = function(jobId, candidateId) {
+    var sexyKey = 'sexy_' + candidateId;
+    var q = _regenQueueCache[sexyKey];
+    if (q) {
+      var s = q.status || '';
+      if (s === 'queued' || s === 'running' || s === 'waiting_pollo') {
+        alert('Esta candidata erótica ya está en la cola de regeneración. Espera a que termine.');
+        return;
+      }
+    }
     document.getElementById('regenCandidateJobId').value = jobId || '';
     document.getElementById('regenCandidateId').value = candidateId || '';
     document.getElementById('regenCandidateRefineText').value = '';
@@ -3685,6 +3838,60 @@ echo '</section>';
     document.getElementById('regenCandidateAction').value = 'regenerate_publicista_candidate';
   };
 
+  // ── Validación client-side: detecta palabras que Pollo.ai bloquea ──
+  window._polloTriggerWords = ['milf', 'MILF', 'teen', 'cougar', 'sugar baby', 'escort', 'prostituta', 'puta', 'porno', 'fuck', 'sexo explícito'];
+
+  window.validateRegenText = function() {
+    var text = document.getElementById('regenCandidateRefineText').value || '';
+    var found = [];
+    for (var i = 0; i < window._polloTriggerWords.length; i++) {
+      var word = window._polloTriggerWords[i];
+      if (text.toLowerCase().indexOf(word.toLowerCase()) !== -1) {
+        found.push(word);
+      }
+    }
+    if (found.length > 0) {
+      var warnDiv = document.getElementById('regenPolloWarning');
+      var warnText = document.getElementById('regenPolloWarningText');
+      warnText.textContent = 'Pollo.ai rechaza las palabras: ' + found.join(', ') + '. El sistema las reemplazará automáticamente, pero puedes corregirlas ahora.';
+      warnDiv.style.display = 'flex';
+      return false; // No enviar — dejar que el usuario corrija
+    }
+    return true;
+  };
+
+  window.sanitizeRegenText = function() {
+    var textarea = document.getElementById('regenCandidateRefineText');
+    var text = textarea.value || '';
+    var replacements = {
+      'milf': 'mujer madura', 'MILF': 'MUJER MADURA',
+      'teen': 'joven', 'cougar': 'mujer atractiva mayor',
+      'sugar baby': 'acompañante', 'escort': 'acompañante',
+      'prostituta': 'trabajadora', 'puta': 'mujer',
+      'porno': 'contenido adulto', 'fuck': '',
+      'sexo explícito': 'contenido sugerente'
+    };
+    for (var word in replacements) {
+      if (replacements.hasOwnProperty(word)) {
+        var regex = new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        text = text.replace(regex, replacements[word]);
+      }
+    }
+    text = text.replace(/\s{2,}/g, ' ').trim();
+    textarea.value = text;
+    document.getElementById('regenPolloWarning').style.display = 'none';
+  };
+
+  // Ocultar warning cuando se escribe en el textarea (el usuario está corrigiendo)
+  (function() {
+    var ta = document.getElementById('regenCandidateRefineText');
+    if (ta) {
+      ta.addEventListener('input', function() {
+        document.getElementById('regenPolloWarning').style.display = 'none';
+      });
+    }
+  })();
+
   window.syncManualBlurIntensity = function(value) {
     var num = parseInt(value, 10);
     if (!isFinite(num)) num = 8;
@@ -3695,12 +3902,12 @@ echo '</section>';
 
   window.openManualBlurModal = function(jobId, finalId, squareSrc, currentIntensity, target) {
     _mbJobId = jobId || '';
-    _mbFinalId = (target === 'real') ? '' : (finalId || '');
-    _mbPhotoId = (target === 'real') ? (finalId || '') : '';
+    _mbFinalId = (target === 'real' || target === 'source') ? '' : (finalId || '');
+    _mbPhotoId = (target === 'real' || target === 'source') ? (finalId || '') : '';
     _mbTarget = target || 'final';
     _mbEllipse = null;
     var targetId = (_mbTarget === 'real') ? _mbPhotoId : _mbFinalId;
-    if (!_mbJobId || !targetId || !squareSrc) {
+    if (!_mbJobId || (!targetId && _mbTarget !== 'source') || !squareSrc) {
       document.getElementById('manualBlurStatus').textContent = 'Faltan datos para abrir el editor.';
       return;
     }
@@ -3874,6 +4081,16 @@ echo '</section>';
         intensity,
         'real'
       );
+    } else if (target === 'source') {
+      var intensity2 = parseInt(btn.getAttribute('data-intensity') || '8', 10);
+      if (!isFinite(intensity2)) intensity2 = 8;
+      window.openManualBlurModal(
+        btn.getAttribute('data-job-id') || '',
+        '',
+        btn.getAttribute('data-square-src') || '',
+        intensity2,
+        'source'
+      );
     } else {
       openManualBlurModalFromButton(btn);
     }
@@ -3898,7 +4115,10 @@ echo '</section>';
     document.getElementById('manualBlurStatus').textContent = 'Aplicando blur...';
 
     var fd = new FormData();
-    if (_mbTarget === 'real') {
+    if (_mbTarget === 'source') {
+      fd.append('action', 'apply_publicista_manual_blur_source');
+      fd.append('id', _mbJobId);
+    } else if (_mbTarget === 'real') {
       fd.append('action', 'apply_publicista_manual_blur_real');
       fd.append('id', _mbJobId);
       fd.append('photo_id', _mbPhotoId);
@@ -3928,6 +4148,18 @@ echo '</section>';
             if (badge) {
               var intensityText = (data.manual_blur_intensity || intensity) + '/20';
               badge.textContent = 'Blur · ' + intensityText;
+              badge.style.background = '#ede9fe';
+              badge.style.color = '#6d28d9';
+            }
+          } else if (_mbTarget === 'source') {
+            var img = document.getElementById('originalBlurImg_' + _mbJobId);
+            if (img && data.stored_path) {
+              img.src = data.stored_path + '?t=' + Date.now();
+            }
+            var badge = document.getElementById('originalBlurStatus_' + _mbJobId);
+            if (badge) {
+              var intensityText = (data.manual_blur_intensity || intensity) + '/20';
+              badge.textContent = 'Blur manual · ' + intensityText;
               badge.style.background = '#ede9fe';
               badge.style.color = '#6d28d9';
             }
@@ -3999,12 +4231,14 @@ echo '</section>';
       _hasActiveQueue = false;
       var hasQueued = false;
       var queue = data.queue || {};
+      // Cachear cola para consultas síncronas (modal guard)
+      _regenQueueCache = queue;
       // Detectar si hay algo en cola activo
-      for (var cid in queue) {
-        var s = queue[cid] ? queue[cid].status : '';
-        if (s === 'queued' || s === 'running') { _hasActiveQueue = true; }
-        if (s === 'queued') { hasQueued = true; }
-      }
+       for (var cid in queue) {
+         var s = queue[cid] ? queue[cid].status : '';
+         if (s === 'queued' || s === 'running' || s === 'waiting_pollo') { _hasActiveQueue = true; }
+         if (s === 'queued' || s === 'waiting_pollo') { hasQueued = true; }
+       }
 
       // Mostrar/ocultar botón de cancelar cola global
       updateCancelQueueButton(hasQueued);
@@ -4049,6 +4283,38 @@ echo '</section>';
         updateQueueBadge(candId, queue[candId] || null, cand);
       }
 
+      // Actualizar imágenes de candidatas eróticas que hayan cambiado
+      var sexyCandidates = data.sexy_candidates || {};
+      for (var sexyCandId in sexyCandidates) {
+        var sc = sexyCandidates[sexyCandId];
+        var newMtimeSc = sc.mtime || 0;
+        var knownKey = 'sexy_' + sexyCandId;
+        if (newMtimeSc > 0 && newMtimeSc !== (_knownMtimes[knownKey] || 0)) {
+          _knownMtimes[knownKey] = newMtimeSc;
+          var sexyCard = document.querySelector('[data-candidate-id="' + sexyCandId + '"][data-candidate-type="sexy"]');
+          var sexyImgs = sexyCard ? sexyCard.querySelectorAll('img') : [];
+          if (!sexyImgs.length) {
+            var sexyBasePath = (sc.square_path || '').replace(/\?.*$/, '');
+            var sexyBaseFile = sexyBasePath.split('/').pop().replace(/\.[^.]+$/, '').replace(/_manual$/, '');
+            if (sexyBaseFile) {
+              sexyImgs = document.querySelectorAll('img[src*="' + sexyBaseFile + '"]');
+            }
+          }
+          if (sexyImgs.length) {
+            var freshSexySrc = (sc.src || '') + '&_=' + Date.now();
+            for (var si = 0; si < sexyImgs.length; si++) {
+              sexyImgs[si].src = '';
+              sexyImgs[si].src = freshSexySrc;
+            }
+          }
+          var sexyQStatus = queue['sexy_' + sexyCandId] ? queue['sexy_' + sexyCandId].status : '';
+          if (sexyQStatus === 'done' || (_knownMtimes[knownKey] && newMtimeSc && sexyImgs.length > 0)) {
+            showCandidateUpdatedBadge(sexyCandId);
+          }
+        }
+        updateQueueBadge(sexyCandId, queue['sexy_' + sexyCandId] || null, sc);
+      }
+
       // Avisos: si hay nuevos, pulsar el sistema de avisos para refrescar badge
       var newAvisosCount = parseInt(data.avisos_count || 0, 10);
       if (_knownAvisosCount >= 0 && newAvisosCount > _knownAvisosCount) {
@@ -4082,13 +4348,17 @@ echo '</section>';
   }
 
   function updateQueueBadge(candId, queueEntry, cand) {
-    var btn = document.querySelector('.js-open-regenerate-candidate-modal[data-candidate-id="' + candId + '"]');
+    var btn = document.querySelector('.js-open-regenerate-candidate-modal[data-candidate-id="' + candId + '"]') ||
+              document.querySelector('.js-open-regenerate-sexy-candidate-modal[data-candidate-id="' + candId + '"]');
     if (!btn) return;
     if (!queueEntry) return;
     var s = queueEntry.status || '';
     var updatedAt = queueEntry.updated_at || '';
     if (s === 'queued') {
       btn.textContent = '⏳ En cola…';
+      btn.disabled = true;
+    } else if (s === 'waiting_pollo') {
+      btn.textContent = '⏳ Esperando turno Pollo…';
       btn.disabled = true;
     } else if (s === 'running') {
       btn.textContent = '⚙ Generando…';
@@ -5274,6 +5544,9 @@ function render_dashboard_page() {
     echo '<div class="brand" style="margin-bottom:4px;font-size:28px;">LaMami <span>CRM</span></div>';
     page_header('Dashboard', 'Vista de pájaro del negocio completo');
 
+    // Alerta de Audio Boost caido (solo admin, no lite)
+    _render_audio_proxy_alert();
+
     echo '<section class="panel panel-space">';
     echo '<form method="get" class="toolbar">';
     echo '<input type="hidden" name="page" value="dashboard">';
@@ -5505,6 +5778,7 @@ function render_dashboard_page() {
     echo '</div>';
 
     echo '<script>';
+    echo 'window._lazyChart(function() {';
     echo 'new Chart(document.getElementById("chartIncomeByBranch12"), {type:"bar",data:{labels:' . json_encode($monthLabels) . ',datasets:[';
     echo '{label:"LaMami",data:' . json_encode($monthIncomeLamami) . '},';
     echo '{label:"Casawasap",data:' . json_encode($monthIncomeCasa) . '},';
@@ -5549,6 +5823,7 @@ function render_dashboard_page() {
     echo 'new Chart(document.getElementById("chartMoM12"),{type:"bar",data:{labels:' . json_encode($momLabels) . ',datasets:[';
     echo '{label:"Var. ingresos %",data:' . json_encode($momValues) . ',backgroundColor:function(c){var v=c.raw;return v>=0?"rgba(34,211,238,0.65)":"rgba(239,68,68,0.55)";},borderColor:function(c){var v=c.raw;return v>=0?"#22d3ee":"#ef4444";},borderWidth:1.5,borderRadius:4,barPercentage:0.7}';
     echo ']},options:{responsive:true,maintainAspectRatio:false,animation:{duration:700,easing:"easeOutQuart"},scales:{x:{grid:{display:false},ticks:{color:"#94a3b8",font:{size:10},maxRotation:35}},y:{grid:{color:"rgba(148,163,184,0.10)"},ticks:{color:"#94a3b8",font:{size:10},callback:function(v){return (v>=0?"+":"")+v+"%";}}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return "Variación: "+(c.parsed.y>=0?"+":"")+c.parsed.y+"%";}}}}}});';
+    echo '});';
     echo '</script>';
 }
 
@@ -7162,12 +7437,14 @@ function render_informes_page() {
     echo '</section>';
 
     echo '<script>';
+    echo 'window._lazyChart(function() {';
     echo 'new Chart(document.getElementById("chartReportTimeline"), {type:"line",data:{labels:' . json_encode($timelineLabels) . ',datasets:[';
     echo '{label:"Ingresos",data:' . json_encode($timelineIncome) . '},';
     echo '{label:"Gastos",data:' . json_encode($timelineExpense) . '}';
     echo ']},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}}}});';
 
     echo 'new Chart(document.getElementById("chartReportMix"), {type:"doughnut",data:{labels:["LaMami","Casawasap","Jostal"],datasets:[{data:' . json_encode(array_values($branchMix)) . '}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}}}});';
+    echo '});';
     echo '</script>';
 }
 
@@ -7370,6 +7647,58 @@ function render_config_section() {
     echo '</form>';
     echo '</section>';
 
+    // ── Dispositivos de confianza ──
+    $devices = auth_trusted_devices();
+    $hasDeviceCookie = !empty($_COOKIE[auth_trusted_device_cookie_name()]);
+    echo '<section class="panel">';
+    echo '<div class="josue-head">';
+    echo '<div>';
+    echo '<h2>Dispositivos de confianza</h2>';
+    echo '<p>Un dispositivo de confianza salta el login mediante una cookie persistente (1 año). No depende de la IP. Se registra automáticamente al acceder por whitelist (Teléfono) o al iniciar sesión con contraseña (Josué).</p>';
+    echo '</div>';
+    echo '</div>';
+
+    if ($hasDeviceCookie) {
+        $currentToken = (string)$_COOKIE[auth_trusted_device_cookie_name()];
+        $isTrusted = auth_is_trusted_device_token($currentToken);
+        $currentDevices = auth_trusted_devices();
+        $currentUser = isset($currentDevices[$currentToken]) ? ($currentDevices[$currentToken]['username'] ?? '?') : '?';
+        echo '<div class="info-strip" style="margin-bottom:12px;"><strong>Este dispositivo: </strong> ' . ($isTrusted ? 'Ya es de confianza ✓ (Usuario: ' . e($currentUser) . ')' : 'No está registrado como dispositivo de confianza') . '</div>';
+    } else {
+        echo '<div class="info-strip" style="margin-bottom:12px;"><strong>Este dispositivo: </strong> No tiene cookie de confianza. Inicia sesión o accede desde una IP whitelist para registrarlo.</div>';
+    }
+
+    if (empty($devices)) {
+        echo '<div class="empty">No hay dispositivos de confianza registrados.</div>';
+    } else {
+        echo '<table class="data-table" style="width:100%;">';
+        echo '<thead><tr><th>Etiqueta</th><th>Usuario</th><th>Creado</th><th>Último uso</th><th style="width:60px;"></th></tr></thead>';
+        echo '<tbody>';
+        foreach ($devices as $token => $d) {
+            $label = e((string)($d['label'] ?? 'Sin etiqueta'));
+            $username = e((string)($d['username'] ?? 'telefono'));
+            $created = e((string)($d['created_at'] ?? '-'));
+            $lastUsed = e((string)($d['last_used_at'] ?? '-'));
+            $tokenShort = substr($token, 0, 12) . '...';
+            echo '<tr>';
+            echo '<td title="' . e($token) . '">' . $label . ' <small style="color:#888;">(' . $tokenShort . ')</small></td>';
+            echo '<td>' . $username . '</td>';
+            echo '<td>' . $created . '</td>';
+            echo '<td>' . $lastUsed . '</td>';
+            echo '<td>';
+            echo '<form method="post" onsubmit="return confirm(\'¿Revocar este dispositivo? Tendrá que volver a hacer login.\');">';
+            echo '<input type="hidden" name="action" value="revoke_trusted_device">';
+            echo '<input type="hidden" name="device_token" value="' . e($token) . '">';
+            echo '<button type="submit" class="btn-small btn-danger" title="Revocar acceso a este dispositivo">✕</button>';
+            echo '</form>';
+            echo '</td>';
+            echo '</tr>';
+        }
+        echo '</tbody>';
+        echo '</table>';
+    }
+    echo '</section>';
+
     echo '<section class="panel">';
     echo '<h2>Diagnóstico</h2>';
     echo '<div class="info-strip"><strong>IP detectada ahora:</strong> ' . e($clientIp !== '' ? $clientIp : 'No detectada') . '</div>';
@@ -7568,45 +7897,73 @@ function render_configm_section() {
         echo '</div>';
     }
 
-    // ---- Campos Pollo.ai (fuera del bucle de avisos_config.php) ----
+    // ---- Campos Pollo.ai (multi-cuenta) ----
     $settingsRaw = settings_get();
-    $polloCookieCurrent = trim((string)($settingsRaw['pollo_session_cookie'] ?? ''));
-    $polloExpiresCurrent = trim((string)($settingsRaw['pollo_cookie_expires'] ?? '2026-07-14'));
-    $polloDaysLeft = function_exists('publicista_pollo_cookie_days_remaining') ? publicista_pollo_cookie_days_remaining() : -1;
-    if ($polloDaysLeft > 30) { $polloStatusBadge = 'OK'; $polloStatusColor = '#059669'; }
-    elseif ($polloDaysLeft > 7) { $polloStatusBadge = 'Aviso - menos de 1 mes'; $polloStatusColor = '#d97706'; }
-    elseif ($polloDaysLeft > 0) { $polloStatusBadge = 'URGENTE - menos de 1 semana'; $polloStatusColor = '#dc2626'; }
-    else { $polloStatusBadge = 'CADUCADA - renueva ya'; $polloStatusColor = '#dc2626'; }
+    $polloAccounts = isset($settingsRaw['pollo_accounts']) && is_array($settingsRaw['pollo_accounts'])
+        ? $settingsRaw['pollo_accounts']
+        : array();
+    // Si no hay pollo_accounts, migrar desde el formato antiguo
+    if (empty($polloAccounts)) {
+        $oldCookie = trim((string)($settingsRaw['pollo_session_cookie'] ?? ''));
+        $oldExpires = trim((string)($settingsRaw['pollo_cookie_expires'] ?? '2026-07-14'));
+        if ($oldCookie !== '') {
+            $polloAccounts[] = array('cookie' => $oldCookie, 'expires' => $oldExpires, 'label' => 'Cuenta 1');
+        }
+    }
+    $polloStatus = function_exists('publicista_pollo_status_read') ? publicista_pollo_status_read() : array();
 
     echo '<div class="field full" style="margin-top:8px;">';
     echo '<hr style="margin:4px 0 12px;border:none;border-top:1px solid #e5e7eb;">';
-    echo '<strong style="font-size:13px;color:#6b7280;">Pollo.ai · Cookie de sesión</strong>';
+    echo '<strong style="font-size:13px;color:#6b7280;">Pollo.ai · Cuentas (' . count($polloAccounts) . ')</strong>';
+    echo '<span style="font-size:11px;color:#9ca3af;margin-left:8px;">Se usan aleatoriamente. Si una se queda sin créditos, se usa la otra automáticamente.</span>';
     echo '</div>';
 
-    echo '<div class="field full">';
-    echo '<label>Cookie sesión Pollo.ai</label>';
-    echo '<textarea name="pollo_session_cookie" rows="3" autocomplete="off" spellcheck="false" style="font-family:monospace;font-size:11px;word-break:break-all;">' . e($polloCookieCurrent) . '</textarea>';
-    echo '<div class="field-help">Pega aquí el valor completo del header <code>Cookie:</code> copiado de las DevTools mientras estás logueado en pollo.ai. Empieza por <code>__Secure-next-auth.session-token=...</code>. Instrucciones detalladas en el formulario de creación de perfiles.</div>';
-    echo '</div>';
+    foreach ($polloAccounts as $idx => $acc) {
+        $label = trim((string)($acc['label'] ?? ('Cuenta ' . ($idx + 1))));
+        $cookie = trim((string)($acc['cookie'] ?? ''));
+        $expires = trim((string)($acc['expires'] ?? '2026-09-07'));
+        $exhausted = !empty($polloStatus[$label]['credits_exhausted']);
+        $accountDaysLeft = (int)((strtotime($expires . ' 23:59:59 UTC') - time()) / 86400);
 
-    echo '<div class="field">';
-    echo '<label>Fecha expiración cookie Pollo.ai</label>';
-    echo '<input type="date" name="pollo_cookie_expires" value="' . e($polloExpiresCurrent) . '">';
-    echo '<div class="field-help">Fecha en que caduca la cookie. La ves en el header <code>set-cookie → Expires=</code> cuando capturas la cookie. Actualiza este campo cada vez que renuevas la cookie.</div>';
-    echo '</div>';
+        if ($exhausted) {
+            $accountBadge = '❌ SIN CRÉDITOS';
+            $accountColor = '#dc2626';
+        } elseif ($accountDaysLeft <= 0) {
+            $accountBadge = '⚠️ CADUCADA';
+            $accountColor = '#dc2626';
+        } elseif ($accountDaysLeft <= 7) {
+            $accountBadge = '⚠️ Expira en ' . $accountDaysLeft . 'd';
+            $accountColor = '#d97706';
+        } elseif ($accountDaysLeft <= 30) {
+            $accountBadge = 'Expira en ' . $accountDaysLeft . 'd';
+            $accountColor = '#d97706';
+        } else {
+            $accountBadge = '✅ OK';
+            $accountColor = '#059669';
+        }
 
-    echo '<div class="field">';
-    echo '<label>Estado actual de la cookie</label>';
-    echo '<div class="info-strip" style="display:flex;align-items:center;gap:12px;">';
-    echo '<span style="font-size:13px;"><strong style="color:' . e($polloStatusColor) . ';">' . e($polloStatusBadge) . '</strong>';
-    if ($polloCookieCurrent !== '') {
-        echo ' · expira ' . e($polloExpiresCurrent);
-        if ($polloDaysLeft > 0) echo ' (en ' . e((string)$polloDaysLeft) . ' días)';
-    } else {
-        echo ' · Sin cookie configurada';
+        echo '<div class="field full" style="background:#f9fafb;border-radius:8px;padding:10px 12px;margin-bottom:6px;">';
+        echo '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
+        echo '<strong style="font-size:14px;color:#111827;">' . e($label) . '</strong>';
+        echo '<span style="font-size:12px;color:' . $accountColor . ';font-weight:600;">' . $accountBadge . '</span>';
+        echo '</div>';
+        echo '<textarea name="pollo_account_' . $idx . '_cookie" rows="2" autocomplete="off" spellcheck="false" style="font-family:monospace;font-size:11px;word-break:break-all;width:100%;margin-bottom:4px;">' . e($cookie) . '</textarea>';
+        echo '<div style="display:flex;gap:12px;align-items:center;">';
+        echo '<input type="text" name="pollo_account_' . $idx . '_label" value="' . e($label) . '" placeholder="Etiqueta" style="width:160px;font-size:12px;">';
+        echo '<input type="date" name="pollo_account_' . $idx . '_expires" value="' . e($expires) . '" style="width:140px;font-size:12px;">';
+        echo '<span style="font-size:11px;color:#6b7280;">Expira</span>';
+        if ($exhausted) {
+            echo '<button type="button" onclick="this.form.pollo_account_' . $idx . '_reset_credits.value=\'1\';this.form.submit();" style="font-size:11px;background:#059669;color:#fff;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;margin-left:auto;">Marcar con créditos</button>';
+            echo '<input type="hidden" name="pollo_account_' . $idx . '_reset_credits" value="0">';
+        }
+        echo '</div>';
+        echo '</div>';
     }
-    echo '</span>';
-    echo '</div>';
+
+    echo '<div class="field full" style="margin-bottom:12px;">';
+    echo '<button type="button" onclick="var n=this.form.querySelectorAll(\'[name^=pollo_account_]\').length/4; this.form.pollo_add_account.value=1;this.form.submit();" style="font-size:12px;background:#e5e7eb;color:#374151;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;">+ Añadir cuenta</button>';
+    echo '<input type="hidden" name="pollo_add_account" value="0">';
+    echo '<input type="hidden" name="pollo_account_count" value="' . count($polloAccounts) . '">';
     echo '</div>';
 
     echo '<div class="full"><button class="btn-primary">Guardar configuración</button></div>';
@@ -7670,10 +8027,23 @@ function render_configm_section() {
 function render_josue_page() {
     $anunciosUnlocked = !empty($_SESSION['josue_anuncios_unlocked']);
 
+    // Modo Lite (coche): auto-desbloquear anuncios — el usuario no puede interactuar con el formulario
+    if (($_SESSION['username'] ?? '') === 'lite' && !$anunciosUnlocked) {
+        $_SESSION['josue_anuncios_unlocked'] = true;
+        $anunciosUnlocked = true;
+    }
+
+    // WhatsApp Personal — protegido con contraseña en modo Lite
+    $isLite = ($_SESSION['username'] ?? '') === 'lite';
+    $wasapUnlocked = !$isLite || !empty($_SESSION['josue_wasap_unlocked']);
+
     $tab = request_get('tab', 'publias');
-    $allowed = array('publias', 'captacion', 'sendtaxs', 'notas', 'autotube', 'waha', 'telefonos', 'agenda', 'config', 'configm');
+    $allowed = array('publias', 'captacion', 'sendtaxs', 'notas', 'autotube', 'reproductor', 'waha', 'telefonos', 'agenda', 'eurekas', 'config', 'configm', 'rutas', 'diario');
     if ($anunciosUnlocked) {
         $allowed[] = 'anuncios';
+    }
+    if ($wasapUnlocked) {
+        $allowed[] = 'wasap';
     }
 
     if (!in_array($tab, $allowed, true)) {
@@ -7684,6 +8054,7 @@ function render_josue_page() {
     $anuncios = storage_read('anuncios.json');
     $telefonos = storage_read('telefonos.json');
     $agenda = storage_read('agenda.json');
+    $eurekas = storage_read('eurekas.json');
     $sendtaxsState = isset($settings['sendtaxs_state']) && is_array($settings['sendtaxs_state'])
         ? $settings['sendtaxs_state']
         : array();
@@ -7706,7 +8077,12 @@ function render_josue_page() {
         $isEdit = true;
     }
 
-    page_header('Josue', 'Sección de trabajo interno');
+    // Modo Lite: saludo personalizado en el coche
+    if (($_SESSION['username'] ?? '') === 'lite') {
+        page_header('Bienvenido Josué', '');
+    } else {
+        page_header('Josue', 'Sección de trabajo interno');
+    }
 
     echo '<section class="panel panel-josue">';
 
@@ -7723,21 +8099,43 @@ function render_josue_page() {
         echo '</div>';
     }
 
+    // WhatsApp Personal — bloqueado en Lite
+    if ($isLite && !$wasapUnlocked) {
+        echo '<div class="josue-unlock-box">';
+        echo '<form method="post" class="josue-unlock-form">';
+        echo '<input type="hidden" name="action" value="unlock_josue_wasap">';
+        echo '<div class="field">';
+        echo '<label>🔒 WhatsApp Personal</label>';
+        echo '<input type="password" name="password" placeholder="Contraseña">';
+        echo '</div>';
+        echo '<button class="btn-secondary-mini">Entrar</button>';
+        echo '</form>';
+        echo '</div>';
+    }
+
     echo '<div class="subtabs">';
     if ($anunciosUnlocked) {
         echo '<a class="subtab ' . ($tab === 'anuncios' ? 'active' : '') . '" href="index.php?page=josue&tab=anuncios">Anuncios</a>';
     }
     echo '<a class="subtab ' . ($tab === 'telefonos' ? 'active' : '') . '" href="index.php?page=josue&tab=telefonos">Telefonos</a>';
-    echo '<a class="subtab ' . ($tab === 'waha' ? 'active' : '') . '" href="index.php?page=josue&tab=waha">WAHA</a>';
-    echo '<a class="subtab ' . ($tab === 'publias' ? 'active' : '') . '" href="index.php?page=josue&tab=publias">PublIas</a>';
-    echo '<a class="subtab ' . ($tab === 'captacion' ? 'active' : '') . '" href="index.php?page=josue&tab=captacion">Captacion</a>';
-    echo '<a class="subtab ' . ($tab === 'sendtaxs' ? 'active' : '') . '" href="index.php?page=josue&tab=sendtaxs">SendTaxs</a>';
+    // echo '<a class="subtab ' . ($tab === 'waha' ? 'active' : '') . '" href="index.php?page=josue&tab=waha">WAHA</a>';
+    // echo '<a class="subtab ' . ($tab === 'publias' ? 'active' : '') . '" href="index.php?page=josue&tab=publias">PublIas</a>';
+    // echo '<a class="subtab ' . ($tab === 'captacion' ? 'active' : '') . '" href="index.php?page=josue&tab=captacion">Captacion</a>';
+    // echo '<a class="subtab ' . ($tab === 'sendtaxs' ? 'active' : '') . '" href="index.php?page=josue&tab=sendtaxs">SendTaxs</a>';
     echo '<a class="subtab ' . ($tab === 'agenda' ? 'active' : '') . '" href="index.php?page=josue&tab=agenda">Agenda</a>';
     //echo '<a class="subtab ' . ($tab === 'avisos' ? 'active' : '') . '" href="index.php?page=josue&tab=avisos">Avisos</a>';
+    echo '<a class="subtab ' . ($tab === 'eurekas' ? 'active' : '') . '" href="index.php?page=josue&tab=eurekas">Eurekas</a>';
+    // WhatsApp Personal subtab (solo si unlocked)
+    if ($wasapUnlocked) {
+        echo '<a class="subtab ' . ($tab === 'wasap' ? 'active' : '') . '" href="index.php?page=josue&tab=wasap">📱 WhatsApp</a>';
+    }
     echo '<a class="subtab ' . ($tab === 'config' ? 'active' : '') . '" href="index.php?page=josue&tab=config">Config</a>';
-    echo '<a class="subtab ' . ($tab === 'configm' ? 'active' : '') . '" href="index.php?page=josue&tab=configm">ConfigM</a>';
+    // echo '<a class="subtab ' . ($tab === 'configm' ? 'active' : '') . '" href="index.php?page=josue&tab=configm">ConfigM</a>';
     echo '<a class="subtab ' . ($tab === 'notas' ? 'active' : '') . '" href="index.php?page=josue&tab=notas">Notas</a>';    
-    echo '<a class="subtab ' . ($tab === 'autotube' ? 'active' : '') . '" href="index.php?page=josue&tab=autotube">Autotube</a>';
+    // echo '<a class="subtab ' . ($tab === 'autotube' ? 'active' : '') . '" href="index.php?page=josue&tab=autotube">Autotube</a>';
+    echo '<a class="subtab ' . ($tab === 'reproductor' ? 'active' : '') . '" href="index.php?page=josue&tab=reproductor">Reproductor</a>';
+    echo '<a class="subtab ' . ($tab === 'rutas' ? 'active' : '') . '" href="index.php?page=josue&tab=rutas">Rutas</a>';
+    echo '<a class="subtab ' . ($tab === 'diario' ? 'active' : '') . '" href="index.php?page=josue&tab=diario">Diario</a>';
     
     echo '</div>';
 
@@ -7936,10 +8334,14 @@ if (!empty($sendtaxsState)) {
         render_avisos_section('index.php?page=josue&tab=avisos');
 */
     } elseif ($tab === 'config') {
+        echo '<h2 class="josue-section-title">Config General</h2>';
         render_config_section();
-
-    } elseif ($tab === 'configm') {
+        echo '<hr class="config-separator" style="margin:32px 0;border-color:#333;">';
+        echo '<h2 class="josue-section-title">Config Avanzada</h2>';
         render_configm_section();
+
+    // } elseif ($tab === 'configm') {
+    //     render_configm_section();
 
     } elseif ($tab === 'anuncios') {
         $editId = request_get('edit', '');
@@ -8111,47 +8513,14 @@ if (!empty($sendtaxsState)) {
 
         echo '</div>';
     } elseif ($tab === 'telefonos') {
-        $editId = request_get('edit', '');
-        $edit = $editId !== '' ? storage_find_by_id('telefonos.json', $editId) : null;
-
         $anunciosIndex = array();
         foreach ($anuncios as $an) {
             $anunciosIndex[$an['id']] = $an;
         }
 
-        echo '<div class="cards two">';
-
-        echo '<section class="panel">';
-        echo '<div class="josue-head">';
-        echo '<h2>' . ($edit ? 'Ficha teléfono' : 'Nuevo teléfono') . '</h2>';
+        echo '<div class="lineas-toolbar">';
+        echo '<button type="button" class="btn-primary" id="btnNuevoTelefono">+ Nuevo teléfono</button>';
         echo '</div>';
-
-        echo '<form method="post" class="form-grid">';
-        echo '<input type="hidden" name="action" value="save_telefono">';
-        echo '<input type="hidden" name="id" value="' . e($edit['id'] ?? '') . '">';
-        field_input('nombre', 'Nombre', $edit['nombre'] ?? '', true);
-        field_input('tfono', 'Tfono', $edit['tfono'] ?? '', true);
-        field_input('uso', 'Uso', $edit['uso'] ?? '');
-        field_input('pin', 'PIN', $edit['pin'] ?? '');
-        field_input('compania', 'Compañía', $edit['compania'] ?? '');
-        field_input('waha_port', 'WAHA Port', $edit['waha_port'] ?? '');
-        field_input('waha', 'WAHA', $edit['waha'] ?? '');
-        echo '<div class="field">';
-        echo '<label>Destacamos</label>';
-        echo '<select name="destacamos_id">';
-        echo '<option value="">Sin vincular</option>';
-        foreach ($anuncios as $an) {
-            $val = $an['id'] ?? '';
-            $label = trim(($an['url'] ?? '') . ' - ' . ($an['user'] ?? ''));
-            $sel = (($edit['destacamos_id'] ?? '') === $val) ? ' selected' : '';
-            echo '<option value="' . e($val) . '"' . $sel . '>' . e($label) . '</option>';
-        }
-        echo '</select>';
-        echo '</div>';
-        field_textarea('notas', 'Notas', $edit['notas'] ?? '', 4);
-        echo '<div class="full"><button class="btn-primary">Guardar teléfono</button></div>';
-        echo '</form>';
-        echo '</section>';
 
         echo '<section class="panel">';
         echo '<h2>Listado teléfonos</h2>';
@@ -8161,7 +8530,7 @@ if (!empty($sendtaxsState)) {
             $telefonos = sort_desc_by_key($telefonos, 'created_at');
             render_live_filter('#telefonosRows tr[data-filter-text]', 'Buscar teléfono...');
             echo '<div class="table-wrap"><table><thead><tr>';
-            echo '<th>Nombre</th><th>Tfono</th><th>Uso</th><th>WAHA Port</th><th>WAHA</th><th>Destacamos</th><th>Acciones</th>';
+            echo '<th>Nombre</th><th>Tfono</th><th>Uso</th><th>WAHA Port</th><th>WAHA</th><th>Salud WAHA</th><th>Notas</th><th>Destacamos</th><th>Acciones</th>';
             echo '</tr></thead><tbody id="telefonosRows">';
             foreach ($telefonos as $row) {
                 $dest = $anunciosIndex[$row['destacamos_id'] ?? ''] ?? null;
@@ -8173,17 +8542,39 @@ if (!empty($sendtaxsState)) {
                     ($row['compania'] ?? '') . ' ' .
                     ($row['waha_port'] ?? '') . ' ' .
                     ($row['waha'] ?? '') . ' ' .
+                    ($row['notas'] ?? '') . ' ' .
                     ($destLabel ?? '')
                 ));
-                echo '<tr data-filter-text="' . e($searchText) . '">';
+                $telefonoEditData = json_encode(array(
+                    'id'             => $row['id'] ?? '',
+                    'nombre'         => $row['nombre'] ?? '',
+                    'tfono'          => $row['tfono'] ?? '',
+                    'uso'            => $row['uso'] ?? '',
+                    'pin'            => $row['pin'] ?? '',
+                    'compania'       => $row['compania'] ?? '',
+                    'waha_port'      => $row['waha_port'] ?? '',
+                    'waha'           => $row['waha'] ?? '',
+                    'destacamos_id'  => $row['destacamos_id'] ?? '',
+                    'notas'          => $row['notas'] ?? '',
+                ), JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS);
+                echo '<tr data-filter-text="' . e($searchText) . '" data-telefono="' . e($telefonoEditData) . '">';
                 echo '<td>' . e($row['nombre'] ?? '') . '</td>';
                 echo '<td>' . e($row['tfono'] ?? '') . '</td>';
                 echo '<td>' . e($row['uso'] ?? '') . '</td>';
                 echo '<td>' . e($row['waha_port'] ?? '') . '</td>';
                 echo '<td>' . e($row['waha'] ?? '') . '</td>';
+                $wahaPort = trim($row['waha_port'] ?? '');
+                $wahaSession = trim($row['waha'] ?? '');
+                echo '<td class="td-waha-salud">';
+                echo '<span id="waha-salud-' . e($row['id'] ?? '') . '" class="waha-indicator">⚪</span>';
+                if ($wahaPort !== '') {
+                    echo '<div class="waha-line-actions" id="waha-actions-' . e($row['id'] ?? '') . '"></div>';
+                }
+                echo '</td>';
+                echo '<td>' . e($row['notas'] ?? '') . '</td>';
                 echo '<td>' . e($destLabel) . '</td>';
                 echo '<td>';
-                echo '<a class="mini-link" href="index.php?page=josue&tab=telefonos&edit=' . e($row['id']) . '">Editar</a> ';
+                echo '<button type="button" class="btn-secondary-mini btn-telefonos-edit">Editar</button> ';
                 echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar este teléfono?\')">';
                 echo '<input type="hidden" name="action" value="delete_telefono">';
                 echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
@@ -8196,12 +8587,1112 @@ if (!empty($sendtaxsState)) {
         }
         echo '</section>';
 
+        echo '<div id="telefonosModalOverlay" class="modal-overlay" style="display:none;">';
+        echo '<div class="modal-container">';
+        echo '<div class="modal-header">';
+        echo '<h2 id="telefonoModalTitle">Nuevo teléfono</h2>';
+        echo '<button type="button" class="modal-close" id="btnTelefonoModalClose">&times;</button>';
         echo '</div>';
+        echo '<div class="modal-body">';
+        echo '<form method="post" class="form-grid" id="telefonoForm">';
+        echo '<input type="hidden" name="action" value="save_telefono">';
+        echo '<input type="hidden" name="id" value="">';
+        field_input('nombre', 'Nombre', '', true);
+        field_input('tfono', 'Tfono', '', true);
+        field_input('uso', 'Uso', '');
+        field_input('pin', 'PIN', '');
+        field_input('compania', 'Compañía', '');
+        field_input('waha_port', 'WAHA Port', '');
+        field_input('waha', 'WAHA', '');
+        echo '<div class="field">';
+        echo '<label>Destacamos</label>';
+        echo '<select name="destacamos_id">';
+        echo '<option value="">Sin vincular</option>';
+        foreach ($anuncios as $an) {
+            $val = $an['id'] ?? '';
+            $label = trim(($an['url'] ?? '') . ' - ' . ($an['user'] ?? ''));
+            echo '<option value="' . e($val) . '">' . e($label) . '</option>';
+        }
+        echo '</select>';
+        echo '</div>';
+        field_textarea('notas', 'Notas', '', 4);
+        echo '</form>';
+        echo '</div>';
+        echo '<div class="modal-footer">';
+        echo '<button type="button" class="btn-primary" id="btnGuardarTelefono">Guardar teléfono</button>';
+        echo '<form method="post" id="deleteTelefonoForm" style="display:inline-block;" onsubmit="return confirm(\'¿Eliminar este teléfono?\')">';
+        echo '<input type="hidden" name="action" value="delete_telefono">';
+        echo '<input type="hidden" name="id" value="">';
+        echo '<button type="submit" class="btn-danger-mini" id="btnEliminarTelefono" style="display:none;">Eliminar</button>';
+        echo '</form>';
+        echo '<button type="button" class="btn-secondary" id="btnCancelarTelefono">Cancelar</button>';
+        echo '</div>';
+        echo '</div>';
+        echo '</div>';
+
+        // ── QR Modal para vincular líneas WAHA (compartido, oculto) ──
+        echo '<div id="twaQrModal" class="wasap-qr-modal" style="display:none">';
+        echo '<div class="wasap-qr-modal-bg" onclick="twaCloseQr()"></div>';
+        echo '<div class="wasap-qr-modal-box">';
+        echo '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+        echo '<h3 style="margin:0">Vincular WhatsApp</h3>';
+        echo '<button onclick="twaCloseQr()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text)">✕</button>';
+        echo '</div>';
+        echo '<div id="twaQrLineName" style="font-size:13px;color:var(--muted);margin-bottom:10px"></div>';
+        echo '<div id="twaQrImageWrap" style="text-align:center;padding:16px;background:#fff;border-radius:8px;margin-bottom:12px">';
+        echo '<span class="muted">Cargando QR...</span>';
+        echo '</div>';
+        echo '<p id="twaQrStatus" class="muted" style="text-align:center;margin-bottom:10px">Esperando...</p>';
+        echo '<div style="display:flex;gap:8px;justify-content:center">';
+        echo '<button onclick="twaRegenerateQr()" class="btn-secondary-mini">🔄 Regenerar QR</button>';
+        echo '<button onclick="twaCloseQr()" class="btn-secondary-mini">Cerrar</button>';
+        echo '</div>';
+        echo '</div>';
+        echo '</div>';
+
+        // ── JS: health polling + vincular líneas WAHA ──
+        echo '<script>
+        (function(){
+            var apiBase = "telefonos_waha_api.php";
+
+            function twaFetchWithTimeout(url, timeoutMs) {
+                return new Promise(function(resolve, reject) {
+                    var timer = setTimeout(function(){ reject(new Error("timeout")); }, timeoutMs);
+                    fetch(url).then(function(r){
+                        clearTimeout(timer);
+                        resolve(r);
+                    }).catch(function(e){
+                        clearTimeout(timer);
+                        reject(e);
+                    });
+                });
+            }
+
+            function twaHealthIcon(status) {
+                var s = (status||"").toUpperCase();
+                if (s === "WORKING" || s === "CONNECTED") return "\u{1F7E2}";
+                if (s === "SCAN_QR_CODE") return "\u{1F7E1}";
+                if (s === "STARTING") return "\u{1F7E0}";
+                return "\u{1F534}";
+            }
+
+            function checkLineHealth(id, port, waha, elSalud, elActions) {
+                if (!port) {
+                    elSalud.innerHTML = "\u26AA Sin WAHA";
+                    if (elActions) elActions.innerHTML = "";
+                    return;
+                }
+                var url = apiBase + "?action=status&waha_port=" + encodeURIComponent(port) + "&waha=" + encodeURIComponent(waha) + "&_=" + Date.now();
+                console.log("[twa] checkLineHealth url=" + url);
+                twaFetchWithTimeout(url, 12000).then(function(r){
+                    console.log("[twa] HTTP " + r.status + " " + (r.ok ? "OK" : "FAIL") + " for " + id);
+                    if (!r.ok) throw new Error("HTTP " + r.status);
+                    return r.json();
+                }).then(function(d){
+                    console.log("[twa] JSON ok=" + d.ok + " status=" + d.status + " phone=" + (d.phone||""));
+                    if (!d.ok) {
+                        // API returned an error with diagnostics
+                        var errType = d.status || "ERROR";
+                        var errLabel = d.status_label || d.error || "Error";
+                        var errIcon = d.status_icon || "\u{1F534}";
+                        console.log("[twa] API error for id=" + id, { error: d.error, debug_url: d.debug_url, debug_http: d.debug_http, debug_curl: d.debug_curl });
+                        var hint = "";
+                        if (d.debug_url) hint = " <small style=\"font-size:10px;color:var(--muted)\">" + d.debug_url + "</small>";
+                        elSalud.innerHTML = errIcon + " " + errLabel + hint;
+                        if (elActions) {
+                            elActions.innerHTML = "<button onclick=\"twaRestartAndRescan(\'"+id+"\',\'"+port+"\',\'"+waha+"\')\" class=\"btn-danger-mini\">\u{1F504} Reiniciar y vincular</button>";
+                        }
+                        return;
+                    }
+                    // Success: WAHA is responding
+                    var icon = d.status_icon || twaHealthIcon(d.status);
+                    var label = d.status_label || d.status;
+                    var phone = d.phone ? (" (" + d.phone + ")") : "";
+                    elSalud.innerHTML = icon + " " + label + phone;
+                    if (!elActions) return;
+                    var st = (d.status||"").toUpperCase();
+                    if (st === "SCAN_QR_CODE" || st === "STARTING") {
+                        elActions.innerHTML = "<button onclick=\"twaShowQr(\'"+id+"\',\'"+port+"\',\'"+waha+"\')\" class=\"btn-secondary-mini\">\u{1F4F1} Vincular</button>";
+                    } else if (st === "FAILED" || st === "STOPPED") {
+                        elActions.innerHTML = "<button onclick=\"twaRestartAndRescan(\'"+id+"\',\'"+port+"\',\'"+waha+"\')\" class=\"btn-danger-mini\">\u{1F504} Reiniciar y vincular</button>";
+                    } else if (d.is_connected) {
+                        elActions.innerHTML = "<span style=\"color:var(--ok);font-size:12px\">\u2705</span>";
+                    } else {
+                        elActions.innerHTML = "";
+                    }
+                }).catch(function(e){
+                    var msg = (e.message === "timeout") ? "Timeout" : (e.message||"Error");
+                    console.error("[twa] FAIL for id=" + id + ": " + msg, e);
+                    elSalud.innerHTML = "\u{1F534} " + msg;
+                    if (elActions) {
+                        elActions.innerHTML = "<button onclick=\"twaRestartAndRescan(\'"+id+"\',\'"+port+"\',\'"+waha+"\')\" class=\"btn-danger-mini\">\u{1F504} Reiniciar y vincular</button>";
+                    }
+                });
+            }
+
+            function checkAllLines() {
+                var rows = document.getElementById("telefonosRows");
+                if (!rows) return;
+                var trs = rows.querySelectorAll("tr[data-telefono]");
+                trs.forEach(function(tr){
+                    try {
+                        var tel = JSON.parse(tr.getAttribute("data-telefono"));
+                        var id = tel.id || "";
+                        var port = (tel.waha_port || "").trim();
+                        var waha = (tel.waha || "").trim() || "default";
+                        var elSalud = document.getElementById("waha-salud-" + id);
+                        var elActions = document.getElementById("waha-actions-" + id);
+                        if (!elSalud) return;
+                        checkLineHealth(id, port, waha, elSalud, elActions);
+                    } catch(ignored) {}
+                });
+            }
+
+            // ── QR Modal ──
+            var twaQrPolling = null;
+            var twaCurrent = { id: "", port: "", waha: "" };
+
+            function twaShowQr(id, port, waha) {
+                twaCurrent = { id: id, port: port, waha: waha };
+                var modal = document.getElementById("twaQrModal");
+                if (!modal) return;
+                modal.style.display = "flex";
+                document.getElementById("twaQrImageWrap").innerHTML = "<span class=\"muted\">Cargando QR...</span>";
+                document.getElementById("twaQrStatus").textContent = "Obteniendo QR del puerto " + port + "...";
+                var lnEl = document.getElementById("twaQrLineName");
+                if (lnEl) lnEl.textContent = "Línea: " + waha;
+                twaFetchQr();
+                if (twaQrPolling) clearInterval(twaQrPolling);
+                twaQrPolling = setInterval(function(){
+                    var url = apiBase + "?action=status&waha_port=" + encodeURIComponent(port) + "&waha=" + encodeURIComponent(waha) + "&_=" + Date.now();
+                    twaFetchWithTimeout(url, 8000).then(function(r){return r.json()}).then(function(d){
+                        if (d.is_connected) {
+                            twaCloseQr();
+                            checkAllLines();
+                        }
+                    }).catch(function(){});
+                }, 4000);
+            }
+
+            function twaFetchQr() {
+                var wrap = document.getElementById("twaQrImageWrap");
+                var st = document.getElementById("twaQrStatus");
+                if (!wrap) return;
+                var url = apiBase + "?action=qr&waha_port=" + encodeURIComponent(twaCurrent.port) + "&waha=" + encodeURIComponent(twaCurrent.waha) + "&_=" + Date.now();
+                console.log("[twa] fetchQr url=" + url);
+                twaFetchWithTimeout(url, 20000).then(function(r){
+                    if (!r.ok) throw new Error("HTTP " + r.status);
+                    return r.json();
+                }).then(function(d){
+                    console.log("[twa] fetchQr result:", d.ok ? ("OK " + (d.qr_base64 ? d.qr_base64.length + "b" : "no data")) : ("FAIL: " + (d.error||"")));
+                    if (d.ok && d.qr_base64) {
+                        wrap.innerHTML = "<img src=\"data:image/png;base64," + d.qr_base64 + "\" style=\"max-width:260px;border-radius:4px\" alt=\"QR\" onerror=\"this.innerHTML=\'<span style=color:var(--danger)>\u274C Error al mostrar QR</span>\'\">";
+                        if (st) st.textContent = "Escanea con WhatsApp \u2192 Vincular dispositivo";
+                    } else {
+                        wrap.innerHTML = "<div style=\"color:var(--danger);margin-bottom:6px\">\u274C " + (d.error||"No se pudo obtener QR") + "</div><div class=\"muted\" style=\"font-size:12px\">" + (d.hint||"\u00BFWAHA ca\u00EDdo? Prueba Reiniciar y vincular.") + "</div>";
+                        if (st) st.textContent = "Error. Prueba reiniciando.";
+                    }
+                }).catch(function(e){
+                    console.error("[twa] fetchQr error:", e.message || e);
+                    var msg = (e.message === "timeout") ? "Tiempo agotado (WAHA no responde)" : (e.message||"Error de red");
+                    wrap.innerHTML = "<div style=\"color:var(--danger);margin-bottom:6px\">\u274C " + msg + "</div>";
+                    if (st) st.textContent = "WAHA no responde.";
+                });
+            }
+
+            function twaRegenerateQr() {
+                document.getElementById("twaQrImageWrap").innerHTML = "<span class=\"muted\">Regenerando QR...</span>";
+                document.getElementById("twaQrStatus").textContent = "Solicitando nuevo QR...";
+                twaFetchQr();
+            }
+
+            function twaCloseQr() {
+                var modal = document.getElementById("twaQrModal");
+                if (modal) modal.style.display = "none";
+                if (twaQrPolling) { clearInterval(twaQrPolling); twaQrPolling = null; }
+                checkAllLines();
+            }
+
+            function twaRestartAndRescan(id, port, waha) {
+                if (!confirm("Reiniciar sesión WAHA de esta línea? Deberás escanear el QR para vincular de nuevo.")) return;
+                var elSalud = document.getElementById("waha-salud-" + id);
+                var elActions = document.getElementById("waha-actions-" + id);
+                if (elSalud) elSalud.innerHTML = "\u{1F7E0} Reiniciando...";
+                if (elActions) elActions.innerHTML = "<span class=\"muted\" style=\"font-size:12px\">\u23F3 Espera ~15s</span>";
+                console.log("[twa] restartAndRescan id=" + id + " port=" + port + " waha=" + waha);
+                var url = apiBase + "?action=restart&waha_port=" + encodeURIComponent(port) + "&waha=" + encodeURIComponent(waha) + "&_=" + Date.now();
+                twaFetchWithTimeout(url, 30000).then(function(r){return r.json()}).then(function(d){
+                    console.log("[twa] restart response:", d.ok ? "OK" : ("FAIL: " + (d.error||"")));
+                    // Wait 10s for WAHA to restart, then poll for QR
+                    setTimeout(function(){
+                        console.log("[twa] restartAndRescan: starting QR poll...");
+                        var pollCount = 0;
+                        var maxPolls = 30; // 30 × 2s = 60s max
+                        var pollForQr = setInterval(function(){
+                            pollCount++;
+                            var statusUrl = apiBase + "?action=status&waha_port=" + encodeURIComponent(port) + "&waha=" + encodeURIComponent(waha) + "&_=" + Date.now();
+                            twaFetchWithTimeout(statusUrl, 8000).then(function(r){return r.json()}).then(function(sd){
+                                console.log("[twa] restartAndRescan: poll #"+pollCount+" status=" + sd.status + " qr=" + (sd.status==="SCAN_QR_CODE"));
+                                if (sd.status === "SCAN_QR_CODE" || sd.status === "STARTING") {
+                                    clearInterval(pollForQr);
+                                    console.log("[twa] restartAndRescan: QR available, opening modal");
+                                    checkAllLines(); // refresh status card
+                                    twaShowQr(id, port, waha);
+                                }
+                                if (pollCount >= maxPolls) {
+                                    clearInterval(pollForQr);
+                                    checkAllLines();
+                                    if (sd.status !== "SCAN_QR_CODE" && sd.status !== "STARTING" && !sd.is_connected) {
+                                        alert("WAHA no ha generado QR tras 60s. Revisa el estado de conexión.");
+                                    }
+                                }
+                            }).catch(function(){
+                                if (pollCount >= maxPolls) {
+                                    clearInterval(pollForQr);
+                                    checkAllLines();
+                                }
+                            });
+                        }, 2000);
+                    }, 10000);
+                }).catch(function(e){
+                    console.error("[twa] restart error:", e);
+                    alert("Error al reiniciar WAHA. Intenta manualmente.");
+                    setTimeout(function(){ checkAllLines(); }, 10000);
+                });
+            }
+
+            // Expose to global scope (needed for inline onclick handlers)
+            window.twaShowQr = twaShowQr;
+            window.twaRegenerateQr = twaRegenerateQr;
+            window.twaCloseQr = twaCloseQr;
+            window.twaRestartAndRescan = twaRestartAndRescan;
+
+            // Init: check all lines immediately, then poll every 15s
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", function(){ checkAllLines(); });
+            } else {
+                checkAllLines();
+            }
+            setInterval(function(){ checkAllLines(); }, 15000);
+        })();
+        </script>';
+
     } elseif ($tab === 'autotube') {
         echo '<div class="josue-head"><h2>Autotube</h2></div>';
         echo '<div style="padding:0;overflow:visible;border-radius:8px;background:#0a0a0f">';
         echo '<iframe src="/autotube/" style="width:100%;min-height:calc(100vh - 280px);height:auto;border:none;display:block" title="Panel Autotube" loading="lazy" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>';
         echo '</div>';
+
+    } elseif ($tab === 'reproductor') {
+        render_youtube_player();
+
+    } elseif ($tab === 'eurekas') {
+        $editId = request_get('edit', '');
+        $edit = $editId !== '' ? storage_find_by_id('eurekas.json', $editId) : null;
+        $eurekaRows = sort_desc_by_key($eurekas, 'updated_at');
+        $statusLabels = array(
+            'pendiente' => 'Pendiente',
+            'descartada' => 'Descartada',
+            'cumplida' => 'Cumplida',
+            'cumplida_v2' => 'Cumplida V2',
+        );
+        $estadoFilter = trim((string)request_get('estado', 'pendiente'));
+        if ($estadoFilter !== 'todas' && !isset($statusLabels[$estadoFilter])) {
+            $estadoFilter = 'todas';
+        }
+        if ($estadoFilter !== 'todas') {
+            $eurekaRows = array_values(array_filter($eurekaRows, function ($row) use ($estadoFilter) {
+                return trim((string)($row['estado'] ?? 'pendiente')) === $estadoFilter;
+            }));
+        }
+
+        echo '<div class="cards two">';
+
+        echo '<section class="panel">';
+        echo '<div class="josue-head">';
+        echo '<h2>' . ($edit ? 'Editar eureka' : 'Nueva eureka') . '</h2>';
+        if ($edit) {
+            echo '<a class="btn-secondary-mini" href="index.php?page=josue&tab=eurekas">Nueva eureka</a>';
+        }
+        echo '</div>';
+
+        echo '<form method="post" class="form-grid" style="margin-top:12px;">';
+        echo '<input type="hidden" name="action" value="save_eureka">';
+        echo '<input type="hidden" name="id" value="' . e($edit['id'] ?? '') . '">';
+        field_textarea('descripcion', 'Descripción', $edit['descripcion'] ?? '', 8);
+        echo '<div class="full josue-actions">';
+        echo '<button class="btn-primary" type="submit">' . ($edit ? 'Guardar cambios' : 'Crear eureka') . '</button>';
+        if ($edit) {
+            echo '<a class="btn-secondary-mini" href="index.php?page=josue&tab=eurekas">Cancelar</a>';
+        }
+        echo '</div>';
+        echo '</form>';
+        echo '</section>';
+
+        echo '<section class="panel">';
+        echo '<div class="josue-head">';
+        echo '<h2>Eurekas</h2>';
+        echo '<span class="summary-badge">' . count($eurekaRows) . ' items</span>';
+        echo '</div>';
+
+        echo '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 6px;">';
+        $filterOptions = array('todas' => 'Todas', 'pendiente' => 'Pendientes', 'cumplida_v2' => 'Cumplidas V2', 'cumplida' => 'Cumplidas', 'descartada' => 'Descartadas');
+        foreach ($filterOptions as $filterValue => $filterLabel) {
+            $href = 'index.php?page=josue&tab=eurekas';
+            if ($filterValue !== 'todas') {
+                $href .= '&estado=' . urlencode($filterValue);
+            }
+            $class = ($estadoFilter === $filterValue) ? 'btn-primary' : 'btn-secondary-mini';
+            echo '<a class="' . $class . '" href="' . e($href) . '">' . e($filterLabel) . '</a>';
+        }
+        echo '</div>';
+
+        if (empty($eurekaRows)) {
+            echo '<div class="empty">Todavía no hay eurekas guardadas.</div>';
+        } else {
+            render_live_filter('#eurekaCards .contact-card[data-filter-text]', 'Buscar por descripción o estado...');
+            echo '<div id="eurekaCards" class="stack-list">';
+            foreach ($eurekaRows as $row) {
+                $descripcion = trim((string)($row['descripcion'] ?? ''));
+                $estado = trim((string)($row['estado'] ?? 'pendiente'));
+                $promptCodex = trim((string)($row['prompt_codex'] ?? ''));
+                $promptGeneratedAt = trim((string)($row['prompt_generated_at'] ?? ''));
+                if (!isset($statusLabels[$estado])) {
+                    $estado = 'pendiente';
+                }
+                $searchText = strtolower(trim($descripcion . ' ' . $estado));
+
+                echo '<article class="contact-card info-strip" data-filter-text="' . e($searchText) . '">';
+                echo '<div class="contact-card-main">';
+                echo '<div class="contact-card-body">';
+                echo '<div class="contact-card-name">' . e($statusLabels[$estado]) . '</div>';
+                echo '<div class="contact-card-notes">' . nl2br(e($descripcion !== '' ? $descripcion : 'Sin descripción')) . '</div>';
+                echo '</div>';
+
+                echo '<div class="contact-card-actions">';
+                if ($estado !== 'pendiente') {
+                    echo '<form method="post" class="inline-form">';
+                    echo '<input type="hidden" name="action" value="set_eureka_estado">';
+                    echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
+                    echo '<input type="hidden" name="estado" value="pendiente">';
+                    echo '<button class="mini-link" type="submit">Pendiente</button>';
+                    echo '</form>';
+                }
+                if ($estado !== 'cumplida_v2') {
+                    echo '<form method="post" class="inline-form">';
+                    echo '<input type="hidden" name="action" value="set_eureka_estado">';
+                    echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
+                    echo '<input type="hidden" name="estado" value="cumplida_v2">';
+                    echo '<button class="mini-link" type="submit">Cumplida</button>';
+                    echo '</form>';
+                }
+                if ($estado !== 'descartada') {
+                    echo '<form method="post" class="inline-form">';
+                    echo '<input type="hidden" name="action" value="set_eureka_estado">';
+                    echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
+                    echo '<input type="hidden" name="estado" value="descartada">';
+                    echo '<button class="mini-link" type="submit">Descartar</button>';
+                    echo '</form>';
+                }
+                echo '<form method="post" class="inline-form">';
+                echo '<input type="hidden" name="action" value="generate_eureka_prompt">';
+                echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
+                echo '<button class="mini-link" type="submit">' . e($promptCodex !== '' ? 'Regenerar prompt' : 'Generar prompt') . '</button>';
+                echo '</form>';
+                echo '<a class="mini-link" href="index.php?page=josue&tab=eurekas&edit=' . e($row['id']) . '">Editar</a>';
+                echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar esta eureka?\')">';
+                echo '<input type="hidden" name="action" value="delete_eureka">';
+                echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
+                echo '<button class="btn-danger-mini" type="submit">Eliminar</button>';
+                echo '</form>';
+                echo '</div>';
+                echo '</div>';
+
+                if ($promptCodex !== '') {
+                    echo '<details style="margin-top:12px;">';
+                    echo '<summary>Prompt Codex' . ($promptGeneratedAt !== '' ? ' · ' . e(format_created_at($promptGeneratedAt)) : '') . '</summary>';
+                    echo '<div class="generated-box" style="margin-top:10px;">';
+                    echo '<div class="generated-box-head">';
+                    echo '<h3>Prompt listo para pasar a Codex</h3>';
+                    echo '<button type="button" class="btn-copy-mini" data-copy="' . e($promptCodex) . '">Copiar prompt</button>';
+                    echo '</div>';
+                    echo '<textarea class="generated-textarea" rows="14" readonly>' . e($promptCodex) . '</textarea>';
+                    echo '</div>';
+                    echo '</details>';
+                }
+
+                echo '<div class="muted contact-card-meta">Actualizado: ' . e($row['updated_at'] ?? '-') . '</div>';
+                echo '</article>';
+            }
+            echo '</div>';
+        }
+        echo '</section>';
+
+        echo '</div>';
+
+    } elseif ($tab === 'rutas') {
+        render_rutas_tab();
+
+    } elseif ($tab === 'diario') {
+        render_diario_tab();
+
+    } elseif ($tab === 'wasap') {
+        // ── WhatsApp Personal ──
+        $wasapSub = request_get('sub', 'chat');
+        echo '<div class="josue-head">';
+        echo '<h2>📱 WhatsApp Personal</h2>';
+        echo '<div style="display:flex;gap:8px;margin-top:6px">';
+        echo '<a class="subtab ' . ($wasapSub === 'chat' ? 'active' : '') . '" href="index.php?page=josue&tab=wasap&sub=chat">Chat</a>';
+        echo '<a class="subtab ' . ($wasapSub === 'config' ? 'active' : '') . '" href="index.php?page=josue&tab=wasap&sub=config">Config</a>';
+        echo '</div>';
+        echo '</div>';
+
+        if ($wasapSub === 'config') {
+            // ── Sub-tab Config: estado WAHA + QR ──
+            echo '<div class="wasap-config">';
+
+            // Card 1: Estado
+            echo '<div class="wasap-config-card">';
+            echo '<h3>Estado de conexión</h3>';
+            echo '<div id="wasapStatusCard">';
+            echo '<div id="wasapStatusContent"><span class="muted">Cargando...</span></div>';
+            echo '<div id="wasapQrBtnWrap" style="margin-top:12px;display:none"></div>';
+            echo '</div>';
+            echo '</div>';
+
+            // Card 2: Instrucciones
+            echo '<div class="wasap-config-card">';
+            echo '<h3>Vincular WhatsApp</h3>';
+            echo '<p class="muted">Para vincular tu WhatsApp personal:</p>';
+            echo '<ol style="margin:8px 0 0 16px;font-size:13px;color:var(--muted);line-height:1.8">';
+            echo '<li>Abre WhatsApp en tu móvil</li>';
+            echo '<li>Ve a <strong>Ajustes → Dispositivos vinculados</strong></li>';
+            echo '<li>Toca <strong>Vincular un dispositivo</strong></li>';
+            echo '<li>Apunta la cámara al código QR</li>';
+            echo '</ol>';
+            echo '</div>';
+            echo '</div>';
+
+            // QR Modal (hidden)
+            echo '<div id="wasapQrModal" class="wasap-qr-modal" style="display:none">';
+            echo '<div class="wasap-qr-modal-bg" onclick="wasapCloseQr()"></div>';
+            echo '<div class="wasap-qr-modal-box">';
+            echo '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+            echo '<h3 style="margin:0">Vincular WhatsApp</h3>';
+            echo '<button onclick="wasapCloseQr()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text)">✕</button>';
+            echo '</div>';
+            echo '<div id="wasapQrImageWrap" style="text-align:center;padding:16px;background:#fff;border-radius:8px;margin-bottom:12px">';
+            echo '<span class="muted">Cargando QR...</span>';
+            echo '</div>';
+            echo '<p id="wasapQrStatus" class="muted" style="text-align:center;margin-bottom:10px">Esperando...</p>';
+            echo '<div style="display:flex;gap:8px;justify-content:center">';
+            echo '<button onclick="wasapRegenerateQr()" class="btn-secondary-mini">🔄 Regenerar QR</button>';
+            echo '<button onclick="wasapCloseQr()" class="btn-secondary-mini">Cerrar</button>';
+            echo '</div>';
+            echo '</div>';
+            echo '</div>';
+
+            // Debug panel (visible on-screen)
+            echo '<div class="wasap-config-card" style="margin-top:12px"><h3>🐛 Debug Log</h3><div id="wasapDebug" style="background:#1a1a2e;color:#e0e0e0;font:11px/1.5 monospace;padding:10px;border-radius:6px;max-height:300px;overflow-y:auto;word-break:break-all"><div style="color:#888">Esperando inicio del script...</div></div></div>';
+
+            // JS
+            echo '<script>
+            (function(){
+                try {
+                // ── debug helpers ──
+                function wasapLog(msg) {
+                    console.log("[wasap]", msg);
+                    var d = document.getElementById("wasapDebug");
+                    if (d) {
+                        var time = new Date().toLocaleTimeString();
+                        var safe = String(msg).replace(/</g,"&lt;").replace(/>/g,"&gt;");
+                        d.innerHTML += "<div style=\"border-bottom:1px solid #252545;padding:2px 0\"><b style=\"color:#4fc3f7\">" + time + "</b> <span style=\"color:#ccc\">" + safe + "</span></div>";
+                        d.scrollTop = d.scrollHeight;
+                    }
+                }
+                function wasapLogErr(msg) {
+                    console.error("[wasap]", msg);
+                    var d = document.getElementById("wasapDebug");
+                    if (d) {
+                        var time = new Date().toLocaleTimeString();
+                        var safe = String(msg).replace(/</g,"&lt;").replace(/>/g,"&gt;");
+                        d.innerHTML += "<div style=\"border-bottom:1px solid #452525;padding:2px 0\"><b style=\"color:#ef5350\">" + time + "</b> <span style=\"color:#ff8a80\">" + safe + "</span></div>";
+                        d.scrollTop = d.scrollHeight;
+                    }
+                }
+                wasapLog("IIFE START");
+
+                var api = "personal_wasap_api.php";
+                var token = "&token=wasap_personal_2026";
+                var qrPolling = null;
+                var lastStatus = "";
+
+                function fetchWithTimeout(url, timeoutMs) {
+                    return new Promise(function(resolve, reject) {
+                        var timer = setTimeout(function(){ reject(new Error("timeout")); }, timeoutMs);
+                        fetch(url).then(function(r){
+                            clearTimeout(timer);
+                            resolve(r);
+                        }).catch(function(e){
+                            clearTimeout(timer);
+                            reject(e);
+                        });
+                    });
+                }
+
+                function checkStatus() {
+                    wasapLog("checkStatus() ENTERED");
+                    var el = document.getElementById("wasapStatusContent");
+                    var btnWrap = document.getElementById("wasapQrBtnWrap");
+                    if (!el) { wasapLogErr("checkStatus ABORT: #wasapStatusContent NOT FOUND in DOM!"); return; }
+                    wasapLog("DOM elements found OK (content="+!!el+", btnWrap="+!!btnWrap+")");
+
+                    var url = api + "?action=status" + token + "&_=" + Date.now();
+                    wasapLog("fetch START -> " + url);
+                    fetchWithTimeout(url, 12000)
+                    .then(function(r){
+                        wasapLog("fetch RESPONSE: HTTP " + r.status + " " + (r.ok?"OK":"FAIL"));
+                        if (!r.ok) throw new Error("HTTP " + r.status);
+                        return r.json();
+                    })
+                    .then(function(d){
+                        wasapLog("JSON PARSED: ok=" + d.ok + " status=" + d.status + " qr_available=" + d.qr_available);
+                        if (!d.ok) {
+                            el.innerHTML = "<div style=\"color:var(--danger);margin-bottom:4px\">🔴 " + (d.error||"Error") + "</div>";
+                            if (btnWrap) { btnWrap.innerHTML = "<button onclick=\"checkStatus()\" class=\"btn-secondary-mini\">🔄 Reintentar</button>"; btnWrap.style.display = "block"; }
+                            wasapLog("DOM: wrote error (" + (d.error||"Error") + ")");
+                            return;
+                        }
+                        var icon = d.status_icon||"?";
+                        var label = d.status_label||d.status||"?";
+                        var phone = d.health_phone || d.phone || "654464023";
+                        var html = "<div style=\"font-size:18px;margin-bottom:4px\">" + icon + " " + label + "</div>";
+                        html += "<div class=\"muted\">Teléfono: " + phone + "</div>";
+                        if (d.last_sync) html += "<div class=\"muted\" style=\"font-size:12px\">Última sincro: " + d.last_sync + "</div>";
+                        el.innerHTML = html;
+                        wasapLog("DOM UPDATED: statusContent <- " + icon + " " + label);
+
+                        // QR button
+                        if (btnWrap) {
+                            if (d.qr_available) {
+                                btnWrap.innerHTML = "<button onclick=\"wasapShowQr()\" class=\"btn-primary\">📱 Generar QR</button>";
+                                btnWrap.style.display = "block";
+                                wasapLog("DOM: QR button shown");
+                            } else if (d.is_connected) {
+                                btnWrap.innerHTML = "<div style=\"display:flex;flex-direction:column;align-items:flex-start;gap:10px\"><span style=\"color:var(--ok);font-weight:600\">✅ WhatsApp vinculado correctamente</span><button onclick=\"wasapRestartAndRescan()\" class=\"btn-secondary-mini\" style=\"background:var(--warning);color:#000;font-weight:600;border:none;padding:6px 14px;border-radius:6px;cursor:pointer\">🔄 Reiniciar sesión</button></div>";
+                                btnWrap.style.display = "block";
+                                wasapLog("DOM: connected label + restart button shown");
+                            } else if (d.status === "FAILED") {
+                                btnWrap.innerHTML = "<button onclick=\"wasapRestartWaha()\" class=\"btn-primary\" style=\"background:var(--danger)\">🔄 Reiniciar WAHA</button><br><small class=\"muted\">La sesión falló. Pulsa para reiniciar y luego escanea el QR.</small>";
+                                btnWrap.style.display = "block";
+                                wasapLog("DOM: restart button shown (status=FAILED)");
+                            } else {
+                                btnWrap.style.display = "none";
+                                wasapLog("DOM: button hidden (status=" + d.status + ")");
+                            }
+                        }
+
+                        // Auto-close QR modal if just connected
+                        if (d.is_connected && lastStatus === "SCAN_QR_CODE") {
+                            wasapLog("STATUS TRANSITION: SCAN_QR_CODE -> CONNECTED, closing modal");
+                            wasapCloseQr();
+                            if (el) { el.style.transition = "background 0.3s"; el.style.background = "rgba(37,211,102,0.08)"; setTimeout(function(){ el.style.background = ""; }, 2000); }
+                        }
+                        lastStatus = d.status;
+                    }).catch(function(e){
+                        var msg = (e.message === "timeout") ? "Tiempo de espera (WAHA no responde)" : (e.message||"Error de red");
+                        wasapLogErr("checkStatus FAILED: " + msg);
+                        el.innerHTML = "<div style=\"color:var(--danger);margin-bottom:4px\">⚠️ " + msg + "</div>";
+                        if (btnWrap) { btnWrap.innerHTML = "<button onclick=\"checkStatus()\" class=\"btn-secondary-mini\">🔄 Reintentar</button>"; btnWrap.style.display = "block"; }
+                    });
+                }
+
+                function wasapShowQr() {
+                    var modal = document.getElementById("wasapQrModal");
+                    if (!modal) return;
+                    modal.style.display = "flex";
+                    document.getElementById("wasapQrImageWrap").innerHTML = "<span class=\"muted\">Cargando QR...</span>";
+                    document.getElementById("wasapQrStatus").textContent = "Obteniendo QR de WAHA...";
+                    wasapFetchQr();
+                    // Start polling
+                    if (qrPolling) clearInterval(qrPolling);
+                    qrPolling = setInterval(function(){
+                        fetch(api + "?action=status" + token + "&_=" + Date.now())
+                        .then(function(r){return r.json()})
+                        .then(function(d){
+                            if (d.is_connected) {
+                                checkStatus();
+                                // modal will be closed by checkStatus detecting transition
+                            }
+                        }).catch(function(){});
+                    }, 4000);
+                }
+
+                function wasapFetchQr() {
+                    var wrap = document.getElementById("wasapQrImageWrap");
+                    var st = document.getElementById("wasapQrStatus");
+                    if (!wrap) return;
+
+                    console.log("[wasap] fetching QR...");
+                    var url = api + "?action=qr" + token + "&_=" + Date.now();
+                    fetchWithTimeout(url, 20000)
+                    .then(function(r){
+                        if (!r.ok) throw new Error("HTTP " + r.status);
+                        return r.json();
+                    })
+                    .then(function(d){
+                        console.log("[wasap] QR:", d.ok ? "OK ("+((d.qr_base64||"").length)+"b)" : "FAIL: "+(d.error||""));
+                        if (d.ok && d.qr_base64) {
+                            wrap.innerHTML = "<img src=\"data:image/png;base64," + d.qr_base64 + "\" style=\"max-width:260px;border-radius:4px\" alt=\"QR\" onerror=\"this.innerHTML=\'<span style=color:var(--danger)>❌ Error al mostrar QR</span>\';\">";
+                            if (st) st.textContent = "Escanea con WhatsApp → Vincular dispositivo";
+                        } else {
+                            wrap.innerHTML = "<div style=\"color:var(--danger);margin-bottom:6px\">❌ " + (d.error||"No se pudo obtener QR") + "</div><div class=\"muted\" style=\"font-size:12px\">" + (d.hint||"¿WAHA caído? Prueba \"Reiniciar WAHA\".") + "</div>";
+                            if (st) st.textContent = "Error. Usa \"Reiniciar WAHA\".";
+                        }
+                    }).catch(function(e){
+                        var msg = (e.message === "timeout") ? "Tiempo agotado (WAHA no responde)" : (e.message||"Error de red");
+                        console.log("[wasap] QR error:", msg);
+                        wrap.innerHTML = "<div style=\"color:var(--danger);margin-bottom:6px\">❌ " + msg + "</div><div class=\"muted\" style=\"font-size:12px\">WAHA parece caído. Usa \"Reiniciar WAHA\".</div>";
+                        if (st) st.textContent = "WAHA no responde. Necesitas reiniciarlo.";
+                    });
+                }
+
+                function wasapRegenerateQr() {
+                    document.getElementById("wasapQrImageWrap").innerHTML = "<span class=\"muted\">Regenerando QR...</span>";
+                    document.getElementById("wasapQrStatus").textContent = "Solicitando nuevo QR...";
+                    wasapFetchQr();
+                }
+
+                function wasapCloseQr() {
+                    document.getElementById("wasapQrModal").style.display = "none";
+                    if (qrPolling) { clearInterval(qrPolling); qrPolling = null; }
+                    checkStatus();
+                }
+
+                function wasapRestartWaha() {
+                    var btnWrap = document.getElementById("wasapQrBtnWrap");
+                    if (btnWrap) btnWrap.innerHTML = "<span style=\"color:var(--warning)\">⏳ Reiniciando WAHA... (~15s)</span>";
+                    var card = document.getElementById("wasapStatusCard");
+                    if (card) card.style.opacity = "0.5";
+                    console.log("[wasap] restarting WAHA...");
+                    fetch(api + "?action=restart" + token + "&_=" + Date.now())
+                    .then(function(r){return r.json()})
+                    .then(function(d){
+                        console.log("[wasap] restart response:", d.ok ? "OK" : "FAIL: "+(d.error||""));
+                        // Wait 10s then re-check
+                        setTimeout(function(){
+                            if (card) card.style.opacity = "1";
+                            checkStatus();
+                        }, 10000);
+                    }).catch(function(e){
+                        console.log("[wasap] restart error:", e);
+                        alert("Error al reiniciar WAHA. Intenta manualmente.");
+                        if (card) card.style.opacity = "1";
+                        checkStatus();
+                    });
+                }
+
+                function wasapRestartAndRescan() {
+                    if (!confirm("¿Reiniciar sesión de WhatsApp? Deberás volver a escanear el código QR para vincular de nuevo.")) return;
+                    var btnWrap = document.getElementById("wasapQrBtnWrap");
+                    if (btnWrap) btnWrap.innerHTML = "<span style=\"color:var(--warning)\">⏳ Reiniciando WAHA... (~15s)</span>";
+                    var card = document.getElementById("wasapStatusCard");
+                    if (card) card.style.opacity = "0.5";
+                    console.log("[wasap] restartAndRescan: calling restart...");
+                    fetch(api + "?action=restart" + token + "&_=" + Date.now())
+                    .then(function(r){return r.json()})
+                    .then(function(d){
+                        console.log("[wasap] restartAndRescan: response", d.ok ? "OK" : "FAIL: "+(d.error||""));
+                        // Wait 10s for WAHA to restart, then poll for QR
+                        setTimeout(function(){
+                            if (card) card.style.opacity = "1";
+                            console.log("[wasap] restartAndRescan: starting QR poll...");
+                            var pollCount = 0;
+                            var maxPolls = 30; // 30 * 2s = 60s max
+                            var pollForQr = setInterval(function(){
+                                pollCount++;
+                                fetch(api + "?action=status" + token + "&_=" + Date.now())
+                                .then(function(r){return r.json()})
+                                .then(function(sd){
+                                    console.log("[wasap] restartAndRescan: poll #"+pollCount+" qr_available="+sd.qr_available);
+                                    if (sd.qr_available) {
+                                        clearInterval(pollForQr);
+                                        console.log("[wasap] restartAndRescan: QR available, showing modal");
+                                        checkStatus(); // refresh status card
+                                        wasapShowQr();
+                                    }
+                                    if (pollCount >= maxPolls) {
+                                        clearInterval(pollForQr);
+                                        checkStatus();
+                                        if (!sd.qr_available) {
+                                            alert("WAHA no ha generado QR tras 60s. Revisa el estado de conexión.");
+                                        }
+                                    }
+                                }).catch(function(){
+                                    if (pollCount >= maxPolls) {
+                                        clearInterval(pollForQr);
+                                        checkStatus();
+                                    }
+                                });
+                            }, 2000);
+                        }, 10000);
+                    }).catch(function(e){
+                        console.log("[wasap] restartAndRescan: error", e);
+                        alert("Error al reiniciar WAHA. Intenta manualmente.");
+                        if (card) card.style.opacity = "1";
+                        checkStatus();
+                    });
+                }
+
+                // Expose to global scope
+                window.wasapShowQr = wasapShowQr;
+                window.wasapRegenerateQr = wasapRegenerateQr;
+                window.wasapCloseQr = wasapCloseQr;
+                window.wasapFetchQr = wasapFetchQr;
+                window.wasapRestartWaha = wasapRestartWaha;
+                window.wasapRestartAndRescan = wasapRestartAndRescan;
+                wasapLog("Functions exposed to window OK");
+
+                // Init
+                wasapLog("Calling checkStatus() for the first time...");
+                checkStatus();
+                // Refresh every 15s
+                wasapLog("Setting 15s interval for status polling");
+                setInterval(function(){
+                    wasapLog("Timer: calling checkStatus()");
+                    checkStatus();
+                }, 15000);
+                wasapLog("IIFE INIT COMPLETE");
+
+            } catch(e) {
+                wasapLogErr("IIFE FATAL ERROR: " + (e.message||String(e)) + " | stack: " + (e.stack||"none"));
+                var el = document.getElementById("wasapDebug");
+                if (el) el.style.background = "#2d0000";
+            }
+            })();
+            </script>';
+
+        } else {
+            // ── Sub-tab Chat: interfaz de conversación ──
+            $apiBase = 'personal_wasap_api.php';
+            echo '<div class="wasap-chat-shell" id="wasapChatShell">';
+
+            // Sidebar: lista de chats
+            echo '<div class="wasap-sidebar" id="wasapSidebar">';
+            echo '<div class="wasap-sidebar-head">';
+            echo '<input type="text" class="wasap-search" id="wasapSearch" placeholder="🔍 Buscar...">';
+            echo '</div>';
+            echo '<div class="wasap-chat-list" id="wasapChatList">';
+            echo '<div class="wasap-chat-list-empty">Cargando conversaciones...</div>';
+            echo '</div>';
+            echo '</div>';
+
+            // Panel principal de chat
+            echo '<div class="wasap-chat-main" id="wasapChatMain">';
+            echo '<div class="wasap-chat-header" id="wasapChatHeader">';
+            echo '<div class="wasap-chat-header-info">';
+            echo '<div class="wasap-chat-header-name" id="wasapChatName">Selecciona una conversación</div>';
+            echo '<div class="wasap-chat-header-phone" id="wasapChatPhone"></div>';
+            echo '</div>';
+            echo '<button class="wasap-btn-icon" id="wasapBtnEditName" title="Editar nombre" onclick="wasapEditSelectedContact()" style="display:none">✏️</button>';
+            echo '<button class="wasap-btn-icon" id="wasapBtnTts" title="Leer en voz alta" onclick="wasapReadAloud()" style="display:none">🔊</button>';
+            echo '</div>';
+
+            echo '<div class="wasap-chat-messages" id="wasapMessages">';
+            echo '<div class="wasap-chat-placeholder">';
+            echo '<div style="font-size:48px;margin-bottom:12px">💬</div>';
+            echo '<div>Selecciona una conversación para ver los mensajes</div>';
+            echo '</div>';
+            echo '</div>';
+
+            echo '<div class="wasap-input-area" id="wasapInputArea" style="display:none">';
+            echo '<textarea id="wasapInputText" class="wasap-input" rows="1" placeholder="Escribe un mensaje..." onkeydown="wasapInputKey(event)"></textarea>';
+            echo '<button class="wasap-btn-send" id="wasapBtnSend" onclick="wasapSendMessage()">▶</button>';
+            echo '</div>';
+            echo '</div>';
+
+            echo '</div>'; // .wasap-chat-shell
+
+            // ── JS del chat ──
+            echo '<script>
+            (function(){
+                var api = "' . e($apiBase) . '";
+                var token = "&token=wasap_personal_2026";
+                var selectedChat = null;
+                var chatMessages = [];
+                var pollingTimer = null;
+                var lastChatsJson = "";
+                var lastMessagesJson = "";
+                var unreadCache = {};
+
+                // ── Cargar lista de chats ──
+                function loadChats() {
+                    fetch(api + "?action=chats" + token + "&_=" + Date.now())
+                    .then(function(r){return r.json()})
+                    .then(function(d){
+                        if (!d.ok) return;
+                        var json = JSON.stringify(d.chats || []);
+                        if (json === lastChatsJson) return;
+                        lastChatsJson = json;
+                        unreadCache = {};
+                        (d.chats||[]).forEach(function(c){ unreadCache[c.chat_id] = c.unread_count || 0; });
+                        renderChatList(d.chats||[]);
+                    }).catch(function(){});
+                }
+
+                function renderChatList(chats) {
+                    var list = document.getElementById("wasapChatList");
+                    if (!list) return;
+                    if (!chats.length) {
+                        list.innerHTML = "<div class=\"wasap-chat-list-empty\">No hay conversaciones aún</div>";
+                        return;
+                    }
+                    var h = "";
+                    for (var i = 0; i < chats.length; i++) {
+                        var c = chats[i];
+                        var name = c.contact_name || formatPhone(c.phone || "");
+                        var unread = c.unread_count > 0 ? "<span class=\"wasap-badge\">" + c.unread_count + "</span>" : "";
+                        var active = selectedChat === c.chat_id ? " active" : "";
+                        var lastMsg = c.last_message || "";
+                        h += "<div class=\"wasap-chat-item" + active + "\" data-chat-id=\"" + escAttr(c.chat_id) + "\" onclick=\"wasapSelectChat(\'" + escAttr(c.chat_id) + "\')\">";
+                        h += "<div class=\"wasap-chat-item-top\"><span class=\"wasap-chat-item-name\">" + esc(name) + "</span>";
+                        h += "<button class=\"wasap-chat-item-edit\" title=\"Renombrar\" onclick=\"event.stopPropagation();wasapRenameContact(\'" + escAttr(c.chat_id) + "\',\'" + escAttr(name) + "\')\">✏️</button>";
+                        h += "</div>";
+                        h += "<div class=\"wasap-chat-item-bottom\">";
+                        h += "<span class=\"wasap-chat-item-phone\">" + esc(c.phone || "") + "</span>";
+                        if (unread) h += unread;
+                        h += "</div>";
+                        if (lastMsg) h += "<div class=\"wasap-chat-item-msg\">" + esc(lastMsg) + "</div>";
+                        h += "</div>";
+                    }
+                    list.innerHTML = h;
+                }
+
+                // ── Seleccionar chat ──
+                window.wasapSelectChat = function(chatId) {
+                    selectedChat = chatId;
+                    chatMessages = [];
+                    lastMessagesJson = "";
+                    document.getElementById("wasapInputArea").style.display = "flex";
+                    document.getElementById("wasapBtnTts").style.display = "inline-block";
+                    document.getElementById("wasapBtnEditName").style.display = "inline-block";
+                    document.getElementById("wasapChatName").textContent = "Cargando...";
+                    document.getElementById("wasapChatPhone").textContent = "";
+                    document.getElementById("wasapMessages").innerHTML = "";
+                    // Marcar como leído
+                    fetch(api + "?action=mark_read" + token, {
+                        method: "POST",
+                        headers: {"Content-Type":"application/x-www-form-urlencoded"},
+                        body: "chat_id=" + encodeURIComponent(chatId)
+                    }).catch(function(){});
+                    loadMessages();
+                    loadChats(); // refrescar sidebar (quitar badge)
+                };
+
+                // ── Cargar mensajes ──
+                function loadMessages() {
+                    if (!selectedChat) return;
+                    fetch(api + "?action=messages" + token + "&chat_id=" + encodeURIComponent(selectedChat) + "&_=" + Date.now())
+                    .then(function(r){return r.json()})
+                    .then(function(d){
+                        if (!d.ok) return;
+                        var json = JSON.stringify(d.messages||[]);
+                        if (json === lastMessagesJson) return;
+                        lastMessagesJson = json;
+                        chatMessages = d.messages||[];
+                        if (d.chat) {
+                            document.getElementById("wasapChatName").textContent = d.chat.contact_name || formatPhone(d.chat.contact_phone || "");
+                            document.getElementById("wasapChatPhone").textContent = d.chat.contact_phone || "";
+                        }
+                        renderMessages();
+                    }).catch(function(){});
+                }
+
+                function renderMessages() {
+                    var area = document.getElementById("wasapMessages");
+                    if (!area) return;
+                    // Dedup por id (safety net por si el store tiene duplicados historicos)
+                    var seen = {};
+                    var uniq = [];
+                    for (var i = 0; i < chatMessages.length; i++) {
+                        var mId = chatMessages[i].id || "";
+                        if (!seen[mId]) { seen[mId] = true; uniq.push(chatMessages[i]); }
+                    }
+                    chatMessages = uniq;
+                    if (!chatMessages.length) {
+                        area.innerHTML = "<div class=\"wasap-chat-placeholder\"><div>Sin mensajes</div></div>";
+                        return;
+                    }
+                    var wasAtBottom = (area.scrollHeight - area.scrollTop - area.clientHeight) <= 80;
+                    var lastDate = "";
+                    var h = "";
+                    for (var i = 0; i < chatMessages.length; i++) {
+                        var m = chatMessages[i];
+                        var d = formatMsgDate(m.ts||"");
+                        if (d !== lastDate) {
+                            h += "<div class=\"wasap-date-sep\"><span>" + esc(d) + "</span></div>";
+                            lastDate = d;
+                        }
+                        if (m.direction === "in") {
+                            h += "<div class=\"wasap-bubble in\"><div class=\"wasap-bubble-text\">" + esc(m.text||"") + "</div><div class=\"wasap-bubble-time\">" + esc(formatMsgTime(m.ts||"")) + "</div></div>";
+                        } else {
+                            h += "<div class=\"wasap-bubble out\"><div class=\"wasap-bubble-text\">" + esc(m.text||"") + "</div><div class=\"wasap-bubble-time\">" + esc(formatMsgTime(m.ts||"")) + " ✓✓</div></div>";
+                        }
+                    }
+                    area.innerHTML = h;
+                    if (wasAtBottom) area.scrollTop = area.scrollHeight;
+                }
+
+                // ── Enviar mensaje ──
+                window.wasapSendMessage = function() {
+                    var input = document.getElementById("wasapInputText");
+                    var text = (input.value||"").trim();
+                    if (!text || !selectedChat) return;
+                    input.value = "";
+                    var btn = document.getElementById("wasapBtnSend");
+                    btn.disabled = true;
+                    btn.textContent = "...";
+                    fetch(api + "?action=send" + token, {
+                        method: "POST",
+                        headers: {"Content-Type":"application/x-www-form-urlencoded"},
+                        body: "chat_id=" + encodeURIComponent(selectedChat) + "&text=" + encodeURIComponent(text)
+                    }).then(function(r){return r.json()}).then(function(d){
+                        btn.disabled = false;
+                        if (d.ok) {
+                            btn.textContent = "▶";
+                            loadMessages();
+                            loadChats();
+                        } else {
+                            // Error → feedback visual, restaurar texto para reintentar
+                            btn.textContent = "❌";
+                            input.value = text;
+                            setTimeout(function(){ if (btn) btn.textContent = "▶"; }, 1500);
+                        }
+                    }).catch(function(){
+                        btn.disabled = false;
+                        btn.textContent = "❌";
+                        input.value = text;
+                        setTimeout(function(){ if (btn) btn.textContent = "▶"; }, 1500);
+                    });
+                };
+
+                // ── Enviar con Enter ──
+                window.wasapInputKey = function(e) {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        wasapSendMessage();
+                    }
+                };
+
+                // ── Leer en voz alta ──
+                window.wasapReadAloud = function() {
+                    if (!chatMessages.length) return;
+                    // Usar TTS del navegador
+                    var unread = chatMessages.filter(function(m){ return m.direction === "in"; });
+                    if (!unread.length) { alert("No hay mensajes para leer"); return; }
+                    var text = unread.map(function(m){ return m.text||""; }).join(". ");
+                    if ("speechSynthesis" in window) {
+                        var u = new SpeechSynthesisUtterance(text);
+                        u.lang = "es-ES";
+                        u.rate = 1.0;
+                        speechSynthesis.cancel();
+                        speechSynthesis.speak(u);
+                    } else {
+                        alert("Tu navegador no soporta lectura en voz alta");
+                    }
+                };
+
+                // ── Renombrar contacto ──
+                window.wasapRenameContact = function(chatId, currentName) {
+                    // Si el nombre actual está vacío o es solo un teléfono (empieza por "+"),
+                    // prellenar el prompt vacío para escribir directamente el nombre real.
+                    var prefill = (currentName || "").trim();
+                    if (/^\+/.test(prefill)) prefill = "";
+                    var newName = prompt("Nombre para este contacto:", prefill);
+                    if (!newName || newName.trim() === "") return;
+                    fetch(api + "?action=rename_contact" + token, {
+                        method: "POST",
+                        headers: {"Content-Type":"application/x-www-form-urlencoded"},
+                        body: "chat_id=" + encodeURIComponent(chatId) + "&name=" + encodeURIComponent(newName.trim())
+                    }).then(function(r){return r.json()}).then(function(d){
+                        if (d.ok) {
+                            loadChats();
+                            if (selectedChat === chatId) {
+                                document.getElementById("wasapChatName").textContent = d.contact_name;
+                            }
+                        }
+                    }).catch(function(){});
+                };
+
+                // ── Editar nombre del chat abierto (desde la cabecera) ──
+                window.wasapEditSelectedContact = function() {
+                    if (!selectedChat) return;
+                    var nameEl = document.getElementById("wasapChatName");
+                    var currentName = nameEl ? nameEl.textContent : "";
+                    wasapRenameContact(selectedChat, currentName);
+                };
+
+                // ── Polling ──
+                function startPolling() {
+                    loadChats();
+                    pollingTimer = setInterval(function(){
+                        loadChats();
+                        if (selectedChat) loadMessages();
+                    }, 3000);
+                }
+
+                // ── Helpers ──
+                function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+                function escAttr(s) { return String(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\'/g,"\\\'"); }
+                function formatPhone(p) { p = String(p||""); if (p.length >= 9) return "+" + p.substring(0,2) + " " + p.substring(2,5) + " " + p.substring(5,8) + " " + p.substring(8); return p; }
+                function formatMsgDate(ts) {
+                    if (!ts) return "";
+                    var d = new Date(ts);
+                    if (isNaN(d.getTime())) {
+                        // intentar parsear "2026-07-27T..."
+                        var parts = ts.split("T")[0];
+                        if (parts) return parts.split("-").reverse().join("/");
+                        return "";
+                    }
+                    var today = new Date();
+                    if (d.toDateString() === today.toDateString()) return "Hoy";
+                    var yesterday = new Date(today); yesterday.setDate(today.getDate()-1);
+                    if (d.toDateString() === yesterday.toDateString()) return "Ayer";
+                    return ("0"+d.getDate()).slice(-2) + "/" + ("0"+(d.getMonth()+1)).slice(-2) + "/" + d.getFullYear();
+                }
+                function formatMsgTime(ts) {
+                    if (!ts) return "";
+                    var d = new Date(ts);
+                    if (isNaN(d.getTime())) {
+                        var timePart = (ts||"").split("T")[1];
+                        if (timePart) return timePart.substring(0,5);
+                        return "";
+                    }
+                    return ("0"+d.getHours()).slice(-2) + ":" + ("0"+d.getMinutes()).slice(-2);
+                }
+                function focusInput() {
+                    var inp = document.getElementById("wasapInputText");
+                    if (inp) inp.focus();
+                }
+
+                // Búsqueda
+                var searchInput = document.getElementById("wasapSearch");
+                if (searchInput) {
+                    searchInput.addEventListener("input", function(){
+                        var q = (this.value||"").toLowerCase();
+                        var items = document.querySelectorAll(".wasap-chat-item");
+                        items.forEach(function(item){
+                            var name = (item.querySelector(".wasap-chat-item-name")||{}).textContent||"";
+                            var phone = (item.querySelector(".wasap-chat-item-phone")||{}).textContent||"";
+                            item.style.display = (name.toLowerCase().indexOf(q) !== -1 || phone.indexOf(q) !== -1) ? "" : "none";
+                        });
+                    });
+                }
+
+                startPolling();
+            })();
+            </script>';
+        }
 
     } else {
         $title = ($tab === 'publias') ? 'PublIas' : (($tab === 'captacion') ? 'Captacion' : (($tab === 'notas') ? 'Notas' : 'WAHA'));
@@ -8233,6 +9724,534 @@ if (!empty($sendtaxsState)) {
 
     echo '</div>';
     echo '</section>';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RUTAS — GPS tracking dashboard dentro de Josue
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function render_rutas_tab() {
+    $day = request_get('day', date('Y-m-d'));
+    $allPositions = gps_read_positions(0); // sin límite de días
+    $grouped      = gps_group_by_day($allPositions);
+
+    // Días disponibles para el selector
+    $availableDays = array_keys($grouped);
+    rsort($availableDays); // más reciente primero
+
+    // Si no hay datos para el día pedido, usar el último día con datos
+    if (!isset($grouped[$day]) && !empty($availableDays)) {
+        $day = $availableDays[0];
+    }
+
+    $dayPositions = isset($grouped[$day]) ? $grouped[$day] : array();
+    $prevDayPos   = null;
+    // Buscar último punto del día anterior (para dibujar continuidad)
+    $prevIdx = array_search($day, $availableDays, true);
+    if ($prevIdx !== false && isset($availableDays[$prevIdx + 1])) {
+        $prevDayKey = $availableDays[$prevIdx + 1];
+        if (!empty($grouped[$prevDayKey])) {
+            $prevDayPos = end($grouped[$prevDayKey]);
+        }
+    }
+
+    $kpi      = gps_kpi_summary($allPositions, 'lite');
+    $timeline = gps_timeline_for_day($dayPositions);
+
+    // ── Detección de lugares ──
+    $places        = gps_detect_places($allPositions);
+    $totalDaysData = gps_days_for_user($allPositions);
+    $showPlaces    = $totalDaysData >= 3; // necesita al menos 3 días de datos
+
+    // ── Curiosidades (Fase 3) ──
+    $curiosities = gps_curiosities($allPositions, $places);
+    $showCuriosities = $totalDaysData >= 5; // necesita al menos 5 días para curiosidades fiables
+
+    // Preparar datos para el mapa (JS los consumirá)
+    $mapPoints = array();
+    foreach ($dayPositions as $p) {
+        $mapPoints[] = array(
+            'lat'   => (float)$p['lat'],
+            'lng'   => (float)$p['lng'],
+            'ts'    => $p['ts'],
+            'time'  => date('H:i', $p['_ts']),
+            'acc'   => (float)$p['acc'],
+            'user'  => $p['user'] ?? 'unknown',
+        );
+    }
+
+    $mapData = array(
+        'points'     => $mapPoints,
+        'prevPoint'  => $prevDayPos ? array(
+            'lat'  => (float)$prevDayPos['lat'],
+            'lng'  => (float)$prevDayPos['lng'],
+        ) : null,
+        'center'     => !empty($mapPoints) ? array(
+            'lat' => $mapPoints[0]['lat'],
+            'lng' => $mapPoints[0]['lng'],
+        ) : null,
+    );
+    $mapJson = json_encode($mapData);
+
+    echo '<div class="josue-head">';
+    echo '<h2>Rutas — ' . e(gps_fmt_date($day)) . '</h2>';
+    // Selector de día
+    if (!empty($availableDays)) {
+        echo '<form method="get" class="rutas-day-form">';
+        echo '<input type="hidden" name="page" value="josue">';
+        echo '<input type="hidden" name="tab" value="rutas">';
+        echo '<select name="day" onchange="this.form.submit()" class="rutas-day-select">';
+        foreach ($availableDays as $d) {
+            $sel = ($d === $day) ? ' selected' : '';
+            echo '<option value="' . e($d) . '"' . $sel . '>' . e(gps_fmt_date($d)) . '</option>';
+        }
+        echo '</select>';
+        echo '</form>';
+    }
+    echo '</div>';
+
+    // ── KPI cards ──
+    $lastPos       = $kpi['last'];
+    $lastActivePos = $kpi['last_active'];
+    echo '<div class="cards four rutas-kpi-row">';
+
+    // 🅿️ Último aparcamiento (solo coche/lite)
+    echo '<div class="panel rutas-kpi">';
+    echo '<div class="rutas-kpi-label">🅿️ Último aparcamiento</div>';
+    if ($lastPos) {
+        echo '<div class="rutas-kpi-coords">' . e($lastPos['lat']) . ', ' . e($lastPos['lng']) . '</div>';
+        echo '<div class="rutas-kpi-meta">hace ' . e($kpi['last_ago']) . ' · precisión ' . e($lastPos['acc']) . 'm</div>';
+        echo '<a class="rutas-kpi-maps" href="#" onclick="window._rutasMapGoTo(' . e($lastPos['lat']) . ',' . e($lastPos['lng']) . ',17);return false;">📍 Ver en mapa →</a>';
+    } else {
+        echo '<div class="rutas-kpi-meta">Sin datos todavía</div>';
+    }
+    // Última posición de cualquier cuenta
+    if ($lastActivePos && $lastPos !== $lastActivePos && ($lastActivePos['user'] ?? '') !== 'lite') {
+        echo '<div class="rutas-kpi-sub">📱 Última activa: <strong>' . e($kpi['last_active_user']) . '</strong> hace ' . e($kpi['last_active_ago']) . '</div>';
+    }
+    echo '</div>';
+
+    // 📍 Hoy
+    echo '<div class="panel rutas-kpi">';
+    echo '<div class="rutas-kpi-label">📍 Hoy</div>';
+    echo '<div class="rutas-kpi-big">' . e($kpi['today_km']) . ' <small>km</small></div>';
+    echo '<div class="rutas-kpi-meta">' . e($kpi['today_trips']) . ' trayectos · ' . e($kpi['today_positions']) . ' posiciones</div>';
+    echo '</div>';
+
+    // 📊 Semana
+    echo '<div class="panel rutas-kpi">';
+    echo '<div class="rutas-kpi-label">📊 Esta semana</div>';
+    echo '<div class="rutas-kpi-big">' . e($kpi['week_km']) . ' <small>km</small></div>';
+    echo '<div class="rutas-kpi-meta">' . e($kpi['week_trips']) . ' trayectos en ' . e($kpi['week_days']) . ' días</div>';
+    if ($kpi['week_avg_km'] > 0) {
+        echo '<div class="rutas-kpi-sub">Media: ' . e($kpi['week_avg_km']) . ' km/día</div>';
+    }
+    echo '</div>';
+
+    // 📡 Total posiciones
+    echo '<div class="panel rutas-kpi">';
+    echo '<div class="rutas-kpi-label">📡 Total posiciones</div>';
+    echo '<div class="rutas-kpi-big">' . count($allPositions) . '</div>';
+    echo '<div class="rutas-kpi-meta">' . count($availableDays) . ' días con datos</div>';
+    if ($lastActivePos) {
+        echo '<div class="rutas-kpi-sub">Última: <strong>' . e($kpi['last_active_user']) . '</strong> hace ' . e($kpi['last_active_ago']) . '</div>';
+    }
+    echo '</div>';
+
+    echo '</div>'; // .cards.four
+
+    // ── Lugares detectados ──
+    if (!empty($places)) {
+        echo '<div class="panel rutas-places-panel">';
+        echo '<h3 class="rutas-section-title">🗺️ Lugares detectados <span class="rutas-badge-auto">automático</span></h3>';
+        if (!$showPlaces) {
+            $remaining = 3 - $totalDaysData;
+            echo '<div class="rutas-places-banner">⏳ Datos preliminares · se necesitan ' . e($remaining) . ' día(s) más para afinar la detección</div>';
+        }
+        echo '<div class="rutas-places-grid">';
+        foreach ($places as $place) {
+            $confClass    = 'rutas-conf-' . $place['confidence'];
+            $label        = $place['label'];
+            $isCustom     = ($place['confidence'] === 'personalizada');
+            $isThin       = (!$isCustom && strpos($label, '📍 Lugar') === 0 && in_array($place['confidence'], array('mínima', 'baja'), true));
+            // Extraer emoji del label (si empieza con uno)
+            $icon = '📍';
+            $name = $label;
+            if (preg_match('/^([\x{1F300}-\x{1F9FF}])/u', $label, $m)) {
+                $icon = $m[1];
+                $name = trim(substr($label, strlen($m[1])));
+            }
+            echo '<div class="rutas-place-card' . ($isThin ? ' rutas-place-unlabeled' : '') . '">';
+            echo '<div class="rutas-place-icon">' . e($icon) . '</div>';
+            echo '<div class="rutas-place-info">';
+            // Nombre + botón editar
+            echo '<div class="rutas-place-name-row">';
+            echo '<span class="rutas-place-name">' . e($name) . '</span>';
+            echo '<button type="button" class="rutas-place-edit-btn" onclick="var f=this.parentElement.nextElementSibling.nextElementSibling;f.style.display=f.style.display===\'block\'?\'none\':\'block\';return false;" title="Renombrar lugar">✏️</button>';
+            echo '</div>';
+            echo '<div class="rutas-place-coords">' . e($place['center_lat']) . ', ' . e($place['center_lng']) . '</div>';
+            // Formulario inline de edición (oculto por defecto)
+            echo '<form method="post" class="rutas-place-edit-form" style="display:none;">';
+            echo '<input type="hidden" name="action" value="rename_place">';
+            echo '<input type="hidden" name="lat" value="' . e(round($place['center_lat'], 4)) . '">';
+            echo '<input type="hidden" name="lng" value="' . e(round($place['center_lng'], 4)) . '">';
+            echo '<input type="text" name="name" value="' . e($name) . '" class="rutas-place-edit-input" placeholder="Nombre del lugar...">';
+            echo '<button type="submit" class="rutas-place-edit-save" title="Guardar">💾</button>';
+            echo '<button type="button" class="rutas-place-edit-cancel" onclick="this.parentElement.style.display=\'none\';return false;" title="Cancelar">✖</button>';
+            echo '</form>';
+            // Meta
+            echo '<div class="rutas-place-meta">';
+            echo e($place['total_hours']) . 'h total · ' . e($place['days']) . ' días · ' . e($place['points']) . ' puntos';
+            echo '</div>';
+            // Confianza
+            echo '<div class="rutas-place-confidence ' . $confClass . '">confianza: ' . e($place['confidence']) . '</div>';
+            echo '</div>';
+            echo '<a class="rutas-place-maps" href="#" onclick="window._rutasMapGoTo(' . e($place['center_lat']) . ',' . e($place['center_lng']) . ',16);return false;" title="Ver en mapa">📍</a>';
+            // Botón ocultar (mini form POST)
+            echo '<form method="post" class="rutas-place-hide-form" style="display:inline;margin:0;padding:0;" onsubmit="return confirm(\'¿Ocultar este lugar?\');">';
+            echo '<input type="hidden" name="action" value="hide_place">';
+            echo '<input type="hidden" name="lat" value="' . e(round($place['center_lat'], 4)) . '">';
+            echo '<input type="hidden" name="lng" value="' . e(round($place['center_lng'], 4)) . '">';
+            echo '<button type="submit" class="rutas-place-hide-btn" title="Ocultar lugar">🗑️</button>';
+            echo '</form>';
+            echo '</div>';
+        }
+        echo '</div>';
+        echo '</div>';
+    } elseif (!$showPlaces && !empty($allPositions)) {
+        $remaining = 3 - $totalDaysData;
+        echo '<div class="panel rutas-places-panel rutas-places-waiting">';
+        echo '<div class="rutas-empty-text">⏳ Recopilando patrones…</div>';
+        echo '<div class="rutas-empty-hint">Se necesitan al menos 3 días de datos GPS para detectar lugares automáticamente. Te quedan ' . e($remaining) . ' día(s). Mientras tanto puedes ver las posiciones en el mapa y el timeline.</div>';
+        echo '</div>';
+    }
+
+    // ── Mapa ──
+    if (!empty($mapPoints)) {
+        echo '<div class="panel rutas-map-panel">';
+        echo '<div id="rutasMapNav" class="rutas-map-nav" style="display:none;"><button class="rutas-map-nav-btn" onclick="window._rutasMapReset();">← Ver día completo</button><span id="rutasMapNavLabel" class="rutas-map-nav-label"></span></div>';
+        echo '<div id="rutasMap" class="rutas-map"></div>';
+        echo '</div>';
+    } else {
+        echo '<div class="panel rutas-map-panel rutas-empty">';
+        echo '<div class="rutas-empty-text">📡 No hay datos GPS para ' . e(gps_fmt_date($day)) . '</div>';
+        echo '<div class="rutas-empty-hint">El tracking GPS se activa automáticamente al abrir la app. Los datos aparecerán aquí cuando el dispositivo empiece a enviar posiciones.</div>';
+        echo '</div>';
+    }
+
+    // ── Timeline ──
+    if (!empty($timeline)) {
+        echo '<div class="panel rutas-timeline-panel">';
+        echo '<h3 class="rutas-section-title">⏱️ Cronología del día</h3>';
+        echo '<div class="rutas-timeline">';
+        foreach ($timeline as $evIdx => $ev) {
+            // Buscar el lugar más cercano para enriquecer la etiqueta
+            $nearbyPlace = $showPlaces ? gps_match_position_to_place($ev['lat'], $ev['lng'], $places) : null;
+            $placeName   = $nearbyPlace ? $nearbyPlace['label'] : null;
+
+            if ($ev['type'] === 'trip_end') {
+                $dist  = isset($ev['distance']) ? $ev['distance'] . ' km' : '';
+                $dur   = gps_fmt_duration($ev['duration']);
+                $lbl   = $placeName ? 'Trayecto → ' . $placeName : 'Trayecto';
+
+                // Datos del trayecto para el mapa
+                $tripData = json_encode(array(
+                    'startLat' => (float)$ev['start_lat'],
+                    'startLng' => (float)$ev['start_lng'],
+                    'endLat'   => (float)$ev['end_lat'],
+                    'endLng'   => (float)$ev['end_lng'],
+                    'label'    => $lbl . ' · ' . $dist . ($dist && $dur ? ' · ' : '') . $dur,
+                    'points'   => isset($ev['route_points']) ? $ev['route_points'] : array(),
+                ));
+
+                echo '<div class="rutas-timeline-item rutas-timeline-trip rutas-clickable" data-trip=\'' . $tripData . '\' onclick="window._rutasMapShowTrip(JSON.parse(this.getAttribute(\'data-trip\')));">';
+                echo '<span class="rutas-timeline-time">' . e($ev['time']) . '</span>';
+                echo '<span class="rutas-timeline-icon">🚗</span>';
+                echo '<div class="rutas-timeline-body">';
+                echo '<span class="rutas-timeline-label">' . e($lbl) . '</span>';
+                if ($dist || $dur) {
+                    echo '<span class="rutas-timeline-detail">' . e($dist . ($dist && $dur ? ' · ' : '') . $dur) . '</span>';
+                }
+                echo '<span class="rutas-timeline-maps">📍 Ver ruta</span>';
+                echo '</div>';
+                echo '</div>';
+            } elseif ($ev['type'] === 'stop_end') {
+                $dur  = gps_fmt_duration($ev['duration']);
+                $lbl  = $placeName ? 'Aparcado en ' . $placeName : 'Aparcado';
+                echo '<div class="rutas-timeline-item rutas-timeline-stop rutas-clickable" onclick="window._rutasMapGoTo(' . e($ev['lat']) . ',' . e($ev['lng']) . ',16);">';
+                echo '<span class="rutas-timeline-time">' . e($ev['time']) . '</span>';
+                echo '<span class="rutas-timeline-icon">📌</span>';
+                echo '<div class="rutas-timeline-body">';
+                echo '<span class="rutas-timeline-label">' . e($lbl) . '</span>';
+                if ($dur) {
+                    echo '<span class="rutas-timeline-detail">' . e($dur) . '</span>';
+                }
+                echo '<span class="rutas-timeline-maps">📍 Ver</span>';
+                echo '</div>';
+                echo '</div>';
+            }
+        }
+        echo '</div>';
+        echo '</div>';
+    } elseif (!empty($dayPositions)) {
+        echo '<div class="panel rutas-timeline-panel">';
+        echo '<h3 class="rutas-section-title">⏱️ Cronología del día</h3>';
+        echo '<div class="rutas-timeline-simple">';
+        foreach ($dayPositions as $p) {
+            $nearbyPlace = $showPlaces ? gps_match_position_to_place($p['lat'], $p['lng'], $places) : null;
+            $placeLabel  = $nearbyPlace ? ' · ' . $nearbyPlace['label'] : '';
+            echo '<div class="rutas-timeline-item rutas-timeline-point rutas-clickable" onclick="window._rutasMapGoTo(' . e($p['lat']) . ',' . e($p['lng']) . ',16);">';
+            echo '<span class="rutas-timeline-time">' . e(date('H:i', $p['_ts'])) . '</span>';
+            echo '<span class="rutas-timeline-icon">📍</span>';
+            echo '<div class="rutas-timeline-body">';
+            echo '<span class="rutas-timeline-coords">' . e($p['lat']) . ', ' . e($p['lng']) . e($placeLabel) . '</span>';
+            echo '<span class="rutas-timeline-maps">📍 Ver</span>';
+            echo '</div>';
+            echo '</div>';
+        }
+        echo '</div>';
+        echo '</div>';
+    }
+
+    // ── Curiosidades ──
+    if ($totalDaysData >= 1 && !empty($allPositions)) {
+        $c = $curiosities;
+        echo '<div class="panel rutas-curiosidades-panel">';
+
+        // Cabecera con botón export
+        echo '<div class="rutas-curiosidades-head">';
+        echo '<h3 class="rutas-section-title">💡 Curiosidades</h3>';
+        if (!empty($dayPositions)) {
+            echo '<a class="btn-secondary-mini" href="index.php?action=export_gpx&day=' . e($day) . '" download>📥 Exportar GPX</a>';
+        }
+        echo '</div>';
+
+        if (!$showCuriosities) {
+            $remaining = 5 - $totalDaysData;
+            echo '<div class="rutas-places-banner">⏳ Datos preliminares · ' . e($remaining) . ' día(s) más para estadísticas completas</div>';
+        }
+
+        $hasAnyCard = false;
+        echo '<div class="cards two rutas-curiosidades-grid">';
+
+        // ── Simple stats when early ──
+        if (!$showCuriosities) {
+            $hasAnyCard = true;
+            // Mostrar stats básicas disponibles desde el día 1
+            echo '<div class="panel rutas-curio-card">';
+            echo '<div class="rutas-curio-icon">📊</div>';
+            echo '<div class="rutas-curio-body">';
+            echo '<div class="rutas-curio-title">Estadísticas básicas</div>';
+            echo '<div class="rutas-curio-big">' . e(count($availableDays)) . ' <small>días</small></div>';
+            echo '<div class="rutas-curio-meta">' . e(count($allPositions)) . ' posiciones totales</div>';
+            echo '</div>';
+            echo '</div>';
+
+            if ($c['max_km_day'] && $c['max_km_day']['km'] > 0) {
+                echo '<div class="panel rutas-curio-card">';
+                echo '<div class="rutas-curio-icon">🏆</div>';
+                echo '<div class="rutas-curio-body">';
+                echo '<div class="rutas-curio-title">Día con más km</div>';
+                echo '<div class="rutas-curio-big">' . e($c['max_km_day']['km']) . ' <small>km</small></div>';
+                echo '<div class="rutas-curio-meta">' . e(gps_fmt_date($c['max_km_day']['date'])) . '</div>';
+                echo '</div>';
+                echo '</div>';
+            }
+        }
+
+        // ── Rachas ──
+        if ($c['streaks']['current'] > 0 || $c['streaks']['longest'] > 0) {
+            $hasAnyCard = true;
+            echo '<div class="panel rutas-curio-card">';
+            echo '<div class="rutas-curio-icon">🔥</div>';
+            echo '<div class="rutas-curio-body">';
+            echo '<div class="rutas-curio-title">Racha de visitas a ' . e(str_replace(array('🏠 ','🏢 ','📍 '), '', $c['streaks']['place'])) . '</div>';
+            if ($c['streaks']['current'] > 0) {
+                echo '<div class="rutas-curio-big">' . e($c['streaks']['current']) . ' <small>días seguidos</small></div>';
+            }
+            echo '<div class="rutas-curio-meta">Récord: ' . e($c['streaks']['longest']) . ' días</div>';
+            echo '</div>';
+            echo '</div>';
+        }
+
+        // ── Comparativa mensual ──
+        if ($c['comparison']['last_month_km'] > 0) {
+            $hasAnyCard = true;
+            $pct = $c['comparison']['pct_change'];
+            $arrow = $pct > 0 ? '📈' : ($pct < 0 ? '📉' : '➡️');
+            $color = $pct > 0 ? '#22c55e' : ($pct < 0 ? '#ef4444' : '');
+            echo '<div class="panel rutas-curio-card">';
+            echo '<div class="rutas-curio-icon">📊</div>';
+            echo '<div class="rutas-curio-body">';
+            echo '<div class="rutas-curio-title">Este mes vs mes pasado</div>';
+            echo '<div class="rutas-curio-big">' . e($c['comparison']['this_month_km']) . ' <small>km</small></div>';
+            echo '<div class="rutas-curio-meta">';
+            echo $arrow . ' <span' . ($color ? ' style="color:' . $color . '"' : '') . '>' . e($pct > 0 ? '+' : '') . e($pct) . '%</span> vs ' . e($c['comparison']['last_month_km']) . ' km';
+            echo '</div>';
+            echo '<div class="rutas-curio-meta">' . e($c['comparison']['this_month_trips']) . ' trayectos en ' . e($c['comparison']['this_month_days']) . ' días</div>';
+            echo '</div>';
+            echo '</div>';
+        }
+
+        // ── Hora punta ──
+        if ($c['peak_hours']) {
+            $hasAnyCard = true;
+            $ph = $c['peak_hours'];
+            echo '<div class="panel rutas-curio-card">';
+            echo '<div class="rutas-curio-icon">⏰</div>';
+            echo '<div class="rutas-curio-body">';
+            echo '<div class="rutas-curio-title">Hora punta en ' . e(str_replace(array('🏠 ','🏢 ','📍 '), '', $ph['place'])) . '</div>';
+            echo '<div class="rutas-curio-row">';
+            echo '<div><span class="rutas-curio-label">Llegada</span> <span class="rutas-curio-value">' . e($ph['avg_arrival']) . '</span></div>';
+            echo '<div><span class="rutas-curio-label">Salida</span> <span class="rutas-curio-value">' . e($ph['avg_departure']) . '</span></div>';
+            echo '</div>';
+            echo '<div class="rutas-curio-meta">Rango: ' . e($ph['arrival_range']) . ' – ' . e($ph['departure_range']) . ' (' . e($ph['sample_size']) . ' visitas)</div>';
+            echo '</div>';
+            echo '</div>';
+        }
+
+        // ── Día récord ──
+        if ($c['max_km_day'] && $c['max_km_day']['km'] > 0 && $showCuriosities) {
+            $hasAnyCard = true;
+            echo '<div class="panel rutas-curio-card">';
+            echo '<div class="rutas-curio-icon">🏆</div>';
+            echo '<div class="rutas-curio-body">';
+            echo '<div class="rutas-curio-title">Día con más km</div>';
+            echo '<div class="rutas-curio-big">' . e($c['max_km_day']['km']) . ' <small>km</small></div>';
+            echo '<div class="rutas-curio-meta">' . e(gps_fmt_date($c['max_km_day']['date'])) . '</div>';
+            echo '</div>';
+            echo '</div>';
+        }
+
+        // ── Distribución del tiempo ──
+        if (!empty($c['place_hours'])) {
+            $hasAnyCard = true;
+            echo '<div class="panel rutas-curio-card rutas-curio-full">';
+            echo '<div class="rutas-curio-icon">⏱️</div>';
+            echo '<div class="rutas-curio-body">';
+            echo '<div class="rutas-curio-title">Distribución del tiempo</div>';
+            echo '<div class="rutas-curio-bars">';
+            foreach ($c['place_hours'] as $ph) {
+                echo '<div class="rutas-curio-bar-row">';
+                echo '<span class="rutas-curio-bar-label">' . e($ph['label']) . '</span>';
+                echo '<span class="rutas-curio-bar-track"><span class="rutas-curio-bar-fill" style="width:' . e($ph['pct']) . '%"></span></span>';
+                echo '<span class="rutas-curio-bar-pct">' . e($ph['pct']) . '%</span>';
+                echo '</div>';
+            }
+            echo '</div>';
+            echo '</div>';
+            echo '</div>';
+        }
+
+        if (!$hasAnyCard && !$showCuriosities) {
+            echo '<div class="rutas-empty-text" style="grid-column:1/-1;text-align:center;padding:20px;">📡 Esperando más datos para mostrar curiosidades…</div>';
+        }
+
+        echo '</div>'; // .cards.two
+        echo '</div>'; // .rutas-curiosidades-panel
+    }
+
+    // ── Embed map data for JS ──
+    if (!empty($mapPoints)) {
+        echo '<script>';
+        echo 'window._rutasMapData = ' . $mapJson . ';';
+        echo 'if (typeof window._loadRutasMap === "function") window._loadRutasMap();';
+        echo '</script>';
+    }
+}
+
+/**
+ * Formatea una fecha YYYY-MM-DD para mostrar.
+ */
+function gps_fmt_date($ymd) {
+    $ts = strtotime($ymd);
+    if ($ts === false) return $ymd;
+    $today = date('Y-m-d');
+    $yesterday = date('Y-m-d', strtotime('-1 day'));
+    if ($ymd === $today) return 'Hoy (' . date('d/m', $ts) . ')';
+    if ($ymd === $yesterday) return 'Ayer (' . date('d/m', $ts) . ')';
+    // Días de la semana en español
+    $dias = array('Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado');
+    $diaSem = $dias[(int)date('w', $ts)];
+    return $diaSem . ' ' . date('d/m/Y', $ts);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DIARIO — Tab en Josue (solo lectura)
+// ═══════════════════════════════════════════════════════════════════
+
+function render_diario_tab() {
+    echo '<div class="josue-head">';
+    echo '<h2>Diario</h2>';
+    echo '<div class="diary-search-wrap">';
+    echo '<input type="text" id="diarySearch" class="josue-input" placeholder="Buscar en el diario..." style="max-width:320px">';
+    echo '</div>';
+    echo '</div>';
+
+    echo '<div class="diary-timeline" id="diaryTimeline">';
+    echo '<div class="diary-loading">Cargando entradas...</div>';
+    echo '</div>';
+
+    echo '<div id="diaryLoadMore" style="text-align:center;padding:16px;display:none">';
+    echo '<button class="btn-secondary" id="diaryLoadMoreBtn">Cargar más</button>';
+    echo '</div>';
+}
+
+function render_diario_entry_card($entry) {
+    $fecha = $entry['fecha'] ?? '';
+    $cleanText = $entry['clean_text'] ?? '';
+    $rawText = $entry['raw_text'] ?? '';
+    $mood = $entry['mood'] ?? 'neutro';
+    $highlights = $entry['highlights'] ?? array();
+    $tags = $entry['tags'] ?? array();
+    $fragmentos = $entry['fragmentos'] ?? 0;
+
+    $moodEmojis = array(
+        'motivado' => '😊', 'feliz' => '😄', 'ilusionado' => '🤩',
+        'neutro' => '😐', 'cansado' => '😴', 'preocupado' => '😟',
+        'frustrado' => '😤', 'estresado' => '😰',
+    );
+    $moodEmoji = $moodEmojis[$mood] ?? '😐';
+
+    // Formatear fecha
+    $ts = strtotime($fecha);
+    $fechaFormat = $ts ? date('D d', $ts) : $fecha;
+
+    echo '<div class="diary-entry" data-fecha="' . e($fecha) . '" data-search-text="' . e(strtolower($cleanText . ' ' . implode(' ', $tags))) . '">';
+    echo '<div class="diary-entry-header">';
+    echo '<span class="diary-entry-date">' . e($fechaFormat) . '</span>';
+    echo '<span class="diary-entry-mood" title="' . e($mood) . '">' . $moodEmoji . '</span>';
+    echo '<span class="diary-entry-frags">' . (int)$fragmentos . ' fragmentos</span>';
+    echo '</div>';
+
+    echo '<div class="diary-entry-body">';
+    echo '<p class="diary-entry-text">' . nl2br(e($cleanText)) . '</p>';
+    echo '</div>';
+
+    if (!empty($highlights)) {
+        echo '<div class="diary-entry-highlights">';
+        foreach ($highlights as $h) {
+            echo '<span class="diary-highlight-tag">' . e($h) . '</span>';
+        }
+        echo '</div>';
+    }
+
+    if (!empty($tags)) {
+        echo '<div class="diary-entry-tags">';
+        foreach ($tags as $tag) {
+            echo '<span class="diary-tag">' . e($tag) . '</span>';
+        }
+        echo '</div>';
+    }
+
+    // Toggle para transcripción literal
+    $entryId = 'diary-raw-' . md5($fecha);
+    echo '<button class="diary-raw-toggle" onclick="var el=document.getElementById(\'' . $entryId . '\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';this.textContent=el.style.display===\'none\'?\'📝 Ver transcripción literal\':\'📝 Ocultar transcripción literal\';">📝 Ver transcripción literal</button>';
+    echo '<div class="diary-raw-text" id="' . $entryId . '" style="display:none">';
+    echo '<pre>' . e($rawText) . '</pre>';
+    echo '</div>';
+
+    echo '</div>';
 }
 
 function render_casawasap_page() {
@@ -8540,7 +10559,7 @@ function render_casawasap_page() {
 
 function render_jostal_page() {
     $tab = request_get('tab', 'interesadas');
-    $allowed = array('interesadas', 'clientas', 'ventas', 'informes');
+    $allowed = array('interesadas', 'clientas', 'ventas', 'informes', 'deudas');
     if (!in_array($tab, $allowed, true)) $tab = 'interesadas';
 
     $legacyConvertId = request_get('convert', '');
@@ -8566,6 +10585,7 @@ function render_jostal_page() {
     echo '</div>';
     echo '<a class="subtab ' . ($tab === 'ventas' ? 'active' : '') . '" href="index.php?page=jostal&tab=ventas">Ventas</a>';
     echo '<a class="subtab ' . ($tab === 'informes' ? 'active' : '') . '" href="index.php?page=jostal&tab=informes">GridMensual</a>';
+    echo '<a class="subtab ' . ($tab === 'deudas' ? 'active' : '') . '" href="index.php?page=jostal&tab=deudas">Deudas</a>';
     echo '</div>';
 
     echo '<div class="subtab-content">';
@@ -8787,6 +10807,12 @@ if ($tab === 'clientas') {
         echo '</select>';
         echo '<div class="field-help">Solo aplica al modo alquiler. Se puede ajustar cuando quieras.</div>';
         echo '</div>';
+
+        $precioSemanalActual = $edit ? jostal_precio_semanal($edit) : null;
+        field_input('precio_semanal', 'Precio semanal alquiler (€)', $precioSemanalActual !== null ? $precioSemanalActual : '', false);
+        field_input('precio_semanal_anterior', 'Precio anterior (€, opcional)', $edit['precio_semanal_anterior'] ?? '', false);
+        field_input('precio_semanal_desde', 'Precio actual desde (opcional)', $edit['precio_semanal_desde'] ?? '', false, 'date');
+        echo '<div class="field-help" style="grid-column:1/-1;">Si rellenas "precio anterior" y "desde", las semanas anteriores a esa fecha usarán el precio anterior (ej. 130€ antes, 150€ después).</div>';
 
         if ($isNew) {
             field_input('first_arrival_date', 'Primera llegada a la casa', business_today_date(), true, 'date');
@@ -9209,6 +11235,298 @@ if ($tab === 'informes') {
         }
         echo '</div>';
         echo '<div class="jostal-month-total">Total del mes: <span class="money-chip big">' . e(euro($monthTotal)) . '</span></div>';
+    }
+
+    if ($tab === 'deudas') {
+        $desde = trim(request_get('desde', ''));
+        $hasta = trim(request_get('hasta', ''));
+
+        $clientasDeuda = array();
+        foreach ($clientas as $c) {
+            if (($c['modo'] ?? '') !== 'alquiler') continue;
+            if (!jostal_clienta_en_casa($c)) continue;
+            $clientasDeuda[] = $c;
+        }
+        usort($clientasDeuda, function ($a, $b) {
+            $pa = jostal_periodo_actual($a);
+            $pb = jostal_periodo_actual($b);
+            return strcmp($pa['entrada'] ?? '', $pb['entrada'] ?? '');
+        });
+
+        echo '<div class="section-head">';
+        echo '<div>';
+        echo '<h2>Informe de deuda — alquiler en casa</h2>';
+        echo '<div class="muted">Detalle semanal y deuda acumulada. El total de deuda es histórico completo; el rango de fechas solo recorta el detalle semanal.</div>';
+        echo '</div>';
+        echo '</div>';
+
+        // Filtros de rango
+        echo '<form method="get" class="toolbar">';
+        echo '<input type="hidden" name="page" value="jostal">';
+        echo '<input type="hidden" name="tab" value="deudas">';
+        echo '<div class="field"><label>Desde</label><input type="date" name="desde" value="' . e($desde) . '"></div>';
+        echo '<div class="field"><label>Hasta</label><input type="date" name="hasta" value="' . e($hasta) . '"></div>';
+        echo '<div class="field field-btn"><label>&nbsp;</label><button class="btn-primary">Filtrar</button></div>';
+        if ($desde !== '' || $hasta !== '') {
+            echo '<div class="field field-btn"><label>&nbsp;</label><a class="btn-secondary-mini" href="index.php?page=jostal&tab=deudas">Todo el tiempo</a></div>';
+        }
+        echo '</form>';
+
+        echo '<div class="info-strip" style="background:rgba(59,130,246,.10);border-left-color:#3b82f6;margin-bottom:14px;">';
+        echo '<strong>¿Cómo se reparten los pagos?</strong> Cada pago cubre la semana más antigua con deuda pendiente (FIFO). ';
+        echo 'Si paga más de lo que debe esa semana, el sobrante se aplica a la siguiente (adelanto); si paga por delante más allá de todas las semanas, se marca "a favor". ';
+        echo 'Los pagos "no alquiler" (cliente, fianza, taxi…) se muestran aparte y no suman en ningún sitio.';
+        echo '</div>';
+
+        if (empty($clientasDeuda)) {
+            echo '<div class="empty">No hay clientas en modo alquiler actualmente en casa.</div>';
+        } else {
+            // Calcular todos los informes y recopilar dudosos.
+            $reportes = array();
+            $dudosos = array();
+
+            foreach ($clientasDeuda as $c) {
+                $data = jostal_compute_deuda($c, $leads);
+                $nombre = trim((string)($c['nombre'] ?? ''));
+                $nombreReal = trim((string)($c['nombre_real'] ?? ''));
+                $display = $nombre . ($nombreReal !== '' && mb_strtolower($nombreReal, 'UTF-8') !== mb_strtolower($nombre, 'UTF-8') ? ' (' . $nombreReal . ')' : '');
+
+                if (isset($data['error'])) {
+                    $reportes[] = array('clienta' => $c, 'nombre' => $display, 'data' => $data, 'error' => $data['error']);
+                    continue;
+                }
+
+                $reportes[] = array('clienta' => $c, 'nombre' => $display, 'data' => $data, 'error' => null);
+
+                foreach ((array)($data['dudosos'] ?? array()) as $d) {
+                    $d['clienta_nombre'] = $display;
+                    $d['clienta_id'] = (string)($c['id'] ?? '');
+                    $dudosos[] = $d;
+                }
+            }
+
+            // ── Bloqueo por pagos dudosos ──
+            if (!empty($dudosos)) {
+                echo '<section class="panel">';
+                echo '<div class="info-strip" style="background:rgba(245,158,11,.12);border-left-color:#f59e0b;margin-bottom:14px;">';
+                echo '<strong>⚠️ Hay pagos sin clasificar.</strong> Para calcular el informe, aclara cada uno si es alquiler o no. Tu decisión se guarda y no volverá a preguntar.';
+                echo '</div>';
+                echo '<table class="debt-table"><thead><tr>';
+                echo '<th>Clienta</th><th>Fecha</th><th>Importe</th><th>Concepto</th><th>Motivo de duda</th><th>Acción</th>';
+                echo '</tr></thead><tbody>';
+                foreach ($dudosos as $d) {
+                    echo '<tr>';
+                    echo '<td><strong>' . e($d['clienta_nombre']) . '</strong></td>';
+                    echo '<td>' . e(jostal_fecha_corta($d['date'])) . '</td>';
+                    echo '<td><span class="money-chip">' . e(euro($d['amount'])) . '</span></td>';
+                    echo '<td>' . e($d['concepto'] !== '' ? $d['concepto'] : '(vacío)') . '</td>';
+                    echo '<td class="muted">' . e($d['razon']) . '</td>';
+                    echo '<td style="display:flex;gap:6px;flex-wrap:wrap;">';
+                    echo '<form method="post" class="inline-form">';
+                    echo '<input type="hidden" name="action" value="jostal_clasificar_lead">';
+                    echo '<input type="hidden" name="lead_id" value="' . e($d['lead_id']) . '">';
+                    echo '<input type="hidden" name="concepto_tipo" value="alquiler">';
+                    echo '<input type="hidden" name="return_tab" value="deudas">';
+                    echo '<input type="hidden" name="desde" value="' . e($desde) . '">';
+                    echo '<input type="hidden" name="hasta" value="' . e($hasta) . '">';
+                    echo '<button class="btn-ok-mini">Es alquiler</button>';
+                    echo '</form>';
+                    echo '<form method="post" class="inline-form">';
+                    echo '<input type="hidden" name="action" value="jostal_clasificar_lead">';
+                    echo '<input type="hidden" name="lead_id" value="' . e($d['lead_id']) . '">';
+                    echo '<input type="hidden" name="concepto_tipo" value="no_alquiler">';
+                    echo '<input type="hidden" name="return_tab" value="deudas">';
+                    echo '<input type="hidden" name="desde" value="' . e($desde) . '">';
+                    echo '<input type="hidden" name="hasta" value="' . e($hasta) . '">';
+                    echo '<button class="btn-secondary-mini">No es alquiler</button>';
+                    echo '</form>';
+                    echo '</td>';
+                    echo '</tr>';
+                }
+                echo '</tbody></table>';
+                echo '</section>';
+            } else {
+                // ── Resumen global ──
+                $gDebe = 0.0; $gPagado = 0.0; $gDeuda = 0.0; $gCount = 0; $gConError = 0;
+                foreach ($reportes as $r) {
+                    if ($r['error'] !== null) { $gConError++; continue; }
+                    $gDebe += (float)$r['data']['debe_total'];
+                    $gPagado += (float)$r['data']['pagado_total'];
+                    $gDeuda += (float)($r['data']['deuda_vencida'] ?? $r['data']['deuda_total']);
+                    $gCount++;
+                }
+                echo '<div class="cards four">';
+                dashboard_card('Clientas en alquiler', $gCount, false);
+                dashboard_card('Debe total', euro($gDebe), true);
+                dashboard_card('Pagado total', euro($gPagado), true);
+                dashboard_card('Deuda vencida', euro($gDeuda), true);
+                echo '</div>';
+
+                // ── Detalle por clienta ──
+                foreach ($reportes as $r) {
+                    if ($r['error'] !== null) {
+                        echo '<section class="panel">';
+                        echo '<h2>' . e($r['nombre']) . '</h2>';
+                        $msgs = array(
+                            'sin_precio' => 'No tiene precio semanal definido. Añádelo en su ficha (Precio semanal alquiler).',
+                            'sin_alquiler_activo' => 'No está en modo alquiler activo.',
+                            'sin_vencimientos' => 'Entró hace menos de una semana, sin vencimientos todavía.',
+                        );
+                        echo '<div class="empty">' . e($msgs[$r['error']] ?? 'No se pudo calcular.') . '</div>';
+                        echo '</section>';
+                        continue;
+                    }
+
+                    $data = $r['data'];
+                    $c = $r['clienta'];
+                    $nombre = $r['nombre'];
+                    $deuda = (float)($data['deuda_vencida'] ?? $data['deuda_total']);
+                    $saldoFavor = (float)($data['saldo_favor'] ?? 0);
+                    $pendienteActual = (float)($data['pendiente_actual'] ?? 0);
+                    $weeks = jostal_weeks_en_rango((array)$data['weeks'], $desde, $hasta);
+
+                    $precioLabel = count((array)($data['precios'] ?? array())) > 0
+                        ? implode('€ → ', array_map(function ($p) { return (int)round((float)$p); }, array_values(array_unique((array)$data['precios'])))) . '€'
+                        : euro((float)$data['precio']);
+
+                    if ($deuda > 0.005) {
+                        $estadoTxt = '⚠ Debe ' . euro($deuda);
+                        $estadoColor = '#f87171';
+                    } elseif ($saldoFavor > 0.005) {
+                        $estadoTxt = '✓ A favor ' . euro($saldoFavor);
+                        $estadoColor = '#60a5fa';
+                    } else {
+                        $estadoTxt = '✓ Al día';
+                        $estadoColor = '#4ade80';
+                    }
+                    if ($pendienteActual > 0.005) {
+                        $estadoTxt .= ' · sem. actual pendiente ' . euro($pendienteActual);
+                    }
+
+                    echo '<section class="panel">';
+                    echo '<div class="section-head">';
+                    echo '<div>';
+                    echo '<h2>' . e($nombre) . '</h2>';
+                    echo '<div class="muted">' . e($c['id'] ?? '') . ' · ' . e($precioLabel) . '/sem · vence ' . e($data['due_weekday_label']) . ' · Entrada ' . e(jostal_fecha_corta($data['entry_date'])) . ' · ' . count($weeks) . ' sem. mostradas</div>';
+                    echo '</div>';
+                    echo '<div class="section-head-actions" style="align-items:center;text-align:right;">';
+                    echo '<strong style="color:' . $estadoColor . ';font-size:15px;">' . $estadoTxt . '</strong>';
+                    echo '</div>';
+                    echo '</div>';
+
+                    if (!empty($data['no_alq_total']) && $data['no_alq_total'] > 0) {
+                        echo '<div class="muted" style="margin-bottom:8px;">(+) ' . e(euro($data['no_alq_total'])) . ' en pagos NO alquiler (clientes, fianza…) — no descuentan deuda.</div>';
+                    }
+
+                    echo '<div class="table-wrap"><table><thead><tr>';
+                    echo '<th>Sem</th><th>Periodo</th><th>Pagos alquiler</th><th>Otros ingresos</th><th>Deuda semana</th><th>Acumulado</th>';
+                    echo '</tr></thead><tbody>';
+                    foreach ($weeks as $w) {
+                        $dif = (float)$w['diff'];
+                        $run = (float)$w['running'];
+                        $esActual = !empty($w['es_actual']);
+                        $rowBg = $esActual
+                            ? 'rgba(245,158,11,.08)'
+                            : ($run > 0.005 ? 'rgba(239,68,68,.08)' : 'rgba(16,185,129,.09)');
+
+                        $pagosHtml = '';
+                        if (empty($w['pagos'])) {
+                            $pagosHtml = '<span class="muted">—</span>';
+                        } else {
+                            foreach ($w['pagos'] as $p) {
+                                $aplicado = (float)($p['aplicado'] ?? $p['amount']);
+                                $esParte = $aplicado < (float)$p['amount'] - 0.005;
+                                $concepto = trim((string)($p['desc'] ?? ''));
+                                $line = e(jostal_fecha_corta($p['date'])) . ' · <strong>' . e(euro($aplicado)) . '</strong>';
+                                if ($esParte) $line .= ' <span class="muted">(parte)</span>';
+                                if ($concepto !== '') $line .= ' <span class="muted">' . e($concepto) . '</span>';
+                                $pagosHtml .= '<div>' . $line . '</div>';
+                            }
+                        }
+
+                        $otrosHtml = '';
+                        if (empty($w['otros'])) {
+                            $otrosHtml = '<span class="muted">—</span>';
+                        } else {
+                            foreach ($w['otros'] as $op) {
+                                $concepto = trim((string)($op['desc'] ?? ''));
+                                $line = e(jostal_fecha_corta($op['date'])) . ' · <strong>' . e(euro($op['amount'])) . '</strong>';
+                                if ($concepto !== '') $line .= ' <span class="muted">' . e($concepto) . '</span>';
+                                $otrosHtml .= '<div>' . $line . '</div>';
+                            }
+                        }
+
+                        if ($esActual) {
+                            $difHtml = '<span style="color:#f59e0b;font-weight:600;">' . ($dif > 0.005 ? 'pend. ' . e(euro($dif)) : 'pagado') . '</span>';
+                        } else {
+                            $difHtml = $dif > 0.005 ? '<span style="color:#f87171;font-weight:600;">+' . e(euro($dif)) . '</span>' : '<span class="muted">0,00 €</span>';
+                        }
+                        $runColor = $run > 0.005 ? '#f87171' : '#4ade80';
+                        $runIcon = $run > 0.005 ? '⚠' : '✓';
+
+                        echo '<tr style="background:' . $rowBg . ';">';
+                        echo '<td>' . e($w['n']) . '</td>';
+                        echo '<td>' . e(jostal_fecha_corta($w['ps']) . ' → ' . jostal_fecha_corta($w['pe'])) . ($esActual ? ' <span style="color:#f59e0b;font-size:11px;font-weight:600;">(en curso)</span>' : '') . '</td>';
+                        echo '<td>' . $pagosHtml . '</td>';
+                        echo '<td>' . $otrosHtml . '</td>';
+                        echo '<td>' . $difHtml . '</td>';
+                        echo '<td style="color:' . $runColor . ';font-weight:700;text-align:right;">' . e(euro($run)) . ' ' . $runIcon . '</td>';
+                        echo '</tr>';
+                    }
+                    echo '</tbody><tfoot><tr>';
+                    echo '<td colspan="2"><strong>TOTAL</strong></td>';
+                    echo '<td colspan="2">Debe ' . e(euro($data['debe_total'])) . ' · Pagado ' . e(euro($data['pagado_total'])) . '</td>';
+                    echo '<td colspan="2" style="color:' . $estadoColor . ';"><strong>' . $estadoTxt . '</strong></td>';
+                    echo '</tr></tfoot></table></div>';
+
+                    // ── Resumen por meses ──
+                    $meses = (array)($data['resumen_meses'] ?? array());
+                    if (!empty($meses)) {
+                        echo '<div style="margin-top:12px;">';
+                        echo '<div class="muted" style="margin-bottom:6px;"><strong>Deuda por mes</strong> (histórico completo, no filtrado por rango)</div>';
+                        echo '<div class="table-wrap"><table><thead><tr><th>Mes</th><th>Debe</th><th>Pagado</th><th>Deuda del mes</th><th>Acumulado</th></tr></thead><tbody>';
+                        foreach ($meses as $mkey => $m) {
+                            $mDiff = (float)$m['diff'];
+                            $mRun = (float)$m['running'];
+                            $mDiffHtml = $mDiff > 0.005 ? '<span style="color:#f87171;font-weight:600;">+' . e(euro($mDiff)) . '</span>' : '<span class="muted">0,00 €</span>';
+                            $mRunColor = $mRun > 0.005 ? '#f87171' : '#4ade80';
+                            echo '<tr>';
+                            echo '<td>' . e(jostal_mes_label($mkey)) . '</td>';
+                            echo '<td>' . e(euro($m['debe'])) . '</td>';
+                            echo '<td>' . e(euro($m['pagado'])) . '</td>';
+                            echo '<td>' . $mDiffHtml . '</td>';
+                            echo '<td style="color:' . $mRunColor . ';font-weight:700;text-align:right;">' . e(euro($mRun)) . '</td>';
+                            echo '</tr>';
+                        }
+                        echo '</tbody></table></div></div>';
+                    }
+
+                    // Enviar por WhatsApp (desde dulce)
+                    echo '<div class="mini-actions-bar" style="margin-top:10px;">';
+                    echo '<form method="post" class="inline-form" style="gap:6px;flex-wrap:wrap;">';
+                    echo '<input type="hidden" name="action" value="jostal_send_deuda_wasap">';
+                    echo '<input type="hidden" name="clienta_id" value="' . e($c['id'] ?? '') . '">';
+                    echo '<input type="hidden" name="desde" value="' . e($desde) . '">';
+                    echo '<input type="hidden" name="hasta" value="' . e($hasta) . '">';
+                    echo '<label class="inline-label">Enviar informe por WhatsApp (desde dulce) a</label>';
+                    echo '<select name="destino_tipo">';
+                    echo '<option value="clienta">la clienta (' . e($c['telefono'] ?? 'sin teléfono') . ')</option>';
+                    echo '<option value="personal">mi número (654464023)</option>';
+                    echo '<option value="otro">otro número</option>';
+                    echo '</select>';
+                    echo '<input type="text" name="destino_manual" placeholder="Número si eliges otro" style="max-width:180px;">';
+                    echo '<button class="btn-wa-mini">📱 Enviar</button>';
+                    echo '</form>';
+                    echo '</div>';
+
+                    echo '</section>';
+                }
+
+                if ($gConError > 0) {
+                    echo '<div class="muted">' . e($gConError) . ' clienta(s) sin calcular por falta de precio o datos.</div>';
+                }
+            }
+        }
     }
 
     echo '</div>';
@@ -9795,6 +12113,712 @@ function render_casawasap_bot_profile_fields($row = array()) {
     echo '</div>';
 }
 
+/**
+ * Reproductor YouTube — Modo Lite (Cassette Deck Vintage para coche).
+ * Mismos IDs que el reproductor desktop para compatibilidad con YTPlayer JS.
+ */
+function render_youtube_player_lite($playParam, $playlists, $channels, $history, $lastVideo) {
+    // ── Procesar POST directo: añadir a lista desde el modal ──
+    $directPlAction = (string)request_post('action');
+    if ($directPlAction === 'youtube_add_to_pl_direct') {
+        $plId = trim((string)request_post('playlist_id'));
+        $vid  = trim((string)request_post('video_id'));
+        if ($plId !== '' && $vid !== '') {
+            $vtitle = trim((string)request_post('title'));
+            $vthumb = trim((string)request_post('thumbnail'));
+            $vchan  = trim((string)request_post('channel_name'));
+            $pls = storage_read('youtube_playlists.json');
+            if (!is_array($pls)) $pls = [];
+            foreach ($pls as &$p) {
+                if ($p['id'] === $plId) {
+                    $dup = false;
+                    foreach ($p['videos'] as $v) { if ($v['video_id'] === $vid) { $dup = true; break; } }
+                    if (!$dup) {
+                        $p['videos'][] = [
+                            'video_id' => $vid, 'title' => $vtitle,
+                            'thumbnail' => $vthumb, 'channel_name' => $vchan,
+                            'added_at' => now_datetime(),
+                        ];
+                        $p['updated_at'] = now_datetime();
+                    }
+                    break;
+                }
+            }
+            unset($p);
+            storage_write('youtube_playlists.json', $pls);
+            // Refrescar $playlists para el render
+            $playlists = storage_read('youtube_playlists.json');
+            if (!is_array($playlists)) $playlists = [];
+        }
+    }
+
+    echo '<div class="youtube-reproductor yt-lite-radio" id="youtubeReproductor"';
+    if ($playParam !== '') {
+        echo ' data-auto-search="' . e($playParam) . '"';
+    }
+    echo '>';
+
+    // ═══ CASSETTE DECK BODY: Marco bakelita ════════════════════════════
+    echo '<div class="yt-radio-body">';
+
+    // Power LED
+    echo '<span class="yt-power-led" id="ytPowerLed"></span>';
+
+    // ── DISPLAY PANEL: LCD con dial FM + VU meters + stereo ──
+    echo '<div class="yt-radio-display">';
+    // Banda de frecuencia decorativa
+    echo '<div class="yt-radio-dial">';
+    echo '<span class="yt-radio-dial-freq">88</span>';
+    echo '<span class="yt-radio-dial-freq">92</span>';
+    echo '<span class="yt-radio-dial-freq">96</span>';
+    echo '<span class="yt-radio-dial-freq yt-radio-dial-active">100</span>';
+    echo '<span class="yt-radio-dial-freq">104</span>';
+    echo '<span class="yt-radio-dial-freq">108</span>';
+    echo '<span class="yt-radio-dial-mhz">MHz</span>';
+    echo '<div class="yt-radio-dial-needle"></div>';
+    echo '</div>';
+    // VU Meters (decorativos, animados CSS)
+    echo '<div class="yt-vu-meters">';
+    echo '<div class="yt-vu-bar" id="ytVuLeft"><span></span></div>';
+    echo '<div class="yt-vu-bar" id="ytVuRight"><span></span></div>';
+    echo '</div>';
+    // Título now-playing + stereo
+    echo '<div class="yt-radio-now-playing yt-radio-idle" id="youtubeNowPlaying">';
+    echo '<span id="youtubeNowPlayingTitle">Sintoniza una emisora</span>';
+    echo '</div>';
+    // Stereo indicator
+    echo '<span class="yt-stereo-indicator" id="ytStereoIndicator">STEREO</span>';
+    // Badge FM
+    echo '<div class="yt-radio-band"><span>FM</span></div>';
+    echo '</div>'; // display
+
+    // ── KITT Coche Fantástico overlay ──
+    echo '<div class="kitt-overlay" id="kittOverlay">';
+    echo '<div class="kitt-scanner-bar"></div>';
+    echo '<div class="kitt-leds">';
+    for ($i = 1; $i <= 8; $i++) {
+        echo '<span class="kitt-led kitt-led-' . $i . '"></span>';
+    }
+    echo '</div>';
+    echo '<div class="kitt-glow"></div>';
+    echo '</div>';
+
+    // ── GPS NAVIGATION overlay ──
+    echo '<div class="yt-gps-overlay" id="gpsOverlay">';
+    echo '<div class="yt-gps-backdrop" id="gpsBackdrop"></div>';
+    echo '<div class="yt-gps-panel" id="gpsPanel">';
+    echo '<button type="button" class="yt-gps-close" id="gpsCloseBtn" title="Cerrar GPS">&times;</button>';
+    echo '<div class="yt-gps-header">';
+    echo '<span class="yt-gps-title">GPS NAVEGACIÓN</span>';
+    echo '<span class="yt-gps-coords" id="gpsCoordsDisplay">--</span>';
+    echo '</div>';
+    echo '<div class="yt-gps-map-container" id="gpsMapContainer">';
+    // ── Layout: Left HUD | Radar Canvas | Right HUD ──
+    echo '<div class="yt-gps-layout">';
+    // LEFT HUD PANEL
+    echo '<div class="yt-gps-hud-left">';
+    echo '<div class="yt-gps-hud-section">';
+    echo '<span class="yt-gps-hud-label">PROFUNDIDAD</span>';
+    echo '<div class="yt-gps-depth-gauge"><div class="yt-gps-depth-fill" id="gpsDepthFill"></div></div>';
+    echo '<span class="yt-gps-hud-value" id="gpsDepthValue">-- km</span>';
+    echo '</div>';
+    echo '<div class="yt-gps-hud-section">';
+    echo '<span class="yt-gps-hud-label">SEÑAL</span>';
+    echo '<div class="yt-gps-signal-bars" id="gpsSignalBars">';
+    for ($i = 0; $i < 10; $i++) echo '<span class="gps-signal-bar"></span>';
+    echo '</div>';
+    echo '<span class="yt-gps-hud-value" id="gpsSignalText">--%</span>';
+    echo '</div>';
+    echo '<div class="yt-gps-hud-section" id="gpsHomeInfo" style="display:none">';
+    echo '<span class="yt-gps-hud-label">BASE</span>';
+    echo '<span class="yt-gps-hud-value" id="gpsHomeLabel">--</span>';
+    echo '</div>';
+    echo '<button type="button" class="yt-gps-hud-btn" id="gpsSetHomeBtn" title="Establecer base">🏠 BASE</button>';
+    echo '<button type="button" class="yt-gps-hud-btn yt-gps-hud-btn-sos" id="gpsSosBtn" title="Emergencia — copiar coordenadas">🆘 SOS</button>';
+    echo '</div>';
+    // CENTER: Radar Canvas (overlay on Leaflet map)
+    echo '<div id="gpsRadarMap" class="yt-gps-radar-map">';
+    echo '<div id="gpsRadarMapInner" class="yt-gps-radar-map-inner"></div>';
+    echo '<canvas id="gpsRadarCanvas" width="350" height="350"></canvas>';
+    echo '<div class="yt-gps-zoom-controls">';
+    echo '<button type="button" class="yt-gps-zoom-btn" id="gpsZoomInBtn" title="Acercar">+</button>';
+    echo '<button type="button" class="yt-gps-zoom-btn" id="gpsZoomOutBtn" title="Alejar">&minus;</button>';
+    echo '</div>';
+    echo '</div>';
+    // RIGHT HUD PANEL
+    echo '<div class="yt-gps-hud-right">';
+    echo '<div class="yt-gps-hud-section">';
+    echo '<span class="yt-gps-hud-label">TUBOS</span>';
+    echo '<div class="yt-gps-torpedo-list" id="gpsTorpedoList">';
+    echo '<span class="yt-gps-hud-empty">Sin torpedos</span>';
+    echo '</div>';
+    echo '</div>';
+    echo '<button type="button" class="yt-gps-hud-btn" id="gpsFireTorpedoBtn" title="Disparar torpedo en posición actual">🎯 DISPARAR</button>';
+    echo '<button type="button" class="yt-gps-hud-btn" id="gpsBitacoraBtn" title="Bitácora de inmersiones">📜 BITÁCORA</button>';
+    echo '</div>';
+    echo '</div>'; // yt-gps-layout
+    // BOTTOM HUD BAR
+    echo '<div class="yt-gps-hud-bar">';
+    echo '<div class="yt-gps-hud-item">';
+    echo '<span class="yt-gps-hud-label">VEL</span>';
+    echo '<span class="yt-gps-hud-value yt-gps-hud-value-big" id="gpsSpeedDisplay">--</span>';
+    echo '<span class="yt-gps-hud-unit">km/h</span>';
+    echo '</div>';
+    echo '<div class="yt-gps-hud-item">';
+    echo '<span class="yt-gps-hud-label">RUMBO</span>';
+    echo '<span class="yt-gps-hud-value yt-gps-hud-value-big" id="gpsHeadingDisplay">--</span>';
+    echo '<span class="yt-gps-hud-unit">&deg;</span>';
+    echo '</div>';
+    echo '<div class="yt-gps-hud-item yt-gps-hud-item-wide">';
+    echo '<span class="yt-gps-hud-label">COORDENADAS</span>';
+    echo '<span class="yt-gps-hud-value" id="gpsCoordsDisplayFull">--</span>';
+    echo '</div>';
+    echo '</div>'; // yt-gps-hud-bar
+    echo '</div>'; // yt-gps-map-container
+    echo '</div>'; // gpsPanel
+    echo '</div>'; // gpsOverlay
+
+    // ═══ TWO-COLUMN DECK: Cassette (left) + Controls & Knobs (right) ═══
+    echo '<div class="yt-radio-deck-row">';
+
+    // ── CASSETTE WELL: Slot de cinta ──
+    echo '<div class="yt-cassette-well">';
+    echo '<div class="yt-cassette-door">';
+    // Tape (visible cuando hay video cargado)
+    echo '<div class="yt-cassette-tape" id="ytCassetteTape">';
+    echo '<div class="yt-cassette-reel yt-cassette-reel-l" id="ytCassetteReelL"></div>';
+    echo '<div class="yt-cassette-reel yt-cassette-reel-r" id="ytCassetteReelR"></div>';
+    echo '<div class="yt-cassette-label">';
+    // Video player dentro de la etiqueta de la cinta
+    echo '<div class="youtube-mini-player" id="youtubeMiniPlayer">';
+    echo '<div class="youtube-mini-player-placeholder yt-radio-placeholder" id="youtubePlayerPlaceholder">';
+    echo '<div class="youtube-placeholder-icon">&#9654;</div>';
+    echo '<div class="youtube-placeholder-text">Selecciona un video</div>';
+    echo '</div>';
+    echo '<div id="youtubePlayerContainer" style="display:none"></div>';
+    echo '</div>';
+    echo '</div>'; // label
+    echo '</div>'; // tape
+    // Slot vacío (visible cuando no hay video)
+    echo '<div class="yt-cassette-empty" id="ytCassetteEmpty">';
+    echo '<div class="yt-cassette-empty-reels">';
+    echo '<span class="yt-cassette-empty-reel"></span>';
+    echo '<span class="yt-cassette-empty-reel"></span>';
+    echo '</div>';
+    echo '<span class="yt-cassette-empty-text">INSERT TAPE</span>';
+    echo '</div>';
+    echo '<button type="button" class="yt-lite-fs-close" id="ytLiteFsClose" title="Salir de pantalla completa">&times;</button>';
+    echo '</div>'; // door
+    // Info bar: tape counter + time + direction + badges
+    echo '<div class="yt-cassette-info">';
+    echo '<span class="yt-tape-counter" id="ytTapeCounter">000</span>';
+    echo '<span class="yt-tape-time" id="ytTapeTime">--:--</span>';
+    echo '<span class="yt-tape-direction" id="ytTapeDir">&#9654;</span>';
+    echo '<span class="yt-tape-badge yt-tape-dnr">DNR</span>';
+    echo '<span class="yt-tape-badge yt-tape-ar">&#8644;</span>';
+    echo '</div>';
+    // ── DJ Jefry: Like / Dislike / Skip buttons (esquina inferior dcha del well) ──
+    // Estilos inline anti-caché — no dependen de lite.css ni de la clase is-lite
+    echo '<style>
+.yt-dj-buttons{display:flex!important;gap:2px;position:absolute!important;top:3px;right:4px;z-index:10}
+.yt-dj-btn{width:19px!important;height:15px!important;border-radius:3px;border:1px solid #2a2a2a;border-top-color:#666!important;border-left-color:#5a5a5a!important;border-bottom-color:#111!important;border-right-color:#111!important;background:linear-gradient(180deg,#4a4a4a 0%,#2a2a2a 40%,#151515 100%)!important;color:#aaa!important;font-size:8px!important;font-weight:700!important;cursor:pointer;display:flex!important;align-items:center;justify-content:center;padding:0!important;line-height:1;box-shadow:0 2px 3px rgba(0,0,0,.5),0 1px 0 rgba(255,255,255,.04),inset 0 1px 0 rgba(255,255,255,.04)!important;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.yt-dj-btn:active{transform:translateY(1px)!important;box-shadow:0 1px 1px rgba(0,0,0,.6),inset 0 2px 3px rgba(0,0,0,.35)!important;border-top-color:#111!important;border-left-color:#111!important}
+.yt-dj-like{border-top-color:#8b6914!important;border-left-color:#8b6914!important;box-shadow:0 2px 3px rgba(0,0,0,.5),0 0 2px rgba(230,168,23,.1),inset 0 1px 0 rgba(255,200,60,.05)!important}
+.yt-dj-like:hover{color:#e6a817!important;border-top-color:#e6a817!important;border-left-color:#c8960c!important;box-shadow:0 2px 3px rgba(0,0,0,.5),0 0 5px rgba(230,168,23,.2),inset 0 1px 0 rgba(255,200,60,.08)!important}
+.yt-dj-dislike:hover{color:#ddd!important;border-top-color:#777!important;border-left-color:#666!important}
+.yt-dj-skip:hover{color:#e6a817!important;border-top-color:#8b6914!important;border-left-color:#8b6914!important}
+</style>';
+    echo '<div class="yt-dj-buttons" id="ytDjButtons">';
+    echo '<button type="button" class="yt-dj-btn yt-dj-like" id="ytDjLikeBtn" title="Me gusta" onclick="if(window._DjJefry){window._DjJefry.executeCommand({action:\'like\'});}">+</button>';
+    echo '<button type="button" class="yt-dj-btn yt-dj-dislike" id="ytDjDislikeBtn" title="No me gusta" onclick="if(window._DjJefry){window._DjJefry.executeCommand({action:\'dislike\'});}">-</button>';
+    echo '<button type="button" class="yt-dj-btn yt-dj-skip" id="ytDjSkipBtn" title="Saltar" onclick="if(window._DjJefry){window._DjJefry.executeCommand({action:\'skip\'});}">&#9654;</button>';
+    echo '</div>';
+    echo '</div>'; // cassette well
+
+    // Right column: transport controls + knobs
+    echo '<div class="yt-deck-controls-col">';
+
+    // ── TRANSPORT CONTROLS: Botones mecánicos cuadrados ──
+    echo '<div class="yt-mech-controls" id="youtubeControls">';
+    echo '<button type="button" class="yt-mech-btn" id="youtubePrevBtn" title="Anterior (mantener para rebobinar)">|&#9664;&#9664;</button>';
+    echo '<button type="button" class="yt-mech-btn yt-mech-play" id="youtubePlayPauseBtn" title="Reproducir/Pausa">&#9654; &#8214;</button>';
+    echo '<button type="button" class="yt-mech-btn" id="youtubeNextBtn" title="Siguiente (mantener para avanzar)">&#9654;&#9654;|</button>';
+    echo '<button type="button" class="yt-mech-btn yt-mech-stop" id="youtubeStopBtn" title="Parar">&#9632;</button>';
+    echo '<button type="button" class="yt-mech-btn yt-mech-rec" id="youtubeAddToPlBtn" title="Grabar a lista" onclick="YTPlayer._openLiteAddModal()">&#9679;</button>';
+    echo '<span class="yt-rec-led" id="ytRecLed"></span>';
+    echo '</div>';
+
+     // ── KNOBS ROW: Ruletas para volumen y boost ──
+    echo '<div class="yt-knob-row">';
+    // Menu exit button (X, red, left of knobs)
+    echo '<div class="yt-knob-wrap">';
+    echo '<button type="button" class="yt-menu-exit-btn" id="josueYtFsBtnLite" title="Menú / Salir">&#10005;</button>';
+    echo '<span class="yt-knob-label">menu</span>';
+    echo '</div>';
+    // Volume knob
+    echo '<div class="yt-knob-wrap">';
+    echo '<div class="yt-knob" id="ytVolKnob" data-knob="volume"><span class="yt-knob-mark"></span><span class="yt-knob-txt" id="ytVolVal">100</span></div>';
+    echo '<span class="yt-knob-label">vol</span>';
+    echo '<input type="range" id="youtubeVolumeSlider" class="youtube-volume-slider yt-knob-slider" min="0" max="100" value="100" style="display:none">';
+    // Hidden vol down/up buttons (kept for JS compat, hidden)
+    echo '<button type="button" id="youtubeVolDownBtn" style="display:none"></button>';
+    echo '<button type="button" id="youtubeVolUpBtn" style="display:none"></button>';
+    echo '<span id="youtubeVolumeLabel" style="display:none"></span>';
+    echo '</div>';
+    // Boost knob
+    echo '<div class="yt-knob-wrap">';
+    echo '<div class="yt-knob" id="ytBoostKnob" data-knob="boost"><span class="yt-knob-mark"></span><span class="yt-knob-txt" id="ytBoostVal">150</span></div>';
+    echo '<span class="yt-knob-label">boost</span>';
+    echo '<input type="range" id="youtubeBoostSlider" class="youtube-boost-slider yt-knob-slider" min="50" max="300" value="150" style="display:none">';
+    echo '<input type="checkbox" id="youtubeBoostCheckbox" style="display:none">';
+    echo '<span id="youtubeBoostStatus" style="display:none"></span>';
+    echo '</div>';
+    // Luz button (square, lightbulb icon)
+    echo '<div class="yt-knob-wrap">';
+    echo '<button type="button" class="yt-luz-btn" id="ytSunlightToggle" title="Modo luz solar (día/noche)">&#x1F4A1;</button>';
+    echo '<span class="yt-knob-label">luz</span>';
+    echo '</div>';
+    echo '</div>'; // knob row
+
+    echo '</div>'; // yt-deck-controls-col
+    echo '</div>'; // yt-radio-deck-row
+
+    // ── DJ Jefry: Confidence bar (bajo la cinta, solo barra) ──
+    echo '<style>.yt-dj-confidence{display:block;width:100%;margin-top:4px;margin-bottom:2px}.yt-dj-confidence-track{width:100%;height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}.yt-dj-confidence-fill{height:100%;background:linear-gradient(90deg,rgba(245,158,11,.5),rgba(16,185,129,.7));border-radius:2px;transition:width .8s ease}.is-lite .yt-dj-confidence-fill{animation-duration:auto!important;transition-duration:.8s!important}</style>';
+    echo '<div class="yt-dj-confidence" id="ytDjConfidence">';
+    echo '<div class="yt-dj-confidence-track"><div class="yt-dj-confidence-fill" id="jefryConfidenceBar" style="width:50%"></div></div>';
+    echo '</div>';
+
+    // ── MENU BANK: Botonera de menú cuadrada ──
+    echo '<div class="yt-menu-bank">';
+    echo '<button type="button" class="yt-menu-btn yt-menu-btn-car yt-menu-btn-kitt" id="ytJefryChatStart" title="Izq: Jefry | Der: Coche Fantástico"><svg viewBox="0 0 50 28"><path d="M2,22 L5,12 L7,6 L18,4 L34,4 L44,6 L47,12 L48,22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M17,4 L15,14 C15,14 20,11 26,10 C32,9 37,10 38,14 L34,4" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><rect class="scanner" x="8" y="6.5" width="12" height="1.8" rx="0.9" fill="#ee3333"/><circle cx="12" cy="24" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="39" cy="24" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="24" r="1.2" fill="currentColor"/><circle cx="39" cy="24" r="1.2" fill="currentColor"/></svg></button>';
+    echo '<button type="button" class="yt-menu-btn" id="ytRadioPresintoniasToggle" title="Presintonías">&#9733; PRES</button>';
+    echo '<button type="button" class="yt-menu-btn" id="ytGpsBtn" title="GPS / Navegación"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="currentColor"/></svg>GPS</button>';
+    echo '<button type="button" class="yt-menu-btn" id="ytRadioRadiosToggle" title="Emisoras de radio">&#9889; RAD</button>';
+    echo '<button type="button" class="yt-menu-btn" id="ytRadioSidebarToggle" title="Biblioteca (listas, sugerencias, resultados)">&#9835; BIB</button>';
+    echo '</div>';
+
+    // ── SEARCH BAR ──
+    echo '<div class="youtube-search yt-radio-search-inline yt-search-row">';
+    echo '<input type="text" id="youtubeSearchInput" class="youtube-search-input yt-radio-search-input" placeholder="Buscar en la biblioteca..." autocomplete="off">';
+    echo '<button type="button" id="youtubeVoiceSearchBtn" class="youtube-voice-search-btn" title="Buscar por voz">🎤</button>';
+    echo '<div class="youtube-search-spinner" id="youtubeSearchSpinner" style="display:none"></div>';
+    echo '</div>';
+
+    // ── Speed indicator (se muestra al hacer FF/RW) ──
+    echo '<span class="yt-speed-badge" id="ytSpeedBadge"></span>';
+
+    // ── PRESETS: movidos a paneles laterales ──
+    echo '<div class="yt-radio-presets" style="display:none"></div>';
+
+    echo '</div>'; // yt-radio-body
+
+    // ═══ PANEL PRESINTONÍAS ════════════════════════════════════════════════
+    echo '<div class="yt-radio-sidebar" id="presintoniasPanel">';
+    echo '<button type="button" class="yt-radio-sidebar-close" id="presintoniasPanelClose" title="Cerrar panel">&times;</button>';
+    echo '<div class="yt-radio-presets-title">PRESINTONÍAS</div>';
+    echo '<div class="yt-radio-presets-scroll">';
+    echo '<div class="youtube-channel-grid" id="youtubeChannelGrid">';
+    if (empty($channels)) {
+        echo '<div class="youtube-channel-tag youtube-channel-seed yt-radio-channel-tag" onclick="YTPlayer.seedChannels()" id="ytSeedTag">';
+        echo '<span class="youtube-channel-icon">&#10024;</span><span>Cargar canales</span>';
+        echo '</div>';
+    } else {
+        foreach ($channels as $ch) {
+            $icon = e($ch['icon'] ?? '📺');
+            $name = e($ch['name'] ?? '');
+            $chId = e($ch['id'] ?? '');
+            $type = e($ch['type'] ?? '');
+            echo '<div class="youtube-channel-tag yt-radio-channel-tag' . ($type === 'ai_suggested' ? ' youtube-channel-ai' : '') . '" onclick="YTPlayer.loadTopicChannel(\'' . e($chId) . '\')">';
+            echo '<span class="youtube-channel-icon">' . $icon . '</span><span>' . $name . '</span>';
+            if ($type === 'custom' || $type === 'ai_suggested') {
+                echo '<button type="button" class="youtube-channel-del" onclick="event.stopPropagation();YTPlayer.deleteTopicChannel(\'' . e($chId) . '\')" title="Eliminar">&times;</button>';
+            }
+            echo '</div>';
+        }
+    }
+    echo '</div>';
+    echo '</div>'; // scroll
+    echo '<div class="youtube-playlist-form" style="margin-top:10px">';
+    echo '<input type="text" id="youtubeNewTopicInput" class="youtube-search-input yt-radio-preset-input" placeholder="Anadir tema..." style="flex:1">';
+    echo '<button type="button" id="youtubeNewTopicBtn" class="youtube-search-btn yt-radio-preset-btn" style="flex-shrink:0;width:auto">Crear</button>';
+    echo '</div>';
+    echo '</div>';
+
+    // ═══ PANEL RADIOS ══════════════════════════════════════════════════════
+    echo '<div class="yt-radio-sidebar" id="radiosPanel">';
+    echo '<button type="button" class="yt-radio-sidebar-close" id="radiosPanelClose" title="Cerrar panel">&times;</button>';
+    echo '<div class="yt-radio-presets-title">📻 RADIO EN DIRECTO</div>';
+    echo '<div class="youtube-channel-grid" id="youtubeRadioGrid">';
+    $radioStations = radio_default_stations();
+    foreach ($radioStations as $rs) {
+        $icon = e($rs['icon'] ?? '📻');
+        $name = e($rs['name'] ?? '');
+        $urlJs = e($rs['url'] ?? '');
+        $freq = $rs['freq'] ?? null;
+        $freqAttr = ($freq !== null) ? ' data-freq="' . e((string)$freq) . '"' : '';
+        echo '<div class="youtube-channel-tag yt-radio-channel-tag youtube-radio-tag"' . $freqAttr . ' onclick="YTPlayer.playRadioStation(this,\'' . $urlJs . '\',\'' . addcslashes($rs['name'] ?? '', "'") . '\',\'' . addcslashes($rs['icon'] ?? '📻', "'") . '\')">';
+        echo '<span class="youtube-channel-icon">' . $icon . '</span><span>' . $name . '</span>';
+        echo '</div>';
+    }
+    echo '</div>';
+    echo '</div>';
+
+    // ═══ SIDEBAR: Contenidos plegables ════════════════════════════════════
+    echo '<div class="yt-radio-sidebar" id="ytRadioSidebar">';
+    echo '<button type="button" class="yt-radio-sidebar-close" id="ytRadioSidebarClose" title="Cerrar panel">&times;</button>';
+
+    // ═══ RESULTS: Búsqueda + Historial ════════════════════════════════════
+    echo '<div class="youtube-results yt-radio-results" id="youtubeResults">';
+    if ($lastVideo) {
+        echo '<div class="youtube-section-title">Últimos escuchados</div>';
+        echo '<div class="youtube-history-row" id="youtubeHistoryRow">';
+        echo '<button type="button" class="youtube-history-arrow youtube-history-arrow-left" id="youtubeHistLeft" title="Anterior">&#9664;</button>';
+        echo '<div class="youtube-history-scroll" id="youtubeHistoryScroll">';
+        echo '<div class="youtube-result-grid youtube-result-grid-row yt-radio-result-grid" id="youtubeLastPlayed"></div>';
+        echo '</div>';
+        echo '<button type="button" class="youtube-history-arrow youtube-history-arrow-right" id="youtubeHistRight" title="Siguiente">&#9654;</button>';
+        echo '</div>';
+    }
+    echo '<div class="youtube-section-title">Busca algo para empezar</div>';
+    echo '<div class="youtube-result-grid yt-radio-result-grid" id="youtubeResultGrid"></div>';
+    echo '</div>';
+
+    // ── SUGERENCIAS IA ──
+    echo '<div class="youtube-section yt-radio-section">';
+    echo '<div class="youtube-section-title">Sugerencias IA</div>';
+    echo '<button type="button" class="youtube-suggest-btn" id="youtubeSuggestBtn">Generar sugerencias</button>';
+    echo '<div class="youtube-result-grid" id="youtubeSuggestGrid"></div>';
+    echo '</div>';
+
+    // ── MIS LISTAS ──
+    echo '<div class="youtube-section yt-radio-section">';
+    echo '<div class="youtube-section-title">Mis Listas de reproducción</div>';
+    echo '<p class="youtube-section-hint">Crea listas para organizar tus videos. Pulsa <strong>+</strong> en un video para añadirlo, o <strong>&#128203;</strong> para ver y gestionar la lista.</p>';
+    echo '<div class="youtube-playlist-form">';
+    echo '<input type="text" id="youtubeNewPlaylistInput" class="youtube-search-input" placeholder="Nombre de la nueva lista..." style="flex:1">';
+    echo '<button type="button" id="youtubeNewPlaylistBtn" class="youtube-search-btn" style="flex-shrink:0;width:auto">Crear lista</button>';
+    echo '</div>';
+    echo '<div class="youtube-playlist-list" id="youtubePlaylistList">';
+    if (empty($playlists)) {
+        echo '<div class="youtube-empty">No tienes listas todavía. Escribe un nombre arriba y pulsa "Crear lista".</div>';
+    } else {
+        foreach ($playlists as $pl) {
+            $count = count($pl['videos'] ?? array());
+            echo '<div class="youtube-playlist-item" data-playlist-id="' . e($pl['id']) . '">';
+            echo '<span class="youtube-playlist-name" onclick="YTPlayer.openPlaylistDetail(\'' . e($pl['id']) . '\')" style="cursor:pointer" title="Ver lista completa">' . e($pl['name']) . ' <small>(' . $count . ' videos)</small></span>';
+            echo '<div class="youtube-playlist-actions">';
+            echo '<button type="button" class="youtube-mic-btn" onclick="YTPlayer.openPlaylistDetail(\'' . e($pl['id']) . '\')" title="Ver y gestionar lista">&#128203;</button>';
+            echo '<button type="button" class="youtube-mic-btn" onclick="YTPlayer.playPlaylist(\'' . e($pl['id']) . '\')" title="Reproducir lista">&#9654;</button>';
+            echo '<button type="button" class="youtube-mic-btn youtube-delete-btn" onclick="YTPlayer.deletePlaylist(\'' . e($pl['id']) . '\')" title="Eliminar lista">&times;</button>';
+            echo '</div>';
+            echo '</div>';
+        }
+    }
+    echo '</div>';
+    echo '</div>'; // playlist section
+
+    echo '</div>'; // yt-radio-sidebar
+
+    // ── INITIAL DATA (igual que desktop) ───────────────────────────────────
+    echo '<script>';
+    echo 'window._ytPlaylists = ' . json_encode($playlists, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';';
+    echo 'window._ytChannels = ' . json_encode($channels, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';';
+    echo 'window._ytHistory = ' . json_encode(array_slice($history, 0, 20), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';';
+    if ($lastVideo) {
+        echo 'window._ytLastVideo = ' . json_encode($lastVideo, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';';
+    } else {
+        echo 'window._ytLastVideo = null;';
+    }
+    echo '</script>';
+
+    // ── MODAL: Añadir a lista (server-rendered) ───────────────────────────
+    echo '<div class="add-pl-modal-overlay" id="addPlModalLite" style="display:none" onclick="if(event.target===this)this.style.display=\'none\'">';
+    echo '<div class="add-pl-modal-box">';
+    echo '<h3>Añadir a lista</h3>';
+    echo '<p class="add-pl-video-hint" id="addPlVideoHint">';
+    if ($lastVideo) {
+        echo 'Video: ' . e($lastVideo['title'] ?? '');
+    }
+    echo '</p>';
+    if (empty($playlists)) {
+        echo '<p class="add-pl-empty">No tienes listas todavía. Usa el panel ♫ para crear una.</p>';
+    } else {
+        echo '<form method="POST" action="index.php?page=josue&tab=reproductor&lite=1">';
+        echo '<input type="hidden" name="action" value="youtube_add_to_pl_direct">';
+        echo '<input type="hidden" name="video_id" id="addPlVid" value="">';
+        echo '<input type="hidden" name="title" id="addPlVTitle" value="">';
+        echo '<input type="hidden" name="thumbnail" id="addPlVThumb" value="">';
+        echo '<input type="hidden" name="channel_name" id="addPlVChan" value="">';
+        echo '<div class="add-pl-list">';
+        foreach ($playlists as $pl) {
+            $count = count($pl['videos'] ?? []);
+            $name = e($pl['name']);
+            $pid = e($pl['id']);
+            echo '<button type="submit" name="playlist_id" value="' . $pid . '" class="add-pl-item">';
+            echo '<span>' . $name . '</span>';
+            echo '<small>' . $count . ' videos</small>';
+            echo '</button>';
+        }
+        echo '</div>';
+        echo '</form>';
+    }
+    echo '<button type="button" class="add-pl-close-btn" onclick="document.getElementById(\'addPlModalLite\').style.display=\'none\'">Cerrar</button>';
+    echo '</div></div>';
+
+    echo '</div>'; // youtube-reproductor
+
+    // ── Knight Rider melody audio (hidden) ──
+    echo '<audio id="kittMelody" src="assets/knight-rider-intro.mp3?v=' . filemtime(__DIR__ . '/../assets/knight-rider-intro.mp3') . '" preload="auto" style="display:none"></audio>';
+}
+
+
+
+
+function render_youtube_player() {
+    $playParam = trim((string)request_get('play', ''));
+    $playlists = storage_read('youtube_playlists.json');
+    $channels = storage_read('youtube_channels.json');
+    $history = storage_read('youtube_history.json');
+    if (!is_array($playlists)) $playlists = array();
+    if (!is_array($channels)) $channels = array();
+    if (!is_array($history)) $history = array();
+
+    // Ultimo video del historial
+    $lastVideo = !empty($history) ? $history[0] : null;
+
+    // 🔁 Modo Lite: radio vintage
+    $isLite = request_get('lite') === '1';
+    if ($isLite) {
+        render_youtube_player_lite($playParam, $playlists, $channels, $history, $lastVideo);
+        return;
+    }
+
+    echo '<div class="youtube-reproductor" id="youtubeReproductor"';
+    if ($playParam !== '') {
+        echo ' data-auto-search="' . e($playParam) . '"';
+    }
+    echo '>';
+
+    // ── Botón flotante cerrar fullscreen (visible solo en modo fullscreen) ──
+    echo '<button type="button" class="josue-yt-fs-close-float" id="josueYtFsClose" title="Mostrar menús">⟲ Menús</button>';
+
+    // ── Barra de búsqueda ──────────────────────────────────────────
+    echo '<div class="youtube-search-bar">';
+    echo '<div class="youtube-search" id="youtubeSearchRow">';
+    echo '<input type="text" id="youtubeSearchInput" class="youtube-search-input" placeholder="Buscar en YouTube... (ej: musica, artista, cancion)" autocomplete="off">';
+    echo '<button type="button" id="youtubeVoiceSearchBtn" class="youtube-voice-search-btn" title="Buscar por voz" style="margin-left:6px">🎤</button>';
+    echo '<button type="button" id="youtubeSearchBtn" class="youtube-search-btn">Buscar</button>';
+    echo '<button type="button" id="josueYtFsBtn" class="youtube-search-btn" style="background:rgba(96,165,250,.12);border-color:rgba(96,165,250,.22);color:#93c5fd;width:auto;flex-shrink:0;margin-left:6px" title="Pantalla completa">⛶</button>';
+    echo '<div class="youtube-search-spinner" id="youtubeSearchSpinner" style="display:none"></div>';
+    echo '</div>';
+    echo '</div>';
+
+    // ── Reproductor mini (50%) + Canales (50%) ──────────────────────
+    echo '<div class="youtube-main">';
+
+    // Columna izquierda: reproductor
+    echo '<div class="youtube-player-column">';
+    echo '<div class="youtube-mini-player" id="youtubeMiniPlayer">';
+    echo '<div class="youtube-mini-player-placeholder" id="youtubePlayerPlaceholder">';
+    echo '<div class="youtube-placeholder-icon">&#9654;</div>';
+    echo '<div class="youtube-placeholder-text">Selecciona un video</div>';
+    echo '</div>';
+    echo '<div id="youtubePlayerContainer" style="display:none"></div>';
+    echo '<div class="youtube-now-playing" id="youtubeNowPlaying" style="display:none">';
+    echo '<span id="youtubeNowPlayingTitle"></span>';
+    echo '</div>';
+    echo '</div>';
+
+    // Controles del reproductor
+    echo '<div class="youtube-controls" id="youtubeControls" style="display:none">';
+    echo '<button type="button" class="youtube-ctrl-btn" id="youtubePrevBtn" title="Anterior">&#9664;</button>';
+    echo '<button type="button" class="youtube-ctrl-btn" id="youtubePlayPauseBtn" title="Pausa">&#10074;&#10074;</button>';
+    echo '<button type="button" class="youtube-ctrl-btn" id="youtubeNextBtn" title="Siguiente">&#9654;</button>';
+    // Slider de volumen + botones
+    echo '<div class="youtube-volume-row">';
+    echo '<button type="button" class="youtube-ctrl-btn youtube-vol-btn" id="youtubeVolDownBtn" title="Bajar volumen">&#8722;</button>';
+    echo '<input type="range" id="youtubeVolumeSlider" class="youtube-volume-slider" min="0" max="100" value="100" title="Volumen">';
+    echo '<span class="youtube-volume-label" id="youtubeVolumeLabel">100%</span>';
+    echo '<button type="button" class="youtube-ctrl-btn youtube-vol-btn" id="youtubeVolUpBtn" title="Subir volumen">+</button>';
+    echo '</div>';
+    // Boost de audio
+    echo '<div class="youtube-boost-row">';
+    echo '<label class="youtube-boost-toggle" id="youtubeBoostToggle" title="Audio Boost: amplificación real vía Web Audio API">';
+    echo '<input type="checkbox" id="youtubeBoostCheckbox"> <span class="youtube-boost-label">🔊 Boost</span>';
+    echo '</label>';
+    echo '<input type="range" id="youtubeBoostSlider" class="youtube-boost-slider" min="50" max="300" value="150" style="display:none">';
+    echo '<span class="youtube-boost-value" id="youtubeBoostValue" style="display:none">150%</span>';
+    echo '<span class="youtube-boost-status" id="youtubeBoostStatus"></span>';
+    echo '</div>';
+    // Add to playlist
+    echo '<button type="button" class="youtube-ctrl-btn" id="youtubeAddToPlBtn" title="Añadir a lista" style="border-color:var(--accent);color:var(--accent)" onclick="YTPlayer.addCurrentToPlaylist()">+</button>';
+    echo '</div>';
+
+    echo '</div>'; // player column
+
+    // Columna derecha: Canales tematicos
+    echo '<div class="youtube-channel-sidebar">';
+    echo '<div class="youtube-section">';
+    echo '<div class="youtube-section-title">Canales tematicos</div>';
+    echo '<p class="youtube-section-hint">Temas generados por IA. Pulsa un canal para ver videos actuales de ese tema.</p>';
+    echo '<div class="youtube-channel-grid" id="youtubeChannelGrid">';
+    if (empty($channels)) {
+        echo '<div class="youtube-channel-tag youtube-channel-seed" onclick="YTPlayer.seedChannels()" id="ytSeedTag">';
+        echo '<span class="youtube-channel-icon">✨</span><span>Cargar canales</span>';
+        echo '</div>';
+    } else {
+        foreach ($channels as $ch) {
+            $icon = e($ch['icon'] ?? '📺');
+            $name = e($ch['name'] ?? '');
+            $chId = e($ch['id'] ?? '');
+            $type = e($ch['type'] ?? '');
+            echo '<div class="youtube-channel-tag' . ($type === 'ai_suggested' ? ' youtube-channel-ai' : '') . '" onclick="YTPlayer.loadTopicChannel(\'' . e($chId) . '\')">';
+            echo '<span class="youtube-channel-icon">' . $icon . '</span><span>' . $name . '</span>';
+            if ($type === 'custom' || $type === 'ai_suggested') {
+                echo '<button type="button" class="youtube-channel-del" onclick="event.stopPropagation();YTPlayer.deleteTopicChannel(\'' . e($chId) . '\')" title="Eliminar">&times;</button>';
+            }
+            echo '</div>';
+        }
+    }
+    echo '</div>';
+    echo '<div class="youtube-playlist-form" style="margin-top:10px">';
+    echo '<input type="text" id="youtubeNewTopicInput" class="youtube-search-input" placeholder="Anadir tema..." style="flex:1">';
+    echo '<button type="button" id="youtubeNewTopicBtn" class="youtube-search-btn" style="flex-shrink:0;width:auto">Crear</button>';
+    echo '</div>';
+    echo '</div>';
+
+    // ── Radio en directo ──────────────────────────────────────
+    echo '<div class="youtube-section" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line)">';
+    echo '<div class="youtube-section-title">📻 Radio en directo</div>';
+    echo '<p class="youtube-section-hint">Emisoras de radio españolas en directo. Pulsa para sintonizar.</p>';
+    echo '<div class="youtube-channel-grid" id="youtubeRadioGrid">';
+    $radioStations = radio_default_stations();
+    foreach ($radioStations as $rs) {
+        $icon = e($rs['icon'] ?? '📻');
+        $name = e($rs['name'] ?? '');
+        $urlJs = e($rs['url'] ?? '');
+        echo '<div class="youtube-channel-tag youtube-radio-tag" onclick="YTPlayer.playRadioStation(this,\'' . $urlJs . '\',\'' . addcslashes($rs['name'] ?? '', "'") . '\',\'' . addcslashes($rs['icon'] ?? '📻', "'") . '\')">';
+        echo '<span class="youtube-channel-icon">' . $icon . '</span><span>' . $name . '</span>';
+        echo '</div>';
+    }
+    echo '</div>';
+    echo '</div>';
+
+    echo '</div>'; // channel sidebar
+
+    // ── Resultados (full width, debajo de player + canales) ─────────
+    echo '<div class="youtube-results" id="youtubeResults">';
+    if ($lastVideo) {
+        echo '<div class="youtube-section-title">Ultimos escuchados</div>';
+        echo '<div class="youtube-history-row" id="youtubeHistoryRow">';
+        echo '<button type="button" class="youtube-history-arrow youtube-history-arrow-left" id="youtubeHistLeft" title="Anterior">&#9664;</button>';
+        echo '<div class="youtube-history-scroll" id="youtubeHistoryScroll">';
+        echo '<div class="youtube-result-grid youtube-result-grid-row" id="youtubeLastPlayed"></div>';
+        echo '</div>';
+        echo '<button type="button" class="youtube-history-arrow youtube-history-arrow-right" id="youtubeHistRight" title="Siguiente">&#9654;</button>';
+        echo '</div>';
+    }
+    echo '<div class="youtube-section-title">Busca algo para empezar</div>';
+    echo '<div class="youtube-result-grid" id="youtubeResultGrid"></div>';
+    echo '</div>';
+
+    echo '</div>'; // youtube-main
+
+    // ── Sugerencias IA ─────────────────────────────────────────────
+    echo '<div class="youtube-section" id="youtubeSuggestions">';
+    echo '<div class="youtube-section-title">Sugerencias IA</div>';
+    echo '<button type="button" class="youtube-suggest-btn" id="youtubeSuggestBtn">Generar sugerencias</button>';
+    echo '<div class="youtube-result-grid" id="youtubeSuggestGrid"></div>';
+    echo '</div>';
+
+    // ── Mis Listas ─────────────────────────────────────────────────
+    echo '<div class="youtube-section">';
+    echo '<div class="youtube-section-title">Mis Listas de reproduccion</div>';
+    echo '<p class="youtube-section-hint">Crea listas para organizar tus videos. Pulsa <strong>+</strong> en un video para anadirlo, o <strong>📋</strong> para ver y gestionar la lista.</p>';
+    echo '<div class="youtube-playlist-form">';
+    echo '<input type="text" id="youtubeNewPlaylistInput" class="youtube-search-input" placeholder="Nombre de la nueva lista..." style="flex:1">';
+    echo '<button type="button" id="youtubeNewPlaylistBtn" class="youtube-search-btn" style="flex-shrink:0;width:auto">Crear lista</button>';
+    echo '</div>';
+    echo '<div class="youtube-playlist-list" id="youtubePlaylistList">';
+    if (empty($playlists)) {
+        echo '<div class="youtube-empty">No tienes listas todavia. Escribe un nombre arriba y pulsa "Crear lista".</div>';
+    } else {
+        foreach ($playlists as $pl) {
+            $count = count($pl['videos'] ?? array());
+            echo '<div class="youtube-playlist-item" data-playlist-id="' . e($pl['id']) . '">';
+            echo '<span class="youtube-playlist-name">' . e($pl['name']) . ' <small>(' . $count . ' videos)</small></span>';
+            echo '<div class="youtube-playlist-actions">';
+            echo '<button type="button" class="youtube-mic-btn" onclick="YTPlayer.openPlaylistDetail(\'' . e($pl['id']) . '\')" title="Ver y gestionar lista">📋</button>';
+            echo '<button type="button" class="youtube-mic-btn" onclick="YTPlayer.playPlaylist(\'' . e($pl['id']) . '\')" title="Reproducir lista">&#9654;</button>';
+            echo '<button type="button" class="youtube-mic-btn youtube-delete-btn" onclick="YTPlayer.deletePlaylist(\'' . e($pl['id']) . '\')" title="Eliminar lista">&times;</button>';
+            echo '</div>';
+            echo '</div>';
+        }
+    }
+    echo '</div>';
+    echo '</div>'; // playlist section
+
+    // ── Initial data for JS ─────────────────────────────────────────
+    echo '<script>';
+    echo 'window._ytPlaylists = ' . json_encode($playlists, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';';
+    echo 'window._ytChannels = ' . json_encode($channels, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';';
+    echo 'window._ytHistory = ' . json_encode(array_slice($history, 0, 20), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';';
+    if ($lastVideo) {
+        echo 'window._ytLastVideo = ' . json_encode($lastVideo, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';';
+    } else {
+        echo 'window._ytLastVideo = null;';
+    }
+    echo '</script>';
+
+    // ── Auto-fullscreen al cargar el reproductor ─────────────────────
+    echo '<script>';
+    echo '(function(){if(document.body.classList.contains("josue-yt-fs")||document.body.classList.contains("is-lite"))return;document.body.classList.add("josue-yt-fs");})();';
+    echo '</script>';
+
+    echo '</div>'; // youtube-reproductor
+}
+
+/**
+ * Alerta en el dashboard cuando el proxy de audio de YouTube está caído.
+ * Solo se muestra si hay errores registrados (no-lite, solo admin).
+ */
+function _render_audio_proxy_alert() {
+    $errors = storage_read('youtube_audio_errors.json');
+    if (!is_array($errors) || ($errors['status'] ?? 'ok') !== 'broken') {
+        return; // Todo OK, no mostrar nada
+    }
+
+    // Auto-sanación: re-chequear el proxy como máximo cada 30 min. Evita que la
+    // alerta quede clavada si el proxy se recupera sin pasar por el reproductor.
+    $lastCheck = strtotime($errors['last_checked'] ?? '2000-01-01');
+    if (time() - $lastCheck >= 1800) {
+        if (youtube_audio_proxy_health_check()) {
+            _youtube_reset_audio_errors();
+            return;
+        }
+        // Sigue caído: refrescar solo last_checked (sin inflar error_count
+        // ni perder el error original que se muestra al admin).
+        $errors['last_checked'] = now_datetime();
+        storage_write('youtube_audio_errors.json', $errors);
+    }
+
+    $lastFailure = $errors['last_failure'] ?? '?';
+    $errorCount = (int)($errors['error_count'] ?? 0);
+    $lastError = $errors['last_error'] ?? 'Error desconocido';
+
+    echo '<section class="panel audio-proxy-alert" style="background:#3b1010;border:2px solid #dc2626;padding:14px 18px;margin-bottom:12px;border-radius:10px;display:flex;align-items:center;gap:12px">';
+    echo '<span style="font-size:24px">🔊❌</span>';
+    echo '<div style="flex:1">';
+    echo '<strong style="color:#fca5a5;font-size:15px">Audio Boost caído</strong>';
+    echo '<p style="color:#fca5a5;margin:4px 0 0;font-size:12px">';
+    echo 'El sistema de amplificación de YouTube ha dejado de funcionar (posible cambio en la web de YouTube). ';
+    echo 'Fallos: ' . $errorCount . '. Último: ' . e($lastFailure) . '. ' . e($lastError) . '.';
+    echo '</p>';
+    echo '</div>';
+    echo '</section>';
+}
+
 function publicista_field_clienta_picker($name, $label, $clientas, $selected = '') {
     $selected = trim((string)$selected);
     $selectId = 'publicista_clienta_picker_' . substr(md5($name . '|' . $selected . '|' . count($clientas)), 0, 10);
@@ -9813,52 +12837,4 @@ function publicista_field_clienta_picker($name, $label, $clientas, $selected = '
     echo '</select>';
     echo '<div class="field-help">Se muestran clientas de LaMami y de Jostal, estén o no en la casa. Escribe para filtrar el listado y luego selecciona una.</div>';
     echo '</div>';
-}
-function publicista_render_intro_guide_panel() {
-    $steps = array(
-        array(
-            'num' => 1,
-            'title' => 'Elige clienta y nombre del pack',
-            'body' => 'Empieza en <strong>Nuevo trabajo Publicista</strong>. Selecciona la clienta y pon un nombre interno fácil de reconocer.'
-        ),
-        array(
-            'num' => 2,
-            'title' => 'Sube la foto base y define matices',
-            'body' => 'Añade la imagen original y, si hace falta, escribe matices físicos, restricciones y tono deseado de los textos.'
-        ),
-        array(
-            'num' => 3,
-            'title' => 'Decide cómo arrancar',
-            'body' => '<strong>Crear borrador</strong> solo guarda la base. <strong>Crear y generar</strong> lanza todo el proceso de imágenes desde esa misma foto.'
-        ),
-        array(
-            'num' => 4,
-            'title' => 'Espera el batch y vuelve a continuar',
-            'body' => 'En modo ahorro máximo se envían 6 candidatas por batch. Si queda pendiente, reabre la ficha y pulsa <strong>Actualizar batch / continuar</strong>.'
-        ),
-        array(
-            'num' => 5,
-            'title' => 'Revisa las candidatas y el top 4 final',
-            'body' => 'Cuando el batch termine, verás candidatas y 4 finales. Si una flojea, usa <strong>Regenerar esta</strong> en la candidata concreta.'
-        ),
-        array(
-            'num' => 6,
-            'title' => 'Genera textos y cierra el trabajo',
-            'body' => 'Con el pack visual ya bueno, pulsa <strong>Generar / regenerar textos</strong>. Si todo está correcto, termina con <strong>Marcar pack como definitivo</strong>.'
-        ),
-    );
-
-    echo '<section class="panel panel-space publicista-guide-panel">';
-    echo '<div class="section-head"><div><h2>Qué hace Publicista y en qué orden usarlo</h2><p>Esta sección convierte una foto real de una clienta en un pack publicitario completo: imágenes finales, títulos, anuncios y export listo para publicar.</p></div></div>';
-    echo '<div class="publicista-steps-grid">';
-    foreach ($steps as $step) {
-        echo '<article class="publicista-step-card is-pending">';
-        echo '<div class="publicista-step-top"><span class="publicista-step-num">' . e((string)$step['num']) . '</span><span class="publicista-step-status">Paso</span></div>';
-        echo '<h4>' . e($step['title']) . '</h4>';
-        echo '<p>' . $step['body'] . '</p>';
-        echo '</article>';
-    }
-    echo '</div>';
-    echo '<div class="publicista-guide-note"><strong>Idea clave:</strong> Publicista no es solo “generar imágenes”. Primero prepara una base fiel a la clienta, luego monta el pack visual, después crea el pack de textos y por último te deja cerrar una versión definitiva.</div>';
-    echo '</section>';
 }

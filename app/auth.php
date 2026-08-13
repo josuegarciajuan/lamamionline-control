@@ -88,9 +88,115 @@ function auth_auto_login_from_whitelist() {
     if (request_get('logged_out') === '1') return false;
     if (!auth_is_whitelisted_ip()) return false;
 
+    // Si ya existe un dispositivo de confianza, dejar que él decida el usuario
+    $cookieName = auth_trusted_device_cookie_name();
+    if (!empty($_COOKIE[$cookieName]) && auth_is_trusted_device_token($_COOKIE[$cookieName])) {
+        return false;
+    }
+
     $_SESSION['logged_in'] = true;
-    $_SESSION['username'] = 'whitelist';
-    $_SESSION['display_name'] = 'Josué';
+    $_SESSION['username'] = 'telefono';
+    $_SESSION['display_name'] = 'Teléfono';
     $_SESSION['auth_via_whitelist'] = true;
+
+    // Registrar automáticamente como dispositivo de confianza (cookie de 1 año)
+    auth_register_trusted_device('IP ' . auth_client_ip(), 'telefono');
+    return true;
+}
+
+// ── Trusted device (cookie-based, survives IP changes) ──
+
+function auth_trusted_devices() {
+    $settings = settings_get();
+    return $settings['trusted_devices'] ?? array();
+}
+
+function auth_is_trusted_device_token($token) {
+    $token = trim((string)$token);
+    if ($token === '') return false;
+    $devices = auth_trusted_devices();
+    return isset($devices[$token]);
+}
+
+function auth_trusted_device_cookie_name() {
+    return 'lamami_td';
+}
+
+function auth_generate_device_token() {
+    return bin2hex(random_bytes(32));
+}
+
+function auth_register_trusted_device($label = '', $username = 'telefono') {
+    $token = auth_generate_device_token();
+    $devices = auth_trusted_devices();
+
+    $label = trim((string)$label);
+    if ($label === '') {
+        $label = 'Dispositivo ' . date('Y-m-d H:i');
+    }
+
+    $devices[$token] = array(
+        'label'        => $label,
+        'username'     => $username,
+        'created_at'   => now_datetime(),
+        'last_used_at' => now_datetime(),
+    );
+
+    $settings = settings_get();
+    $settings['trusted_devices'] = $devices;
+    storage_write('settings.json', $settings);
+
+    setcookie(
+        auth_trusted_device_cookie_name(),
+        $token,
+        time() + 365 * 86400,
+        '/',
+        '',
+        false,
+        true
+    );
+
+    return $token;
+}
+
+function auth_remove_trusted_device($token) {
+    $token = trim((string)$token);
+    $devices = auth_trusted_devices();
+    if (!isset($devices[$token])) return false;
+
+    unset($devices[$token]);
+    $settings = settings_get();
+    $settings['trusted_devices'] = $devices;
+    storage_write('settings.json', $settings);
+    return true;
+}
+
+function auth_auto_login_from_trusted_device() {
+    if (is_logged_in()) return false;
+    if (request_get('page') === 'logout') return false;
+    if (request_get('logged_out') === '1') return false;
+
+    $cookieName = auth_trusted_device_cookie_name();
+    if (empty($_COOKIE[$cookieName])) return false;
+
+    $token = trim((string)$_COOKIE[$cookieName]);
+    if (!auth_is_trusted_device_token($token)) return false;
+
+    // Actualizar last_used_at y leer el username almacenado
+    $devices = auth_trusted_devices();
+    $device = $devices[$token];
+    $device['last_used_at'] = now_datetime();
+    $devices[$token] = $device;
+    $settings = settings_get();
+    $settings['trusted_devices'] = $devices;
+    storage_write('settings.json', $settings);
+
+    $username = $device['username'] ?? 'telefono';
+    $displayName = ($username === 'josue') ? 'Josué' : (($username === 'telefono') ? 'Teléfono' : (($username === 'coche') ? 'Coche' : ucfirst($username)));
+
+    $_SESSION['logged_in'] = true;
+    $_SESSION['username'] = $username;
+    $_SESSION['display_name'] = $displayName;
+    $_SESSION['auth_via_device'] = true;
     return true;
 }

@@ -43,6 +43,24 @@ CREATE TABLE IF NOT EXISTS crm_agenda (
   KEY idx_crm_agenda_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Agenda Comercial (Inbox SuperWasap)
+CREATE TABLE IF NOT EXISTS crm_comercial_agenda (
+  id VARCHAR(64) NOT NULL PRIMARY KEY,
+  nombre VARCHAR(191) NULL,
+  telefono VARCHAR(32) NULL,
+  telefono_norm VARCHAR(16) NULL,
+  negocio VARCHAR(64) NULL,
+  submode VARCHAR(32) NULL,
+  notas TEXT NULL,
+  thread_id VARCHAR(64) NULL,
+  created_at DATETIME NULL,
+  updated_at DATETIME NULL,
+  raw_json JSON NULL,
+  KEY idx_ca_telefono_norm (telefono_norm),
+  KEY idx_ca_negocio (negocio),
+  KEY idx_ca_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS crm_gastos (
   id VARCHAR(64) NOT NULL PRIMARY KEY,
   descripcion VARCHAR(255) NULL,

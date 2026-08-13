@@ -9,9 +9,15 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIiB2aWV3Qm94PSIwIDAgMTkyIDE5MiI+CiAgPHJlY3Qgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiIHJ4PSIzMiIgZmlsbD0iIzA2MGMxNiIvPgogIDxwYXRoIGQ9Ik00OCAxNDQgTDcyIDk2IEw5NiAxMjAgTDEyMCA3MiBMMTQ0IDEwOCIgc3Ryb2tlPSIjZjU5ZTBiIiBzdHJva2Utd2lkdGg9IjYiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDxjaXJjbGUgY3g9IjQ4IiBjeT0iMTQ0IiByPSI1IiBmaWxsPSIjZjU5ZTBiIi8+CiAgPGNpcmNsZSBjeD0iNzIiIGN5PSI5NiIgcj0iNSIgZmlsbD0iI2Y1OWUwYiIvPgogIDxjaXJjbGUgY3g9Ijk2IiBjeT0iMTIwIiByPSI1IiBmaWxsPSIjZjU5ZTBiIi8+CiAgPGNpcmNsZSBjeD0iMTIwIiBjeT0iNzIiIHI9IjUiIGZpbGw9IiNmNTllMGIiLz4KICA8Y2lyY2xlIGN4PSIxNDQiIGN5PSIxMDgiIHI9IjUiIGZpbGw9IiNmNTllMGIiLz4KPC9zdmc+",
+      "src": "icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

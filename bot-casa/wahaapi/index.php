@@ -216,7 +216,7 @@ services:
       - WHATSAPP_SWAGGER_USERNAME=admin
       - WHATSAPP_SWAGGER_PASSWORD=admin123
       - WHATSAPP_HOOK_URL={$webhookUrl}
-      - WHATSAPP_HOOK_EVENTS=message
+      - WHATSAPP_HOOK_EVENTS=message,message.any
     volumes:
       - ./data:/app/data
       - ./sessions:/app/.sessions
@@ -249,7 +249,7 @@ YAML;
             // ── Create session with webhook config ──
             $sessionPayload = json_encode([
                 'name' => 'default',
-                'config' => ['webhooks' => [['url' => $webhookUrl, 'events' => ['message']]]],
+                'config' => ['webhooks' => [['url' => $webhookUrl, 'events' => ['message', 'message.any']]]],
             ]);
             wahaApiCall('POST', $port, '/api/sessions', $sessionPayload);
 
@@ -317,7 +317,7 @@ YAML;
             $webhookUrl = 'https://lamami.online/control/bot-casa/public/webhook.php';
             $sessionPayload = json_encode([
                 'name' => 'default',
-                'config' => ['webhooks' => [['url' => $webhookUrl, 'events' => ['message']]]],
+                'config' => ['webhooks' => [['url' => $webhookUrl, 'events' => ['message', 'message.any']]]],
             ]);
             wahaApiCall('POST', $port, '/api/sessions', $sessionPayload);
             wahaApiCall('PUT', $port, '/api/sessions/default', $sessionPayload);

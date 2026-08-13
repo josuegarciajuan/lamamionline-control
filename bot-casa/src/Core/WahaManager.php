@@ -143,7 +143,7 @@ final class WahaManager
         $url = "http://{$this->wahaServer}:{$port}/api/sessions/default";
         $payload = json_encode([
             'name' => 'default',
-            'config' => ['webhooks' => [['url' => $webhookUrl, 'events' => ['message']]]],
+            'config' => ['webhooks' => [['url' => $webhookUrl, 'events' => ['message', 'message.any']]]],
         ]);
         $ch = curl_init($url);
         curl_setopt_array($ch, [

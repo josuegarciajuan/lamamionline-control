@@ -83,7 +83,7 @@ function publicista_ai_config() {
         $copyApiUrl = trim((string)($settings['publicista_copy_api_url'] ?? ''));
     }
     if ($copyApiUrl === '') {
-        $copyApiUrl = 'https://api.deepseek.com/v1';
+        $copyApiUrl = 'https://api.deepseek.com';
     }
     $copyModel = trim((string)getenv('PUBLICISTA_COPY_MODEL'));
     if ($copyModel === '') {
@@ -195,21 +195,33 @@ function publicista_uncensored_chat_request($payload, $timeoutSec = 120) {
         'messages' => $messages,
         'temperature' => $temperature,
         'max_tokens' => 24576,
+        'thinking'        => array('type' => 'enabled'),
+        'reasoning_effort' => 'high',
     );
     if ($jsonSchema !== null) $chatPayload['response_format'] = array('type' => 'json_object');
 
-    $maxAttempts = 3;
-    for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+    // Retry: sin timeout fijo (el modelo puede tardar lo necesario).
+    // Safety nets: CONNECTTIMEOUT=30s + LOW_SPEED (si 0 bytes durante 10 min, abortar).
+    // Solo los errores HTTP reales (500+, 429) cuentan como errores "de verdad".
+    // Los timeouts/desconexiones de red no cuentan → solo reintentar.
+    $maxTotalAttempts = 15;       // hard cap absoluto de seguridad
+    $maxConsecutiveErrors = 5;    // errores reales consecutivos antes de rendirse
+    $consecutiveErrors = 0;
+
+    $url = rtrim($cfg['copy_api_url'], '/') . '/chat/completions';
+    $headers = array(
+        'Authorization: Bearer ' . $cfg['copy_api_key'],
+        'Content-Type: application/json', 'Accept: application/json',
+    );
+
+    for ($attempt = 1; $attempt <= $maxTotalAttempts; $attempt++) {
         $responseHeaders = array();
-        $headers = array(
-            'Authorization: Bearer ' . $cfg['copy_api_key'],
-            'Content-Type: application/json', 'Accept: application/json',
-        );
-        $url = rtrim($cfg['copy_api_url'], '/') . '/chat/completions';
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, (int)$timeoutSec);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_LOW_SPEED_LIMIT, 1);
+        curl_setopt($ch, CURLOPT_LOW_SPEED_TIME, 600);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($chatPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, $headerLine) use (&$responseHeaders) {
@@ -265,7 +277,9 @@ function publicista_uncensored_chat_request($payload, $timeoutSec = 120) {
                 $ch2 = curl_init($url);
                 curl_setopt($ch2, CURLOPT_POST, true);
                 curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch2, CURLOPT_TIMEOUT, (int)$timeoutSec);
+                curl_setopt($ch2, CURLOPT_CONNECTTIMEOUT, 30);
+                curl_setopt($ch2, CURLOPT_LOW_SPEED_LIMIT, 1);
+                curl_setopt($ch2, CURLOPT_LOW_SPEED_TIME, 600);
                 curl_setopt($ch2, CURLOPT_HTTPHEADER, $headers);
                 curl_setopt($ch2, CURLOPT_POSTFIELDS, json_encode($chatPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
                 $body2 = curl_exec($ch2);
@@ -290,20 +304,71 @@ function publicista_uncensored_chat_request($payload, $timeoutSec = 120) {
             $result['error'] = '';
             return $result;
         }
+
+        // ── Error handling: distinguir timeout/red vs error real del API ──
         $result['error'] = $curlError !== '' ? 'curl:' . $curlError
             : (is_array($decoded) && !empty($decoded['error']['message']) ? $decoded['error']['message']
             : substr((string)$body, 0, 500));
-        $retryable = ($httpCode >= 500 || $httpCode === 0 || $curlError !== '');
-        if (!$retryable || $attempt >= $maxAttempts) return $result;
-        sleep((int)pow(2, $attempt));
+
+        $isConnectionError = ($curlError !== '' || $httpCode === 0);
+        $isRetryableHttp  = ($httpCode >= 500 || $httpCode === 429);
+
+        if ($isConnectionError) {
+            // Timeout o desconexión: el modelo sigue pensando, no es un error real.
+            // Reintentar sin incrementar contador de errores (backoff suave).
+            sleep(2);
+            continue;
+        }
+
+        if ($isRetryableHttp) {
+            $consecutiveErrors++;
+            $result['retry_history'][] = array(
+                'attempt' => $attempt,
+                'http_code' => $httpCode,
+                'error' => $result['error'],
+                'consecutive_errors' => $consecutiveErrors,
+            );
+            if ($consecutiveErrors >= $maxConsecutiveErrors) {
+                $result['error'] = 'Demasiados errores consecutivos del API (' . $consecutiveErrors . '): ' . $result['error'];
+                return $result;
+            }
+            sleep((int)pow(2, min($consecutiveErrors, 5)));
+            continue;
+        }
+
+        // Error no retryable (4xx excepto 429): devolver directamente
+        return $result;
     }
+
+    $result['error'] = 'Se alcanzó el límite máximo de intentos (' . $maxTotalAttempts . '). Último error: ' . $result['error'];
     return $result;
 }
 
-// Wrapper: usa DeepSeek si configurado, OpenAI como fallback
+// Wrapper: DeepSeek primero (si configurado), fallback a OpenAI si falla
 function publicista_copy_api_request($payload, $timeoutSec = 120) {
     $cfg = publicista_ai_config();
-    if ($cfg['copy_configured']) return publicista_uncensored_chat_request($payload, $timeoutSec);
+
+    // DeepSeek configurado → intentar primero
+    if ($cfg['copy_configured']) {
+        $response = publicista_uncensored_chat_request($payload, $timeoutSec);
+        if ($response['ok']) return $response;
+
+        // Fallback: si DeepSeek falló y OpenAI está disponible, intentar OpenAI
+        if ($cfg['configured']) {
+            $fallbackResponse = publicista_openai_json_request('/v1/responses', $payload, $timeoutSec);
+            if ($fallbackResponse['ok']) {
+                $fallbackResponse['fallback_reason'] = 'deepseek_failed: ' . ($response['error'] ?? 'unknown');
+                return $fallbackResponse;
+            }
+            // Ambos fallaron: devolver el error de DeepSeek + info del fallback
+            $response['error'] = 'DeepSeek falló (' . $response['error'] . ') | Fallback OpenAI también falló (' . ($fallbackResponse['error'] ?? 'unknown') . ')';
+            return $response;
+        }
+
+        return $response; // DeepSeek falló y no hay OpenAI
+    }
+
+    // Sin DeepSeek → OpenAI directamente (si está configurado)
     return publicista_openai_json_request('/v1/responses', $payload, $timeoutSec);
 }
 function publicista_copy_api_configured() {
@@ -530,6 +595,29 @@ function publicista_notify_candidate_regeneration_finished($job, $candidateId, $
     } else {
         $errorText = is_string($resultOrError) ? trim($resultOrError) : trim((string)publicista_array_get((array)$resultOrError, 'error', ''));
         $details[] = $errorText !== '' ? $errorText : 'No se pudo completar la regeneración.';
+
+        // Si Pollo falló sin motivo ("desconocido"), incluir el prompt usado para diagnóstico rápido
+        if (stripos($errorText, 'desconocido') !== false) {
+            // Intentar obtener el prompt del job (candidate base_prompt)
+            $jobFull = is_array($job) && isset($job['candidates']) ? $job : (function_exists('publicista_job_get') ? publicista_job_get($jobId) : null);
+            if (is_array($jobFull)) {
+                $candidates = publicista_array_get($jobFull, 'candidates', array());
+                foreach ($candidates as $cand) {
+                    if (trim((string)publicista_array_get($cand, 'id', '')) === $candidateId) {
+                        $basePrompt = trim((string)publicista_array_get($cand, 'base_prompt', ''));
+                        if ($basePrompt === '') {
+                            $basePrompt = trim((string)publicista_array_get($cand, 'prompt', ''));
+                        }
+                        if ($basePrompt !== '') {
+                            $preview = mb_substr($basePrompt, 0, 300);
+                            if (mb_strlen($basePrompt) > 300) $preview .= '...';
+                            $details[] = 'Prompt: ' . $preview;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     $sourceKey = 'publicista_candidate_regen_' . $jobId . '_' . $candidateId . '_' . ($ok ? 'ok' : 'error') . '_' . date('YmdHis');
@@ -1241,7 +1329,9 @@ function publicista_openai_json_request($endpoint, $payload, $timeoutSec = 60, $
         $ch = curl_init('https://api.openai.com' . $endpoint);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, (int)$timeoutSec);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_LOW_SPEED_LIMIT, 1);
+        curl_setopt($ch, CURLOPT_LOW_SPEED_TIME, 600);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, $headerLine) use (&$responseHeaders) {
@@ -3416,11 +3506,14 @@ function publicista_build_compact_identity_block($job) {
  * Compact keywords format, ~350-400 chars.
  */
 function publicista_build_compact_realism_block() {
-    return '[REAL] foto real selfie movil — 1 mujer sola protagonista — '
+    return '[REAL] foto real de persona real — fotografia realista no retocada — 1 mujer sola protagonista — '
         . '1 sola foto en el archivo, NO dos fotos, NO diptych, NO collage — '
         . 'poros textura piel real, imperfecciones naturales, grano fino camara, '
-        . 'luz natural ventana o bombilla doméstica, sombras contacto reales — '
+        . 'luz natural ventana o bombilla doméstica, sombras contacto reales, '
+        . 'snapshot espontaneo camara amateur — '
         . 'NO CGI NO 3D NO anime NO ilust NO render NO videojuego NO cartoon '
+        . 'NO caricatura NO dibujo_animado NO pintura NO acuarela NO ilustracion_digital '
+        . 'NO colores_saturados NO rasgos_exagerados NO aerografo_excesivo NO filtro_belleza '
         . 'NO collage NO multi-persona NO montaje NO piel plastico NO maniqui '
         . 'NO barbie NO skin_smoothing NO airbrush — '
         . '5 dedos manos normales anatomia correcta proporcion humana real '
@@ -3437,6 +3530,9 @@ function publicista_build_pollo_compact_prompt($job) {
     $count = 4; // Pollo siempre 4 imágenes
 
     $operatorBrief = trim((string)($pp['operator_brief'] ?? ''));
+    if ($operatorBrief !== '') {
+        list($operatorBrief, $_) = publicista_sanitize_pollo_prompt($operatorBrief);
+    }
     $restrictions  = publicista_compose_restrictions_summary($job);
     $selfieMode    = trim((string)($pp['selfie_mode'] ?? 'off'));
     $outfitVariety = trim((string)($pp['outfit_variety'] ?? 'mixed'));
@@ -3561,9 +3657,11 @@ function publicista_build_pollo_compact_prompt($job) {
         $sections[] = '[EXTRA] ' . implode(' ', $extraBits);
     }
 
-    // [NEG] Negative block (compact)
-    $negBlock = '[NEG] NO dibujo NO ilustracion NO texto NO marca_agua NO manos_deformes '
-        . 'NO espejo_salvo_selfie NO desnudo NO lenceria_visible NO transparencia '
+    // [NEG] Negative block — CRITICAL censorship FIRST (NO desnudo, NO lenceria), quality after.
+    //   Order matters: fit_budget trims from the END, so front tokens survive.
+    $negBlock = '[NEG] NO desnudo NO lenceria_visible NO transparencia '
+        . 'NO dibujo NO ilustracion NO texto NO marca_agua NO manos_deformes '
+        . 'NO espejo_salvo_selfie '
         . 'NO estudio NO ciclorama NO bokeh_falso NO neón_colores NO discoteca '
         . 'NO deformidad NO doble_cara NO objetos_flotantes '
         . 'NO 2_fotos_juntas NO diptych NO mosaico NO collage NO antes_despues';
@@ -3587,95 +3685,107 @@ function publicista_build_pollo_compact_prompt($job) {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Compact erotic prompt builder — MISMOS [FORMATO]+[REAL]+[ID] que el capado,
- * pero SIN safety lines, outfits eroticos, fondos bedroom, y NEG sin restricción de desnudo.
+ * Compact erotic prompt builder — ESTRUCTURA IDÉNTICA al prompt normal (que ya funciona),
+ * pero SIN safety lines, outfits eroticos, fondos bedroom, poses sensuales.
  * 
- * DIFERENCIA CLAVE vs capado: [ID] va AL FINAL como refuerzo (no recortable por budget),
- * y las poses son sensuales pero con cara visible para mantener identidad.
+ * ESTRUCTURA: [FORMATO] → [BRIEF] → [REAL] → [ID] → [IMG1..4] → [EXTRA] → [NEG] → [RES]
+ * 
+ * CAMBIOS vs versión anterior (que fallaba):
+ * - [ID] va ANTES de [IMG1..4] (como el normal — CRÍTICO para que el modelo mantenga la identidad)
+ * - Incluye [BRIEF] del operador (antes no lo incluía)
+ * - Usa parámetros del form (pose, framing, expression, makeup, lighting)
+ * - [NEG] sin restricción de desnudo/lencería
+ * - Outfits del pool erótico completo, fondos del pool erótico
  */
 function publicista_build_pollo_compact_erotic_prompt($job) {
+    $pp = function_exists('publicista_job_production_params') ? publicista_job_production_params($job) : array();
     $count = 4;
 
-    // ── Identity block (mismo que el capado) ──
-    $identityBlock = publicista_build_compact_identity_block($job);
+    $operatorBrief = trim((string)($pp['operator_brief'] ?? ''));
+    if ($operatorBrief !== '') {
+        list($operatorBrief, $_) = publicista_sanitize_pollo_prompt($operatorBrief);
+    }
+    $restrictions  = publicista_compose_restrictions_summary($job);
+    $selfieMode    = trim((string)($pp['selfie_mode'] ?? 'off'));
+    $outfitVariety = trim((string)($pp['outfit_variety'] ?? 'mixed'));
 
-    // ── OUTFITS CORTOS (uso interno, no el pool largo) ──
-    $shortOutfits = array(
-        'lenceria negra encaje sujetador+tanga',
-        'bikini hilo minimo color carne',
-        'body gasa transparente negro',
-        'corset saten rojo con ligas',
-        'babydoll encaje blanco abierto',
-        'conjunto lenceria roja saten',
-        'microbikini cintas doradas',
-        'camison seda corto tirantes',
+    // ── Outfits ──
+    $shortOutfits = array();
+    if (function_exists('publicista_pick_erotic_outfits_for_images')) {
+        $shortOutfits = publicista_pick_erotic_outfits_for_images(4);
+    }
+    if (empty($shortOutfits)) {
+        $shortOutfits = array('lenceria negra encaje sujetador+tanga', 'bikini hilo minimo color carne', 'body gasa transparente negro', 'corset saten rojo con ligas');
+    }
+
+    // ── Fondos ──
+    $shortBgs = array();
+    if (function_exists('publicista_erotic_background_pool')) {
+        $bgPool = publicista_erotic_background_pool();
+        if (!empty($bgPool)) {
+            $bgValues = array_values($bgPool);
+            $shortBgs = array_map(function($v) { return mb_substr($v, 0, 40); }, $bgValues);
+        }
+    }
+    if (empty($shortBgs)) {
+        $shortBgs = array('dormitorio luz tenue', 'cama grande sabana blanca', 'sofa terciopelo rojo', 'alfombra pelo blanco');
+    }
+
+    $shots = array('cuerpo_entero_sensual', 'tres_cuartos_ligero_giro', 'cintura_arriba_favorecedor', 'sentada_borde_cama');
+    $poses = array('de_pie_cadera_marcada_mirada_directa', 'apoyada_pared_cabeza_ladeada', 'mano_en_pelo_mirada_camara', 'sentada_piernas_cruzadas_sonrisa');
+
+    $outfit = isset($shortOutfits[$targetIndex]) ? $shortOutfits[$targetIndex] : ($shortOutfits[0] ?? 'lenceria negra encaje');
+    $bg = isset($shortBgs[$targetIndex]) ? $shortBgs[$targetIndex] : ($shortBgs[0] ?? 'dormitorio luz tenue');
+    $shot = $shots[$targetIndex % count($shots)];
+    $pose = $poses[$targetIndex % count($poses)];
+
+    $isSelfie = ($selfieMode === 'mixed') && ($targetIndex === 1);
+    $shotFinal = $isSelfie ? 'selfie_movil_brazo_visible' : $shot;
+
+    $eroticExpMap = array(
+        'sonrisa' => 'sonrisa_magnética', 'seria' => 'seria_intensa',
+        'sugerente' => 'mirada_magnética_atractiva', 'variado' => 'expresion_sensual',
     );
-    shuffle($shortOutfits);
-    $outfits = array_slice($shortOutfits, 0, $count);
+    $expKey  = trim((string)($pp['expression'] ?? 'variado'));
+    $expWord = isset($eroticExpMap[$expKey]) ? $eroticExpMap[$expKey] : 'expresion_sensual';
 
-    // ── FONDOS CORTOS ──
-    $shortBgs = array(
-        'cama grande sabana blanca',
-        'sofa terciopelo rojo oscuro',
-        'dormitorio luz vela tenue',
-        'alfombra pelo blanco suelo',
-        'cama saten burdeos cojines',
-        'espejo vertical dormitorio',
+    $lightingKey = trim((string)($pp['lighting'] ?? 'natural'));
+    $eroticLightMap = array(
+        'natural'=>'luz_tenue_natural', 'studio'=>'luz_suave_penumbra',
+        'calida'=>'luz_calida_intima', 'contraluz'=>'contraluz_silueta_sensual',
     );
-    shuffle($shortBgs);
-    $backgrounds = array_slice($shortBgs, 0, $count);
+    $lightWord = isset($eroticLightMap[$lightingKey]) ? $eroticLightMap[$lightingKey] : 'luz_tenue_intima';
 
-    // ── Poses sensuales con cara visible ── (nada de tumbada/a 4 patas)
-    $shots = array(
-        'cuerpo_entero_de_pie_sensual',
-        'tres_cuartos_ligero_giro',
-        'cintura_arriba_favorecedor',
-        'sentada_borde_cama',
-    );
-    $poses = array(
-        'de_pie_cadera_marcada_mirada_directa',
-        'apoyada_pared_cabeza_ladeada',
-        'mano_en_pelo_mirada_camara',
-        'sentada_piernas_cruzadas_sonrisa',
-    );
-
-    $selfieUse = mt_rand(0, 1) === 1; // 50% de incluir un selfie
-
-    // ── Build sections ──
     $sections = array();
-
-    // [FORMATO] — COMPLETO (igual que el capado) + NEGATIVOS CRÍTICOS dentro.
-    //   fit_budget NUNCA recorta [FORMATO]. Al meter aquí NO collage/diptych/2_fotos,
-    //   garantizamos que el modelo SIEMPRE los ve, sin depender de [NEG] (que sí se recorta).
     $sections[] = '[FORMATO] 1 sola fotografía — NUNCA 2 fotos juntas, NUNCA collage, '
         . 'NUNCA diptych, NUNCA mosaico de imágenes, NUNCA antes/después, '
         . 'NUNCA montaje de varias tomas. El archivo debe contener UNA única foto. '
-        . '1 mujer, 1 encuadre, 1 escena, 1 archivo = 1 foto. '
-        . 'NO 2_fotos_juntas NO diptych NO mosaico NO collage NO antes_despues '
-        . 'NO dibujo NO ilustracion NO texto NO marca_agua NO deformidad NO doble_cara '
-        . 'NO objetos_flotantes NO manos_deformes NO estudio NO ciclorama';
+        . '1 mujer, 1 encuadre, 1 escena, 1 archivo = 1 foto.';
 
-    // [REAL] — mismo que capado
-    $sections[] = publicista_build_compact_realism_block();
-
-    // [IMG1]...[IMG4] — outfits cortos, poses con cara visible
-    for ($i = 0; $i < $count; $i++) {
-        $isSelfie = $selfieUse && ($i === 1);
-        $shot = $isSelfie ? 'selfie_movil_brazo_visible' : $shots[$i % count($shots)];
-        $pose = $poses[$i % count($poses)];
-        $outfit = isset($outfits[$i]) ? $outfits[$i] : 'lenceria negra encaje';
-        $bg = isset($backgrounds[$i]) ? $backgrounds[$i] : 'dormitorio luz calida';
-
-        $line = '[IMG' . ($i + 1) . '] fondo:' . $bg . ' | ropa:' . $outfit
-              . ' | enc:' . $shot . ' | pose:' . $pose;
-        $sections[] = $line;
+    // [BRIEF]
+    if ($operatorBrief !== '') {
+        $sections[] = '[BRIEF] ' . $operatorBrief;
     }
 
-    // [EXTRA] — mínimo (sin esto fit_budget no llega a recortar [ID])
-    $sections[] = '[EXTRA] luz_tenue exp:magnética';
+    $sections[] = publicista_build_compact_realism_block();
 
-    // [ID] — AL FINAL como refuerzo (inrecortable porque antes recorta [EXTRA])
+    // [ID] — ANTES de IMG (no al final)
     $sections[] = '[ID] ' . $identityBlock;
+
+    $sections[] = '[IMG1] fondo:' . $bg . ' | ropa:' . $outfit . ' | enc:' . $shotFinal . ' | pose:' . $pose;
+
+    $sections[] = '[EXTRA] ' . $lightWord . ' exp:' . $expWord;
+
+    // [NEG] — calidad sin censura de desnudo/lencería
+    $sections[] = '[NEG] NO dibujo NO ilustracion NO texto NO marca_agua NO manos_deformes '
+        . 'NO espejo_salvo_selfie NO estudio NO ciclorama NO bokeh_falso NO neón_colores NO discoteca '
+        . 'NO deformidad NO doble_cara NO objetos_flotantes '
+        . 'NO 2_fotos_juntas NO diptych NO mosaico NO collage NO antes_despues';
+
+    // [RES]
+    if ($restrictions !== '') {
+        $sections[] = '[RES] ' . mb_substr($restrictions, 0, 150);
+    }
 
     $prompt = trim(implode("\n", $sections));
     $prompt = publicista_compact_prompt_fit_budget($prompt, 2000);
@@ -3683,16 +3793,63 @@ function publicista_build_pollo_compact_erotic_prompt($job) {
     return $prompt;
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+//  SANITIZADOR DE PROMPTS + REGENERACIÓN ERÓTICA INDIVIDUAL
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Reemplaza palabras que Pollo.ai rechaza silenciosamente.
+ * Se aplica a refine_text, operator_brief y cualquier texto de usuario.
+ */
+function publicista_sanitize_pollo_prompt($text) {
+    $text = (string)$text;
+    $replacements = array(
+        '/\bmilf\b/i'             => 'mujer madura',
+        '/\bMILF\b/'              => 'MUJER MADURA',
+        '/\bteen\b/i'             => 'joven',
+        '/\bcougar\b/i'           => 'mujer atractiva mayor',
+        '/\bsugar\s*baby\b/i'     => 'acompañante',
+        '/\bescort\b/i'           => 'acompañante',
+        '/\bprostituta\b/i'       => 'trabajadora',
+        '/\bputa\b/i'             => 'mujer',
+        '/\bporno\b/i'            => 'contenido adulto',
+        '/\bfuck\b/i'             => '',
+        '/\bsexo\s+explícito\b/i' => 'contenido sugerente',
+    );
+    $changed = false;
+    foreach ($replacements as $pattern => $replacement) {
+        $newText = preg_replace($pattern, $replacement, $text);
+        if ($newText !== $text) {
+            $changed = true;
+            $text = $newText;
+        }
+    }
+    if ($changed) {
+        $text = preg_replace('/\s{2,}/', ' ', $text);
+        $text = trim($text);
+    }
+    return array($text, $changed);
+}
+
 /**
  * Compact erotic regeneration prompt — para regenerar UNA sola candidata erotica.
- * Misma estrategia: negativos en [FORMATO], sin [SIMILITUD] ni [NEG] separado.
  */
 function publicista_build_pollo_compact_erotic_regeneration_prompt($job, $targetIndex, $refineText = '') {
     $refineText = trim((string)$refineText);
+    if ($refineText !== '') {
+        list($refineText, $_) = publicista_sanitize_pollo_prompt($refineText);
+    }
+    $pp = function_exists('publicista_job_production_params') ? publicista_job_production_params($job) : array();
 
     $identityBlock = publicista_build_compact_identity_block($job);
     if ($refineText !== '') {
         $identityBlock = '[REFINO: ' . $refineText . '] | ' . $identityBlock;
+    }
+
+    $operatorBrief = trim((string)($pp['operator_brief'] ?? ''));
+    if ($operatorBrief !== '') {
+        list($operatorBrief, $_) = publicista_sanitize_pollo_prompt($operatorBrief);
     }
 
     $shortOutfits = array(
@@ -3724,10 +3881,156 @@ function publicista_build_pollo_compact_erotic_regeneration_prompt($job, $target
         . 'NO 2_fotos_juntas NO diptych NO mosaico NO collage NO antes_despues '
         . 'NO dibujo NO ilustracion NO texto NO marca_agua NO deformidad NO doble_cara '
         . 'NO objetos_flotantes NO manos_deformes NO estudio NO ciclorama';
+    if ($operatorBrief !== '') {
+        $sections[] = '[BRIEF] ' . $operatorBrief;
+    }
     $sections[] = publicista_build_compact_realism_block();
+    $sections[] = '[ID] ' . $identityBlock;
     $sections[] = '[IMG1] fondo:' . $bg . ' | ropa:' . $outfit . ' | enc:' . $shot . ' | pose:' . $pose;
     $sections[] = '[EXTRA] luz_tenue exp:magnética';
+
+    $prompt = trim(implode("\n", $sections));
+    $prompt = publicista_compact_prompt_fit_budget($prompt, 2000);
+
+    return $prompt;
+}
+
+
+/**
+ * Compact non-erotic regeneration prompt — para regenerar UNA sola candidata normal.
+ * Misma estructura que el prompt normal principal.
+ * 
+ * ESTRUCTURA: [FORMATO] → [BRIEF] → [REAL] → [ID] → [IMG1] → [EXTRA] → [NEG] → [RES]
+ */
+function publicista_build_pollo_compact_regeneration_prompt($job, $targetIndex, $refineText = '') {
+    $refineText = trim((string)$refineText);
+    if ($refineText !== '') {
+        list($refineText, $_) = publicista_sanitize_pollo_prompt($refineText);
+    }
+    $pp = function_exists('publicista_job_production_params') ? publicista_job_production_params($job) : array();
+
+    $identityBlock = publicista_build_compact_identity_block($job);
+    if ($refineText !== '') {
+        $identityBlock = '[REFINO: ' . $refineText . '] | ' . $identityBlock;
+    }
+
+    $operatorBrief = trim((string)($pp['operator_brief'] ?? ''));
+    if ($operatorBrief !== '') {
+        list($operatorBrief, $_) = publicista_sanitize_pollo_prompt($operatorBrief);
+    }
+    $restrictions  = publicista_compose_restrictions_summary($job);
+    $selfieMode    = trim((string)($pp['selfie_mode'] ?? 'off'));
+    $outfitVariety = trim((string)($pp['outfit_variety'] ?? 'mixed'));
+
+    // ── Outfits ──
+    $outfits = array();
+    if (function_exists('publicista_pick_outfits_for_images')) {
+        $outfits = publicista_pick_outfits_for_images($job, 4);
+    }
+    if (empty($outfits)) {
+        $outfits = array('look casual calle', 'vaqueros+top', 'vestido corto', 'pantalon+blusa');
+    }
+
+    // ── Fondos ──
+    $backgrounds = array();
+    if (function_exists('publicista_pick_backgrounds_for_images')) {
+        $backgrounds = publicista_pick_backgrounds_for_images($job, 4);
+    }
+    if (empty($backgrounds)) {
+        $backgrounds = array('salon casa real', 'dormitorio real', 'calle dia', 'cafeteria');
+    }
+
+    // Non-erotic shots/poses
+    $shots = array(
+        'cuerpo_entero_casual',
+        'tres_cuartos_ligero_giro',
+        'cintura_arriba_favorecedor',
+        'lejano_2-3m_descentrado',
+    );
+    $poses = array(
+        'de_pie_cadera_marcada',
+        'sentada_piernas_cruzadas',
+        'apoyada_pared_silueta',
+        'casual_espontanea',
+    );
+
+    $idx  = max(0, (int)$targetIndex);
+    $outfit = isset($outfits[$idx]) ? $outfits[$idx] : ($outfits[$idx % count($outfits)] ?? 'look casual calle');
+    $bg     = isset($backgrounds[$idx]) ? $backgrounds[$idx] : ($backgrounds[$idx % count($backgrounds)] ?? 'salon casa real');
+    $shot   = $shots[$idx % count($shots)];
+    $pose   = $poses[$idx % count($poses)];
+
+    $isSelfie = ($selfieMode === 'mixed') && ($idx === 1);
+    $shotFinal = $isSelfie ? 'selfie_movil_brazo_visible' : $shot;
+
+    // Expression
+    $expressionShortMap = array(
+        'sonrisa' => 'sonrisa_natural', 'seria' => 'seria_segura',
+        'sugerente' => 'magnética_atractiva', 'variado' => 'expresion_natural',
+    );
+    $expKey  = trim((string)($pp['expression'] ?? 'variado'));
+    $expWord = isset($expressionShortMap[$expKey]) ? $expressionShortMap[$expKey] : 'expresion_natural';
+
+    // Makeup
+    $makeupShortMap = array(
+        'natural' => 'maq_natural', 'elegante' => 'maq_elegante', 'intenso' => 'maq_intenso', 'auto' => '',
+    );
+    $makeupKey  = trim((string)($pp['makeup'] ?? 'auto'));
+    $makeupWord = isset($makeupShortMap[$makeupKey]) ? $makeupShortMap[$makeupKey] : '';
+
+    // Lighting
+    $lightingKey = trim((string)($pp['lighting'] ?? 'natural'));
+    $lightingMap = array(
+        'natural' => 'luz_natural_ventana', 'studio' => 'luz_suave_sombras',
+        'calida' => 'luz_calida_lampara', 'contraluz' => 'contraluz_ventana',
+    );
+    $lightWord = isset($lightingMap[$lightingKey]) ? $lightingMap[$lightingKey] : 'luz_natural_ventana';
+
+    $sections = array();
+    $sections[] = '[FORMATO] 1 sola fotografía — NUNCA 2 fotos juntas, NUNCA collage, '
+        . 'NUNCA diptych, NUNCA mosaico de imágenes, NUNCA antes/después, '
+        . 'NUNCA montaje de varias tomas. El archivo debe contener UNA única foto. '
+        . '1 mujer, 1 encuadre, 1 escena, 1 archivo = 1 foto.';
+
+    if ($operatorBrief !== '') {
+        $sections[] = '[BRIEF] ' . $operatorBrief;
+    }
+
+    $sections[] = publicista_build_compact_realism_block();
+
+    // [ID] — ANTES de IMG, con refine inyectado si existe
     $sections[] = '[ID] ' . $identityBlock;
+
+    // [IMG1] — una sola línea de imagen
+    $sections[] = '[IMG1] fondo:' . $bg . ' | ropa:' . $outfit . ' | enc:' . $shotFinal . ' | pose:' . $pose;
+
+    // [EXTRA]
+    $extraBits = array();
+    if ($outfitVariety === 'mixed') {
+        $extraBits[] = 'var_ropa:si';
+    }
+    if ($selfieMode === 'mixed') {
+        $extraBits[] = 'selfie:algunas';
+    }
+    $extraBits[] = 'exp:' . $expWord;
+    if ($makeupWord !== '') {
+        $extraBits[] = $makeupWord;
+    }
+    $extraBits[] = $lightWord;
+    $sections[] = '[EXTRA] ' . implode(' ', $extraBits);
+
+    // [NEG] — con censura (NO desnudo/lenceria)
+    $sections[] = '[NEG] NO desnudo NO lenceria_visible NO transparencia '
+        . 'NO dibujo NO ilustracion NO texto NO marca_agua NO manos_deformes '
+        . 'NO espejo_salvo_selfie '
+        . 'NO estudio NO ciclorama NO bokeh_falso NO neón_colores NO discoteca '
+        . 'NO deformidad NO doble_cara NO objetos_flotantes '
+        . 'NO 2_fotos_juntas NO diptych NO mosaico NO collage NO antes_despues';
+
+    // [RES]
+    if ($restrictions !== '') {
+        $sections[] = '[RES] ' . mb_substr($restrictions, 0, 150);
+    }
 
     $prompt = trim(implode("\n", $sections));
     $prompt = publicista_compact_prompt_fit_budget($prompt, 2000);
@@ -3738,39 +4041,25 @@ function publicista_build_pollo_compact_erotic_regeneration_prompt($job, $target
 
 /**
  * Dynamic budget management: ensures prompt fits within $maxChars.
- * Trimming order: [NEG] → [RES] → [EXTRA] details → [ID] rasgos → shorten per-image lines.
+ * Trimming order: [RES] → [EXTRA] → [NEG] (trim chars from end, keep censorship) → [ID] rasgos → shorten per-image lines.
  * NEVER trims [FORMATO], [BRIEF] or [REAL].
+ * NEVER drops [NEG] entirely — it shortens from the end, preserving critical tokens (NO desnudo, NO lenceria_visible, NO transparencia) at the front.
  */
 function publicista_compact_prompt_fit_budget($prompt, $maxChars = 2000) {
     $len = mb_strlen($prompt);
     if ($len <= $maxChars) {
-        // Under budget: we could expand [ID] with more detail, but for now return as-is
         return $prompt;
     }
 
     $lines = explode("\n", $prompt);
     $over = $len - $maxChars;
 
-    // Pass 1: Drop purely negative lines ([NEG])
-    $filtered = array();
-    $droppedNeg = false;
-    foreach ($lines as $line) {
-        $trimmed = trim($line);
-        if (!$droppedNeg && strpos($trimmed, '[NEG]') === 0 && $over > 0) {
-            $droppedNeg = true;
-            $over -= mb_strlen($line) + 1;
-            continue;
-        }
-        $filtered[] = $line;
-    }
-    $lines = $filtered;
-
-    // Pass 2: Shorten [RES] line if present
+    // Pass 1: Shorten [RES] line if present (least critical)
     if ($over > 0) {
         foreach ($lines as &$line) {
             if (strpos(trim($line), '[RES]') === 0) {
                 $oldLen = mb_strlen($line);
-                $cut = min($over, $oldLen - 10); // keep at least 10 chars
+                $cut = min($over, $oldLen - 10);
                 if ($cut > 0) {
                     $line = mb_substr($line, 0, $oldLen - $cut);
                     $over -= $cut;
@@ -3781,18 +4070,40 @@ function publicista_compact_prompt_fit_budget($prompt, $maxChars = 2000) {
         unset($line);
     }
 
-    // Pass 3: Shorten [EXTRA] line
+    // Pass 2: Shorten [EXTRA] line (nice to have, not critical)
     if ($over > 0) {
         foreach ($lines as &$line) {
             if (strpos(trim($line), '[EXTRA]') === 0) {
                 $oldLen = mb_strlen($line);
                 $parts = explode(' ', $line);
-                // Drop last tokens until budget fits
                 while ($over > 0 && count($parts) > 2) {
                     $removed = array_pop($parts);
                     $over -= mb_strlen($removed) + 1;
                 }
                 $line = implode(' ', $parts);
+                break;
+            }
+        }
+        unset($line);
+    }
+
+    // Pass 3: Shorten [NEG] by trimming characters from the END (keeps critical censorship at front)
+    if ($over > 0) {
+        foreach ($lines as &$line) {
+            if (strpos(trim($line), '[NEG]') === 0) {
+                $oldLen = mb_strlen($line);
+                // Keep at least 35 chars: [NEG] + "NO desnudo NO lenceria_visible NO transparencia" (~44 chars min)
+                $keepLen = max(50, $oldLen - $over);
+                if ($keepLen < $oldLen) {
+                    // Cut at the last full word boundary before keepLen
+                    $cut = mb_substr($line, 0, $keepLen);
+                    $lastSpace = mb_strrpos($cut, ' ');
+                    if ($lastSpace > 10) {
+                        $cut = mb_substr($cut, 0, $lastSpace);
+                    }
+                    $line = $cut;
+                    $over -= ($oldLen - mb_strlen($line));
+                }
                 break;
             }
         }
@@ -3878,6 +4189,9 @@ function publicista_build_master_prompt($job) {
 
     // Brief libre del operador — PRIORIDAD MÁXIMA
     $operatorBrief = trim((string)($pp['operator_brief'] ?? ''));
+    if ($operatorBrief !== '') {
+        list($operatorBrief, $_) = publicista_sanitize_pollo_prompt($operatorBrief);
+    }
 
     $restrictions = publicista_compose_restrictions_summary($job);
     $selfieMode = trim((string)($pp['selfie_mode'] ?? 'off'));
@@ -5584,13 +5898,13 @@ function publicista_run_image_pipeline($jobId, $uploadedFile = null) {
             );
             if ($okEroticBatch) break;
 
-            // Si es error de watermark, probar con prompt más suave
+            // Si es error de watermark, regenerar prompt con ropa más cubriente
             if ($eroticBatchAttempts < $maxEroticAttempts && is_string($eroticBatchOrError)) {
                 if (stripos($eroticBatchOrError, 'watermark') !== false || stripos($eroticBatchOrError, 'marca de agua') !== false || stripos($eroticBatchOrError, 'sin watermark') !== false) {
-                    // Reconstruir prompt con ropa más cubriente y poses aún más neutras
+                    // Reconstruir prompt suavizando poses sensuales por neutras (los outfits del pool no se pueden parchear con str_replace)
                     $eroticPrompt = str_replace(
-                        array('lenceria negra encaje sujetador+tanga', 'bikini hilo minimo color carne', 'body gasa transparente negro','corset saten rojo con ligas', 'babydoll encaje blanco abierto', 'conjunto lenceria roja saten', 'microbikini cintas doradas', 'camison seda corto tirantes', 'de_pie_cadera_marcada_mirada_directa', 'apoyada_pared_cabeza_ladeada', 'cuerpo_entero_de_pie_sensual'),
-                        array('body lencero negro escotado opaco', 'bikini blanco palabra honor', 'top tirantes + short vaquero minimo', 'vestido punto ceñido muy corto', 'camiseta lencera blanca opaca', 'mono escotado ceñido corto', 'body palabra honor sin tirantes', 'top halter + minifalda tubo', 'de_pie_mano_cadera_segura', 'apoyada_pared_brazo_cruzado', 'cuerpo_entero_postura_natural'),
+                        array('cuerpo_entero_sensual', 'sentada_borde_cama', 'de_pie_cadera_marcada_mirada_directa', 'apoyada_pared_cabeza_ladeada', 'mano_en_pelo_mirada_camara', 'sentada_piernas_cruzadas_sonrisa', 'luz_tenue_intima', 'luz_tenue_natural', 'luz_calida_intima', 'luz_suave_penumbra', 'contraluz_silueta_sensual'),
+                        array('cuerpo_entero_postura_natural', 'sentada_silla_normal', 'de_pie_mano_cadera_segura', 'apoyada_pared_brazo_cruzado', 'mano_en_cadera_mirada_frontal', 'sentada_silla_postura_normal', 'luz_natural_ventana', 'luz_natural_ventana', 'luz_calida_lampara', 'luz_suave_difusa', 'contraluz_ventana'),
                         $eroticPrompt
                     );
                     publicista_job_log_write($jobId, 'erotic_batch_watermark_retry', array('attempt' => $eroticBatchAttempts));
@@ -5975,9 +6289,206 @@ function publicista_rebuild_finals_from_candidates($jobId, $candidates, $job = n
 }
 
 
+// ─── Estado global de ocupación de Pollo.ai ────────────────────────────────────
+// Evita saturación: cuando una generación está activa, las siguientes se encolan
+// en lugar de lanzarse en paralelo (que causaría "desconocido").
+
+function publicista_pollo_gen_status_path() {
+    return BASE_PATH . '/data/publicista/pollo_gen_status.json';
+}
+
+/**
+ * Devuelve true si Pollo.ai está actualmente ocupado con una generación activa.
+ * Usa flock breve para lectura consistente.
+ */
+function publicista_pollo_is_busy() {
+    $path = publicista_pollo_gen_status_path();
+    $dir = dirname($path);
+    if (!is_dir($dir)) return false;
+    $fh = @fopen($path, 'c+');
+    if (!$fh) return false;
+    flock($fh, LOCK_SH);
+    $raw = @file_get_contents($path);
+    flock($fh, LOCK_UN);
+    fclose($fh);
+    if ($raw === false || trim($raw) === '') return false;
+    $data = @json_decode($raw, true);
+    $busy = is_array($data) && !empty($data['busy']);
+    if (!$busy) return false;
+
+    // Dead-man switch: si el busy flag lleva > 15 min, el proceso original murió
+    // y hay que liberar el slot para no bloquear el sistema permanentemente.
+    $since = trim((string)($data['since'] ?? ''));
+    if ($since !== '') {
+        $sinceTs = strtotime($since);
+        if ($sinceTs !== false && (time() - $sinceTs) > 900) { // 15 minutos
+            // Auto-limpiar: el proceso que marcó busy ya no existe
+            $fh2 = @fopen($path, 'c+');
+            if ($fh2) {
+                flock($fh2, LOCK_EX);
+                $raw2 = @file_get_contents($path);
+                $data2 = ($raw2 !== false && trim($raw2) !== '') ? @json_decode($raw2, true) : array();
+                if (is_array($data2) && !empty($data2['busy'])) {
+                    $data2['busy'] = false;
+                    $data2['stale_cleared_at'] = date('Y-m-d H:i:s');
+                    @file_put_contents($path, json_encode($data2, JSON_UNESCAPED_UNICODE));
+                }
+                flock($fh2, LOCK_UN);
+                fclose($fh2);
+            }
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Marca Pollo.ai como ocupado. Debe llamarse ANTES de lanzar la generación.
+ * Si ya está ocupado, devuelve false (no sobreescribe).
+ */
+function publicista_pollo_set_busy($jobId, $candidateId) {
+    $path = publicista_pollo_gen_status_path();
+    $dir = dirname($path);
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    $fh = @fopen($path, 'c+');
+    if (!$fh) return false;
+    flock($fh, LOCK_EX);
+    // Leer estado actual
+    $raw = @file_get_contents($path);
+    $data = ($raw !== false && trim($raw) !== '') ? @json_decode($raw, true) : array();
+    if (!is_array($data)) $data = array();
+    if (!empty($data['busy'])) {
+        flock($fh, LOCK_UN);
+        fclose($fh);
+        return false; // ya ocupado, otro proceso ganó la carrera
+    }
+    $data['busy'] = true;
+    $data['job_id'] = $jobId;
+    $data['candidate_id'] = $candidateId;
+    $data['since'] = date('Y-m-d H:i:s');
+    @file_put_contents($path, json_encode($data, JSON_UNESCAPED_UNICODE));
+    flock($fh, LOCK_UN);
+    fclose($fh);
+    return true;
+}
+
+/**
+ * Libera el estado de ocupación de Pollo.ai y, si hay candidatas encoladas
+ * en regen_queue.json (waiting_pollo), dispara la primera de ellas.
+ */
+function publicista_pollo_clear_busy_and_trigger_next() {
+    $path = publicista_pollo_gen_status_path();
+    $dir = dirname($path);
+    if (!is_dir($dir)) return;
+
+    // ── Bloque atómico: mantener LOCK_EX durante scan + transfer ──
+    // Así no hay ventana de carrera entre clear y set_busy del siguiente.
+    $fh = @fopen($path, 'c+');
+    if (!$fh) return;
+    flock($fh, LOCK_EX);
+
+    $nextJob   = null;
+    $nextCand  = null;
+    $nextIsSexy = false;
+    $nextRefine = '';
+
+    // Buscar la siguiente candidata encolada (waiting_pollo) en cualquier job
+    $jobsDir = BASE_PATH . '/data/publicista/jobs';
+    if (is_dir($jobsDir)) {
+        $handles = @scandir($jobsDir, SCANDIR_SORT_ASCENDING);
+        if (is_array($handles)) {
+            foreach ($handles as $entry) {
+                if ($entry === '.' || $entry === '..') continue;
+                $queuePath = $jobsDir . '/' . $entry . '/meta/regen_queue.json';
+                if (!file_exists($queuePath)) continue;
+                $raw = @file_get_contents($queuePath);
+                if ($raw === false) continue;
+                $queue = @json_decode($raw, true);
+                if (!is_array($queue)) continue;
+                foreach ($queue as $candId => $info) {
+                    if (($info['status'] ?? '') === 'waiting_pollo') {
+                        $nextJob    = $entry;
+                        $nextCand   = $candId;
+                        $nextIsSexy = (strpos($candId, 'sexy_') === 0);
+                        $nextRefine = trim((string)($info['refine_text'] ?? ''));
+                        break 2; // salir de ambos foreach
+                    }
+                }
+            }
+        }
+    }
+
+    if ($nextJob !== null && $nextCand !== null) {
+        // Transferir el busy flag al siguiente, SIN soltar el lock
+        $data = array();
+        $raw = @file_get_contents($path);
+        if ($raw !== false && trim($raw) !== '') {
+            $decoded = @json_decode($raw, true);
+            if (is_array($decoded)) $data = $decoded;
+        }
+        $data['busy']        = true;
+        $data['job_id']      = $nextJob;
+        $data['candidate_id'] = $nextCand;
+        $data['since']       = date('Y-m-d H:i:s');
+        @file_put_contents($path, json_encode($data, JSON_UNESCAPED_UNICODE));
+    } else {
+        // Nadie esperando: simplemente liberar
+        @file_put_contents($path, json_encode(array('busy' => false), JSON_UNESCAPED_UNICODE));
+    }
+
+    flock($fh, LOCK_UN);
+    fclose($fh);
+
+    // ── Fuera del lock: disparar regeneración ──
+    if ($nextJob === null || $nextCand === null) return;
+
+    $job = publicista_job_get($nextJob);
+    if (!$job) {
+        // Job desapareció — liberar y retry
+        publicista_pollo_clear_busy_and_trigger_next();
+        return;
+    }
+
+    if ($nextIsSexy) {
+        $actualCandId = substr($nextCand, 5);
+        publicista_regen_queue_set_status($nextJob, $nextCand, 'queued');
+        // Si hay refine_text guardado, pasarlo; si no, vacío
+        $refineExtra = array('refine_text' => $nextRefine);
+        try {
+            list($ok, $result) = publicista_regenerate_sexy_candidate($nextJob, $actualCandId, $nextRefine);
+            if (function_exists('publicista_notify_candidate_regeneration_finished')) {
+                $latestJob = publicista_job_get($nextJob) ?: $job;
+                publicista_notify_candidate_regeneration_finished($latestJob, $actualCandId, $ok, $result);
+            }
+        } catch (Throwable $e) {
+            if (function_exists('bootstrap_runtime_log_exception')) {
+                bootstrap_runtime_log_exception('pollo_trigger_next_sexy', $e);
+            }
+        }
+    } else {
+        $actualCandId = $nextCand;
+        publicista_regen_queue_set_status($nextJob, $nextCand, 'queued');
+        try {
+            list($ok, $result) = publicista_regenerate_candidate($nextJob, $actualCandId, $nextRefine);
+            if (function_exists('publicista_notify_candidate_regeneration_finished')) {
+                $latestJob = publicista_job_get($nextJob) ?: $job;
+                publicista_notify_candidate_regeneration_finished($latestJob, $actualCandId, $ok, $result);
+            }
+        } catch (Throwable $e) {
+            if (function_exists('bootstrap_runtime_log_exception')) {
+                bootstrap_runtime_log_exception('pollo_trigger_next_candidate', $e);
+            }
+        }
+    }
+}
+
 // ─── Cola y estado de regeneraciones individuales ─────────────────────────────
 
-function publicista_regen_lock_path($jobId) {
+function publicista_regen_lock_path($jobId, $candidateId = '') {
+    if ($candidateId !== '') {
+        return BASE_PATH . '/data/publicista/jobs/' . $jobId . '/meta/regen_queue_' . $candidateId . '.lock';
+    }
     return BASE_PATH . '/data/publicista/jobs/' . $jobId . '/meta/regen_queue.lock';
 }
 
@@ -5986,11 +6497,12 @@ function publicista_regen_queue_path($jobId) {
 }
 
 /**
- * Adquiere el lock de cola para el job dado. Bloquea hasta MAX_WAIT segundos.
- * Devuelve el recurso de fichero (lo guarda el llamante) o false.
+ * Adquiere el lock de cola PARA UNA CANDIDATA concreta dentro del job.
+ * Bloquea hasta MAX_WAIT segundos. Devuelve el recurso o false.
+ * Si no se pasa candidateId, usa el lock legacy por job (compatibilidad).
  */
-function publicista_regen_lock_acquire($jobId, $maxWaitSeconds = 900) {
-    $lockPath = publicista_regen_lock_path($jobId);
+function publicista_regen_lock_acquire($jobId, $candidateId = '', $maxWaitSeconds = 900) {
+    $lockPath = publicista_regen_lock_path($jobId, $candidateId);
     $dir = dirname($lockPath);
     if (!is_dir($dir)) {
         @mkdir($dir, 0755, true);
@@ -6019,21 +6531,38 @@ function publicista_regen_lock_release($fh) {
 /**
  * Escribe/actualiza el estado de una candidata en el fichero de estado de cola.
  * Estados: queued | running | done | error
+ * 
+ * @param array $extra Metadatos adicionales a preservar (e.g. refine_text)
  */
-function publicista_regen_queue_set_status($jobId, $candidateId, $status, $error = '') {
+function publicista_regen_queue_set_status($jobId, $candidateId, $status, $error = '', $lockWait = 5, $extra = array()) {
     $path = publicista_regen_queue_path($jobId);
+    $dir = dirname($path);
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    // Lock breve para lectoescritura atómica — evita data races entre procesos concurrentes
+    $lockFh = publicista_regen_lock_acquire($jobId, '_queue_writer', $lockWait);
     $data = array();
     if (file_exists($path)) {
         $raw = @file_get_contents($path);
         $decoded = $raw !== false ? @json_decode($raw, true) : null;
         if (is_array($decoded)) $data = $decoded;
     }
-    $data[$candidateId] = array(
+    // Preservar campos existentes (e.g. refine_text) y mergear con los nuevos
+    $existing = isset($data[$candidateId]) && is_array($data[$candidateId]) ? $data[$candidateId] : array();
+    $data[$candidateId] = array_merge($existing, array(
         'status'     => $status,
         'updated_at' => date('Y-m-d H:i:s'),
         'error'      => $error,
-    );
+    ));
+    // Mergear metadatos extra sin sobrescribir status/error
+    if (is_array($extra) && !empty($extra)) {
+        foreach ($extra as $k => $v) {
+            if ($k !== 'status' && $k !== 'updated_at' && $k !== 'error') {
+                $data[$candidateId][$k] = $v;
+            }
+        }
+    }
     @file_put_contents($path, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    if ($lockFh) publicista_regen_lock_release($lockFh);
 }
 
 function publicista_regen_queue_get($jobId) {
@@ -6043,6 +6572,17 @@ function publicista_regen_queue_get($jobId) {
     if ($raw === false) return array();
     $data = @json_decode($raw, true);
     return is_array($data) ? $data : array();
+}
+
+/**
+ * Comprueba si una candidata ya tiene una regeneración activa o encolada.
+ * Útil para evitar duplicados en la UI y el backend.
+ */
+function publicista_regen_is_candidate_busy($jobId, $candidateId) {
+    $queue = publicista_regen_queue_get($jobId);
+    if (!isset($queue[$candidateId])) return false;
+    $status = $queue[$candidateId]['status'] ?? '';
+    return in_array($status, array('queued', 'running', 'waiting_pollo'), true);
 }
 
 /**
@@ -6086,10 +6626,11 @@ function publicista_regenerate_candidate($jobId, $candidateId, $refineText = '',
     // Guardar base_prompt para trazabilidad (no se reusa en siguientes regeneraciones)
     $candidates[$targetIndex]['base_prompt'] = $prompt;
 
-    // ── Cola serializada: solo un proceso activo por job a la vez ──────────────
-    // Evita saturar Pollo.ai con peticiones paralelas que causan "La generacion fallo: desconocido"
+    // ── Cola serializada: lock POR CANDIDATA, no por job ────────────────────
+    // Cada candidata tiene su propio lock. Pollo.ai se serializa a nivel
+    // global vía pollo_gen_status.json (set_busy / clear_busy_and_trigger_next).
     publicista_regen_queue_set_status($jobId, $candidateId, 'queued');
-    $lockFh = publicista_regen_lock_acquire($jobId, 900); // espera hasta 15 min
+    $lockFh = publicista_regen_lock_acquire($jobId, $candidateId, 900);
     if ($lockFh === false) {
         publicista_regen_queue_set_status($jobId, $candidateId, 'error', 'Timeout esperando cola de regeneración.');
         return array(false, 'No se pudo adquirir el turno en la cola de regeneración. Inténtalo de nuevo.');
@@ -6113,10 +6654,12 @@ function publicista_regenerate_candidate($jobId, $candidateId, $refineText = '',
     $backoffSeconds = array(30, 60, 120, 180, 300);
 
     for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
-        // Espera de backoff entre intentos
-        $waitSec = isset($backoffSeconds[$attempt - 1]) ? $backoffSeconds[$attempt - 1] : 45;
-        if ($waitSec > 0) {
-            sleep($waitSec);
+        // Espera de backoff SOLO en reintentos (no en el primer intento)
+        if ($attempt > 1) {
+            $waitSec = isset($backoffSeconds[$attempt - 2]) ? $backoffSeconds[$attempt - 2] : 45;
+            if ($waitSec > 0) {
+                sleep($waitSec);
+            }
         }
 
         if ($usePollo) {
@@ -6147,12 +6690,15 @@ function publicista_regenerate_candidate($jobId, $candidateId, $refineText = '',
 
     if (!$okGen) {
         publicista_regen_queue_set_status($jobId, $candidateId, 'error', is_string($genOrError) ? $genOrError : 'Error al generar imagen.');
+        // Liberar Pollo y trigger siguiente encolada antes de retornar
+        publicista_pollo_clear_busy_and_trigger_next();
         return array(false, is_string($genOrError) ? $genOrError : 'Error al generar imagen.');
     }
 
     $row = $candidates[$targetIndex];
+    // Guardar prompt para trazabilidad (se reconstruye siempre en cada regeneración)
     if (trim((string)publicista_array_get($row, 'base_prompt', '')) === '') {
-        $row['base_prompt'] = $basePrompt !== '' ? $basePrompt : trim((string)($genOrError['prompt'] ?? $prompt));
+        $row['base_prompt'] = trim((string)($genOrError['prompt'] ?? $prompt));
     }
     $row['prompt'] = trim((string)($genOrError['prompt'] ?? $prompt));
     $row['last_refine_text'] = $refineText;
@@ -6182,6 +6728,7 @@ function publicista_regenerate_candidate($jobId, $candidateId, $refineText = '',
         }
         if (!copy($rawFs, $squareTarget)) {
             publicista_regen_queue_set_status($jobId, $candidateId, 'error', 'No se pudo copiar la imagen Pollo con ratio nativo.');
+            publicista_pollo_clear_busy_and_trigger_next();
             return array(false, 'No se pudo copiar la imagen Pollo con ratio nativo.');
         }
         // Generar preview simple (max 320px lado más largo, manteniendo ratio)
@@ -6289,6 +6836,7 @@ function publicista_regenerate_candidate($jobId, $candidateId, $refineText = '',
     }
     if (!$okLocal) {
         publicista_regen_queue_set_status($jobId, $candidateId, 'error', is_string($localOrError) ? $localOrError : 'Error al procesar la imagen localmente.');
+        publicista_pollo_clear_busy_and_trigger_next();
         return array(false, $localOrError);
     }
     $row['square_path'] = $localOrError['square_path'];
@@ -6343,13 +6891,41 @@ function publicista_regenerate_candidate($jobId, $candidateId, $refineText = '',
         $job['pipeline']['summary'] .= ' Evaluación OpenAI pendiente temporalmente; la imagen regenerada sí se aplicó.';
     }
     $job['estado'] = count($finalImages) >= 4 ? 'done' : 'needs_review';
+
+    // ── Safe-save: re-leer job de disco para no machacar cambios de otra ──
+    // regeneración concurrente de la misma job (merge solo esta candidata).
+    $diskJob = publicista_job_get($jobId);
+    if ($diskJob && is_array($diskJob)) {
+        // Merge: mantener el job que acabamos de procesar, pero tomar del disco
+        // las candidatas que no hemos tocado (otro proceso pudo haberlas modificado)
+        $diskCandidates = is_array(publicista_array_get($diskJob, 'candidates', array())) ? publicista_array_get($diskJob, 'candidates', array()) : array();
+        foreach ($diskCandidates as $idx => $dc) {
+            $dcId = trim((string)($dc['id'] ?? ''));
+            if ($dcId !== '' && $dcId !== $candidateId && !isset($candidates[$idx])) {
+                // Candidata tocada por otro proceso concurrente — preservarla
+                $candidates[$idx] = $dc;
+            }
+        }
+        // Reordenar índices y reconstruir finales si los candidatos cambiaron
+        $candidates = array_values($candidates);
+        list($candidates, $finalImages, $selectedIds) = publicista_rebuild_finals_from_candidates($jobId, $candidates, $diskJob);
+        $job['candidates'] = $candidates;
+        $job['final_images'] = $finalImages;
+        // Mantener el pipeline metadata del disco como base pero sobreescribir summary
+        $diskPipeline = publicista_array_get($diskJob, 'pipeline', array());
+        $job['pipeline'] = array_merge(is_array($diskPipeline) ? $diskPipeline : array(), $job['pipeline']);
+    }
+
     list($okSave, $saved) = publicista_job_save($job);
     if (!$okSave) {
         publicista_regen_queue_set_status($jobId, $candidateId, 'error', 'No se pudo guardar la regeneración.');
+        publicista_pollo_clear_busy_and_trigger_next();
         return array(false, is_string($saved) ? $saved : 'No se pudo guardar la regeneración de candidata.');
     }
 
     publicista_regen_queue_set_status($jobId, $candidateId, 'done');
+    // Liberar Pollo y disparar la siguiente candidata encolada
+    publicista_pollo_clear_busy_and_trigger_next();
     return array(true, $saved);
 }
 
@@ -6379,10 +6955,10 @@ function publicista_regenerate_sexy_candidate($jobId, $candidateId, $refineText 
     $prompt = publicista_build_pollo_compact_erotic_regeneration_prompt($job, $targetIndex, $refineText);
     $sexyCandidates[$targetIndex]['base_prompt'] = $prompt;
 
-    // Cola serializada
+    // Cola serializada: lock por candidata erótica (no por job)
     $queueId = 'sexy_' . $candidateId;
     publicista_regen_queue_set_status($jobId, $queueId, 'queued');
-    $lockFh = publicista_regen_lock_acquire($jobId, 900);
+    $lockFh = publicista_regen_lock_acquire($jobId, $queueId, 900);
     if ($lockFh === false) {
         publicista_regen_queue_set_status($jobId, $queueId, 'error', 'Timeout esperando cola.');
         return array(false, 'No se pudo adquirir el turno en la cola.');
@@ -6397,8 +6973,11 @@ function publicista_regenerate_sexy_candidate($jobId, $candidateId, $refineText 
     $backoffSeconds = array(30, 60, 120);
 
     for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
-        $waitSec = isset($backoffSeconds[$attempt - 1]) ? $backoffSeconds[$attempt - 1] : 45;
-        if ($waitSec > 0) sleep($waitSec);
+        // Espera de backoff SOLO en reintentos (no en el primer intento)
+        if ($attempt > 1) {
+            $waitSec = isset($backoffSeconds[$attempt - 2]) ? $backoffSeconds[$attempt - 2] : 45;
+            if ($waitSec > 0) sleep($waitSec);
+        }
 
         list($okGen, $genOrError) = publicista_generate_candidate_image_pollo($jobId, $genIndex, $prompt, $modelName);
         if ($okGen) break;
@@ -6413,6 +6992,7 @@ function publicista_regenerate_sexy_candidate($jobId, $candidateId, $refineText 
 
     if (!$okGen) {
         publicista_regen_queue_set_status($jobId, $queueId, 'error', is_string($genOrError) ? $genOrError : 'Error al generar imagen erotica.');
+        publicista_pollo_clear_busy_and_trigger_next();
         return array(false, is_string($genOrError) ? $genOrError : 'Error al generar imagen erotica.');
     }
 
@@ -6444,6 +7024,7 @@ function publicista_regenerate_sexy_candidate($jobId, $candidateId, $refineText 
     }
     if (!copy($rawFs, $squareTarget)) {
         publicista_regen_queue_set_status($jobId, $queueId, 'error', 'No se pudo copiar la imagen erotica regenerada.');
+        publicista_pollo_clear_busy_and_trigger_next();
         return array(false, 'No se pudo copiar la imagen erotica regenerada.');
     }
 
@@ -6484,7 +7065,7 @@ function publicista_regenerate_sexy_candidate($jobId, $candidateId, $refineText 
         if ($okEval) {
             $row['evaluation'] = $evalOrError;
             $row['effective_score'] = publicista_candidate_effective_score($row);
-            $row['status'] = ($row['effective_score'] >= 60) ? 'ok' : 'needs_review';
+            $row['status'] = ($row['effective_score'] >= 60 && !empty($evalOrError['adult_appearing'])) ? 'ok' : 'needs_review';
         }
     } else {
         $row['status'] = 'ok';
@@ -6500,13 +7081,33 @@ function publicista_regenerate_sexy_candidate($jobId, $candidateId, $refineText 
     );
 
     $job['estado'] = 'done';
+
+    // Safe-save: merge con disco para no machacar regeneraciones concurrentes
+    $diskJob = publicista_job_get($jobId);
+    if ($diskJob && is_array($diskJob)) {
+        $diskSexy = is_array(publicista_array_get($diskJob, 'sexy_candidates', array())) ? publicista_array_get($diskJob, 'sexy_candidates', array()) : array();
+        foreach ($diskSexy as $idx => $ds) {
+            $dsId = trim((string)($ds['id'] ?? ''));
+            if ($dsId !== '' && $dsId !== $candidateId && !isset($sexyCandidates[$idx])) {
+                $sexyCandidates[$idx] = $ds;
+            }
+        }
+        $sexyCandidates = array_values($sexyCandidates);
+        $job['sexy_candidates'] = $sexyCandidates;
+        list($job['sexy_candidates'], $job['sexy_final_images'], $sexySelectedIds) = publicista_rebuild_erotic_finals(
+            $jobId, $job['sexy_candidates'], $diskJob
+        );
+    }
+
     list($okSave, $saved) = publicista_job_save($job);
     if (!$okSave) {
         publicista_regen_queue_set_status($jobId, $queueId, 'error', 'No se pudo guardar la regeneracion erotica.');
+        publicista_pollo_clear_busy_and_trigger_next();
         return array(false, is_string($saved) ? $saved : 'No se pudo guardar la regeneracion erotica.');
     }
 
     publicista_regen_queue_set_status($jobId, $queueId, 'done');
+    publicista_pollo_clear_busy_and_trigger_next();
     return array(true, $saved);
 }
 
@@ -6678,6 +7279,42 @@ function publicista_apply_manual_blur_to_final($jobId, $finalId, $bx, $by, $bw, 
         'last_error_at' => '',
     ));
     list($okSave, $saved) = publicista_job_save($job);
+    if (!$okSave) {
+        // Retry: re-read fresh job data and re-apply blur, then save again
+        usleep(500000); // 500ms
+        $jobFresh = publicista_job_get($jobId);
+        if ($jobFresh) {
+            $finalsFresh = $isSexyFinal
+                ? (is_array(publicista_array_get($jobFresh, 'sexy_final_images', array())) ? publicista_array_get($jobFresh, 'sexy_final_images', array()) : array())
+                : (is_array(publicista_array_get($jobFresh, 'final_images', array())) ? publicista_array_get($jobFresh, 'final_images', array()) : array());
+            $targetFreshIdx = -1;
+            foreach ($finalsFresh as $idx => $final) {
+                if (trim((string)publicista_array_get($final, 'id', '')) === trim((string)$finalId)) {
+                    $targetFreshIdx = $idx; break;
+                }
+            }
+            if ($targetFreshIdx >= 0) {
+                $finalsFresh[$targetFreshIdx]['final_path'] = file_exists($blurFs) ? publicista_path_to_web($blurFs) : ($finalsFresh[$targetFreshIdx]['final_path'] ?? '');
+                $finalsFresh[$targetFreshIdx]['preview_path'] = file_exists($previewFs) ? publicista_path_to_web($previewFs) : ($finalsFresh[$targetFreshIdx]['preview_path'] ?? '');
+                $finalsFresh[$targetFreshIdx]['manual_blur_applied'] = 1;
+                $finalsFresh[$targetFreshIdx]['manual_blur_intensity'] = $intensity;
+                $finalsFresh[$targetFreshIdx]['manual_blur_shape'] = array('bx' => $bx, 'by' => $by, 'bw' => $bw, 'bh' => $bh);
+                $finalsFresh[$targetFreshIdx]['copied_at'] = now_datetime();
+                if ($isSexyFinal) {
+                    $jobFresh['sexy_final_images'] = array_values($finalsFresh);
+                } else {
+                    $jobFresh['final_images'] = array_values($finalsFresh);
+                }
+                $jobFresh['processing'] = array_merge(publicista_array_get($jobFresh, 'processing', array()), array(
+                    'last_action' => 'apply_manual_blur',
+                    'last_finished_at' => now_datetime(),
+                    'last_error' => '',
+                    'last_error_at' => '',
+                ));
+                list($okSave, $saved) = publicista_job_save($jobFresh);
+            }
+        }
+    }
     if (!$okSave) return array(false, is_string($saved) ? $saved : 'No se pudo guardar el blur manual.');
 
     $updated = is_array(publicista_array_get($saved, ($isSexyFinal ? 'sexy_final_images' : 'final_images'), array()))
@@ -6773,6 +7410,35 @@ function publicista_apply_manual_blur_to_real_photo($jobId, $photoId, $bx, $by, 
         'last_error_at' => '',
     ));
     list($okSave, $saved) = publicista_job_save($job);
+    if (!$okSave) {
+        // Retry: re-read fresh job data and re-apply blur, then save again
+        usleep(500000); // 500ms
+        $jobFresh = publicista_job_get($jobId);
+        if ($jobFresh) {
+            $photosFresh = is_array($jobFresh['real_photos'] ?? null) ? $jobFresh['real_photos'] : array();
+            $targetFreshIdx = -1;
+            foreach ($photosFresh as $idx => $rp) {
+                if (trim((string)($rp['id'] ?? '')) === trim((string)$photoId)) {
+                    $targetFreshIdx = $idx; break;
+                }
+            }
+            if ($targetFreshIdx >= 0) {
+                $photosFresh[$targetFreshIdx]['stored_path'] = file_exists($blurFs) ? publicista_path_to_web($blurFs) : ($photosFresh[$targetFreshIdx]['stored_path'] ?? '');
+                $photosFresh[$targetFreshIdx]['preview_path'] = file_exists($previewFs) ? publicista_path_to_web($previewFs) : ($photosFresh[$targetFreshIdx]['preview_path'] ?? '');
+                $photosFresh[$targetFreshIdx]['manual_blur_applied'] = 1;
+                $photosFresh[$targetFreshIdx]['manual_blur_intensity'] = $intensity;
+                $photosFresh[$targetFreshIdx]['manual_blur_shape'] = array('bx' => $bx, 'by' => $by, 'bw' => $bw, 'bh' => $bh);
+                $jobFresh['real_photos'] = array_values($photosFresh);
+                $jobFresh['processing'] = array_merge($jobFresh['processing'] ?? array(), array(
+                    'last_action' => 'apply_manual_blur_real',
+                    'last_finished_at' => now_datetime(),
+                    'last_error' => '',
+                    'last_error_at' => '',
+                ));
+                list($okSave, $saved) = publicista_job_save($jobFresh);
+            }
+        }
+    }
     if (!$okSave) return array(false, is_string($saved) ? $saved : 'No se pudo guardar el blur manual en la foto real.');
 
     $updated = is_array($saved['real_photos'] ?? null) ? $saved['real_photos'] : array();
@@ -6790,6 +7456,100 @@ function publicista_apply_manual_blur_to_real_photo($jobId, $photoId, $bx, $by, 
         'preview_path' => $updatedPhoto['preview_path'] ?? '',
         'manual_blur_applied' => !empty($updatedPhoto['manual_blur_applied']),
         'manual_blur_intensity' => (int)($updatedPhoto['manual_blur_intensity'] ?? $intensity),
+    ));
+}
+
+
+function publicista_apply_manual_blur_to_source($jobId, $bx, $by, $bw, $bh, $intensity = 8) {
+    $job = publicista_job_get($jobId);
+    if (!$job) return array(false, 'No se encontró el trabajo de Publicista.');
+
+    $source = is_array($job['source_image'] ?? null) ? $job['source_image'] : array();
+    $storedRel = trim((string)($source['stored_path'] ?? ''));
+    if ($storedRel === '') return array(false, 'La foto original no tiene ruta guardada.');
+    $storedFs = BASE_PATH . '/' . ltrim($storedRel, '/');
+    if (!file_exists($storedFs)) return array(false, 'No existe en disco la foto original.');
+
+    $bx = max(0.0, min(1.0, (float)$bx));
+    $by = max(0.0, min(1.0, (float)$by));
+    $bw = max(0.01, min(1.0, (float)$bw));
+    $bh = max(0.01, min(1.0, (float)$bh));
+    $intensity = max(1, min(20, (int)$intensity));
+
+    $paths = publicista_job_fs_paths($jobId);
+    $safeBase = 'source';
+    $blurFs = $paths['originals_dir'] . '/' . $safeBase . '_manual_blur.jpg';
+    $previewFs = $paths['originals_dir'] . '/' . $safeBase . '_manual_blur_preview.jpg';
+    $analysisFs = $paths['meta_dir'] . '/' . $safeBase . '_source_blur_result.json';
+
+    $worker = BASE_PATH . '/tools/publicista_image_worker.py';
+    if (!file_exists($worker)) return array(false, 'No se encontró el worker Python de Publicista.');
+
+    $command = 'python3 ' . escapeshellarg($worker)
+        . ' apply-manual-blur'
+        . ' --input ' . escapeshellarg($storedFs)
+        . ' --output-face-blur ' . escapeshellarg($blurFs)
+        . ' --output-preview ' . escapeshellarg($previewFs)
+        . ' --output-json ' . escapeshellarg($analysisFs)
+        . ' --bx ' . escapeshellarg((string)$bx)
+        . ' --by ' . escapeshellarg((string)$by)
+        . ' --bw ' . escapeshellarg((string)$bw)
+        . ' --bh ' . escapeshellarg((string)$bh)
+        . ' --intensity ' . escapeshellarg((string)$intensity)
+        . ' --preview-size 320';
+
+    $proc = publicista_proc_command($command, publicista_ai_timeouts()['local_worker'], BASE_PATH);
+    publicista_job_log_write($jobId, $safeBase . '_source_manual_blur', $proc);
+    if (!$proc['ok']) {
+        return array(false, 'Error en worker local (blur manual origen): ' . ($proc['stderr'] !== '' ? $proc['stderr'] : 'sin detalle'));
+    }
+
+    $analysis = file_exists($analysisFs) ? json_decode((string)@file_get_contents($analysisFs), true) : null;
+    if (!is_array($analysis) || empty($analysis['ok'])) {
+        return array(false, 'El worker de blur manual no devolvió resultado válido.');
+    }
+
+    $job['source_image']['stored_path'] = file_exists($blurFs) ? publicista_path_to_web($blurFs) : $job['source_image']['stored_path'];
+    $job['source_image']['preview_path'] = file_exists($previewFs) ? publicista_path_to_web($previewFs) : ($job['source_image']['preview_path'] ?? '');
+    $job['source_image']['manual_blur_applied'] = 1;
+    $job['source_image']['manual_blur_intensity'] = $intensity;
+    $job['source_image']['manual_blur_shape'] = array('bx' => $bx, 'by' => $by, 'bw' => $bw, 'bh' => $bh);
+
+    $job['processing'] = array_merge($job['processing'] ?? array(), array(
+        'last_action' => 'apply_manual_blur_source',
+        'last_finished_at' => now_datetime(),
+        'last_error' => '',
+        'last_error_at' => '',
+    ));
+    list($okSave, $saved) = publicista_job_save($job);
+    if (!$okSave) {
+        // Retry: re-read fresh job data and re-apply blur, then save again
+        usleep(500000); // 500ms
+        $jobFresh = publicista_job_get($jobId);
+        if ($jobFresh) {
+            $jobFresh['source_image']['stored_path'] = file_exists($blurFs) ? publicista_path_to_web($blurFs) : ($jobFresh['source_image']['stored_path'] ?? '');
+            $jobFresh['source_image']['preview_path'] = file_exists($previewFs) ? publicista_path_to_web($previewFs) : ($jobFresh['source_image']['preview_path'] ?? '');
+            $jobFresh['source_image']['manual_blur_applied'] = 1;
+            $jobFresh['source_image']['manual_blur_intensity'] = $intensity;
+            $jobFresh['source_image']['manual_blur_shape'] = array('bx' => $bx, 'by' => $by, 'bw' => $bw, 'bh' => $bh);
+            $jobFresh['processing'] = array_merge($jobFresh['processing'] ?? array(), array(
+                'last_action' => 'apply_manual_blur_source',
+                'last_finished_at' => now_datetime(),
+                'last_error' => '',
+                'last_error_at' => '',
+            ));
+            list($okSave, $saved) = publicista_job_save($jobFresh);
+        }
+    }
+    if (!$okSave) return array(false, is_string($saved) ? $saved : 'No se pudo guardar el blur manual en la foto original.');
+
+    $updated = is_array($saved['source_image'] ?? null) ? $saved['source_image'] : array();
+
+    return array(true, array(
+        'stored_path' => $updated['stored_path'] ?? '',
+        'preview_path' => $updated['preview_path'] ?? '',
+        'manual_blur_applied' => !empty($updated['manual_blur_applied']),
+        'manual_blur_intensity' => (int)($updated['manual_blur_intensity'] ?? $intensity),
     ));
 }
 
@@ -10289,6 +11049,160 @@ function publicista_pollo_cookie_days_remaining() {
     return (int)floor($diff / 86400);
 }
 
+// ── Sistema dual-cookie Pollo.ai ───────────────────────────────
+
+define('POLLO_STATUS_FILE', BASE_PATH . '/data/pollo_accounts_status.json');
+
+function publicista_pollo_status_file() {
+    return POLLO_STATUS_FILE;
+}
+
+function publicista_pollo_accounts() {
+    $settings = settings_get();
+    return isset($settings['pollo_accounts']) && is_array($settings['pollo_accounts'])
+        ? $settings['pollo_accounts']
+        : array();
+}
+
+function publicista_pollo_active_accounts() {
+    $accounts = publicista_pollo_accounts();
+    $status = publicista_pollo_status_read();
+    $active = array();
+    foreach ($accounts as $acc) {
+        $label = trim((string)($acc['label'] ?? ''));
+        if ($label === '') continue;
+        $cookie = trim((string)($acc['cookie'] ?? ''));
+        if ($cookie === '') continue;
+        $exhausted = !empty($status[$label]['credits_exhausted']);
+        if (!$exhausted) {
+            $active[] = $acc;
+        }
+    }
+    return $active;
+}
+
+function publicista_pollo_random_active() {
+    $active = publicista_pollo_active_accounts();
+    if (empty($active)) return null;
+    return $active[array_rand($active)];
+}
+
+function publicista_pollo_fallback_account($exclude_label) {
+    $exclude_label = trim((string)$exclude_label);
+    $accounts = publicista_pollo_accounts();
+    foreach ($accounts as $acc) {
+        $label = trim((string)($acc['label'] ?? ''));
+        if ($label === '' || $label === $exclude_label) continue;
+        $cookie = trim((string)($acc['cookie'] ?? ''));
+        if ($cookie === '') continue;
+        return $acc;
+    }
+    return null;
+}
+
+function publicista_pollo_status_read() {
+    $path = publicista_pollo_status_file();
+    if (!file_exists($path)) return array();
+    $raw = @file_get_contents($path);
+    if ($raw === false) return array();
+    $data = json_decode($raw, true);
+    return is_array($data) ? $data : array();
+}
+
+function publicista_pollo_status_write($data) {
+    $path = publicista_pollo_status_file();
+    $dir = dirname($path);
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    @file_put_contents($path, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), LOCK_EX);
+}
+
+function publicista_pollo_mark_exhausted($label) {
+    $label = trim((string)$label);
+    if ($label === '') return;
+    $status = publicista_pollo_status_read();
+    if (!isset($status[$label]) || !is_array($status[$label])) {
+        $status[$label] = array();
+    }
+    $status[$label]['credits_exhausted'] = true;
+    $status[$label]['exhausted_at'] = gmdate('Y-m-d H:i:s');
+    publicista_pollo_status_write($status);
+}
+
+function publicista_pollo_check_and_alert() {
+    $status = publicista_pollo_status_read();
+    $accounts = publicista_pollo_accounts();
+
+    // ── Dedup via avisos.json (más fiable que el status file compartido con Python) ──
+    $allAvisos = function_exists('avisos_all') ? avisos_all() : array();
+    $now = time();
+    $cooldown = 24 * 3600; // 24 horas entre avisos repetidos
+
+    foreach ($accounts as $acc) {
+        $label = trim((string)($acc['label'] ?? ''));
+        if ($label === '') continue;
+        $creditsExhausted = !empty($status[$label]['credits_exhausted']);
+        if (!$creditsExhausted) continue;
+
+        $alertTitle = 'Pollo.ai: cuenta ' . $label . ' sin créditos';
+
+        // Buscar si ya existe un aviso RECIENTE (< 24h) para esta cuenta
+        // (activo o ya descartado) para no repetir el aviso en la misma ventana.
+        $recentActive = null;
+        $oldActives = array();
+        foreach ($allAvisos as $av) {
+            if (($av['engine'] ?? '') !== 'pollo') continue;
+            if (($av['title'] ?? '') !== $alertTitle) continue;
+
+            $avStatus = (string)($av['status'] ?? '');
+            $createdTs = strtotime((string)($av['created_at'] ?? ''));
+            if ($createdTs && ($now - $createdTs) < $cooldown) {
+                $recentActive = $av;
+                break;
+            } elseif ($avStatus === 'active') {
+                $oldActives[] = $av;
+            }
+        }
+
+        // Descartar avisos viejos/stale para esta cuenta (limpieza siempre)
+        if (function_exists('aviso_dismiss')) {
+            foreach ($oldActives as $oldAv) {
+                @aviso_dismiss($oldAv['id']);
+            }
+        }
+
+        if ($recentActive !== null) {
+            // Ya hay un aviso reciente — no repetir
+            continue;
+        }
+
+        // Crear nuevo aviso
+        if (function_exists('avisos_create_active')) {
+            avisos_create_active(
+                $alertTitle,
+                'Se agotaron los créditos de la cuenta ' . e($label) . ' en Pollo.ai. Se usará otra cuenta como fallback si está disponible.',
+                'alta',
+                'pollo',
+                array('account' => $label),
+                true,
+                'pollo_exhausted_' . md5((string)$label)
+            );
+        }
+    }
+
+    // Limpiar flags alerted huérfanos del status file (ya no se usan)
+    $statusChanged = false;
+    foreach ($status as $lbl => $info) {
+        if (isset($info['alerted']) || isset($info['alerted_at'])) {
+            unset($status[$lbl]['alerted']);
+            unset($status[$lbl]['alerted_at']);
+            $statusChanged = true;
+        }
+    }
+    if ($statusChanged) {
+        publicista_pollo_status_write($status);
+    }
+}
+
 
 function publicista_pollo_prompt_char_limit() {
     return 2000;
@@ -10947,10 +11861,17 @@ function publicista_pollo_batch_is_retryable_error($error) {
 }
 
 function publicista_generate_candidate_images_pollo_batch($jobId, $numOutputs, $prompt, $modelName, $job = null, $outputSuffix = '') {
-    $cookie = publicista_pollo_session_cookie();
-    if ($cookie === '') {
-        return array(false, 'Pollo.ai: cookie de sesion no configurada. Guardala en Josue > ConfigM > Cookie Pollo.ai.');
+    // ── Sistema dual-cookie: elegir cuenta primaria aleatoria + fallback ──
+    $primary = publicista_pollo_random_active();
+    if ($primary === null) {
+        return array(false, 'Pollo.ai: todas las cuentas están sin créditos o no hay cookies configuradas. Revisa Josue > ConfigM.');
     }
+    $cookie = trim((string)($primary['cookie'] ?? ''));
+    $primaryLabel = trim((string)($primary['label'] ?? 'primary'));
+    $fallback = publicista_pollo_fallback_account($primaryLabel);
+    $fallbackCookie = $fallback !== null ? trim((string)($fallback['cookie'] ?? '')) : '';
+    $fallbackLabel = $fallback !== null ? trim((string)($fallback['label'] ?? 'fallback')) : '';
+    $statusFile = publicista_pollo_status_file();
 
     $worker = BASE_PATH . '/tools/pollo_image_worker.py';
     if (!file_exists($worker)) {
@@ -11018,6 +11939,10 @@ function publicista_generate_candidate_images_pollo_batch($jobId, $numOutputs, $
             $fullCommand = 'python3 ' . escapeshellarg($worker)
                 . ' generate'
                 . ' --cookie ' . escapeshellarg($cookie)
+                . ' --account-label ' . escapeshellarg($primaryLabel)
+                . ($fallbackCookie !== '' ? ' --fallback-cookie ' . escapeshellarg($fallbackCookie) : '')
+                . ($fallbackLabel !== '' ? ' --fallback-label ' . escapeshellarg($fallbackLabel) : '')
+                . ' --status-file ' . escapeshellarg($statusFile)
                 . ' --prompt ' . escapeshellarg($promptToUse)
                 . ' --model ' . escapeshellarg($modelKey)
                 . ' --num-outputs 1'
@@ -11028,6 +11953,10 @@ function publicista_generate_candidate_images_pollo_batch($jobId, $numOutputs, $
             $fullCommand = 'python3 ' . escapeshellarg($worker)
                 . ' generate'
                 . ' --cookie ' . escapeshellarg($cookie)
+                . ' --account-label ' . escapeshellarg($primaryLabel)
+                . ($fallbackCookie !== '' ? ' --fallback-cookie ' . escapeshellarg($fallbackCookie) : '')
+                . ($fallbackLabel !== '' ? ' --fallback-label ' . escapeshellarg($fallbackLabel) : '')
+                . ' --status-file ' . escapeshellarg($statusFile)
                 . ' --prompt ' . escapeshellarg($promptToUse)
                 . ' --model ' . escapeshellarg($modelKey)
                 . ' --num-outputs ' . escapeshellarg((string)$numOutputs)
@@ -11038,6 +11967,8 @@ function publicista_generate_candidate_images_pollo_batch($jobId, $numOutputs, $
         }
 
         $proc = publicista_proc_command($fullCommand, 520, BASE_PATH);
+        // Verificar si alguna cuenta se quedó sin créditos (el worker escribe el status file)
+        publicista_pollo_check_and_alert();
         publicista_job_log_write($jobId, 'pollo_worker_batch_try' . $workerAttempt, array(
             'ok' => $proc['ok'],
             'exit_code' => $proc['exit_code'],
@@ -11145,11 +12076,17 @@ function publicista_generate_candidate_image_pollo($jobId, $candidateIndex, $pro
     // igual que hace publicista_image_worker.py para el procesado de imagenes.
 
     $candidateSafe = str_pad((string)$candidateIndex, 2, '0', STR_PAD_LEFT);
-    $cookie = publicista_pollo_session_cookie();
-
-    if ($cookie === '') {
-        return array(false, 'Pollo.ai: cookie de sesion no configurada. Guardala en Josue > ConfigM > Cookie Pollo.ai.');
+    // ── Sistema dual-cookie: elegir cuenta primaria aleatoria + fallback ──
+    $primary = publicista_pollo_random_active();
+    if ($primary === null) {
+        return array(false, 'Pollo.ai: todas las cuentas están sin créditos o no hay cookies configuradas. Revisa Josue > ConfigM.');
     }
+    $cookie = trim((string)($primary['cookie'] ?? ''));
+    $primaryLabel = trim((string)($primary['label'] ?? 'primary'));
+    $fallback = publicista_pollo_fallback_account($primaryLabel);
+    $fallbackCookie = $fallback !== null ? trim((string)($fallback['cookie'] ?? '')) : '';
+    $fallbackLabel = $fallback !== null ? trim((string)($fallback['label'] ?? 'fallback')) : '';
+    $statusFile = publicista_pollo_status_file();
 
     $worker = BASE_PATH . '/tools/pollo_image_worker.py';
     if (!file_exists($worker)) {
@@ -11205,14 +12142,20 @@ function publicista_generate_candidate_image_pollo($jobId, $candidateIndex, $pro
         // ocurre ANTES del inline assignment, dejando la cookie vacia.
         $fullCommand = 'python3 ' . escapeshellarg($worker)
             . ' generate'
-            . ' --cookie '       . escapeshellarg($cookie)
-            . ' --prompt '       . escapeshellarg($promptToUse)
-            . ' --model '        . escapeshellarg($modelKey)
-            . ' --output-image ' . escapeshellarg($rawFs)
-            . ' --output-json '  . escapeshellarg($jsonFs)
+            . ' --cookie '        . escapeshellarg($cookie)
+            . ' --account-label ' . escapeshellarg($primaryLabel)
+            . ($fallbackCookie !== '' ? ' --fallback-cookie ' . escapeshellarg($fallbackCookie) : '')
+            . ($fallbackLabel !== '' ? ' --fallback-label ' . escapeshellarg($fallbackLabel) : '')
+            . ' --status-file '   . escapeshellarg($statusFile)
+            . ' --prompt '        . escapeshellarg($promptToUse)
+            . ' --model '         . escapeshellarg($modelKey)
+            . ' --output-image '  . escapeshellarg($rawFs)
+            . ' --output-json '   . escapeshellarg($jsonFs)
             . ' --timeout 300';
 
         $proc = publicista_proc_command($fullCommand, 360, BASE_PATH);
+        // Verificar si alguna cuenta se quedó sin créditos (el worker escribe el status file)
+        publicista_pollo_check_and_alert();
 
         publicista_job_log_write($jobId, 'pollo_worker_' . $candidateSafe . '_try' . $workerAttempt, array(
             'ok' => $proc['ok'],

@@ -2394,7 +2394,7 @@ services:
       - WHATSAPP_SWAGGER_USERNAME=admin
       - WHATSAPP_SWAGGER_PASSWORD=admin123
       - WHATSAPP_HOOK_URL=https://n8n.makemerich.live/webhook/waha-in-[LAMAMI_NOMBRE_BOT]
-      - WHATSAPP_HOOK_EVENTS=message
+      - WHATSAPP_HOOK_EVENTS=message,message.any
     volumes:
       - ./data:/app/data
       - ./sessions:/app/.sessions
@@ -4792,7 +4792,7 @@ function lamamibot_generate_texto3($botSlug, $wahaConfig) {
         $block .= "      - WHATSAPP_SWAGGER_USERNAME=admin\n";
         $block .= "      - WHATSAPP_SWAGGER_PASSWORD=admin123\n";
         $block .= "      - WHATSAPP_HOOK_URL={$hookUrl}\n";
-        $block .= "      - WHATSAPP_HOOK_EVENTS=message\n";
+        $block .= "      - WHATSAPP_HOOK_EVENTS=message,message.any\n";
         $block .= "    volumes:\n";
         $block .= "      - ./data:/app/data\n";
         $block .= "      - ./sessions:/app/.sessions\n";

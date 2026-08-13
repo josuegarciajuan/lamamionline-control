@@ -1,0 +1,14 @@
+{
+  "name": "bot-casa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "bot-casa WhatsApp chat tests",
+  "scripts": {
+    "test:js": "node --test tests/js/chat.test.js",
+    "test:e2e": "playwright test --config tests/e2e/playwright.config.js",
+    "test": "npm run test:js && npm run test:e2e"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  }
+}

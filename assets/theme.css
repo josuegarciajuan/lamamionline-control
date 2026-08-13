@@ -1751,6 +1751,7 @@ tr:hover td {
   background: rgba(3, 8, 15, 0.75);
   z-index: 1300;
 }
+.app-backdrop[hidden] { display: none !important; }
 
 .dashboard-note {
   margin: 10px 0 18px;

@@ -1,0 +1,6 @@
+# LaMami CRM — Anti-cache para assets estáticos
+# Forzar revalidación de CSS y JS en cada carga
+<FilesMatch "\.(css|js)$">
+    Header set Cache-Control "no-cache, must-revalidate, max-age=0"
+    Header set Pragma "no-cache"
+</FilesMatch>

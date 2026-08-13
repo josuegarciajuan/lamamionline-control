@@ -26,6 +26,12 @@ config.local.json
 *.swp
 *.swo
 
+# Dependencies (instaladas via composer install)
+vendor/
+
+# PHPUnit cache
+.phpunit.result.cache
+
 # OS
 .DS_Store
 Thumbs.db

@@ -51,7 +51,7 @@ final class ToneBuilder implements PipelineStageInterface
         $styles = (array) $this->config->get('message_variants.personality_styles', []);
         if ($styles === []) {
             $styles = [
-                'cariñosa'   => 'Dulce, usa muchos "cari", "amor", "papi". Tierna.',
+                'cariñosa'   => 'Dulce, usa mucho "cari", "amor", "cielo", "guapo". Tierna. Evita "papi".',
                 'pícara'     => 'Provocativa, insinuante, usa emojis 🔥😏. Juega con doble sentido.',
                 'directa'    => 'Va al grano, sin rodeos. Frases cortas, tono profesional pero cálido.',
                 'tímida'     => 'Reservada, habla poco, responde con monosílabos. Se hace la dura.',
@@ -167,6 +167,7 @@ final class ToneBuilder implements PipelineStageInterface
         //  5. Catalog / info-dump flags                                       //
         // ------------------------------------------------------------------ //
         $wantsMoreGirls = !empty($ctx['wants_more_girls']);
+        $catalogCount = (int) ($ctx['catalog_count'] ?? 0);
 
         if ($wantsMoreGirls) {
             $catalogCapped = ($catalogCount >= 2);
@@ -188,7 +189,6 @@ final class ToneBuilder implements PipelineStageInterface
         // ------------------------------------------------------------------ //
         //  5b. Anti-catalog — prevenir envío repetido de catálogo            //
         // ------------------------------------------------------------------ //
-        $catalogCount = (int) ($ctx['catalog_count'] ?? 0);
         if ($catalogCount >= 2) {
             $directives[] = 'CATÁLOGO AGOTADO: Ya has mostrado el catálogo de chicas 2 o más veces '
                 . 'en esta conversación. PROHIBIDO TOTAL photo_action="catalog". '
@@ -385,7 +385,11 @@ final class ToneBuilder implements PipelineStageInterface
         $etaFromUserFlag   = !empty($ctx['eta_from_user_flag']);
 
         // ── 12a. Preemptive: maps being sent RIGHT NOW → ETA en mismo mensaje ──
-        if ($mapsBeingSentNow && !$etaFromUserFlag) {
+        // NOVA FIX 2026-06-17: Requerir al menos 4 mensajes del humano en la
+        // conversación antes de activar ATTA MODE. Evita que el bot envíe maps
+        // en el 2º o 3º mensaje de una conversación que acaba de empezar.
+        $humanMsgCount = (int) ($ctx['__human_msg_count'] ?? 0);
+        if ($mapsBeingSentNow && !$etaFromUserFlag && $humanMsgCount >= 4) {
             $locationUrl = (string) ($ctx['location_url'] ?? '');
             $directives[] = 'ATTA MODE: Vas a enviar el maps/ubicación AHORA MISMO. '
                 . 'Incluye el location_url LITERAL y la petición de ETA EN EL MISMO MENSAJE. '
@@ -450,8 +454,9 @@ final class ToneBuilder implements PipelineStageInterface
         //  16. Generic human-voice directives                                  //
         // ------------------------------------------------------------------ //
         $directives[] = 'Saludo minimalista: Saludo MÁX 4 palabras. No preguntes "cómo estás" ni similares.';
-        $directives[] = 'Reactivo: Responde SOLO lo que preguntan. NO hagas preguntas genéricas de follow-up ni sondeos. EXCEPCIÓN: si toca pedir ETA (post-maps) o necesitas aclarar un mensaje confuso del cliente, haz UNA pregunta concreta y corta. Pero NUNCA preguntes "q buscas", "q te apetece saber" ni similares.';
+        $directives[] = 'Reactivo: Responde SOLO lo que preguntan. NO hagas preguntas genéricas de follow-up ni sondeos. EXCEPCIÓN: si toca pedir ETA (post-maps) o necesitas aclarar un mensaje confuso del cliente, haz UNA pregunta concreta y corta. Pero NUNCA preguntes "q buscas", "q te apetece saber" ni similares. Si el mensaje del cliente contiene VARIAS preguntas o ideas (separadas por " | " o saltos de línea), responde a TODAS de forma coherente en un solo mensaje, sin ignorar ninguna parte.';
         $directives[] = 'Sin auto-identificación: NUNCA digas "soy la encargada", "atiendo yo", "soy la que está aquí", "no soy [nombre]", "yo no soy", ni similares.';
+        $directives[] = 'Evita "papi" como término de trato habitual. Usa preferentemente "amor", "cariño", "cielo" o "guapo". "papi" solo de forma muy puntual, nunca en saludos ni ETA.';
         $directives[] = 'Sin signos de apertura (¿ ¡) y faltas de ortografía leves para sonar humana.';
         $directives[] = 'Emojis: usa 1 emoji en ~2 de cada 3 mensajes, como parte natural de la conversación. Si el anterior tuyo llevó, este puede llevarlo o no. Lo importante es no forzar: a veces sí, a veces no.';
 

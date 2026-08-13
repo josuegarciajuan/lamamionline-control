@@ -56,9 +56,41 @@ function bootstrap_storage() {
         'avisos_runs.json' => array(),
         'voice_commands_log.json' => array(),
         'voice_pending_actions.json' => array(),
+        'voice_memory.json' => array(
+            'conversation_history' => array(),
+            'long_term' => array(),
+            'pending_questions' => array(),
+            'stats' => array(
+                'total_conversations' => 0,
+                'total_messages' => 0,
+                'first_interaction' => null,
+                'last_interaction' => null,
+            ),
+        ),
+        'voice_reminders.json' => array(),
+        'diario.json' => array(
+            'buffer' => array(),
+            'entries' => array(),
+            'weekly_summaries' => array(),
+            'meta' => array(
+                'last_compiled' => null,
+                'last_weekly_summary' => null,
+                'total_entries' => 0,
+            ),
+        ),
+        'voice_notes.json' => array(),
+        'voice_command_history.json' => array(),
         'settings.json' => array(
             'lead_default_price' => 10,
             'brand' => 'LaMami CRM',
+            'voice_assistant_name' => 'Jefry',
+            'voice_assistant_tts_voice' => 'nova',
+            'voice_assistant_tts_enabled' => true,
+            'voice_assistant_language' => 'es',
+            'voice_assistant_proactive' => true,
+            'voice_wake_enabled' => true,
+            'voice_wake_word' => 'Jefry',
+            'voice_use_unified_prompt' => false,
             'voice_ai_model' => 'deepseek-v4-pro',
             'voice_ai_provider' => 'deepseek',
             'whitelist_ips' => array(
@@ -176,9 +208,6 @@ function storage_json_read_direct($file) {
     if ($file === 'anuncios.json') {
         return storage_read_accounts_fast($path);
     }
-    if (storage_should_stream_read($file, $path)) {
-        return storage_read_large_array_stream($path);
-    }
     $raw = @file_get_contents($path);
     $data = json_decode((string)$raw, true);
     return is_array($data) ? $data : array();
@@ -211,24 +240,32 @@ function storage_json_write_direct($file, $data) {
     }
     $json = storage_json_encode($data, $pretty);
     $tmpPath = $path . '.tmp';
+    $ok = false;
     $written = @file_put_contents($tmpPath, $json, LOCK_EX);
     if ($written === false) {
         storage_runtime_log('tmp_write_failed', array('file' => $file, 'tmp_path' => $tmpPath));
         $fallbackWritten = @file_put_contents($path, $json, LOCK_EX);
-        if ($fallbackWritten === false) {
+        if ($fallbackWritten !== false) {
+            $ok = true;
+        } else {
             storage_runtime_log('final_write_failed', array('file' => $file, 'path' => $path));
         }
     } else {
         $renamed = @rename($tmpPath, $path);
-        if (!$renamed) {
+        if ($renamed) {
+            $ok = true;
+        } else {
             storage_runtime_log('rename_failed', array('file' => $file, 'tmp_path' => $tmpPath, 'path' => $path));
             $fallbackWritten = @file_put_contents($path, $json, LOCK_EX);
-            if ($fallbackWritten === false) {
+            if ($fallbackWritten !== false) {
+                $ok = true;
+            } else {
                 storage_runtime_log('final_write_failed', array('file' => $file, 'path' => $path));
             }
             @unlink($tmpPath);
         }
     }
+    return $ok;
 }
 
 function storage_json_upsert_direct($file, $row) {
@@ -244,7 +281,63 @@ function storage_json_upsert_direct($file, $row) {
     if (!$updated) {
         $rows[] = $row;
     }
-    storage_json_write_direct($file, array_values($rows));
+    return storage_json_write_direct($file, array_values($rows));
+}
+
+function storage_json_upsert_atomic($file, $row) {
+    // ── Read-modify-write atómico con flock(LOCK_EX) ──
+    // Evita race conditions entre dos procesos que lean y escriban el mismo archivo.
+    $path = storage_json_path($file);
+    $dir = dirname($path);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    $fh = @fopen($path, 'c+');
+    if (!$fh) {
+        storage_runtime_log('atomic_open_failed', array('file' => $file, 'path' => $path));
+        return false;
+    }
+    if (!flock($fh, LOCK_EX)) {
+        fclose($fh);
+        storage_runtime_log('atomic_lock_failed', array('file' => $file));
+        return false;
+    }
+    // Leer datos actuales
+    $raw = '';
+    while (!feof($fh)) {
+        $chunk = fread($fh, 16384);
+        if ($chunk === false) break;
+        $raw .= $chunk;
+    }
+    $rows = json_decode($raw, true);
+    if (!is_array($rows)) {
+        $rows = array();
+    }
+    // Upsert: buscar por id y actualizar o añadir
+    $updated = false;
+    foreach ($rows as $i => $item) {
+        if (is_array($item) && isset($item['id']) && $item['id'] === $row['id']) {
+            $rows[$i] = array_merge($item, $row);
+            $updated = true;
+            break;
+        }
+    }
+    if (!$updated) {
+        $rows[] = $row;
+    }
+    // Escribir de vuelta
+    $json = storage_json_encode(array_values($rows), storage_should_pretty_write($file, $rows));
+    ftruncate($fh, 0);
+    rewind($fh);
+    $written = fwrite($fh, $json);
+    $ok = ($written !== false);
+    fflush($fh);
+    flock($fh, LOCK_UN);
+    fclose($fh);
+    if (!$ok) {
+        storage_runtime_log('atomic_write_failed', array('file' => $file, 'path' => $path));
+    }
+    return $ok;
 }
 
 function storage_json_delete_direct($file, $id) {
@@ -900,7 +993,7 @@ function storage_read($file) {
             $GLOBALS['storage_read_cache'] = array();
         }
         $sizeBytes = @filesize(storage_json_path($file));
-        if ($sizeBytes !== false && (int)$sizeBytes <= 1024 * 1024) {
+        if ($sizeBytes !== false && (int)$sizeBytes <= 100 * 1024 * 1024) {
             $GLOBALS['storage_read_cache'][$cacheKey] = $data;
         } else {
             unset($GLOBALS['storage_read_cache'][$cacheKey]);
@@ -1045,13 +1138,8 @@ function storage_walk_rows($file, $callback) {
     if ($file === '') {
         return;
     }
-    $path = storage_json_path($file);
-    if (storage_backend_mode() === 'json' && file_exists($path) && $file !== 'anuncios.json' && storage_should_stream_read($file, $path)) {
-        storage_walk_large_array_stream($path, $callback);
-    } else {
-        foreach ((array)storage_read($file) as $row) {
-            call_user_func($callback, $row);
-        }
+    foreach ((array)storage_read($file) as $row) {
+        call_user_func($callback, $row);
     }
 }
 
@@ -1221,16 +1309,18 @@ function storage_find_by_id($file, $id) {
 function storage_upsert($file, $row) {
     $mode = storage_backend_mode();
     $mysqlOk = false;
+    $jsonOk = true;
     if (in_array($mode, array('dual', 'mysql'), true)) {
         $mysqlOk = storage_mysql_upsert($file, $row);
     }
     if ($mode !== 'mysql' || !$mysqlOk || $file === 'settings.json') {
-        storage_json_upsert_direct($file, $row);
+        $jsonOk = storage_json_upsert_direct($file, $row);
     }
     if ($file === 'settings.json') {
         storage_backend_mode_reset();
     }
     storage_invalidate_cache($file);
+    return ($mode === 'json') ? $jsonOk : ($mysqlOk || $jsonOk);
 }
 
 function storage_delete($file, $id) {
@@ -8332,7 +8422,12 @@ function publicista_job_save($row) {
         return array(false, 'No se pudieron crear las carpetas base del trabajo Publicista.');
     }
 
-    storage_upsert('publicista_jobs.json', $merged);
+    $saved = storage_json_upsert_atomic('publicista_jobs.json', $merged);
+    if (!$saved) {
+        return array(false, 'No se pudo guardar el trabajo Publicista (fallo de escritura en disco).');
+    }
+    // Invalidar caché después del write atómico
+    storage_invalidate_cache('publicista_jobs.json');
     return array(true, $merged);
 }
 

@@ -30,7 +30,7 @@ final class IntentRouter implements PipelineStageInterface
                 'hola cari 😊',
                 'hola guapo 😘',
                 'buenas 😏',
-                'dime papi 🔥',
+                'dime amor 🔥',
                 'hola cielo 😊',
             ]),
         ];

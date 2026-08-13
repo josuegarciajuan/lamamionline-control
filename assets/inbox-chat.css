@@ -1,0 +1,807 @@
+/* ═══ Inbox Chat — WhatsApp dark theme + Agente Comercial ═══ */
+
+/* ── CSS Variables WhatsApp ── */
+:root{
+  --wa-green:#075e54;--wa-green-light:#128c7e;--wa-green-dark:#054d44;
+  --wa-bg:#0b141a;--wa-sidebar:#111b2e;--wa-border:#222d34;
+  --wa-bubble-in:#1f2c33;--wa-bubble-out:#005c4b;
+  --wa-accent:#25d366;--wa-text:#e9edef;--wa-muted:#8696a0;
+  --wa-header:#075e54;--wa-input:#1f2c33;--wa-search:#202c33;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CHAT WHATSAPP
+   ═══════════════════════════════════════════════════════════════ */
+
+.inbox-chat-shell{display:flex;height:100%;min-height:0;background:var(--wa-bg);overflow:hidden}
+
+/* ── Sidebar ── */
+.inbox-chat-sidebar{width:350px;min-width:280px;background:var(--wa-sidebar);border-right:1px solid var(--wa-border);display:flex;flex-direction:column;overflow:hidden}
+.inbox-sidebar-head{padding:10px 12px;background:#075e54;border-bottom:1px solid rgba(0,0,0,.15);flex-shrink:0}
+.inbox-sidebar-search{width:100%;padding:8px 14px;border-radius:8px;border:none;background:rgba(255,255,255,.14);color:#fff;font-size:13px;outline:none}
+.inbox-sidebar-search:focus{background:rgba(255,255,255,.2)}
+.inbox-sidebar-search::placeholder{color:rgba(255,255,255,.5)}
+
+.inbox-lines-list{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.inbox-lines-list::-webkit-scrollbar{width:6px;background:transparent}
+.inbox-lines-list::-webkit-scrollbar-thumb{background:#32404a;border-radius:3px}
+
+.inbox-line-group{}
+.inbox-line-header{padding:10px 14px;font-size:12px;font-weight:600;color:var(--wa-accent);display:flex;align-items:center;gap:8px;cursor:pointer;border-bottom:1px solid var(--wa-border);letter-spacing:.03em;transition:background .1s}
+.inbox-line-header:hover{background:rgba(255,255,255,.03)}
+.inbox-line-header .line-dot{width:10px;height:10px;border-radius:50%;background:var(--wa-accent);flex-shrink:0;box-shadow:0 0 6px rgba(37,211,102,.4)}
+.inbox-line-header .line-dot.off{background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.3)}
+.inbox-line-header .line-dot--unread{background:#f59e0b;box-shadow:0 0 8px rgba(245,158,11,.5);animation:inbox-pulse-dot 2s ease-in-out infinite}
+@keyframes inbox-pulse-dot{0%,100%{box-shadow:0 0 4px rgba(245,158,11,.4)}50%{box-shadow:0 0 12px rgba(245,158,11,.8)}}
+.inbox-line-time{font-size:10px;color:#667781;white-space:nowrap;flex-shrink:0}
+.inbox-line-meta{font-size:10px;color:#64748b;white-space:nowrap}
+.inbox-line-badge-unread{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#25d366;color:#000;font-size:11px;font-weight:700;flex-shrink:0;margin-left:2px}
+.inbox-line-arrow{font-size:10px;margin-left:auto;transition:transform .15s;color:var(--wa-muted)}
+.inbox-line-group.collapsed .inbox-line-arrow{transform:rotate(-90deg)}
+.inbox-line-group.collapsed .inbox-thread-list{display:none}
+
+.inbox-thread-list{}
+.inbox-thread-item{padding:11px 16px;display:flex;flex-direction:column;gap:3px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .1s}
+.inbox-thread-item:hover{background:rgba(255,255,255,.04)}
+.inbox-thread-item.active{background:#2a3942;border-left:4px solid var(--wa-accent);padding-left:12px}
+.inbox-thread-item-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.inbox-thread-name{font-size:14px;font-weight:500;color:var(--wa-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.inbox-thread-time{font-size:11px;color:#667781;flex-shrink:0}
+.inbox-thread-item-sub{display:flex;align-items:center;gap:6px;margin-top:2px}
+.inbox-thread-stage{font-size:10px;padding:2px 8px;border-radius:10px;flex-shrink:0;font-weight:600}
+.inbox-thread-stage.qualified,.inbox-thread-stage.very_hot{background:rgba(37,211,102,.15);color:#25d366}
+.inbox-thread-stage.opened,.inbox-thread-stage.responded{background:rgba(251,191,36,.15);color:#fbbf24}
+.inbox-thread-stage.discarded{background:rgba(239,68,68,.1);color:#f87171}
+.inbox-thread-msg{font-size:13px;color:var(--wa-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px}
+.inbox-thread-msg .paused-icon{font-size:13px;flex-shrink:0}
+.inbox-thread-meta{font-size:11px;color:#667781;display:flex;align-items:center;gap:8px}
+.inbox-thread-item.paused{opacity:.6}
+.inbox-thread-item.paused .inbox-thread-name{color:var(--wa-muted)}
+.inbox-thread-item.is-unread{background:rgba(37,211,102,.06)}
+.inbox-thread-item.is-unread .inbox-thread-name{font-weight:700;color:#fff}
+.inbox-thread-dot{width:8px;height:8px;border-radius:50%;background:#25d366;flex-shrink:0;box-shadow:0 0 4px rgba(37,211,102,.5);margin-right:4px}
+
+/* ── Chat main ── */
+.inbox-chat-main{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
+/* WhatsApp wallpaper */
+.inbox-chat-main::before{content:'';position:absolute;inset:0;opacity:.03;background-image:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");pointer-events:none;z-index:0}
+.inbox-chat-main>*{position:relative;z-index:1}
+
+/* Chat header — WhatsApp green */
+.inbox-chat-header{padding:10px 16px;background:#075e54;border-bottom:1px solid rgba(0,0,0,.15);display:flex;align-items:center;gap:12px;flex-shrink:0;min-height:56px}
+.inbox-chat-header-info{flex:1;min-width:0}
+.inbox-chat-header-name{font-size:16px;font-weight:600;color:#fff}
+.inbox-chat-header-sub{font-size:12px;color:rgba(255,255,255,.55);margin-top:2px}
+.inbox-chat-header-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+
+/* Placeholder */
+.inbox-chat-placeholder{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#667781;gap:12px;text-align:center;padding:40px 20px}
+.inbox-chat-placeholder-icon{font-size:4rem;opacity:.3;margin-bottom:8px}
+
+/* ── Messages ── */
+.inbox-chat-messages{flex:1;min-height:0;overflow-y:auto;padding:10px 20px;display:flex;flex-direction:column;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.inbox-chat-messages::-webkit-scrollbar{width:6px;background:transparent}
+.inbox-chat-messages::-webkit-scrollbar-thumb{background:#32404a;border-radius:3px}
+
+.inbox-msg-date-sep{display:flex;align-items:center;justify-content:center;margin:8px 0}
+.inbox-msg-date-sep span{background:rgba(255,255,255,.08);color:var(--wa-muted);font-size:12px;padding:5px 12px;border-radius:8px}
+.inbox-msg-bubble{max-width:65%;padding:7px 10px 4px;border-radius:8px;font-size:14px;line-height:1.45;color:var(--wa-text);word-wrap:break-word;overflow-wrap:break-word;position:relative;box-shadow:0 1px 1px rgba(0,0,0,.08)}
+.inbox-msg-bubble.in{background:var(--wa-bubble-in);align-self:flex-start;border-top-left-radius:2px}
+.inbox-msg-bubble.out{background:var(--wa-bubble-out);align-self:flex-end;border-top-right-radius:2px}
+.inbox-msg-bubble .msg-time{display:flex;align-items:center;justify-content:flex-end;gap:3px;font-size:11px;color:rgba(255,255,255,.45);margin-top:3px;float:right;margin-left:10px;position:relative;top:4px}
+.inbox-msg-bubble .msg-bot-tag{font-size:10px;color:var(--wa-accent);display:block;margin-bottom:1px;font-weight:600}
+
+/* ── Input area ── */
+.inbox-chat-input-area{padding:8px 12px;background:#111b2e;border-top:1px solid var(--wa-border);display:flex;gap:8px;align-items:flex-end;flex-shrink:0;min-height:56px;padding-bottom:max(8px, env(safe-area-inset-bottom))}
+.inbox-chat-input{flex:1;resize:none;padding:9px 14px;border-radius:20px;border:none;background:#1f2c33;color:var(--wa-text);font-size:15px;outline:none;min-height:42px;max-height:120px;font-family:inherit;line-height:1.4}
+.inbox-chat-input:focus{background:#2a3942}
+.inbox-chat-input::placeholder{color:var(--wa-muted)}
+.inbox-chat-send-btn{width:42px;height:42px;border-radius:50%;border:none;background:var(--wa-accent);color:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background .15s, transform .1s}
+.inbox-chat-send-btn:hover{background:#20bd5a;transform:scale(1.05)}
+.inbox-chat-send-btn:active{transform:scale(.95)}
+.inbox-chat-send-btn:disabled{opacity:.3;cursor:default;transform:none}
+.inbox-chat-send-btn::after{content:'▶';font-size:16px}
+
+/* ── Buttons ── */
+.inbox-btn-toggle{padding:5px 14px;border-radius:14px;border:1px solid var(--wa-border);background:rgba(255,255,255,.04);color:var(--wa-muted);font-size:12px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px;transition:all .15s}
+.inbox-btn-toggle:hover{background:rgba(255,255,255,.08);color:var(--wa-text)}
+.inbox-btn-toggle.is-paused{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.25);color:#f87171}
+.inbox-btn-toggle.is-active{background:rgba(37,211,102,.12);border-color:rgba(37,211,102,.25);color:#25d366}
+
+/* Stage badge */
+.inbox-stage-badge{padding:3px 12px;border-radius:12px;font-size:11px;font-weight:600;flex-shrink:0}
+
+/* Empty / Loading */
+.inbox-loading{padding:20px;text-align:center;color:var(--wa-muted);font-size:13px}
+.inbox-empty{padding:40px 20px;text-align:center;color:var(--wa-muted);font-size:14px}
+
+/* ── Mobile ── */
+@media(max-width:768px){
+  .inbox-chat-shell{flex-direction:column}
+  .inbox-chat-sidebar{flex:1;width:100%!important;min-width:0;border-right:none;border-bottom:1px solid var(--wa-border)}
+  .inbox-chat-main{display:none}
+  .inbox-chat-sidebar.hidden-on-mobile{display:none}
+  .inbox-chat-messages{padding:10px 14px}
+}
+.inbox-mobile-back{display:none;background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:4px 8px}
+
+/* ═══════════════════════════════════════════════════════════════
+   BANDEJA COMERCIAL — Tarjetas simplificadas (Card-based layout)
+   Scoped under .inbox-agent-view — no toca el CRM original
+   ═══════════════════════════════════════════════════════════════ */
+
+.inbox-agent-shell{flex:1;min-height:0;flex-direction:column;overflow-y:auto;overflow-x:hidden;padding:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
+.inbox-agent-shell::-webkit-scrollbar{width:6px;background:transparent}
+.inbox-agent-shell::-webkit-scrollbar-thumb{background:#32404a;border-radius:3px}
+
+.inbox-agent-view{flex:1;max-width:1080px;margin:0 auto;width:100%;padding:16px 20px}
+
+/* ── Panel container ── */
+.inbox-agent-view .agent-table-panel{
+  background:#0d1a23;
+  border:1px solid rgba(37,211,102,.08);
+  border-radius:18px;
+  overflow:hidden;
+  box-shadow:0 8px 32px rgba(0,0,0,.3), 0 0 60px rgba(7,94,84,.05);
+}
+
+/* ── Header bar con contador ── */
+.inbox-agent-view .agent-table-counter-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:12px;
+  padding:16px 20px;
+  border-bottom:1px solid rgba(37,211,102,.08);
+  background:linear-gradient(180deg, rgba(37,211,102,.07) 0%, transparent 100%);
+}
+.inbox-agent-view .agent-counter-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:18px;font-weight:700;color:#e9edef;line-height:1;
+}
+.inbox-agent-view .agent-counter-badge .count{
+  font-size:36px;color:#25d366;font-weight:900;letter-spacing:-.03em;line-height:1;
+}
+.inbox-agent-view .agent-counter-label{font-size:14px;color:#8696a0;font-weight:600}
+
+/* ── Quick filters ── */
+.inbox-agent-view .agent-quick-filters{display:flex;gap:6px;flex-wrap:wrap}
+.inbox-agent-view .agent-filter-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:9px 16px;border-radius:999px;
+  background:rgba(37,211,102,.05);border:1px solid rgba(37,211,102,.1);
+  color:#8696a0;font-size:13px;font-weight:600;cursor:pointer;
+  transition:all .18s;width:auto;min-width:auto;
+}
+.inbox-agent-view .agent-filter-btn:hover{
+  background:rgba(37,211,102,.1);border-color:rgba(37,211,102,.2);color:#e9edef;
+}
+.inbox-agent-view .agent-filter-btn.is-active{
+  background:linear-gradient(135deg, #075e54, #128c7e);
+  border-color:transparent;color:#fff;
+}
+.inbox-agent-view .agent-filter-btn .badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:22px;height:22px;padding:0 6px;border-radius:999px;
+  background:rgba(255,255,255,.15);font-size:12px;font-weight:700;
+}
+.inbox-agent-view .agent-filter-btn.is-active .badge{background:rgba(255,255,255,.25)}
+
+/* ── Fullscreen button ── */
+.inbox-agent-view .agent-fullscreen-btn{
+  flex-shrink:0;padding:8px 12px;
+  border:1px solid rgba(37,211,102,.18);border-radius:8px;
+  background:rgba(37,211,102,.06);color:#4ade80;
+  cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;transition:all .15s;
+}
+.inbox-agent-view .agent-fullscreen-btn:hover{background:rgba(37,211,102,.15);border-color:rgba(37,211,102,.35);color:#86efac}
+
+/* ───────────────────────────────────────────────────────────────────
+   CARD GRID — Sistema de tarjetas simplificadas
+   ─────────────────────────────────────────────────────────────────── */
+.agent-cards-grid{
+  padding:16px 20px;
+  display:grid;
+  grid-template-columns:repeat(2, 1fr);
+  gap:14px;
+  align-items:start;
+}
+
+/* ── Card base ── */
+.agent-card{
+  background:#0e1c28;
+  border:1px solid rgba(255,255,255,.05);
+  border-radius:16px;
+  padding:18px 20px;
+  transition:all .15s;
+  position:relative;
+  overflow:hidden;
+}
+.agent-card::before{
+  content:'';position:absolute;top:0;left:0;bottom:0;width:5px;
+  transition:all .2s;
+}
+.agent-card:hover{background:#101f2e;border-color:rgba(255,255,255,.08)}
+
+/* Priority stripes (borde izquierdo coloreado) */
+.agent-card-hot::before{background:#25d366;box-shadow:0 0 12px rgba(37,211,102,.3)}
+.agent-card-warm::before{background:#fbbf24;box-shadow:0 0 8px rgba(251,191,36,.2)}
+.agent-card-pending::before{background:rgba(37,211,102,.35)}
+.agent-card-done::before{background:#94a3b8}
+.agent-card-discarded::before{background:#f87171}
+.agent-card-discarded{opacity:.65}
+
+/* ── Card top: Rama + Status ── */
+.agent-card-top{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;margin-bottom:14px;
+}
+.agent-card-rama{display:flex;align-items:center;gap:8px;min-width:0}
+.agent-card-rama-icon{
+  font-size:22px;flex-shrink:0;
+  width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+  border-radius:10px;
+  background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.12);
+}
+.agent-card-rama-name{font-weight:700;font-size:14px;color:#e9edef;white-space:nowrap}
+.agent-card-line{font-size:11px;color:#8696a0;white-space:nowrap}
+
+/* ── Status pill ── */
+.agent-card-status{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:5px 12px;border-radius:999px;
+  font-size:12px;font-weight:800;white-space:nowrap;flex-shrink:0;
+}
+.agent-card-status.pending{background:rgba(37,211,102,.12);color:#bbf7d0;border:1px solid rgba(37,211,102,.2)}
+.agent-card-status.done{background:rgba(148,163,184,.08);color:#cbd5e1;border:1px solid rgba(148,163,184,.15)}
+.agent-card-status.discarded{background:rgba(248,113,113,.1);color:#fecaca;border:1px solid rgba(248,113,113,.2)}
+
+/* ── Phone row ── */
+.agent-card-phone-row{
+  display:flex;align-items:center;gap:8px;margin-bottom:12px;
+}
+.agent-card-phone{
+  font-size:19px;font-weight:800;letter-spacing:.03em;
+  color:#fff;text-decoration:none;
+  display:inline-flex;align-items:center;gap:6px;
+  transition:color .15s;
+}
+.agent-card-phone:hover{color:#25d366}
+.agent-card-copy{
+  flex-shrink:0;width:30px;height:30px;
+  border:1px solid rgba(37,211,102,.18);border-radius:8px;
+  background:rgba(37,211,102,.06);color:#25d366;
+  cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;
+  padding:0;transition:all .15s;line-height:1;
+}
+.agent-card-copy:hover{background:rgba(37,211,102,.16);border-color:rgba(37,211,102,.35)}
+.agent-card-copy.is-copied{background:rgba(37,211,102,.2);border-color:rgba(37,211,102,.4);color:#4ade80}
+
+/* ── Message preview ── */
+.agent-card-msg{
+  font-size:14px;line-height:1.5;color:#cbd5e1;
+  margin-bottom:10px;padding:8px 12px;
+  background:rgba(255,255,255,.03);border-radius:10px;
+  word-break:break-word;
+}
+.agent-card-ai-badge{font-size:13px;margin-right:2px;vertical-align:middle;cursor:help;opacity:.85}
+.agent-card-ai-badge:hover{opacity:1}
+
+/* ── AI advice ── */
+.agent-card-advice{
+  font-size:12px;color:#25d366;line-height:1.4;
+  margin-bottom:10px;padding:6px 10px;
+  background:rgba(37,211,102,.06);border-radius:8px;
+  border-left:3px solid rgba(37,211,102,.25);
+}
+
+/* ── Meta footer: time + stats ── */
+.agent-card-meta{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  font-size:11px;color:#8696a0;margin-bottom:14px;
+}
+.agent-card-time{color:#f59e0b;font-weight:600}
+
+/* ── Action buttons ── */
+.agent-card-actions{display:flex;gap:8px;flex-wrap:wrap}
+.agent-card-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:11px 18px;border-radius:12px;
+  font-size:15px;font-weight:700;border:none;
+  cursor:pointer;white-space:nowrap;
+  transition:all .15s;line-height:1;
+  min-height:44px; /* min tap target for mobile */
+}
+.agent-card-btn:active{transform:scale(.97)}
+.agent-card-btn-reply{
+  background:linear-gradient(135deg, #16a34a, #22c55e);
+  color:#fff;
+  box-shadow:0 4px 14px rgba(34,197,94,.3);
+}
+.agent-card-btn-reply:hover{
+  box-shadow:0 6px 24px rgba(34,197,94,.5);filter:brightness(1.1);
+}
+.agent-card-btn-reply.is-sent{
+  background:rgba(148,163,184,.14);color:#8696a0;
+  box-shadow:none;cursor:default;pointer-events:none;
+}
+.agent-card-btn-view{
+  background:rgba(37,211,102,.12);color:#86efac;
+  border:1px solid rgba(37,211,102,.2);
+}
+.agent-card-btn-view:hover{
+  background:rgba(37,211,102,.22);color:#bbf7d0;
+}
+.agent-card-btn-attend{
+  background:rgba(34,197,94,.12);color:#86efac;
+  border:1px solid rgba(34,197,94,.2);
+  padding:11px 14px;font-size:14px;
+}
+.agent-card-btn-attend:hover{
+  background:rgba(34,197,94,.22);border-color:rgba(34,197,94,.4);color:#bbf7d0;
+}
+.agent-card-btn-convert-lead{
+  background:rgba(245,158,11,.12);color:#fcd34d;
+  border:1px solid rgba(245,158,11,.2);
+  padding:11px 14px;font-size:14px;
+}
+.agent-card-btn-convert-lead:hover{
+  background:rgba(245,158,11,.22);border-color:rgba(245,158,11,.4);color:#fde68a;
+}
+.agent-card-btn-discard{
+  background:rgba(248,113,113,.08);color:#fecaca;
+  border:1px solid rgba(248,113,113,.16);
+  padding:11px 14px;font-size:14px;
+}
+.agent-card-btn-discard:hover{
+  background:rgba(248,113,113,.2);border-color:rgba(248,113,113,.35);color:#fee2e2;
+}
+.agent-card-btn-discard.is-confirming{
+  background:rgba(248,113,113,.24);border-color:rgba(248,113,113,.44);color:#fff;
+  animation:inbox-pulse .8s ease-in-out;
+}
+@keyframes inbox-pulse{0%,100%{box-shadow:0 0 0 0 rgba(248,113,113,.3)}50%{box-shadow:0 0 0 8px rgba(248,113,113,0)}}
+
+/* ── Empty state ── */
+.inbox-agent-view .agent-empty{
+  grid-column:1/-1;padding:60px 24px;text-align:center;color:#8696a0;
+}
+.inbox-agent-view .agent-empty-icon{
+  font-size:56px;display:block;margin-bottom:16px;opacity:.4;
+}
+.inbox-agent-view .agent-empty strong{display:block;font-size:24px;color:#e9edef;margin-bottom:8px}
+.inbox-agent-view .agent-empty p{font-size:15px}
+
+/* ── Toast ── */
+.agent-toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+  padding:14px 24px;border-radius:12px;
+  font-size:15px;font-weight:700;z-index:20001;pointer-events:none;
+  opacity:0;transition:opacity .2s, transform .2s;
+}
+.agent-toast.is-visible{opacity:1;transform:translateX(-50%) translateY(0)}
+.agent-toast.ok{background:#065f46;border:1px solid #34d399;color:#d1fae5}
+.agent-toast.info{background:#78350f;border:1px solid #f59e0b;color:#fde68a}
+.agent-toast.error{background:#7f1d1d;border:1px solid #f87171;color:#fee2e2}
+
+/* ── Agent FS mode (pantalla completa en inbox) ── */
+body.inbox-agent-fs{overflow:hidden!important}
+body.inbox-agent-fs .inbox-topbar{display:none!important}
+body.inbox-agent-fs .inbox-agent-shell{padding:0!important}
+body.inbox-agent-fs .inbox-agent-view{max-width:100%!important;padding:0!important}
+body.inbox-agent-fs .inbox-agent-view .agent-table-panel{
+  position:fixed!important;inset:0!important;z-index:100000!important;
+  margin:0!important;border-radius:0!important;border:none!important;
+  display:flex!important;flex-direction:column!important;overflow:hidden!important;
+}
+body.inbox-agent-fs .inbox-agent-view .agent-cards-grid{
+  flex:1!important;overflow:auto!important;
+}
+body.inbox-agent-fs .inbox-agent-view .agent-table-counter-bar{
+  background:#0a1620!important;border-color:rgba(37,211,102,.08)!important;
+}
+
+/* ── FS close button ── */
+.inbox-agent-fs-close{
+  display:none;position:fixed;top:14px;right:14px;z-index:100001;
+  padding:10px 20px;border:1px solid rgba(248,113,113,.3);border-radius:8px;
+  background:rgba(15,23,42,.95);color:#fca5a5;
+  cursor:pointer;font-size:14px;font-weight:700;
+  box-shadow:0 4px 20px rgba(0,0,0,.4);transition:all .15s;
+}
+body.inbox-agent-fs .inbox-agent-fs-close{display:block}
+.inbox-agent-fs-close:hover{background:rgba(248,113,113,.18);border-color:rgba(248,113,113,.5)}
+
+/* ── Badge notificación en botón Panel (solo punto) ── */
+.inbox-panel-btn{position:relative}
+.inbox-panel-btn .panel-unread-dot{
+  display:none;position:absolute;top:6px;right:8px;
+  width:10px;height:10px;border-radius:50%;
+  background:#f59e0b;
+  box-shadow:0 0 6px rgba(245,158,11,.6);
+  animation:panelDotPop .3s ease-out;
+}
+@keyframes panelDotPop{
+  0%{transform:scale(0);opacity:0}
+  70%{transform:scale(1.3)}
+  100%{transform:scale(1);opacity:1}
+}
+.inbox-panel-btn .panel-unread-dot.has-unread{display:block}
+
+/* ── Responsive: agent cards ── */
+@media(max-width:900px){
+  .agent-cards-grid{grid-template-columns:1fr;padding:12px 14px;gap:12px}
+  .agent-card{padding:16px}
+  .agent-card-phone{font-size:17px}
+  .agent-card-btn{font-size:14px;padding:12px 14px}
+}
+
+@media(max-width:640px){
+  .inbox-agent-view{padding:8px 6px}
+  .inbox-agent-view .agent-table-counter-bar{
+    flex-direction:column;align-items:flex-start;gap:10px;padding:14px 16px;
+  }
+  .inbox-agent-view .agent-quick-filters{width:100%}
+  .inbox-agent-view .agent-filter-btn{flex:1;justify-content:center;font-size:12px;padding:8px 12px}
+  .agent-cards-grid{padding:8px 10px;gap:10px}
+  .agent-card{padding:14px;border-radius:12px}
+  .agent-card-rama-name{font-size:13px}
+  .agent-card-phone{font-size:16px}
+  .agent-card-btn{min-height:48px;font-size:15px;padding:14px 16px}
+  .agent-card-btn-reply{min-width:auto}
+  .agent-card-actions{flex-wrap:nowrap}
+  .agent-card-btn{flex:1;min-width:0}
+}
+
+@media(max-width:480px){
+  .agent-cards-grid{padding:6px 6px;gap:8px}
+  .agent-card{padding:12px;border-radius:10px}
+  .agent-card-top{margin-bottom:10px}
+  .agent-card-rama-icon{font-size:18px;width:28px;height:28px}
+  .agent-card-phone{font-size:15px}
+  .agent-card-msg{font-size:13px}
+  .agent-card-btn{min-height:44px;font-size:13px;padding:12px 8px;gap:3px}
+  .agent-card-actions{flex-wrap:nowrap;gap:5px}
+}
+
+@media(max-width:768px){
+  body.inbox-agent-fs .inbox-agent-view .agent-cards-grid{
+    grid-template-columns:1fr;padding:8px 6px;
+  }
+  .inbox-agent-fs-close{top:8px;right:8px;padding:8px 14px;font-size:13px}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FULLSCREEN CHAT OVERLAY (desde la tabla de agente)
+   ═══════════════════════════════════════════════════════════════ */
+
+.inbox-fullchat-messages::-webkit-scrollbar{width:6px;background:transparent}
+.inbox-fullchat-messages::-webkit-scrollbar-thumb{background:#32404a;border-radius:3px}
+
+/* Asegurar que los bubbles y date-sep funcionan dentro del fullscreen overlay */
+.inbox-fullchat-overlay .inbox-msg-bubble{max-width:65%;padding:7px 10px 4px;border-radius:8px;font-size:14px;line-height:1.45;color:#e9edef;word-wrap:break-word;overflow-wrap:break-word;position:relative;box-shadow:0 1px 1px rgba(0,0,0,.08)}
+.inbox-fullchat-overlay .inbox-msg-bubble.in{background:#1f2c33;align-self:flex-start;border-top-left-radius:2px}
+.inbox-fullchat-overlay .inbox-msg-bubble.out{background:#005c4b;align-self:flex-end;border-top-right-radius:2px}
+.inbox-fullchat-overlay .inbox-msg-bubble .msg-time{display:flex;align-items:center;justify-content:flex-end;gap:3px;font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;float:right;margin-left:10px;position:relative;top:4px}
+.inbox-fullchat-overlay .inbox-msg-bubble .msg-bot-tag{font-size:10px;color:#25d366;display:block;margin-bottom:1px;font-weight:600}
+.inbox-fullchat-overlay .inbox-msg-date-sep{display:flex;align-items:center;justify-content:center;margin:8px 0}
+.inbox-fullchat-overlay .inbox-msg-date-sep span{background:rgba(255,255,255,.08);color:#8696a0;font-size:12px;padding:5px 12px;border-radius:8px}
+
+@media(max-width:768px){
+  .inbox-fullchat-messages{padding:10px 14px}
+  .inbox-fullchat-overlay .inbox-msg-bubble{max-width:80%}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AGENDA COMERCIAL — Modal overlay
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Agenda button in topbar ── */
+.inbox-agenda-btn{
+  padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.2);
+  background:rgba(255,255,255,.08);color:#fff;font-size:18px;cursor:pointer;
+  white-space:nowrap;flex-shrink:0;transition:all .15s;line-height:1;
+}
+.inbox-agenda-btn:hover{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.35)}
+.inbox-agenda-btn:active{transform:scale(.95)}
+
+/* ── Overlay ── */
+.inbox-agenda-overlay{
+  position:fixed;inset:0;z-index:20000;
+  background:rgba(0,0,0,.7);
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(2px);
+  -webkit-backdrop-filter:blur(2px);
+}
+.inbox-agenda-panel{
+  width:95%;max-width:700px;max-height:85vh;
+  background:#0d1a23;border:1px solid rgba(37,211,102,.12);
+  border-radius:16px;display:flex;flex-direction:column;
+  overflow:hidden;box-shadow:0 16px 64px rgba(0,0,0,.5);
+}
+
+/* ── Header ── */
+.inbox-agenda-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px;background:#075e54;border-bottom:1px solid rgba(0,0,0,.15);
+  flex-shrink:0;
+}
+.inbox-agenda-title{font-size:16px;font-weight:700;color:#fff}
+.inbox-agenda-close{
+  width:32px;height:32px;border-radius:50%;border:none;
+  background:rgba(255,255,255,.12);color:#fff;font-size:16px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:background .15s;
+}
+.inbox-agenda-close:hover{background:rgba(255,255,255,.25)}
+
+/* ── Filters ── */
+.inbox-agenda-filters{
+  display:flex;gap:10px;align-items:center;
+  padding:12px 20px;border-bottom:1px solid rgba(255,255,255,.04);
+  flex-shrink:0;
+}
+.inbox-agenda-filter-select{
+  flex:1;padding:8px 14px;border-radius:8px;
+  border:1px solid rgba(37,211,102,.15);
+  background:#0e1c28;color:#e9edef;font-size:13px;outline:none;
+  font-family:inherit;
+}
+.inbox-agenda-filter-select:focus{border-color:rgba(37,211,102,.4)}
+.inbox-agenda-add-btn{
+  padding:8px 18px;border-radius:8px;border:none;
+  background:linear-gradient(135deg,#16a34a,#22c55e);
+  color:#fff;font-size:13px;font-weight:700;cursor:pointer;
+  white-space:nowrap;transition:all .15s;
+}
+.inbox-agenda-add-btn:hover{filter:brightness(1.1)}
+
+/* ── List / Table ── */
+.inbox-agenda-list{
+  flex:1;min-height:0;overflow-y:auto;overflow-x:auto;padding:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+}
+.inbox-agenda-list::-webkit-scrollbar{width:6px;background:transparent}
+.inbox-agenda-list::-webkit-scrollbar-thumb{background:#32404a;border-radius:3px}
+
+.inbox-agenda-table{
+  width:100%;border-collapse:collapse;font-size:13px;
+}
+.inbox-agenda-table th{
+  text-align:left;padding:10px 14px;font-size:11px;font-weight:700;
+  color:#8696a0;text-transform:uppercase;letter-spacing:.05em;
+  border-bottom:1px solid rgba(255,255,255,.05);position:sticky;top:0;
+  background:#0d1a23;z-index:1;
+}
+.inbox-agenda-table td{
+  padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.03);
+  color:#e9edef;vertical-align:middle;
+}
+.inbox-agenda-table tr{cursor:pointer;transition:background .1s}
+.inbox-agenda-table tr:hover{background:rgba(37,211,102,.05)}
+.inbox-agenda-table .agenda-col-nombre{font-weight:600;color:#fff}
+.inbox-agenda-table .agenda-col-tlf{font-family:monospace;font-size:13px;color:#8696a0}
+.inbox-agenda-table .agenda-col-negocio{
+  display:inline-block;padding:3px 10px;border-radius:12px;
+  font-size:11px;font-weight:700;
+  background:rgba(37,211,102,.08);color:#86efac;
+}
+.inbox-agenda-table .agenda-col-notas{max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#8696a0}
+.inbox-agenda-table .agenda-col-actions{white-space:nowrap}
+.inbox-agenda-table .agenda-action-btn{
+  background:none;border:1px solid rgba(255,255,255,.1);border-radius:6px;
+  color:#8696a0;cursor:pointer;font-size:14px;padding:4px 8px;margin-right:4px;
+  transition:all .15s;line-height:1;
+}
+.inbox-agenda-table .agenda-action-btn:hover{background:rgba(255,255,255,.08);color:#fff}
+.inbox-agenda-table .agenda-action-btn.agenda-action-delete:hover{background:rgba(248,113,113,.15);border-color:rgba(248,113,113,.3);color:#f87171}
+.inbox-agenda-table .agenda-action-btn.agenda-action-panel{color:#25d366;border-color:rgba(37,211,102,.2)}
+.inbox-agenda-table .agenda-action-btn.agenda-action-panel:hover{background:rgba(37,211,102,.1);border-color:rgba(37,211,102,.3);color:#4ade80}
+
+/* ── Form ── */
+.inbox-agenda-form-container,.inbox-agenda-detail{
+  flex:1;display:flex;flex-direction:column;overflow:hidden;
+}
+.inbox-agenda-form-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px;background:rgba(37,211,102,.05);
+  border-bottom:1px solid rgba(37,211,102,.08);flex-shrink:0;
+  font-size:14px;font-weight:700;color:#e9edef;
+}
+.inbox-agenda-back-btn{
+  background:none;border:1px solid rgba(255,255,255,.12);border-radius:6px;
+  color:#8696a0;font-size:12px;cursor:pointer;padding:5px 12px;transition:all .15s;
+}
+.inbox-agenda-back-btn:hover{background:rgba(255,255,255,.08);color:#fff}
+
+.inbox-agenda-form{
+  flex:1;min-height:0;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+}
+.agenda-field{display:flex;flex-direction:column;gap:4px}
+.agenda-field label{font-size:12px;font-weight:600;color:#8696a0;text-transform:uppercase;letter-spacing:.03em}
+.agenda-field input[type="text"],
+.agenda-field input[type="tel"],
+.agenda-field select,
+.agenda-field textarea{
+  padding:10px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.08);
+  background:#0e1c28;color:#e9edef;font-size:14px;outline:none;font-family:inherit;
+  transition:border-color .15s;
+}
+.agenda-field input:focus,.agenda-field select:focus,.agenda-field textarea:focus{
+  border-color:rgba(37,211,102,.4)
+}
+.agenda-field textarea{resize:vertical;min-height:60px}
+.agenda-form-actions{display:flex;gap:10px}
+.agenda-btn-save{
+  flex:1;padding:12px 20px;border-radius:10px;border:none;
+  background:linear-gradient(135deg,#16a34a,#22c55e);
+  color:#fff;font-size:15px;font-weight:700;cursor:pointer;
+  transition:all .15s;
+}
+.agenda-btn-save:hover{filter:brightness(1.1)}
+.agenda-btn-cancel{
+  padding:12px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.04);color:#8696a0;font-size:15px;font-weight:600;
+  cursor:pointer;transition:all .15s;
+}
+.agenda-btn-cancel:hover{background:rgba(255,255,255,.08);color:#fff}
+
+/* ── Detail ── */
+.agenda-detail-content{padding:20px;overflow-y:auto;flex:1}
+.agenda-detail-row{display:flex;align-items:baseline;gap:10px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.agenda-detail-label{font-size:12px;font-weight:700;color:#8696a0;min-width:70px;text-transform:uppercase;letter-spacing:.03em}
+.agenda-detail-value{font-size:15px;color:#e9edef;word-break:break-word}
+.agenda-detail-value.agenda-detail-name{font-size:20px;font-weight:700;color:#fff}
+.agenda-detail-actions{display:flex;gap:10px;margin-top:20px}
+.agenda-detail-actions .agenda-btn-save{flex:0 0 auto}
+
+/* ── Agent card agenda name ── */
+.agent-card-phone--agenda{color:#25d366!important;text-decoration:none!important}
+.agent-card-phone--agenda:hover{color:#4ade80!important;text-decoration:underline!important}
+.agent-card-phone-sub{font-size:12px;color:#8696a0;margin-left:4px}
+
+/* ── Agenda link in fullchat header ── */
+.inbox-fullchat-agenda-link{
+  color:#25d366!important;text-decoration:none!important;cursor:pointer;
+}
+.inbox-fullchat-agenda-link:hover{color:#4ade80!important;text-decoration:underline!important}
+.inbox-fullchat-agenda-add{
+  background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.25);
+  color:#25d366;border-radius:6px;cursor:pointer;font-size:13px;
+  padding:3px 8px;margin-left:6px;transition:all .15s;vertical-align:middle;
+  position:relative;line-height:1;
+}
+.inbox-fullchat-agenda-add::after{
+  content:'+';position:absolute;top:-4px;right:-4px;
+  width:16px;height:16px;border-radius:50%;
+  background:#25d366;color:#000;font-size:12px;font-weight:900;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 1px 3px rgba(0,0,0,.3);
+}
+.inbox-fullchat-agenda-add:hover{background:rgba(37,211,102,.22);color:#4ade80}
+
+/* ── Responsive agenda ── */
+@media(max-width:640px){
+  .inbox-agenda-panel{width:100%;max-height:100vh;border-radius:0}
+  .inbox-agenda-header{padding:12px 14px}
+  .inbox-agenda-filters{flex-direction:column;padding:10px 14px}
+  .inbox-agenda-btn{padding:6px 12px;font-size:16px}
+
+  /* ── Card layout: table → tarjetas ── */
+  .inbox-agenda-list{overflow-x:hidden}
+  .inbox-agenda-table thead{display:none}
+  .inbox-agenda-table tbody,.inbox-agenda-table tr,.inbox-agenda-table td{display:block}
+  .inbox-agenda-table tr{
+    background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);
+    border-radius:10px;margin-bottom:10px;padding:0;cursor:pointer;
+  }
+  .inbox-agenda-table tr:last-child{margin-bottom:0}
+  .inbox-agenda-table td{padding:6px 14px;border-bottom:none;white-space:normal!important}
+  .inbox-agenda-table td:first-child{padding-top:14px}
+
+  /* Nombre: destacado como título de la tarjeta */
+  .inbox-agenda-table .agenda-col-nombre{
+    font-size:16px;font-weight:700;color:#fff;padding-bottom:2px;
+  }
+  /* Teléfono + Negocio: en línea */
+  .inbox-agenda-table .agenda-col-tlf{
+    display:inline-block;font-size:13px;padding-right:12px;padding-bottom:2px;
+  }
+  .inbox-agenda-table td:nth-child(3){
+    display:inline-block;padding-top:0;padding-bottom:2px;vertical-align:middle;
+  }
+  /* Ocultar columna Notas en móvil */
+  .inbox-agenda-table .agenda-col-notas{display:none!important}
+
+  /* Acciones: barra inferior de la tarjeta */
+  .inbox-agenda-table .agenda-col-actions{
+    display:flex;gap:6px;padding-top:8px;padding-bottom:14px;
+    flex-wrap:wrap;
+  }
+  .inbox-agenda-table .agenda-action-btn{
+    padding:6px 12px;font-size:15px;border-radius:8px;
+  }
+}
+
+/* ── Panel Add: Fullchat header button ── */
+.inbox-fullchat-panel-add{
+  background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.25);
+  color:#fbbf24;border-radius:6px;cursor:pointer;font-size:13px;
+  padding:3px 8px;margin-left:6px;transition:all .15s;vertical-align:middle;
+  position:relative;line-height:1;
+}
+.inbox-fullchat-panel-add:hover{background:rgba(251,191,36,.22);color:#fcd34d}
+
+/* ── Panel Add: Chat header button ── */
+.inbox-panel-add-btn{
+  padding:6px 14px;border-radius:8px;border:1px solid rgba(251,191,36,.3);
+  background:rgba(251,191,36,.12);color:#fbbf24;font-size:13px;font-weight:700;
+  cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0;
+}
+.inbox-panel-add-btn:hover{background:rgba(251,191,36,.22);color:#fcd34d}
+.inbox-panel-add-btn:active{transform:translateY(1px)}
+
+/* ── Panel Add: Modal overlay ── */
+.inbox-panel-add-overlay{
+  position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,.75);
+  display:flex;align-items:center;justify-content:center;
+}
+.inbox-panel-add-modal{
+  background:#0b141a;border-radius:14px;width:90%;max-width:420px;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);overflow:hidden;
+  border:1px solid rgba(251,191,36,.12);
+}
+.inbox-panel-add-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px;background:rgba(251,191,36,.06);
+  border-bottom:1px solid rgba(251,191,36,.08);
+  font-size:15px;font-weight:700;color:#fbbf24;
+}
+.inbox-panel-add-close{
+  background:none;border:1px solid rgba(255,255,255,.1);border-radius:6px;
+  color:#8696a0;font-size:14px;cursor:pointer;padding:5px 10px;transition:all .15s;
+}
+.inbox-panel-add-close:hover{background:rgba(255,255,255,.08);color:#fff}
+
+.inbox-panel-add-form{
+  padding:20px;display:flex;flex-direction:column;gap:16px;
+}
+.panel-add-field{display:flex;flex-direction:column;gap:5px}
+.panel-add-field label{font-size:12px;font-weight:600;color:#8696a0;text-transform:uppercase;letter-spacing:.03em}
+.panel-add-field select,
+.panel-add-field textarea{
+  padding:10px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.08);
+  background:#0e1c28;color:#e9edef;font-size:14px;outline:none;font-family:inherit;
+  transition:border-color .15s;
+}
+.panel-add-field select:focus,
+.panel-add-field textarea:focus{border-color:rgba(251,191,36,.4)}
+.panel-add-field textarea{resize:vertical;min-height:60px}
+.panel-add-actions{display:flex;gap:10px;margin-top:4px}
+.panel-add-btn-save{
+  flex:1;padding:12px 20px;border-radius:10px;border:none;
+  background:linear-gradient(135deg,#b45309,#f59e0b);
+  color:#fff;font-size:15px;font-weight:700;cursor:pointer;transition:all .15s;
+}
+.panel-add-btn-save:hover{filter:brightness(1.1)}
+.panel-add-btn-cancel{
+  padding:12px 20px;border-radius:10px;border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.04);color:#8696a0;font-size:15px;font-weight:600;
+  cursor:pointer;transition:all .15s;
+}
+.panel-add-btn-cancel:hover{background:rgba(255,255,255,.08);color:#fff}
+
+/* ── Agent card: Manual badge ── */
+.agent-card-manual-badge{
+  display:inline-block;padding:2px 6px;border-radius:4px;
+  background:rgba(251,191,36,.15);color:#fbbf24;font-size:11px;font-weight:700;
+  margin-right:4px;cursor:help;
+}
+.agent-card-manual-reason{
+  padding:8px 12px;margin-bottom:8px;border-radius:6px;
+  background:rgba(251,191,36,.06);border-left:3px solid rgba(251,191,36,.35);
+  color:#fcd34d;font-size:13px;line-height:1.5;
+}
+/* ── Agent card: Semantic AI badge ── */
+.agent-card-semantic-badge{
+  display:inline-block;padding:2px 6px;border-radius:4px;
+  background:rgba(99,102,241,.15);color:#a5b4fc;font-size:11px;font-weight:700;
+  margin-right:4px;cursor:help;
+}

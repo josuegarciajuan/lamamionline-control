@@ -192,6 +192,11 @@ function aviso_sender_line_candidates_for_aviso($aviso, $lines) {
 
     $picked = aviso_sender_match_line_from_override($overrideValue, $lines);
     if (!$picked) {
+        // Emisor por defecto: la línea de dulce (tf_de558a13) para evitar ruido
+        // de múltiples remitentes distintos en los avisos de WhatsApp.
+        $picked = aviso_sender_match_line_from_override('tf_de558a13', $lines);
+    }
+    if (!$picked) {
         $seed = abs(crc32($normalizedType));
         $picked = $lines[$seed % count($lines)];
     }
@@ -637,6 +642,15 @@ function avisos_active_unread_ids() {
     $ids = array();
     foreach (avisos_get_active() as $row) {
         if (!empty($row['read_at'])) continue;
+        $id = trim((string)($row['id'] ?? ''));
+        if ($id !== '') $ids[] = $id;
+    }
+    return $ids;
+}
+
+function avisos_active_all_ids() {
+    $ids = array();
+    foreach (avisos_get_active() as $row) {
         $id = trim((string)($row['id'] ?? ''));
         if ($id !== '') $ids[] = $id;
     }
@@ -1109,6 +1123,32 @@ function avisos_mark_as_read($ids) {
             $row['updated_at'] = now_datetime();
             $changed = true;
         }
+    }
+    unset($row);
+
+    if ($changed) {
+        avisos_write_rows($rows);
+    }
+}
+
+function avisos_mark_as_read_and_dismiss($ids) {
+    if (empty($ids)) return;
+
+    $rows = storage_read('avisos.json');
+    $changed = false;
+
+    foreach ($rows as &$row) {
+        if (!in_array($row['id'] ?? '', $ids, true)) continue;
+        if (($row['status'] ?? '') !== 'active') continue;
+
+        $now = now_datetime();
+        if (empty($row['read_at'])) {
+            $row['read_at'] = $now;
+        }
+        $row['status'] = 'dismissed';
+        $row['dismissed_at'] = $now;
+        $row['updated_at'] = $now;
+        $changed = true;
     }
     unset($row);
 
@@ -1645,7 +1685,7 @@ function avisos_generate_month_income_milestones() {
                 $sourceKey,
                 'Ingresos del mes superan ' . $target . '€',
                 'El total de ingresos del mes actual ya ha superado los ' . $target . '€. Total actual: ' . euro($total) . '.',
-                'media',
+                'alta',
                 array('month' => $monthKey, 'target' => $target, 'kind' => 'income'),
                 false
             );
@@ -1677,7 +1717,7 @@ function avisos_generate_month_profit_milestones() {
                 $sourceKey,
                 'Beneficio del mes supera ' . $target . '€',
                 'El beneficio real del mes actual ya ha superado los ' . $target . '€. Beneficio actual: ' . euro($profit) . '.',
-                'media',
+                'alta',
                 array('month' => $monthKey, 'target' => $target, 'kind' => 'profit'),
                 false
             );
@@ -1737,7 +1777,7 @@ function avisos_generate_unattended_interesadas_6h() {
             'lamami_unattended_' . ($row['id'] ?? ''),
             'Interesada nueva de LaMami sin atender',
             'La interesada ' . ($row['telefono'] ?? 'sin teléfono') . ' lleva más de ' . $hours . ' horas en estado nueva sin ser atendida.',
-            'alta',
+            'media',
             array('branch' => 'lamami', 'id' => $row['id'] ?? '', 'kind' => 'unattended'),
             true
         );
@@ -1753,7 +1793,7 @@ function avisos_generate_unattended_interesadas_6h() {
             'jostal_unattended_' . ($row['id'] ?? ''),
             'Interesada nueva de Jostal sin atender',
             'La interesada Jostal ' . ($row['telefono'] ?? 'sin teléfono') . ' lleva más de ' . $hours . ' horas sin convertirse ni descartarse.',
-            'alta',
+            'media',
             array('branch' => 'jostal', 'id' => $row['id'] ?? '', 'kind' => 'unattended'),
             true
         );
@@ -1769,7 +1809,7 @@ function avisos_generate_unattended_interesadas_6h() {
             'casawasap_unattended_' . ($row['id'] ?? ''),
             'Interesado de Casawasap sin atender',
             'El interesado Casawasap ' . ($row['telefono'] ?? 'sin teléfono') . ' lleva más de ' . $hours . ' horas sin convertirse ni descartarse.',
-            'alta',
+            'media',
             array('branch' => 'casawasap', 'id' => $row['id'] ?? '', 'kind' => 'unattended'),
             true
         );
@@ -1794,7 +1834,7 @@ function avisos_generate_lamami_atendidas_24h() {
             'lamami_atendida_' . $hours . 'h_' . ($row['id'] ?? ''),
             'Interesada atendida de LaMami sin convertir tras ' . $hours . 'h',
             'La interesada ' . ($row['telefono'] ?? 'sin teléfono') . ' lleva más de ' . $hours . ' horas en estado atendida sin convertirse.',
-            'alta',
+            'media',
             array('branch' => 'lamami', 'id' => $row['id'] ?? '', 'kind' => 'attended_' . $hours . 'h'),
             true
         );
@@ -1958,7 +1998,7 @@ function avisos_generate_lamami_clienta_without_bot() {
             'lamami_clienta_without_bot_' . $clientaId,
             'Clienta activa sin bot vinculado',
             'La clienta "' . ($row['nombre'] ?? 'Clienta') . '" está activa pero no tiene ningún bot vinculado.',
-            'alta',
+            'media',
             array('branch' => 'lamami', 'id' => $clientaId, 'kind' => 'no_bot'),
             true
         );
@@ -2012,7 +2052,7 @@ function avisos_generate_bots_missing_memory_file() {
             'bot_memory_missing_' . $botId,
             'Bot sin archivo de memoria',
             'El bot "' . ($bot['nombre_bot'] ?? 'Bot') . '" no tiene accesible su archivo de memoria esperado: ' . $path,
-            'alta',
+            'media',
             array('bot_id' => $botId, 'path' => $path, 'kind' => 'missing_memory'),
             true
         );
@@ -2116,7 +2156,7 @@ function avisos_generate_casawasap_clientes_without_pagos_7d() {
             'casawasap_sin_pagos_' . $daysLimit . 'd_' . $clienteId,
             'Cliente Casawasap sin pagos tras ' . $daysLimit . ' días',
             'El cliente Casawasap "' . ($row['nombre'] ?? ($row['telefono'] ?? 'Cliente')) . '" lleva más de ' . $daysLimit . ' días dado de alta sin registrar pagos.',
-            'media',
+            'alta',
             array('branch' => 'casawasap', 'id' => $clienteId, 'days' => $daysLimit),
             true
         );
@@ -2274,7 +2314,7 @@ function avisos_generate_many_renewals_due_today() {
         'many_renewals_due_today_' . $todayKey,
         'Varias renovaciones/cobros vencen hoy',
         'Hoy vencen ' . $lamamiCount . ' renovaciones de LaMami y ' . $casaCount . ' cobros de Casawasap. Total a revisar: ' . $total . '.',
-        'alta',
+        'media',
         array('day' => $todayKey, 'lamami' => $lamamiCount, 'casawasap' => $casaCount),
         false
     );
@@ -2320,7 +2360,7 @@ function avisos_generate_jostal_multiple_open_periods() {
             'jostal_multiple_open_periods_' . ($row['id'] ?? ''),
             'Clienta Jostal con varios periodos abiertos',
             'La clienta Jostal "' . ($row['nombre'] ?? 'Clienta') . '" tiene ' . $openCount . ' periodos de estancia abiertos al mismo tiempo.',
-            'alta',
+            'media',
             array('branch' => 'jostal', 'id' => $row['id'] ?? '', 'open_count' => $openCount),
             true
         );
@@ -2420,7 +2460,7 @@ function avisos_generate_record_daily_income() {
             'record_daily_income_' . $todayKey,
             'Récord histórico de ingresos diarios',
             'Hoy se ha alcanzado un nuevo récord de ingresos diarios: ' . euro($todayIncome) . '.',
-            'media',
+            'alta',
             array('day' => $todayKey, 'amount' => $todayIncome),
             false
         );
@@ -2461,7 +2501,7 @@ function avisos_generate_record_daily_profit() {
             'record_daily_profit_' . $todayKey,
             'Récord histórico de beneficio diario',
             'Hoy se ha alcanzado un nuevo récord de beneficio diario: ' . euro($todayProfit) . '.',
-            'media',
+            'alta',
             array('day' => $todayKey, 'amount' => $todayProfit),
             false
         );
@@ -2495,7 +2535,7 @@ function avisos_generate_record_month_income() {
             'record_month_income_' . $monthKey,
             'Récord histórico mensual de ingresos',
             'El mes actual ya ha superado todos los meses anteriores en ingresos: ' . euro($currentIncome) . '.',
-            'media',
+            'alta',
             array('month' => $monthKey, 'amount' => $currentIncome),
             false
         );
@@ -2527,7 +2567,7 @@ function avisos_generate_branch_leader_change() {
         'branch_leader_change_' . $monthKey,
         'Cambio de rama líder del mes',
         'La rama líder del mes ha cambiado: ahora lidera ' . strtoupper($currentLeader) . ' en lugar de ' . strtoupper($previousLeader) . '.',
-        'media',
+        'alta',
         array('month' => $monthKey, 'current' => $currentLeader, 'previous' => $previousLeader),
         false
     );
@@ -2568,7 +2608,6 @@ function avisos_generate_month_projection_below_previous() {
     $monthKey = business_current_month_key();
     $prevMonthKey = date('Y-m', strtotime($monthKey . '-01 -1 month'));
 
-    $minElapsedDays = (int)aviso_cfg('projection_min_elapsed_days', 5);
     $factor = (float)aviso_cfg('projection_vs_previous_factor', 0.80);
 
     $currentIncome = aviso_month_income_total($monthKey);
@@ -2578,16 +2617,21 @@ function avisos_generate_month_projection_below_previous() {
     $prevIncome = aviso_month_income_total($prevMonthKey);
 
     if ($prevIncome <= 0) return $generated;
-    if ($elapsedDays < $minElapsedDays) return $generated;
+
+    // Solo se evalúa en momentos relevantes del mes (días 10, 20 y 30), no en
+    // los primeros días donde la proyección aún no es representativa.
+    $checkDays = array(10, 20, 30);
+    if (!in_array($elapsedDays, $checkDays, true)) return $generated;
+
     if ($projected >= ($prevIncome * $factor)) return $generated;
 
     $generated[] = aviso_make(
         'strategic',
-        'month_projection_low_' . $monthKey,
+        'month_projection_low_' . $monthKey . '_d' . $elapsedDays,
         'Proyección mensual claramente por debajo del mes anterior',
         'La proyección de ingresos del mes actual es ' . euro($projected) . ', claramente por debajo del cierre del mes anterior (' . euro($prevIncome) . ').',
         'alta',
-        array('month' => $monthKey, 'projected' => $projected, 'previous' => $prevIncome),
+        array('month' => $monthKey, 'projected' => $projected, 'previous' => $prevIncome, 'elapsed_days' => $elapsedDays),
         true
     );
 
@@ -2765,7 +2809,7 @@ function avisos_generate_lamami_new_leads() {
             $sourceKey,
             'Nuevo lead en LaMami',
             'Lead añadido a "' . ($row['cliente_nombre'] ?? 'Sin clienta') . '" por ' . euro($row['precio_lead'] ?? 0) . '.',
-            'alta',
+            'media',
             array('branch' => 'lamami', 'id' => $id, 'type' => 'lead'),
             false
         );
@@ -2837,7 +2881,7 @@ function avisos_generate_jostal_new_leads() {
             $sourceKey,
             'Nuevo lead en Jostal',
             'Lead Jostal añadido a "' . ($row['clienta_nombre'] ?? 'Sin clienta') . '" por ' . euro($row['precio'] ?? 0) . '.',
-            'alta',
+            'media',
             array('branch' => 'jostal', 'id' => $id, 'type' => 'lead'),
             false
         );
@@ -2882,7 +2926,7 @@ function avisos_generate_casawasap_new_clientes() {
             $sourceKey,
             'Nuevo cliente en Casawasap',
             'Se ha dado de alta el cliente Casawasap "' . ($row['nombre'] ?? ($row['telefono'] ?? 'Sin nombre')) . '".',
-            'media',
+            'alta',
             array('branch' => 'casawasap', 'id' => $id, 'type' => 'cliente'),
             false
         );
@@ -2904,7 +2948,7 @@ function avisos_generate_casawasap_new_pagos() {
             $sourceKey,
             'Nuevo ingreso en Casawasap',
             'Pago registrado para "' . ($row['cliente_nombre'] ?? 'Cliente') . '" por ' . euro($row['importe'] ?? 0) . '.',
-            'alta',
+            'media',
             array('branch' => 'casawasap', 'id' => $id, 'type' => 'pago'),
             false
         );
@@ -2937,6 +2981,7 @@ function avisos_generate_jostal_alquiler_due() {
                 'anchor_entry' => $paymentInfo['entry_date'] ?? '',
                 'due_today' => true,
                 'rent_due_weekday' => $paymentInfo['due_weekday'] ?? 0,
+                'kind' => 'jostal_alquiler',
             ),
             false
         );
@@ -3043,7 +3088,7 @@ function avisos_generate_overdue_interesadas_all() {
             'lamami_interesada_' . ($row['id'] ?? ''),
             'Interesada de LaMami sin convertir > 2 días',
             'La interesada ' . ($row['telefono'] ?? 'sin teléfono') . ' lleva más de ' . $daysLimit . ' días sin pasar a clienta.',
-            'alta',
+            'media',
             array('branch' => 'lamami', 'id' => $row['id'] ?? ''),
             true
         );
@@ -3060,7 +3105,7 @@ function avisos_generate_overdue_interesadas_all() {
             'jostal_interesada_' . ($row['id'] ?? ''),
             'Interesada de Jostal sin convertir > 2 días',
             'La interesada Jostal ' . ($row['telefono'] ?? 'sin teléfono') . ' lleva más de ' . $daysLimit . ' días sin pasar a clienta.',
-            'alta',
+            'media',
             array('branch' => 'jostal', 'id' => $row['id'] ?? ''),
             true
         );
@@ -3077,10 +3122,472 @@ function avisos_generate_overdue_interesadas_all() {
             'casawasap_interesado_' . ($row['id'] ?? ''),
             'Interesado de Casawasap sin convertir > 2 días',
             'El interesado Casawasap ' . ($row['telefono'] ?? 'sin teléfono') . ' lleva más de ' . $daysLimit . ' días sin pasar a cliente.',
-            'alta',
+            'media',
             array('branch' => 'casawasap', 'id' => $row['id'] ?? ''),
             true
         );
+    }
+
+    return $generated;
+}
+
+// ── OPS: salud de líneas, backup y saldos de IA ──────────────────────────────
+
+function aviso_ops_line_states() {
+    $lines = array();
+    if (!function_exists('comercial_list_lines')) return $lines;
+    foreach ((array)comercial_list_lines() as $line) {
+        if (!is_array($line)) continue;
+        if (trim((string)($line['id'] ?? '')) === '') continue;
+        if (trim((string)($line['waha_port'] ?? '')) === '') continue;
+        $lines[] = $line;
+    }
+    return $lines;
+}
+
+function avisos_generate_line_ban() {
+    $generated = array();
+    $now = time();
+    foreach (aviso_ops_line_states() as $line) {
+        $state = isset($line['comercial_state']) && is_array($line['comercial_state']) ? $line['comercial_state'] : array();
+        $banAt = trim((string)($state['last_ban_at'] ?? ''));
+        if ($banAt === '') continue;
+        $ts = strtotime($banAt);
+        if (!$ts || ($now - $ts) > 24 * 3600) continue;
+
+        $name = trim((string)($line['nombre'] ?? ''));
+        $phone = comercial_only_digits((string)($line['tfono'] ?? ''));
+        $generated[] = aviso_make(
+            'ops',
+            'line_ban_' . ($line['id'] ?? '') . '_' . date('Y-m-d'),
+            'Línea de WhatsApp baneada',
+            'La línea ' . ($name !== '' ? $name . ' (' . $phone . ')' : $phone) . ' ha sido marcada como baneada (' . $banAt . '). Revisa si deja de enviar mensajes.',
+            'alta',
+            array('line_id' => $line['id'] ?? '', 'line_name' => $name, 'line_phone' => $phone, 'kind' => 'line_ban'),
+            true
+        );
+    }
+    return $generated;
+}
+
+function avisos_generate_line_send_failures() {
+    $generated = array();
+    foreach (aviso_ops_line_states() as $line) {
+        $state = isset($line['comercial_state']) && is_array($line['comercial_state']) ? $line['comercial_state'] : array();
+        $failures = (int)($state['consecutive_failures'] ?? 0);
+        if ($failures < 3) continue;
+
+        $name = trim((string)($line['nombre'] ?? ''));
+        $phone = comercial_only_digits((string)($line['tfono'] ?? ''));
+        $lastError = trim((string)($state['last_error'] ?? ''));
+        $generated[] = aviso_make(
+            'ops',
+            'line_send_failures_' . ($line['id'] ?? '') . '_' . date('Y-m-d'),
+            'Envíos fallando de forma recurrente en una línea',
+            'La línea ' . ($name !== '' ? $name . ' (' . $phone . ')' : $phone) . ' acumula ' . $failures . ' fallos consecutivos de envío.' . ($lastError !== '' ? ' Último error: ' . $lastError : ''),
+            'alta',
+            array('line_id' => $line['id'] ?? '', 'line_name' => $name, 'line_phone' => $phone, 'consecutive_failures' => $failures, 'kind' => 'send_failures'),
+            true
+        );
+    }
+    return $generated;
+}
+
+function avisos_generate_waha_down() {
+    $generated = array();
+    $now = time();
+    foreach (aviso_ops_line_states() as $line) {
+        $state = isset($line['comercial_state']) && is_array($line['comercial_state']) ? $line['comercial_state'] : array();
+        $health = trim((string)($state['health_status'] ?? ''));
+        if (!in_array($health, array('down', 'starting'), true)) continue;
+
+        // Solo avisa si la línea llegó a estar sana recientemente (evita avisar
+        // cada día de líneas crónicamente apagadas o fuera de uso).
+        $lastOkAt = trim((string)($state['last_health_ok_at'] ?? ''));
+        if ($lastOkAt === '') continue;
+        $lastOkTs = strtotime($lastOkAt);
+        if (!$lastOkTs || ($now - $lastOkTs) > 48 * 3600) continue;
+
+        // Solo avisa si el último chequeo es reciente (evita estados viejos)
+        $checkAt = trim((string)($state['last_health_check_at'] ?? ''));
+        $ts = $checkAt !== '' ? strtotime($checkAt) : 0;
+        if (!$ts || ($now - $ts) > 6 * 3600) continue;
+
+        $name = trim((string)($line['nombre'] ?? ''));
+        $phone = comercial_only_digits((string)($line['tfono'] ?? ''));
+        $generated[] = aviso_make(
+            'ops',
+            'waha_down_' . ($line['id'] ?? '') . '_' . date('Y-m-d'),
+            'Sesión de WhatsApp caída',
+            'La sesión WAHA de la línea ' . ($name !== '' ? $name . ' (' . $phone . ')' : $phone) . ' está en estado ' . strtoupper($health) . '. El bot o la línea puede haber dejado de responder.',
+            'alta',
+            array('line_id' => $line['id'] ?? '', 'line_name' => $name, 'line_phone' => $phone, 'health_status' => $health, 'kind' => 'waha_down'),
+            true
+        );
+    }
+    return $generated;
+}
+
+function avisos_generate_backup_failed() {
+    $generated = array();
+    $logFile = DATA_PATH . '/cron_backup.log';
+    if (!is_file($logFile)) return $generated;
+
+    $raw = @file_get_contents($logFile);
+    if ($raw === false || trim($raw) === '') return $generated;
+
+    $lastOkTs = 0;
+    foreach (preg_split('/\r\n|\r|\n/', $raw) as $line) {
+        if (strpos($line, 'Backup finalizado') === false) continue;
+        if (preg_match('/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]/', $line, $m)) {
+            $ts = strtotime($m[1]);
+            if ($ts) $lastOkTs = max($lastOkTs, $ts);
+        }
+    }
+
+    if ($lastOkTs > 0 && (time() - $lastOkTs) < 3 * 3600) return $generated;
+
+    $generated[] = aviso_make(
+        'ops',
+        'backup_failed_' . date('Y-m-d'),
+        'Backup automático sin completar',
+        'No se detecta un backup completado en las últimas horas (' . ($lastOkTs > 0 ? 'último: ' . date('d/m/Y H:i', $lastOkTs) : 'sin registro en el log') . '). Revisa el cron de respaldo.',
+        'alta',
+        array('last_ok_at' => $lastOkTs > 0 ? date('Y-m-d H:i:s', $lastOkTs) : '', 'kind' => 'backup_failed'),
+        true
+    );
+
+    return $generated;
+}
+
+function aviso_llm_api_key_for_deepseek() {
+    $key = trim((string)getenv('PUBLICISTA_COPY_API_KEY'));
+    if ($key === '') {
+        $settings = storage_read('settings.json');
+        $key = trim((string)($settings['publicista_copy_api_key'] ?? ''));
+    }
+    return $key;
+}
+
+function aviso_llm_api_key_for_openai() {
+    $key = trim((string)getenv('OPENAI_API_KEY'));
+    if ($key === '') {
+        $settings = storage_read('settings.json');
+        $key = trim((string)($settings['voice_ai_api_key'] ?? ''));
+    }
+    return $key;
+}
+
+function aviso_llm_throttle_should_run($key, $intervalSec) {
+    $path = DATA_PATH . '/avisos_llm_check_state.json';
+    $state = array();
+    if (is_file($path)) {
+        $raw = @file_get_contents($path);
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) $state = $decoded;
+    }
+    $last = isset($state[$key]) ? (int)$state[$key] : 0;
+    if ($last > 0 && (time() - $last) < (int)$intervalSec) return false;
+    $state[$key] = time();
+    @file_put_contents($path, json_encode($state), LOCK_EX);
+    return true;
+}
+
+function avisos_generate_deepseek_balance() {
+    $generated = array();
+    // Throttle: no consultar el saldo cada minuto; basta cada 6 horas.
+    if (!aviso_llm_throttle_should_run('deepseek_balance', 6 * 3600)) return $generated;
+    $key = aviso_llm_api_key_for_deepseek();
+    if ($key === '') return $generated;
+
+    $ch = curl_init('https://api.deepseek.com/user/balance');
+    curl_setopt_array($ch, array(
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => array('Authorization: Bearer ' . $key, 'Accept: application/json'),
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_CONNECTTIMEOUT => 10,
+    ));
+    $body = curl_exec($ch);
+    $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($body === false || $http === 0) return $generated; // error de red: reintento en el próximo cron
+
+    $data = json_decode($body, true);
+    if (!is_array($data)) return $generated;
+
+    if ($http !== 200) {
+        $msg = trim((string)($data['error']['message'] ?? ($data['message'] ?? '')));
+        $generated[] = aviso_make(
+            'ops',
+            'deepseek_balance_error_' . date('Y-m-d'),
+            'DeepSeek: error de saldo/API',
+            'No se pudo consultar el saldo de DeepSeek (HTTP ' . $http . ').' . ($msg !== '' ? ' ' . $msg : '') . ' El bot-casa y el comercial podrían estar sin créditos.',
+            'alta',
+            array('http_code' => $http, 'error' => $msg, 'kind' => 'llm_balance'),
+            true
+        );
+        return $generated;
+    }
+
+    $available = !empty($data['is_available']);
+    $infos = isset($data['balance_infos']) && is_array($data['balance_infos']) ? $data['balance_infos'] : array();
+    $usd = null;
+    foreach ($infos as $info) {
+        if (!is_array($info)) continue;
+        $currency = trim((string)($info['currency'] ?? ''));
+        $total = (float)($info['total_balance'] ?? 0);
+        if ($currency === 'USD') {
+            $usd = $total;
+            break;
+        }
+        if ($usd === null) $usd = $total; // fallback a la primera divisa
+    }
+
+    if (!$available || ($usd !== null && $usd <= 0.0)) {
+        $generated[] = aviso_make(
+            'ops',
+            'deepseek_balance_low_' . date('Y-m-d'),
+            'DeepSeek: saldo agotado',
+            'La cuenta de DeepSeek no tiene saldo disponible' . ($usd !== null ? ' (saldo: $' . number_format($usd, 2) . ')' : '') . '. El bot-casa y el comercial dejarán de responder.',
+            'alta',
+            array('available' => $available, 'balance_usd' => $usd, 'kind' => 'llm_balance'),
+            true
+        );
+    }
+
+    return $generated;
+}
+
+function avisos_generate_openai_balance() {
+    $generated = array();
+    // Throttle: no consultar el saldo cada minuto; basta cada 6 horas.
+    if (!aviso_llm_throttle_should_run('openai_balance', 6 * 3600)) return $generated;
+    $key = aviso_llm_api_key_for_openai();
+    if ($key === '') return $generated;
+
+    // Best-effort: el endpoint de billing de OpenAI no está disponible en todas las cuentas.
+    $ch = curl_init('https://api.openai.com/v1/dashboard/billing/credit_grants');
+    curl_setopt_array($ch, array(
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => array('Authorization: Bearer ' . $key, 'Accept: application/json'),
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_CONNECTTIMEOUT => 10,
+    ));
+    $body = curl_exec($ch);
+    $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($body === false || $http === 0) return $generated;
+
+    $data = json_decode($body, true);
+    if (!is_array($data)) return $generated;
+
+    if ($http === 200) {
+        $totalGranted = (float)($data['total_granted'] ?? 0);
+        $totalUsed = (float)($data['total_used'] ?? 0);
+        $remaining = $totalGranted - $totalUsed;
+        if ($remaining <= 0.0) {
+            $generated[] = aviso_make(
+                'ops',
+                'openai_balance_low_' . date('Y-m-d'),
+                'OpenAI: saldo agotado',
+                'La cuenta de OpenAI no tiene saldo restante. El publicista y la generación de textos dejarán de funcionar.',
+                'alta',
+                array('remaining' => $remaining, 'kind' => 'llm_balance'),
+                true
+            );
+        }
+    }
+    // Otros códigos (401/403 por permisos de billing) se ignoran para no generar ruido.
+
+    return $generated;
+}
+
+// ── Puentes bot-casa → CRM (solo lectura) ────────────────────────────────────
+
+function aviso_botcasa_base_dir() {
+    return BASE_PATH . '/bot-casa/data';
+}
+
+function aviso_botcasa_read_json($relPath) {
+    $path = aviso_botcasa_base_dir() . '/' . ltrim($relPath, '/');
+    if (!is_file($path)) return null;
+    $raw = @file_get_contents($path);
+    if ($raw === false) return null;
+    $data = json_decode($raw, true);
+    return is_array($data) ? $data : null;
+}
+
+function aviso_botcasa_read_ndjson($relPath, $limit = 200) {
+    $path = aviso_botcasa_base_dir() . '/' . ltrim($relPath, '/');
+    if (!is_file($path)) return array();
+    $raw = @file_get_contents($path);
+    if ($raw === false) return array();
+    $out = array();
+    $lines = preg_split('/\r\n|\r|\n/', $raw);
+    $lines = array_slice($lines, -max(1, (int)$limit));
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '') continue;
+        $row = json_decode($line, true);
+        if (is_array($row)) $out[] = $row;
+    }
+    return $out;
+}
+
+function avisos_generate_botcasa_paypal() {
+    $generated = array();
+    $usersData = aviso_botcasa_read_json('users.json');
+    $users = isset($usersData['users']) && is_array($usersData['users']) ? $usersData['users'] : array();
+    $now = time();
+
+    foreach ($users as $user) {
+        if (!is_array($user)) continue;
+        $userId = trim((string)($user['id'] ?? ''));
+        $payments = isset($user['payments']) && is_array($user['payments']) ? $user['payments'] : array();
+        foreach ($payments as $pay) {
+            if (!is_array($pay)) continue;
+            if (trim((string)($pay['gateway'] ?? '')) !== 'paypal') continue;
+            $txnId = trim((string)($pay['transaction_id'] ?? ''));
+            $date = trim((string)($pay['date'] ?? ''));
+            $ts = $date !== '' ? strtotime($date) : 0;
+            if (!$ts || ($now - $ts) > 24 * 3600) continue;
+
+            $key = $txnId !== '' ? $txnId : ('u' . $userId . '_p' . ($pay['id'] ?? ''));
+            if (aviso_exists_any_status('botcasa', 'paypal_' . $key)) continue;
+
+            $amount = (float)($pay['amount'] ?? 0);
+            $name = trim((string)($user['name'] ?? ($user['username'] ?? '')));
+            $generated[] = aviso_make(
+                'botcasa',
+                'paypal_' . $key,
+                'Pago PayPal recibido (bot-casa)',
+                'Se ha registrado un pago PayPal de ' . euro($amount) . ' para ' . ($name !== '' ? $name : ('usuario ' . $userId)) . '.',
+                'alta',
+                array('user_id' => $userId, 'amount' => $amount, 'transaction_id' => $txnId, 'kind' => 'paypal'),
+                true
+            );
+        }
+    }
+
+    return $generated;
+}
+
+function avisos_generate_botcasa_lead() {
+    $generated = array();
+    $now = time();
+    $usersDir = aviso_botcasa_base_dir() . '/users';
+    if (!is_dir($usersDir)) return $generated;
+
+    foreach (glob($usersDir . '/*', GLOB_ONLYDIR) as $userDir) {
+        $leadsFile = $userDir . '/leads.ndjson';
+        if (!is_file($leadsFile)) continue;
+        $leads = aviso_botcasa_read_ndjson('users/' . basename($userDir) . '/leads.ndjson');
+        foreach ($leads as $lead) {
+            $threadId = trim((string)($lead['thread_id'] ?? ''));
+            if ($threadId === '') continue;
+            $ts = strtotime((string)($lead['ts'] ?? ''));
+            if (!$ts || ($now - $ts) > 24 * 3600) continue;
+            if (aviso_exists_any_status('botcasa', 'lead_' . md5($threadId))) continue;
+
+            $phone = preg_replace('/[^0-9]/', '', (string)($lead['phone'] ?? ''));
+            $girl = trim((string)($lead['selected_girl_name'] ?? ''));
+            $line = trim((string)($lead['line_label'] ?? ''));
+            $eta = (int)($lead['eta_minutes'] ?? 0);
+            $conf = (float)($lead['lead_confidence'] ?? 0);
+            $confPct = $conf > 0 ? round($conf * 100) : 0;
+            $msg = trim((string)($lead['user_message'] ?? ($lead['message_text'] ?? '')));
+
+            $detail = '';
+            $head = '📱 ' . ($phone !== '' ? $phone : '?');
+            if ($girl !== '') $head .= ' · 👤 ' . $girl;
+            if ($line !== '') $head .= ' · 📍 ' . $line;
+            $detail .= $head . "\n";
+            $meta = array();
+            if ($confPct > 0) $meta[] = '🎯 Confianza ' . $confPct . '%';
+            if ($eta > 0) $meta[] = '⏱ ETA ' . $eta . ' min';
+            if (!empty($meta)) $detail .= implode(' · ', $meta) . "\n";
+            if ($msg !== '') $detail .= '💬 "' . mb_substr($msg, 0, 120, 'UTF-8') . '"';
+
+            $generated[] = aviso_make(
+                'botcasa',
+                'lead_' . md5($threadId),
+                'Lead bot-casa',
+                $detail,
+                'alta',
+                array('thread_id' => $threadId, 'phone' => $phone, 'kind' => 'lead'),
+                true
+            );
+        }
+    }
+
+    return $generated;
+}
+
+function avisos_generate_botcasa_new_user() {
+    $generated = array();
+    $usersData = aviso_botcasa_read_json('users.json');
+    $users = isset($usersData['users']) && is_array($usersData['users']) ? $usersData['users'] : array();
+    $now = time();
+
+    foreach ($users as $user) {
+        if (!is_array($user)) continue;
+        $userId = trim((string)($user['id'] ?? ''));
+        if ($userId === '') continue;
+        $createdAt = trim((string)($user['created_at'] ?? ''));
+        $ts = $createdAt !== '' ? strtotime($createdAt) : 0;
+        if (!$ts || ($now - $ts) > 24 * 3600) continue;
+        if (aviso_exists_any_status('botcasa', 'newuser_' . $userId)) continue;
+
+        $name = trim((string)($user['name'] ?? ($user['username'] ?? '')));
+        $generated[] = aviso_make(
+            'botcasa',
+            'newuser_' . $userId,
+            'Nueva alta en bot-casa',
+            'Se ha registrado un nuevo usuario en bot-casa: ' . ($name !== '' ? $name : ('usuario ' . $userId)) . '.',
+            'alta',
+            array('user_id' => $userId, 'name' => $name, 'kind' => 'new_user'),
+            true
+        );
+    }
+
+    return $generated;
+}
+
+function avisos_generate_botcasa_reminder() {
+    $generated = array();
+    $now = time();
+    $usersDir = aviso_botcasa_base_dir() . '/users';
+    if (!is_dir($usersDir)) return $generated;
+
+    foreach (glob($usersDir . '/*', GLOB_ONLYDIR) as $userDir) {
+        $remindersFile = $userDir . '/reminders_pending.ndjson';
+        if (!is_file($remindersFile)) continue;
+        $reminders = aviso_botcasa_read_ndjson('users/' . basename($userDir) . '/reminders_pending.ndjson');
+        foreach ($reminders as $rem) {
+            $threadId = trim((string)($rem['thread_id'] ?? ''));
+            $tsCreated = trim((string)($rem['ts_created'] ?? ''));
+            $ts = $tsCreated !== '' ? strtotime($tsCreated) : 0;
+            if (!$ts || ($now - $ts) > 24 * 3600) continue;
+
+            $key = md5(($threadId !== '' ? $threadId : '') . '|' . $tsCreated);
+            if (aviso_exists_any_status('botcasa', 'reminder_' . $key)) continue;
+
+            $phone = preg_replace('/[^0-9]/', '', (string)($rem['phone'] ?? ''));
+            $eta = (int)($rem['eta_minutes'] ?? 0);
+            $line = trim((string)($rem['line_label'] ?? ''));
+
+            $generated[] = aviso_make(
+                'botcasa',
+                'reminder_' . $key,
+                'Visita en camino (bot-casa)',
+                'Cliente en camino' . ($phone !== '' ? ' 📞 ' . $phone : '') . ($line !== '' ? ' 📍 ' . $line : '') . ($eta > 0 ? ' ⏱ llega en ~' . $eta . ' min' : '') . '.',
+                'alta',
+                array('phone' => $phone, 'eta_minutes' => $eta, 'kind' => 'reminder'),
+                true
+            );
+        }
     }
 
     return $generated;
@@ -3235,6 +3742,39 @@ function avisos_run_all_generators($sendWhatsapp = true) {
         $sendWhatsapp,
         $runId
     );
+
+    // ── OPS: salud de líneas, backup y saldos de IA ──
+    $allStats[] = avisos_sync_generated(
+        array_merge(
+            avisos_generate_line_ban(),
+            avisos_generate_line_send_failures(),
+            avisos_generate_waha_down(),
+            avisos_generate_backup_failed(),
+            avisos_generate_deepseek_balance(),
+            avisos_generate_openai_balance()
+        ),
+        'ops',
+        $sendWhatsapp,
+        $runId
+    );
+
+    // ── Puentes bot-casa → CRM ──
+    $allStats[] = avisos_sync_generated(
+        array_merge(
+            avisos_generate_botcasa_paypal(),
+            avisos_generate_botcasa_lead(),
+            avisos_generate_botcasa_new_user(),
+            avisos_generate_botcasa_reminder()
+        ),
+        'botcasa',
+        $sendWhatsapp,
+        $runId
+    );
+
+    // ── Pollo.ai: aviso de cuentas sin créditos (comprobación periódica) ──
+    if (function_exists('publicista_pollo_check_and_alert')) {
+        publicista_pollo_check_and_alert();
+    }
 
     if ($sendWhatsapp && aviso_noise_profile() !== 'agresivo') {
         $allStats[] = avisos_retry_pending_whatsapp();

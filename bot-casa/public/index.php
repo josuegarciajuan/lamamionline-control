@@ -303,6 +303,18 @@ try {
             }
             break;
 
+        // ── GET|POST /chat → chat operador (open access) ──────
+        case ($method === 'GET' || $method === 'POST') && $uri === '/chat':
+            $chatPath = WASAPBOT_ROOT . '/public/chat.php';
+            if (file_exists($chatPath)) {
+                require $chatPath;
+            } else {
+                http_response_code(503);
+                header('Content-Type: text/html; charset=utf-8');
+                echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>503</title></head><body style="background:#080d17;color:#f0f3fa;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><div style="text-align:center"><h1 style="color:#f59e0b">503</h1><p>Chat Operador no disponible.</p></div></body></html>';
+            }
+            break;
+
         // ── GET|POST /pago → payment page ──────────────────────
         case ($method === 'GET' || $method === 'POST') && $uri === '/pago':
             if (!botcasa_is_authenticated()) {
@@ -324,11 +336,12 @@ try {
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode([
                 'status'  => 'error',
-                'message' => 'Not found. Available: POST /webhook, GET /panel, GET /cliente, GET /login, GET /health, GET /info',
+                'message' => 'Not found. Available: POST /webhook, GET /panel, GET /cliente, GET /chat, GET /login, GET /health, GET /info',
                 'routes'  => [
                     'POST /webhook'             => 'WAHA webhook handler',
                     'GET  /panel'               => 'Admin panel',
                     'GET  /cliente'             => 'Client panel',
+                    'GET  /chat'                => 'Chat Operador (PWA)',
                     'GET  /pago'                => 'Payment page',
                     'GET  /login'               => 'Login page',
                     'GET  /health'              => 'Health check',

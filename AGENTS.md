@@ -18,6 +18,17 @@ Aplicación de gestión.
   - Son la misma herramienta con 2 UIs. Prohibido desarrollar para uno solo.
   - Excepciones: gestión de usuarios y API keys (solo admin), wizard onboarding (solo cliente).
 
+## Terminología de apps (para interpretar prompts)
+
+- **"bot comercial"** (también "botcomercial", "inbox comercial") → el archivo `inbox.php`.
+- **"bot-casa"** (también "superwasap", "CasaWasap") → la app en `bot-casa/`.
+
+Ambas son apps/PWA pensadas para instalarse en Android. Cuando se haga referencia a
+**una de estas 2 apps**, se refiere a la vez a:
+1. el **algoritmo de respuestas automáticas** (backend/engine), y
+2. la **interfaz/app** (Android), donde se ve el **listado de todas las líneas
+   vinculadas a ese bot y sus conversaciones**.
+
 ## Validación
 - Ejecuta lint si existe.
 - Ejecuta tests relevantes si existen.
@@ -25,6 +36,8 @@ Aplicación de gestión.
 
 ## Done when
 No des la tarea por terminada hasta que el comportamiento pedido funcione y los checks relevantes estén revisados.
+
+- **bot-casa gate de tests:** cualquier cambio en `bot-casa/` que afecte al pipeline de respuesta debe pasar `composer test` y `composer phpstan` en verde (ejecutar desde `bot-casa/`). Si no hay tests que cubran el punto afectado, créalos como parte del cambio.
 
 ## Proyecto
 
@@ -46,6 +59,25 @@ Ambas rutas apuntan al mismo código.
 - No usar `chmod -R 777` salvo instrucción explícita.
 - No modificar configuraciones globales del servidor sin confirmación.
 - No tocar `/etc`, `/root`, `/var/www/html` fuera de este proyecto ni servicios del sistema salvo que se pida expresamente.
+
+## 🌐 Versión de Chrome objetivo
+
+- El WebView del dispositivo Lite (coche) es **Chrome 95.0.4638.74** (Android 8.1).
+- Esta versión soporta prácticamente todas las features modernas de JS y CSS.
+  Ver `specs/09-lite-device-specs.md` para las restricciones completas (hardware).
+
+## ⛔ LITE CRM — Restricciones de hardware
+
+Cada vez que se modifique código que afecte a la versión Lite del CRM
+(`?lite=1`, `.is-lite`, `lite.css`), DEBE consultarse `specs/09-lite-device-specs.md`:
+
+- **RAM**: 2 GB total, WebView ~300-500 MB disponibles
+- **SoC**: Rockchip RK3566 / ARM (sin GPU potente)
+- **Pantalla**: Táctil 1024×600 landscape (montaje en coche)
+- **Rendimiento**: máximo 2 charts Chart.js simultáneos; el dashboard lite NO carga Chart.js
+- **CSS**: archivo bajo 10K líneas (lite.css actual ~8K)
+- **Animaciones**: solo `opacity` y `transform` (GPU-accelerated); `.is-lite *` fuerza `animation-duration: 0.01ms`
+- **GPS**: intervalo 90s, threshold 20m, `enableHighAccuracy: true`
 
 ## ⛔ Protección de datos de producción
 

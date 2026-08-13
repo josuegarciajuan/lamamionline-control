@@ -326,6 +326,22 @@
     color: var(--text-muted);
     white-space: nowrap;
 }
+/* Inline timestamp next to conversation name (forced visibility) */
+.chat-conv-time-inline {
+    font-size: .68rem;
+    color: var(--accent);
+    margin-left: 8px;
+    font-weight: 400;
+    white-space: nowrap;
+}
+/* Inline timestamp next to line name */
+.chat-line-time {
+    font-size: .65rem;
+    color: var(--accent);
+    margin-left: 6px;
+    font-weight: 400;
+    white-space: nowrap;
+}
 .chat-conv-paused {
     font-size: .68rem;
     color: var(--warn);
@@ -1241,6 +1257,20 @@
         color: #667781;
         white-space: nowrap;
         line-height: 1;
+    }
+    .chat-conv-time-inline {
+        font-size: .72rem;
+        color: #25D366;
+        margin-left: 6px;
+        font-weight: 400;
+        white-space: nowrap;
+    }
+    .chat-line-time {
+        font-size: .68rem;
+        color: #25D366;
+        margin-left: 6px;
+        font-weight: 400;
+        white-space: nowrap;
     }
     .chat-conv-paused {
         font-size: .7rem;

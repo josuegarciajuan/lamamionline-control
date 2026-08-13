@@ -25,6 +25,7 @@ var ChatApp = (function() {
         lastMsgCount: 0,     // for detecting new messages
         linesSummary: {},    // { lineLast9: { total_convos, total_unread } } — badge data
         _readTimestamps: {}, // { thread_id: Date.now() } — local mark_read timestamps for race-condition protection
+        _renderedCount: 0,   // how many messages are currently in the DOM (for incremental render)
         // Photo picker state
         photoPicker: {
             overlay: null,
@@ -143,7 +144,24 @@ var ChatApp = (function() {
         try {
             var d = new Date(ts);
             if (isNaN(d.getTime())) return '';
-            return d.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+            var now = new Date();
+            var diffMs = now - d;
+            var diffHours = diffMs / 3600000;
+
+            // Recent (<2h): show time only
+            if (diffHours < 2) {
+                return d.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+            }
+
+            // Older: show date + time to avoid confusion
+            var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            var msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            var dayDiff = Math.round((today - msgDay) / 86400000);
+
+            var timePart = d.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+            if (dayDiff === 0) return timePart;                          // hoy → "11:42"
+            if (dayDiff === 1) return 'Ayer ' + timePart;                // ayer → "Ayer 11:42"
+            return d.toLocaleDateString('es-ES', {day:'2-digit', month:'2-digit'}) + ' ' + timePart; // "25/06 11:42"
         } catch(e) {
             return '';
         }
@@ -483,6 +501,9 @@ var ChatApp = (function() {
             state.lines = d.lines;
             renderLineList();
 
+            // Load conversations lazily: only when user expands a line.
+            // No auto-expand — chat opens clean, no conversation preselected.
+
             // Also fetch WAHA statuses for live indicators
             _fetch(apiUrl('api/lines.php?action=status'))
             .then(function(r2) { return r2.json(); })
@@ -563,7 +584,7 @@ var ChatApp = (function() {
                 var readByLine = {};
                 for (var tid in state._readTimestamps) {
                     if (state._readTimestamps.hasOwnProperty(tid)) {
-                        if (now - state._readTimestamps[tid] < 30000) {
+                        if (now - state._readTimestamps[tid] < 15000) {
                             var pos = tid.indexOf('_');
                             var lineId = (pos !== -1) ? tid.substring(0, pos) : '';
                             if (lineId) {
@@ -637,10 +658,21 @@ var ChatApp = (function() {
                 badgeHtml = '<span class="chat-line-badges">' + badgeHtml + '</span>';
             }
 
+            // ── Timestamp for this line: max last_ts across its conversations ──
+            var convsForLineTs = state.conversations[last9] || [];
+            var lineLastTs = '';
+            for (var ci = 0; ci < convsForLineTs.length; ci++) {
+                var cts = convsForLineTs[ci].last_ts || '';
+                if (cts > lineLastTs) lineLastTs = cts;
+            }
+            var lineTime = formatTime(lineLastTs);
+
             html += '<div class="chat-line-row' + (isExpanded ? ' expanded' : '') + '" data-line="' + esc(last9) + '" onclick="ChatApp.toggleLine(\'' + esc(last9) + '\')">' +
                 '<span class="chat-line-dot ' + dotClass + '" title="' + esc(statusLabel || liveSt) + '"></span>' +
                 '<div class="chat-line-info">' +
-                    '<div class="chat-line-name">' + esc(label) + '</div>' +
+                    '<div class="chat-line-name">' + esc(label) +
+                        (lineTime ? '<span class="chat-line-time">' + esc(lineTime) + '</span>' : '') +
+                    '</div>' +
                     '<div class="chat-line-phone">' + esc(formatPhone(phone)) + '</div>' +
                 '</div>' +
                 badgeHtml +
@@ -662,15 +694,19 @@ var ChatApp = (function() {
                     if (preview.length > 40) preview = preview.slice(0, 40) + '...';
                     var time = formatTime(c.last_ts);
                     var isPaused = state.convPause[c.thread_id];
+                    // Forced fallback: show time or "--:--" so it's never invisible
+                    var displayTime = time || '--:--';
 
                     html += '<div class="chat-conv-row' + (isActiveConv ? ' active' : '') + '" data-thread="' + esc(c.thread_id) + '" onclick="event.stopPropagation(); ChatApp.openConversation(\'' + esc(c.thread_id) + '\', \'' + esc(convPhone) + '\')">' +
                         '<div class="chat-conv-avatar">' + esc(getInitial(convPhone)) + '</div>' +
                         '<div class="chat-conv-info">' +
-                            '<div class="chat-conv-name">' + esc(convName) + '</div>' +
+                            '<div class="chat-conv-name">' + esc(convName) +
+                                '<span class="chat-conv-time-inline">' + esc(displayTime) + '</span>' +
+                            '</div>' +
                             '<div class="chat-conv-preview">' + esc(preview) + '</div>' +
                         '</div>' +
                     '<div class="chat-conv-meta">' +
-                        '<span class="chat-conv-time">' + esc(time) + '</span>' +
+                        '<span class="chat-conv-time">' + esc(displayTime) + '</span>' +
                         (c.unread > 0 ? '<span class="chat-conv-badge-unread">' + c.unread + '</span>' : '') +
                         (isPaused ? '<span class="chat-conv-paused" title="Bot pausado">⏸</span>' : '') +
                     '</div>' +
@@ -724,6 +760,7 @@ var ChatApp = (function() {
     function openConversation(threadId, phone) {
         state.activeThread = threadId;
         state.lastMsgCount = 0; // Reset for polling
+        state._renderedCount = 0; // Force full re-render for new thread
 
         // ── Clear unread badges LOCALLY before rendering ──
         // This makes the badge disappear instantly (not waiting for server POST).
@@ -795,6 +832,8 @@ var ChatApp = (function() {
         _fetch(apiUrl('api/mensajes.php?action=conversation&thread_id=' + encodeURIComponent(threadId)))
         .then(function(r) { return r.json(); })
         .then(function(d) {
+            // Guard: if user switched thread while fetching, discard this response
+            if (state.activeThread !== threadId) return;
             if (!d.ok) {
                 msgArea.innerHTML = '<div class="chat-error">Error al cargar conversación</div>';
                 return;
@@ -803,6 +842,8 @@ var ChatApp = (function() {
             state.lastMsgCount = conv.length;
             renderMessages(conv);
         }).catch(function() {
+            // Guard: if user switched thread, don't show error for old thread
+            if (state.activeThread !== threadId) return;
             msgArea.innerHTML = '<div class="chat-error">Error de conexión</div>';
         });
     }
@@ -818,6 +859,7 @@ var ChatApp = (function() {
                     '<div class="chat-empty-title">Sin mensajes</div>' +
                     '<div class="chat-empty-subtitle">Esta conversación aún no tiene mensajes registrados.</div>' +
                 '</div>';
+            state._renderedCount = 0;
             return;
         }
 
@@ -826,20 +868,15 @@ var ChatApp = (function() {
             return (a.ts || '').localeCompare(b.ts || '');
         });
 
-        // Dedup: skip duplicate records
-        // (a) _pending record with a full version later (same user_msg + bot_reply) → skip
-        // (b) duplicate consecutive _pending records (same user_msg) → skip second
-        // (c) duplicate full records (same user_msg + bot_reply + ts) → skip second
+        // Dedup: skip duplicate records (same logic as before)
         var deduped = [];
-        var seenPending = {};   // track _pending user_msgs already emitted
-        var seenFull = {};      // track full records already emitted (key: user_msg|bot_reply|ts)
+        var seenPending = {};
+        var seenFull = {};
         for (var i = 0; i < conversation.length; i++) {
             var m = conversation[i];
             var umsg = (m.user_msg || '').trim();
             var breply = (m.bot_reply || '').trim();
             if (umsg && !breply && m._pending) {
-                // (a) skip if a full record containing this user_msg exists later
-                //     (uses indexOf to handle coalesced messages like "msg1 | msg2")
                 var skip = false;
                 for (var j = i + 1; j < conversation.length; j++) {
                     var nxt = conversation[j];
@@ -849,11 +886,20 @@ var ChatApp = (function() {
                     }
                 }
                 if (skip) continue;
-                // (b) skip duplicate _pending with same user_msg already emitted
                 if (seenPending[umsg]) continue;
                 seenPending[umsg] = true;
             }
-            // (c) skip duplicate full records
+            if (umsg && !breply && !m._pending) {
+                var skipIncomplete = false;
+                for (var j = i + 1; j < conversation.length; j++) {
+                    var nxt2 = conversation[j];
+                    if ((nxt2.user_msg || '').indexOf(umsg) !== -1 && (nxt2.bot_reply || '').trim()) {
+                        skipIncomplete = true;
+                        break;
+                    }
+                }
+                if (skipIncomplete) continue;
+            }
             if (umsg || breply) {
                 var key = umsg + '|' + breply + '|' + (m.ts || '');
                 if (seenFull[key]) continue;
@@ -863,15 +909,29 @@ var ChatApp = (function() {
         }
         conversation = deduped;
 
-        var html = '';
-        var lastDate = '';
+        // ── Incremental rendering instead of full innerHTML replace ──
+        var prevCount = state._renderedCount || 0;
+        var totalCount = conversation.length;
 
-        for (var i = 0; i < conversation.length; i++) {
+        // If thread changed or first render → full rebuild needed
+        if (prevCount === 0 || totalCount < prevCount) {
+            msgArea.innerHTML = '';
+            state._renderedCount = 0;
+            prevCount = 0;
+        }
+
+        // Determine if user is scrolled near bottom (≤ 120px from bottom)
+        var wasAtBottom = (msgArea.scrollHeight - msgArea.scrollTop - msgArea.clientHeight) <= 120;
+
+        // Render only new messages (or all if full rebuild)
+        var lastDate = '';
+        var html = '';
+        for (var i = prevCount; i < totalCount; i++) {
             var msg = conversation[i];
             var ts = msg.ts || '';
             var dk = dateKey(ts);
 
-            // Date separator
+            // Date separator — only add if different from last one already shown
             if (dk !== lastDate && ts) {
                 html += '<div class="chat-date-sep"><span>' + esc(formatDate(ts)) + '</span></div>';
                 lastDate = dk;
@@ -880,7 +940,6 @@ var ChatApp = (function() {
             var userMsg = (msg.user_msg || '').trim();
             var botMsg = (msg.bot_reply || '').trim();
 
-            // User message
             if (userMsg) {
                 html += '<div class="chat-msg user">' +
                     '<div class="bubble">' +
@@ -890,7 +949,6 @@ var ChatApp = (function() {
                 '</div>';
             }
 
-            // Bot reply
             if (botMsg) {
                 html += '<div class="chat-msg bot">' +
                     '<div class="bubble">' +
@@ -903,19 +961,31 @@ var ChatApp = (function() {
                 '</div>';
             }
 
-            // If neither, show as system message if there's raw content
             if (!userMsg && !botMsg && msg.raw) {
                 html += '<div class="chat-msg-system"><div class="system-text">' + esc((msg.raw || '').slice(0, 100)) + '</div></div>';
             }
         }
 
+        // Append new messages (or set if first render)
+        if (prevCount === 0) {
+            msgArea.innerHTML = html;
+        } else if (html) {
+            msgArea.insertAdjacentHTML('beforeend', html);
+        }
+
+        state._renderedCount = totalCount;
+
         // ── Typing indicator: show only if a recent pending message remains unresolved ──
+        // Remove old typing indicator first
+        var oldTyping = msgArea.querySelector('.chat-typing');
+        if (oldTyping) oldTyping.remove();
+
         var hasRecentPending = false;
         var now = Date.now();
         for (var p = 0; p < conversation.length; p++) {
             if (conversation[p]._pending) {
                 var msgTs = new Date(conversation[p].ts).getTime();
-                if (now - msgTs < 5 * 60 * 1000 || (typeof IS_DEMO !== 'undefined' && IS_DEMO)) {  // ≤ 5 min OR demo mode
+                if (now - msgTs < 5 * 60 * 1000 || (typeof IS_DEMO !== 'undefined' && IS_DEMO)) {
                     hasRecentPending = true;
                     break;
                 }
@@ -923,11 +993,16 @@ var ChatApp = (function() {
         }
         var paused = state.convPause[state.activeThread] || false;
         if (hasRecentPending && !paused) {
-            html += '<div class="chat-typing"><span></span><span></span><span></span></div>';
+            var typingEl = document.createElement('div');
+            typingEl.className = 'chat-typing';
+            typingEl.innerHTML = '<span></span><span></span><span></span>';
+            msgArea.appendChild(typingEl);
         }
 
-        msgArea.innerHTML = html;
-        scrollToBottom(false);
+        // Auto-scroll only if user was already at bottom
+        if (wasAtBottom) {
+            scrollToBottom(false);
+        }
     }
 
     function scrollToBottom(smooth) {
@@ -1010,16 +1085,18 @@ var ChatApp = (function() {
             fd.append('text', text);
             fd.append('csrf_token', (typeof _csrf !== 'undefined' ? _csrf : ''));
 
-            // Disable send button during humanized send (sendSeen → typing → delay → text)
+            // Brief disable to prevent accidental double-sends (re-enable after 400ms)
             var sendBtn = document.getElementById('chat-send-btn');
             if (sendBtn) sendBtn.disabled = true;
+            setTimeout(function() {
+                if (sendBtn) sendBtn.disabled = false;
+            }, 400);
 
             _fetch('api/mensajes.php?action=send_manual', {
                 method: 'POST',
                 body: fd
             }).then(function(r) { return r.json(); })
             .then(function(d) {
-                if (sendBtn) sendBtn.disabled = false;
                 if (d.ok) {
                     // Update check marks: ✓✓ if seen worked, ✓⚠ if not
                     var seenOk = (d.seen_ok !== false); // true or undefined = ok
@@ -1044,7 +1121,6 @@ var ChatApp = (function() {
                     scrollToBottom(true);
                 }
             }).catch(function(e) {
-                if (sendBtn) sendBtn.disabled = false;
                 // Show connection error in the chat area
                 msgArea.insertAdjacentHTML('beforeend',
                     '<div class="chat-msg-system"><div class="system-text" style="color:var(--danger)">❌ Error de conexión al enviar mensaje</div></div>');
@@ -1240,9 +1316,12 @@ var ChatApp = (function() {
 
     function refreshMessages() {
         if (!state.activeThread) return;
-        _fetch(apiUrl('api/mensajes.php?action=conversation&thread_id=' + encodeURIComponent(state.activeThread)))
+        var threadId = state.activeThread;  // snapshot for guard
+        _fetch(apiUrl('api/mensajes.php?action=conversation&thread_id=' + encodeURIComponent(threadId)))
         .then(function(r) { return r.json(); })
         .then(function(d) {
+            // Guard: if user switched thread while fetching, discard this response
+            if (state.activeThread !== threadId) return;
             if (!d.ok) return;
             var conv = d.conversation || [];
             var newCount = conv.length;
@@ -1270,25 +1349,17 @@ var ChatApp = (function() {
             // Prevents the poll from restoring unread badges before the server
             // has persisted the mark_read (race condition fix).
             var now = Date.now();
-            var cleanReadTs = false;
             for (var i = 0; i < d.threads.length; i++) {
                 var tid = d.threads[i].thread_id;
                 var readTs = state._readTimestamps[tid];
-                if (readTs) {
-                    if (now - readTs < 30000) {   // 30-second protection window
-                        d.threads[i].unread = 0;
-                    } else {
-                        delete state._readTimestamps[tid];
-                        cleanReadTs = true;
-                    }
+                if (readTs && (now - readTs < 15000)) {   // 15-second protection window
+                    d.threads[i].unread = 0;
                 }
             }
             // Periodic cleanup of stale entries (outside the protection window)
-            if (!cleanReadTs) {
-                for (var k in state._readTimestamps) {
-                    if (state._readTimestamps.hasOwnProperty(k) && (now - state._readTimestamps[k] > 30000)) {
-                        delete state._readTimestamps[k];
-                    }
+            for (var k in state._readTimestamps) {
+                if (state._readTimestamps.hasOwnProperty(k) && (now - state._readTimestamps[k] > 15000)) {
+                    delete state._readTimestamps[k];
                 }
             }
 

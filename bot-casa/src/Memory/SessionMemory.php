@@ -128,6 +128,12 @@ final class SessionMemory implements SessionMemoryInterface
             // 7. Atomic move: rename tmp → final
             if (!@rename($tmpFile, $memoryFile)) {
                 $this->logger->error("SessionMemory: atomic rename failed: {$tmpFile} → {$memoryFile}");
+            } else {
+                // Ensure the file remains writable by www-data (web process).
+                // The rename replaces the inode; when run as root (cron), the
+                // new file becomes root-owned and www-data can't append.
+                @chmod($memoryFile, 0664);
+                @chown($memoryFile, 'www-data');
             }
         } finally {
             // 8. Release soft lock
@@ -234,7 +240,11 @@ final class SessionMemory implements SessionMemoryInterface
             }
 
             @file_put_contents($tmpFile, $tmpContent, LOCK_EX);
-            @rename($tmpFile, $memoryFile);
+            if (@rename($tmpFile, $memoryFile)) {
+                // Ensure the file remains writable by www-data (web process).
+                @chmod($memoryFile, 0664);
+                @chown($memoryFile, 'www-data');
+            }
 
             $this->logger->info("SessionMemory: deleted {$removed} entries for thread={$threadId}");
 
