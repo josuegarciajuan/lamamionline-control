@@ -1,6 +1,7 @@
 <?php
 
 function handle_get_actions() {
+    @ini_set('display_errors', '0');
     if (!is_logged_in()) {
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(array('ok' => false, 'error' => 'No autenticado.'));
@@ -14,11 +15,181 @@ function handle_get_actions() {
         case 'cancel_publicista_regen_queue':
             action_cancel_publicista_regen_queue();
             break;
+        case 'touch_gps':
+            action_touch_gps();
+            break;
+        case 'export_gpx':
+            action_export_gpx();
+            break;
+        case 'youtube_audio_proxy':
+            action_youtube_audio_proxy();
+            break;
+        case 'youtube_audio_health':
+            action_youtube_audio_health();
+            break;
         default:
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode(array('ok' => false, 'error' => 'Acción GET desconocida.'));
             exit;
     }
+}
+
+// ── GPS position tracking (JSONL) ───────────────────────────────────────────
+function action_touch_gps() {
+    $lat = round((float)($_GET['lat'] ?? 0), 6);
+    $lng = round((float)($_GET['lng'] ?? 0), 6);
+    $acc = round((float)($_GET['acc'] ?? 0), 1);
+
+    if ($lat === 0.0 && $lng === 0.0) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('ok' => false, 'error' => 'Coordenadas inválidas'));
+        exit;
+    }
+
+    // ⛔ Solo aceptar GPS del dispositivo coche real (defensa en profundidad)
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    if (stripos($ua, 'evb3561sv_w_65_m0') === false) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('ok' => false, 'error' => 'Dispositivo no autorizado para GPS'));
+        exit;
+    }
+
+    // Rechazar posiciones con precisión pobre (>50m = sin chip GPS, solo IP/WiFi/torre)
+    if ($acc > 50) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('ok' => false, 'error' => 'Precisión insuficiente'));
+        exit;
+    }
+
+    $entry = array(
+        'ts'   => date('c'),
+        'lat'  => $lat,
+        'lng'  => $lng,
+        'acc'  => $acc,
+        'user' => $_SESSION['username'] ?? 'unknown',
+    );
+
+    $file = __DIR__ . '/../data/gps_positions.jsonl';
+    $dir  = dirname($file);
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+
+    $written = file_put_contents($file, json_encode($entry) . "\n", FILE_APPEND | LOCK_EX);
+
+    if ($written === false) {
+        bootstrap_runtime_log('action_touch_gps | ERROR: no se pudo escribir en ' . $file . ' - lat=' . $lat . ' lng=' . $lng);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('ok' => false, 'error' => 'Error de escritura en el servidor'));
+        exit;
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(array('ok' => true));
+    exit;
+}
+
+// ── GPS: exportar ruta del día como GPX ──────────────────────────────────────
+function action_export_gpx() {
+    if (!is_logged_in()) {
+        header('HTTP/1.1 403 Forbidden');
+        exit;
+    }
+
+    $day = trim((string)($_GET['day'] ?? ''));
+    if ($day === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $day)) {
+        header('HTTP/1.1 400 Bad Request');
+        echo 'Fecha inválida. Usa ?day=YYYY-MM-DD';
+        exit;
+    }
+
+    $positions = gps_read_positions(0);
+    $grouped   = gps_group_by_day($positions);
+
+    if (!isset($grouped[$day]) || empty($grouped[$day])) {
+        header('HTTP/1.1 404 Not Found');
+        echo 'No hay datos GPS para el día ' . htmlspecialchars($day);
+        exit;
+    }
+
+    $dayPositions = $grouped[$day];
+
+    // Generar GPX 1.1
+    $xml  = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    $xml .= '<gpx version="1.1" creator="LaMami CRM" xmlns="http://www.topografix.com/GPX/1/1">' . "\n";
+    $xml .= '  <trk>' . "\n";
+    $xml .= '    <name>Ruta ' . htmlspecialchars($day) . '</name>' . "\n";
+    $xml .= '    <trkseg>' . "\n";
+
+    foreach ($dayPositions as $p) {
+        $ts = date('c', $p['_ts']);
+        $xml .= '      <trkpt lat="' . $p['lat'] . '" lon="' . $p['lng'] . '">' . "\n";
+        $xml .= '        <time>' . $ts . '</time>' . "\n";
+        if (!empty($p['acc'])) {
+            $xml .= '        <hdop>' . round($p['acc'] / 5, 1) . '</hdop>' . "\n";
+        }
+        $xml .= '      </trkpt>' . "\n";
+    }
+
+    $xml .= '    </trkseg>' . "\n";
+    $xml .= '  </trk>' . "\n";
+    $xml .= '</gpx>' . "\n";
+
+    $filename = 'ruta-' . $day . '.gpx';
+    header('Content-Type: application/gpx+xml; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . strlen($xml));
+    echo $xml;
+    exit;
+}
+
+// ── GPS: renombrar un lugar detectado ─────────────────────────────────────────
+function action_rename_place() {
+    $lat  = round((float)request_post('lat', 0), 4);
+    $lng  = round((float)request_post('lng', 0), 4);
+    $name = trim((string)request_post('name', ''));
+
+    if ($lat === 0.0 && $lng === 0.0) {
+        set_flash('error', 'Coordenadas inválidas.');
+        redirect_to('index.php?page=josue&tab=rutas');
+    }
+    if ($name === '') {
+        set_flash('error', 'El nombre no puede estar vacío.');
+        redirect_to('index.php?page=josue&tab=rutas');
+    }
+
+    $key = $lat . ',' . $lng;
+    $settings = storage_read('settings.json');
+    if (!isset($settings['rutas_place_names']) || !is_array($settings['rutas_place_names'])) {
+        $settings['rutas_place_names'] = array();
+    }
+    $settings['rutas_place_names'][$key] = $name;
+    storage_write('settings.json', $settings);
+
+    set_flash('ok', 'Lugar renombrado a "' . $name . '".');
+    redirect_to('index.php?page=josue&tab=rutas');
+}
+
+// ── GPS: ocultar un lugar detectado ────────────────────────────────────────────
+function action_hide_place() {
+    $lat = round((float)request_post('lat', 0), 4);
+    $lng = round((float)request_post('lng', 0), 4);
+
+    if ($lat === 0.0 && $lng === 0.0) {
+        set_flash('error', 'Coordenadas inválidas.');
+        redirect_to('index.php?page=josue&tab=rutas');
+    }
+
+    $key = $lat . ',' . $lng;
+    $settings = storage_read('settings.json');
+    if (!isset($settings['rutas_hidden_places']) || !is_array($settings['rutas_hidden_places'])) {
+        $settings['rutas_hidden_places'] = array();
+    }
+    $settings['rutas_hidden_places'][$key] = true;
+    storage_write('settings.json', $settings);
+
+    set_flash('ok', 'Lugar ocultado.');
+    redirect_to('index.php?page=josue&tab=rutas');
 }
 
 function handle_post_actions() {
@@ -36,7 +207,7 @@ function handle_post_actions() {
     }
 
     if (!is_logged_in()) {
-        if ($action === 'voice_command') {
+        if ($action === 'voice_command' || $action === 'voice_proactive' || $action === 'debug_voice') {
             voice_json_response(voice_build_response(array(
                 'ok' => false,
                 'stage' => 'error',
@@ -165,9 +336,24 @@ function handle_post_actions() {
         case 'jostal_update_rent_due_weekday':
             action_jostal_update_rent_due_weekday();
             break;
+        case 'jostal_clasificar_lead':
+            action_jostal_clasificar_lead();
+            break;
+        case 'jostal_send_deuda_wasap':
+            action_jostal_send_deuda_wasap();
+            break;
 
         case 'unlock_josue_anuncios':
             action_unlock_josue_anuncios();
+            break;
+        case 'unlock_josue_wasap':
+            action_unlock_josue_wasap();
+            break;
+        case 'rename_place':
+            action_rename_place();
+            break;
+        case 'hide_place':
+            action_hide_place();
             break;
         case 'save_anuncio':
             action_save_anuncio();
@@ -281,6 +467,12 @@ function handle_post_actions() {
         case 'save_comercial_process':
             action_save_comercial_process();
             break;
+        case 'upload_plaza_room_photo':
+            action_upload_plaza_room_photo();
+            break;
+        case 'delete_plaza_room_photo':
+            action_delete_plaza_room_photo();
+            break;
         case 'save_comercial_blacklist':
             action_save_comercial_blacklist();
             break;
@@ -310,6 +502,15 @@ function handle_post_actions() {
             break;
         case 'comercial_promote_thread':
             action_comercial_promote_thread();
+            break;
+        case 'toggle_inbox_replies':
+            action_toggle_inbox_replies();
+            break;
+        case 'toggle_inbox_opener':
+            action_toggle_inbox_opener();
+            break;
+        case 'inbox_toggle_thread_pause':
+            action_inbox_toggle_thread_pause();
             break;
         case 'comercial_export_threads_csv':
             action_comercial_export_threads_csv();
@@ -359,6 +560,9 @@ function handle_post_actions() {
             break;
         case 'save_access_config':
             action_save_access_config();
+            break;
+        case 'revoke_trusted_device':
+            action_revoke_trusted_device();
             break;
         case 'save_voice_ai_config':
             action_save_voice_ai_config();
@@ -426,6 +630,9 @@ function handle_post_actions() {
         case 'apply_publicista_manual_blur_real':
             action_apply_publicista_manual_blur_real();
             break;
+        case 'apply_publicista_manual_blur_source':
+            action_apply_publicista_manual_blur_source();
+            break;
         case 'upload_publicista_real_photos':
             action_upload_publicista_real_photos();
             break;
@@ -438,11 +645,82 @@ function handle_post_actions() {
         case 'voice_command':
             action_voice_command();
             break;
+        case 'debug_voice':
+            action_debug_voice();
+            break;
+        case 'tts':
+            action_tts();
+            break;
+        case 'voice_check_reminders':
+            action_voice_check_reminders();
+            break;
+        case 'voice_proactive':
+            $trigger = trim((string)($_POST['proactive_trigger'] ?? ''));
+            $context = json_decode((string)($_POST['proactive_context_json'] ?? '{}'), true) ?: array();
+            echo voice_handle_proactive($trigger, $context);
+            break;
+        case 'get_diario_entries':
+            action_get_diario_entries();
+            break;
+        case 'get_diario_entry':
+            action_get_diario_entry();
+            break;
+        case 'search_diario':
+            action_search_diario();
+            break;
         case 'save_jostal_contrato':
             action_save_jostal_contrato();
             break;
         case 'submit_contrato_firma':
             action_submit_contrato_firma();
+            break;
+        case 'youtube_search':
+            action_youtube_search();
+            break;
+        case 'youtube_suggest':
+            action_youtube_suggest();
+            break;
+        case 'youtube_log_history':
+            action_youtube_log_history();
+            break;
+        case 'youtube_save_playlist':
+            action_youtube_save_playlist();
+            break;
+        case 'youtube_delete_playlist':
+            action_youtube_delete_playlist();
+            break;
+        case 'youtube_add_to_playlist':
+            action_youtube_add_to_playlist();
+            break;
+        case 'youtube_remove_from_playlist':
+            action_youtube_remove_from_playlist();
+            break;
+        case 'youtube_create_topic_channel':
+            action_youtube_create_topic_channel();
+            break;
+        case 'youtube_delete_topic_channel':
+            action_youtube_delete_topic_channel();
+            break;
+        case 'youtube_topic_channel_videos':
+            action_youtube_topic_channel_videos();
+            break;
+        case 'youtube_seed_channels':
+            action_youtube_seed_channels();
+            break;
+        case 'youtube_reorder_playlist':
+            action_youtube_reorder_playlist();
+            break;
+        case 'youtube_audio_stream':
+            action_youtube_audio_stream();
+            break;
+        case 'youtube_audio_proxy':
+            action_youtube_audio_proxy();
+            break;
+        case 'youtube_audio_health':
+            action_youtube_audio_health();
+            break;
+        case 'youtube_voice_search':
+            action_youtube_voice_search();
             break;
     }
 }
@@ -734,6 +1012,33 @@ function action_regenerate_publicista_candidate() {
         redirect_to(publicista_tab_url(array('job' => $id)));
     }
 
+    // ═══ Guard: evitar duplicados ═══
+    if (function_exists('publicista_regen_is_candidate_busy') && publicista_regen_is_candidate_busy($id, $candidateId)) {
+        set_flash('ok', 'Esta candidata ya está en la cola de regeneración. Espera a que termine o cancélala primero.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
+    // ═══ Guard: Pollo.ai ocupado → encolar sin lanzar proceso ═══
+    if (function_exists('publicista_pollo_is_busy') && publicista_pollo_is_busy()) {
+        // No lanzamos proceso background. Solo encolamos para que el proceso
+        // que actualmente ocupa Pollo la procese al terminar (trigger_next).
+        if (function_exists('publicista_regen_queue_set_status')) {
+            publicista_regen_queue_set_status($id, $candidateId, 'waiting_pollo', '', 5, array('refine_text' => $refineText));
+        }
+        set_flash('ok', 'Pollo.ai está ocupado con otra generación. Tu candidata se ha encolado y se regenerará automáticamente en cuanto haya turno.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
+    // ═══ Pollo libre: marcarlo como busy y lanzar ═══
+    if (function_exists('publicista_pollo_set_busy') && !publicista_pollo_set_busy($id, $candidateId)) {
+        // Otro proceso ganó la carrera justo antes — encolar
+        if (function_exists('publicista_regen_queue_set_status')) {
+            publicista_regen_queue_set_status($id, $candidateId, 'waiting_pollo', '', 5, array('refine_text' => $refineText));
+        }
+        set_flash('ok', 'Pollo.ai está ocupado con otra generación. Tu candidata se ha encolado y se regenerará automáticamente en cuanto haya turno.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
     set_flash('ok', 'Regeneración lanzada en segundo plano. Recibirás un aviso cuando termine.');
     $targetUrl = publicista_tab_url(array('job' => $id));
     publicista_finish_redirect_response($targetUrl);
@@ -776,6 +1081,32 @@ function action_regenerate_publicista_sexy_candidate() {
         redirect_to(publicista_tab_url(array('job' => $id)));
     }
 
+    $queueId = 'sexy_' . $candidateId;
+
+    // ═══ Guard: evitar duplicados ═══
+    if (function_exists('publicista_regen_is_candidate_busy') && publicista_regen_is_candidate_busy($id, $queueId)) {
+        set_flash('ok', 'Esta candidata ya está en la cola de regeneración. Espera a que termine o cancélala primero.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
+    // ═══ Guard: Pollo.ai ocupado → encolar sin lanzar proceso ═══
+    if (function_exists('publicista_pollo_is_busy') && publicista_pollo_is_busy()) {
+        if (function_exists('publicista_regen_queue_set_status')) {
+            publicista_regen_queue_set_status($id, $queueId, 'waiting_pollo', '', 5, array('refine_text' => $refineText));
+        }
+        set_flash('ok', 'Pollo.ai está ocupado con otra generación. Tu candidata erótica se ha encolado y se regenerará automáticamente en cuanto haya turno.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
+    // ═══ Pollo libre: marcarlo como busy y lanzar ═══
+    if (function_exists('publicista_pollo_set_busy') && !publicista_pollo_set_busy($id, $candidateId)) {
+        if (function_exists('publicista_regen_queue_set_status')) {
+            publicista_regen_queue_set_status($id, $queueId, 'waiting_pollo', '', 5, array('refine_text' => $refineText));
+        }
+        set_flash('ok', 'Pollo.ai está ocupado con otra generación. Tu candidata erótica se ha encolado y se regenerará automáticamente en cuanto haya turno.');
+        redirect_to(publicista_tab_url(array('job' => $id)));
+    }
+
     set_flash('ok', 'Regeneración erótica lanzada en segundo plano.');
     $targetUrl = publicista_tab_url(array('job' => $id));
     publicista_finish_redirect_response($targetUrl);
@@ -789,6 +1120,9 @@ function action_regenerate_publicista_sexy_candidate() {
     } catch (Throwable $e) {
         if (function_exists('bootstrap_runtime_log_exception')) {
             bootstrap_runtime_log_exception('action_regenerate_publicista_sexy_candidate_background', $e);
+        }
+        if (function_exists('publicista_notify_candidate_regeneration_finished')) {
+            publicista_notify_candidate_regeneration_finished($job ?: array('id' => $id), $candidateId, false, 'Error interno al regenerar la candidata erótica: ' . trim((string)$e->getMessage()));
         }
     }
 
@@ -895,7 +1229,8 @@ function action_cancel_publicista_regen_queue() {
     $queue = publicista_regen_queue_get($id);
     $cancelled = array();
     foreach ($queue as $candId => $entry) {
-        if (($entry['status'] ?? '') === 'queued') {
+        $status = $entry['status'] ?? '';
+        if ($status === 'queued' || $status === 'waiting_pollo') {
             publicista_regen_queue_set_status($id, $candId, 'cancelled', 'Cancelado por el usuario');
             $cancelled[] = $candId;
         }
@@ -1118,10 +1453,6 @@ function action_apply_publicista_manual_blur() {
 
 function action_apply_publicista_manual_blur_real() {
     header('Content-Type: application/json; charset=utf-8');
-    if (!csrf_validate((string)request_post('csrf_token'))) {
-        echo json_encode(array('ok' => false, 'error' => 'Sesión caducada. Recarga la página.'));
-        exit;
-    }
     $id = trim((string)request_post('id'));
     $photoId = trim((string)request_post('photo_id'));
     $bx = (float)request_post('bx', '0.2');
@@ -1151,14 +1482,48 @@ function action_apply_publicista_manual_blur_real() {
     exit;
 }
 
+function action_apply_publicista_manual_blur_source() {
+    header('Content-Type: application/json; charset=utf-8');
+    $id = trim((string)request_post('id'));
+    $bx = (float)request_post('bx', '0.2');
+    $by = (float)request_post('by', '0.05');
+    $bw = (float)request_post('bw', '0.6');
+    $bh = (float)request_post('bh', '0.35');
+    $intensity = (int)request_post('intensity', '8');
+
+    if ($id === '') {
+        echo json_encode(array('ok' => false, 'error' => 'Parámetros incompletos.'));
+        exit;
+    }
+
+    list($ok, $result) = publicista_apply_manual_blur_to_source($id, $bx, $by, $bw, $bh, $intensity);
+    if (!$ok) {
+        echo json_encode(array('ok' => false, 'error' => is_string($result) ? $result : 'Error al aplicar el blur manual.'));
+        exit;
+    }
+
+    echo json_encode(array(
+        'ok' => true,
+        'stored_path' => $result['stored_path'] ?? '',
+        'preview_path' => $result['preview_path'] ?? '',
+        'manual_blur_applied' => !empty($result['manual_blur_applied']),
+        'manual_blur_intensity' => (int)($result['manual_blur_intensity'] ?? 0),
+    ));
+    exit;
+}
+
 function action_voice_command() {
     $commandText = trim((string)request_post('voice_command_text'));
     $contextJson = trim((string)request_post('voice_context_json'));
     $alternativesJson = trim((string)request_post('voice_alternatives_json'));
+    $rawTranscript = trim((string)request_post('voice_raw_transcript'));
+    $modoEureka = (trim((string)request_post('voice_modo_eureka')) === '1');
     $context = array();
     $speechMeta = array(
         'source' => trim((string)request_post('voice_input_source')),
         'alternatives' => array(),
+        'raw_transcript' => $rawTranscript,
+        'modo_eureka' => $modoEureka,
     );
     $interaction = array(
         'pending_token' => trim((string)request_post('voice_pending_token')),
@@ -1186,6 +1551,16 @@ function action_voice_command() {
 
     $response = voice_handle_command($commandText, $context, $interaction, $speechMeta);
     voice_json_response($response);
+}
+
+function action_debug_voice() {
+    $step = trim((string)request_post('step'));
+    $detail = trim((string)request_post('detail'));
+    $line = date('Y-m-d H:i:s') . "\t" . ($step ?? '') . "\t" . substr(($detail ?? ''), 0, 500) . "\n";
+    file_put_contents(__DIR__ . '/../data/voice_debug.log', $line, FILE_APPEND | LOCK_EX);
+    voice_json_response(voice_build_response(array(
+        'ok' => true, 'stage' => 'debug', 'message' => 'Telemetría registrada', 'step' => $step
+    )));
 }
 
 function action_delete_generic($file, $message, $redirect) {
@@ -1916,14 +2291,50 @@ function action_save_configm() {
 
     $settings['avisos_config'] = $config;
 
-    // Guardar cookie de sesion de Pollo.ai (se mantiene aunque este vacia para no borrar una existente)
-    $polloCookie = trim((string)request_post('pollo_session_cookie', ''));
-    if ($polloCookie !== '') {
-        $settings['pollo_session_cookie'] = $polloCookie;
+    // Guardar cuentas de Pollo.ai (formato multi-cuenta)
+    $accountCount = (int)request_post('pollo_account_count', 0);
+    $polloAccounts = array();
+    $addAccount = (int)request_post('pollo_add_account', 0) > 0;
+
+    for ($i = 0; $i < max($accountCount, 2); $i++) {
+        $cookie = trim((string)request_post('pollo_account_' . $i . '_cookie', ''));
+        $label = trim((string)request_post('pollo_account_' . $i . '_label', ''));
+        $expires = trim((string)request_post('pollo_account_' . $i . '_expires', ''));
+        $resetCredits = (int)request_post('pollo_account_' . $i . '_reset_credits', 0) > 0;
+
+        // Si hay cookie, guardar la cuenta
+        if ($cookie !== '') {
+            $polloAccounts[] = array(
+                'cookie' => $cookie,
+                'label' => $label !== '' ? $label : ('Cuenta ' . ($i + 1)),
+                'expires' => $expires !== '' ? $expires : '2026-09-07',
+            );
+        }
+        // Resetear estado de créditos si se pulsó el botón
+        if ($resetCredits && $label !== '' && function_exists('publicista_pollo_status_read')) {
+            $status = publicista_pollo_status_read();
+            if (isset($status[$label])) {
+                unset($status[$label]['credits_exhausted']);
+                unset($status[$label]['exhausted_at']);
+                publicista_pollo_status_write($status);
+            }
+        }
     }
-    $polloExpires = trim((string)request_post('pollo_cookie_expires', ''));
-    if ($polloExpires !== '' && strtotime($polloExpires) !== false) {
-        $settings['pollo_cookie_expires'] = $polloExpires;
+
+    // Si se pidió añadir cuenta, añadir una vacía
+    if ($addAccount) {
+        $polloAccounts[] = array(
+            'cookie' => '',
+            'label' => 'Cuenta ' . (count($polloAccounts) + 1),
+            'expires' => '2026-09-07',
+        );
+    }
+
+    $settings['pollo_accounts'] = $polloAccounts;
+    // Mantener backward compat: primera cuenta en los campos legacy
+    if (!empty($polloAccounts)) {
+        $settings['pollo_session_cookie'] = $polloAccounts[0]['cookie'];
+        $settings['pollo_cookie_expires'] = $polloAccounts[0]['expires'] ?? '2026-09-07';
     }
 
     $settings['updated_at'] = now_datetime();
@@ -1960,6 +2371,16 @@ function action_save_access_config() {
     storage_write('settings.json', $settings);
 
     set_flash('ok', 'Whitelist de IPs guardada correctamente.');
+    redirect_to('index.php?page=josue&tab=config');
+}
+
+function action_revoke_trusted_device() {
+    $token = trim((string)request_post('device_token'));
+    if ($token !== '' && auth_remove_trusted_device($token)) {
+        set_flash('ok', 'Dispositivo revocado correctamente.');
+    } else {
+        set_flash('error', 'No se pudo revocar el dispositivo.');
+    }
     redirect_to('index.php?page=josue&tab=config');
 }
 
@@ -2199,6 +2620,9 @@ function action_convert_jostal_clienta() {
         'telefono' => isset($interesada['telefono']) ? $interesada['telefono'] : '',
         'observaciones' => isset($interesada['observaciones']) ? $interesada['observaciones'] : '',
         'modo' => trim(request_post('modo')),
+        'precio_semanal' => to_float(request_post('precio_semanal'), 0),
+        'precio_semanal_anterior' => to_float(request_post('precio_semanal_anterior'), 0),
+        'precio_semanal_desde' => trim(request_post('precio_semanal_desde')),
         'rent_due_weekday' => max(1, min(7, (int)request_post('rent_due_weekday', jostal_weekday_from_date($firstArrival)))),
         'nombre' => trim(request_post('nombre')),
         'created_at' => now_datetime(),
@@ -2233,6 +2657,7 @@ function action_save_jostal_clienta() {
     $id = trim(request_post('id'));
     $existing = $id !== '' ? storage_find_by_id('jostal_clientas.json', $id) : null;
     $sourceInteresadaId = trim(request_post('source_interesada_id'));
+    error_log("DEBUG_JOSTAL_CONVERT: action=save_jostal_clienta id=[{$id}] source_interesada_id=[{$sourceInteresadaId}] POST_keys=" . implode(',', array_keys($_POST)));
 
     if (!$existing && $sourceInteresadaId === '') {
         set_flash('error', 'No se puede crear una clienta de Jostal directamente.');
@@ -2241,6 +2666,7 @@ function action_save_jostal_clienta() {
 
     if (!$existing) {
         $interesada = storage_find_by_id('jostal_interesadas.json', $sourceInteresadaId);
+        error_log("DEBUG_JOSTAL_CONVERT: storage_find_by_id jostal_interesadas source=[{$sourceInteresadaId}] found=" . ($interesada ? 'SI' : 'NO') . " estado=" . ($interesada['estado'] ?? 'n/a'));
         if (!$interesada) {
             set_flash('error', 'Interesada de Jostal no encontrada.');
             redirect_to('index.php?page=jostal&tab=interesadas');
@@ -2258,6 +2684,9 @@ function action_save_jostal_clienta() {
             'telefono' => trim(request_post('telefono')),
             'observaciones' => trim(request_post('observaciones')),
             'modo' => trim(request_post('modo')),
+            'precio_semanal' => to_float(request_post('precio_semanal'), 0),
+            'precio_semanal_anterior' => to_float(request_post('precio_semanal_anterior'), 0),
+            'precio_semanal_desde' => trim(request_post('precio_semanal_desde')),
             'rent_due_weekday' => max(1, min(7, (int)request_post('rent_due_weekday', jostal_weekday_from_date($firstArrival)))),
             'nombre' => trim(request_post('nombre')),
             'nombre_real' => trim(request_post('nombre_real')),
@@ -2290,6 +2719,9 @@ function action_save_jostal_clienta() {
         'telefono' => trim(request_post('telefono')),
         'observaciones' => trim(request_post('observaciones')),
         'modo' => trim(request_post('modo')),
+        'precio_semanal' => to_float(request_post('precio_semanal'), 0),
+        'precio_semanal_anterior' => to_float(request_post('precio_semanal_anterior'), 0),
+        'precio_semanal_desde' => trim(request_post('precio_semanal_desde')),
         'rent_due_weekday' => max(1, min(7, (int)request_post('rent_due_weekday', jostal_alquiler_due_weekday($existing)))),
         'nombre' => trim(request_post('nombre')),
         'nombre_real' => trim(request_post('nombre_real')),
@@ -2376,6 +2808,15 @@ function action_jostal_edit_lead() {
         'created_at' => $leadCreatedAt,
         'updated_at' => now_datetime()
     );
+
+    // Si la observación no cambió, preservar la clasificación persistida.
+    // Si cambió, se deja sin clasificar para que se re-detecte automáticamente.
+    $obsCambiada = (string)($row['observacion'] ?? '') !== (string)($existing['observacion'] ?? '');
+    if (!$obsCambiada) {
+        if (isset($existing['concepto_tipo'])) $row['concepto_tipo'] = $existing['concepto_tipo'];
+        if (isset($existing['concepto_fuente'])) $row['concepto_fuente'] = $existing['concepto_fuente'];
+        if (isset($existing['concepto_confirmado_at'])) $row['concepto_confirmado_at'] = $existing['concepto_confirmado_at'];
+    }
 
     storage_upsert('jostal_leads.json', $row);
     set_flash('ok', 'Lead actualizado.');
@@ -2599,6 +3040,101 @@ function action_jostal_update_rent_due_weekday() {
     redirect_to('index.php?page=jostal&tab=clientas&edit=' . urlencode($id));
 }
 
+/**
+ * Clasifica manualmente un lead dudoso como alquiler o no-alquiler y lo persiste.
+ * La clasificación manual gana siempre sobre la detección automática.
+ */
+function action_jostal_clasificar_lead() {
+    $leadId = trim(request_post('lead_id'));
+    $tipo = trim(request_post('concepto_tipo'));
+    $returnTab = trim(request_post('return_tab', 'deudas'));
+    $desde = trim(request_post('desde', ''));
+    $hasta = trim(request_post('hasta', ''));
+
+    if (!in_array($tipo, array('alquiler', 'no_alquiler'), true)) {
+        set_flash('error', 'Clasificación inválida.');
+        redirect_to('index.php?page=jostal&tab=deudas');
+    }
+
+    $lead = storage_find_by_id('jostal_leads.json', $leadId);
+    if (!$lead) {
+        set_flash('error', 'Lead no encontrado.');
+        redirect_to('index.php?page=jostal&tab=deudas');
+    }
+
+    $lead['concepto_tipo'] = $tipo;
+    $lead['concepto_fuente'] = 'manual';
+    $lead['concepto_confirmado_at'] = now_datetime();
+    $lead['updated_at'] = now_datetime();
+    storage_upsert('jostal_leads.json', $lead);
+
+    set_flash('ok', 'Pago clasificado como ' . ($tipo === 'alquiler' ? 'alquiler' : 'no alquiler') . '.');
+    $qs = 'index.php?page=jostal&tab=' . urlencode($returnTab);
+    if ($desde !== '') $qs .= '&desde=' . urlencode($desde);
+    if ($hasta !== '') $qs .= '&hasta=' . urlencode($hasta);
+    redirect_to($qs);
+}
+
+/**
+ * Envía por WhatsApp (desde la línea "jostal dulce") el informe de deuda de una clienta.
+ */
+function action_jostal_send_deuda_wasap() {
+    $clientaId = trim(request_post('clienta_id'));
+    $destinoTipo = trim(request_post('destino_tipo', 'clienta'));
+    $destinoManual = trim(request_post('destino_manual', ''));
+    $desde = trim(request_post('desde', ''));
+    $hasta = trim(request_post('hasta', ''));
+
+    $clienta = storage_find_by_id('jostal_clientas.json', $clientaId);
+    if (!$clienta) {
+        set_flash('error', 'Clienta no encontrada.');
+        redirect_to('index.php?page=jostal&tab=deudas');
+    }
+
+    $data = jostal_compute_deuda($clienta);
+    if (isset($data['error'])) {
+        set_flash('error', 'No se pudo calcular la deuda de esta clienta.');
+        redirect_to('index.php?page=jostal&tab=deudas');
+    }
+
+    // Determinar teléfono destino.
+    if ($destinoTipo === 'clienta') {
+        $target = trim((string)($clienta['telefono'] ?? ''));
+    } elseif ($destinoTipo === 'personal') {
+        $target = '654464023';
+    } else {
+        $target = $destinoManual;
+    }
+
+    $targetDigits = comercial_only_digits($target);
+    if ($targetDigits === '') {
+        set_flash('error', 'Teléfono de destino vacío.');
+        redirect_to('index.php?page=jostal&tab=deudas');
+    }
+
+    $line = jostal_dulce_line();
+    if (!$line) {
+        set_flash('error', 'Línea "jostal dulce" no encontrada o sin configurar.');
+        redirect_to('index.php?page=jostal&tab=deudas');
+    }
+
+    $nombre = trim((string)($clienta['nombre'] ?? ''));
+    $texto = jostal_texto_deuda($nombre, $data, $desde, $hasta);
+
+    $result = comercial_send_text_via_line($line, $targetDigits, $texto, array('slug' => 'jostal_deuda'));
+
+    if (!empty($result['ok'])) {
+        set_flash('ok', 'Informe enviado por WhatsApp (dulce) a ' . $targetDigits . '.', 'celebrate');
+    } else {
+        set_flash('error', 'Error al enviar: ' . trim((string)($result['error'] ?? 'desconocido')));
+    }
+
+    $qs = 'index.php?page=jostal&tab=deudas';
+    if ($desde !== '') $qs .= '&desde=' . urlencode($desde);
+    if ($hasta !== '') $qs .= '&hasta=' . urlencode($hasta);
+    redirect_to($qs);
+}
+
 function action_unlock_josue_anuncios() {
     $password = trim(request_post('password'));
 
@@ -2610,6 +3146,19 @@ function action_unlock_josue_anuncios() {
     }
 
     redirect_to('index.php?page=josue');
+}
+
+function action_unlock_josue_wasap() {
+    $password = trim(request_post('password'));
+
+    if ($password === '2681') {
+        $_SESSION['josue_wasap_unlocked'] = true;
+        set_flash('ok', 'WhatsApp Personal desbloqueado.');
+    } else {
+        set_flash('error', 'Contraseña incorrecta.');
+    }
+
+    redirect_to('index.php?page=josue&tab=wasap');
 }
 
 function action_unlock_publicista_accounts() {
@@ -3977,6 +4526,8 @@ function action_mark_avisos_read() {
 
     if ($scope === 'active_unread') {
         $ids = avisos_active_unread_ids();
+    } elseif ($scope === 'active_all') {
+        $ids = avisos_active_all_ids();
     } elseif (isset($_POST['ids']) && is_array($_POST['ids'])) {
         foreach ((array)$_POST['ids'] as $id) {
             $id = trim((string)$id);
@@ -3985,7 +4536,7 @@ function action_mark_avisos_read() {
     }
 
     if (!empty($ids)) {
-        avisos_mark_as_read(array_values(array_unique($ids)));
+        avisos_mark_as_read_and_dismiss(array_values(array_unique($ids)));
     }
 
     if ($isAjax) {
@@ -3995,9 +4546,9 @@ function action_mark_avisos_read() {
     }
 
     if (!empty($ids)) {
-        set_flash('ok', 'Avisos marcados como leídos.');
+        set_flash('ok', 'Avisos descartados correctamente.');
     } else {
-        set_flash('ok', 'No había avisos nuevos para marcar.');
+        set_flash('ok', 'No había avisos para descartar.');
     }
 
     redirect_to($redirect);
@@ -4137,7 +4688,7 @@ function action_delete_eureka() {
 function action_set_eureka_estado() {
     $id = trim(request_post('id'));
     $estado = trim(request_post('estado'));
-    $allowed = array('pendiente', 'descartada', 'cumplida');
+    $allowed = array('pendiente', 'descartada', 'cumplida', 'cumplida_v2');
 
     $row = $id !== '' ? storage_find_by_id('eurekas.json', $id) : null;
     if (!$row) {
@@ -4287,6 +4838,98 @@ function action_save_comercial_process() {
     comercial_upsert_process($row);
     set_flash('ok', 'Proceso comercial guardado.');
     redirect_to(comercial_page_url('procesos', array('edit' => $row['id'])));
+}
+
+function action_upload_plaza_room_photo() {
+    $redirect = comercial_page_url('procesos', array('edit' => 'comproc_plaza'));
+
+    if (!csrf_validate((string)request_post('csrf_token'))) {
+        set_flash('error', 'La sesión del formulario ha caducado. Recarga la página e inténtalo de nuevo.');
+        redirect_to($redirect);
+    }
+
+    $names = (array)($_FILES['photos']['name'] ?? array());
+    if (empty($names) || trim((string)($names[0] ?? '')) === '') {
+        set_flash('error', 'No se recibió ninguna foto.');
+        redirect_to($redirect);
+    }
+
+    $tmpNames = (array)($_FILES['photos']['tmp_name'] ?? array());
+    $sizes = (array)($_FILES['photos']['size'] ?? array());
+    $errs = (array)($_FILES['photos']['error'] ?? array());
+
+    $photos = plaza_room_photos_get();
+    $uploaded = 0;
+    $errors = array();
+
+    for ($i = 0; $i < count($names); $i++) {
+        if (count($photos) >= 12) {
+            $errors[] = 'Máximo 12 fotos alcanzado.';
+            break;
+        }
+        if (($errs[$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
+        $tmp = trim((string)($tmpNames[$i] ?? ''));
+        if ($tmp === '' || !is_file($tmp)) continue;
+        if ((int)($sizes[$i] ?? 0) > COMPARTIR_PHOTO_MAX_BYTES) {
+            $errors[] = 'Foto demasiado grande (máx 5MB).';
+            continue;
+        }
+
+        $finfo = @finfo_open(FILEINFO_MIME_TYPE);
+        $mime = $finfo ? (string)@finfo_file($finfo, $tmp) : '';
+        if ($finfo) @finfo_close($finfo);
+        if (!in_array($mime, COMPARTIR_ALLOWED_MIMES, true)) {
+            $errors[] = 'Formato no permitido. Usa JPG, PNG o WebP.';
+            continue;
+        }
+
+        $result = compartir_store_image($tmp, $mime, 'Habitación Casa Burriana', 'Habitación disponible');
+        if (empty($result['ok'])) {
+            $errors[] = (string)($result['error'] ?? 'Error al subir la foto.');
+            continue;
+        }
+
+        $photos[] = array(
+            'url' => (string)$result['url'],
+            'img' => (string)$result['img'],
+            'added_at' => now_datetime(),
+        );
+        $uploaded++;
+    }
+
+    plaza_room_photos_save($photos);
+
+    if ($uploaded > 0) {
+        set_flash('ok', $uploaded . ' foto(s) subida(s) correctamente.');
+    }
+    if (!empty($errors)) {
+        set_flash('error', implode(' ', array_slice($errors, 0, 3)));
+    }
+    redirect_to($redirect);
+}
+
+function action_delete_plaza_room_photo() {
+    $redirect = comercial_page_url('procesos', array('edit' => 'comproc_plaza'));
+
+    if (!csrf_validate((string)request_post('csrf_token'))) {
+        set_flash('error', 'La sesión del formulario ha caducado. Recarga la página e inténtalo de nuevo.');
+        redirect_to($redirect);
+    }
+
+    $index = (int)request_post('index', -1);
+    $photos = plaza_room_photos_get();
+    if ($index >= 0 && isset($photos[$index])) {
+        $url = trim((string)($photos[$index]['url'] ?? ''));
+        array_splice($photos, $index, 1);
+        plaza_room_photos_save($photos);
+        if ($url !== '') {
+            compartir_delete_folder_by_url($url);
+        }
+        set_flash('ok', 'Foto eliminada.');
+    } else {
+        set_flash('error', 'Foto no encontrada.');
+    }
+    redirect_to($redirect);
 }
 
 function action_save_comercial_blacklist() {
@@ -4466,6 +5109,7 @@ function action_comercial_send_thread_message() {
                 'accepted' => !empty($threadAfter['last_ai_feedback_meta']['accepted']),
                 'edited' => !empty($threadAfter['last_ai_feedback_meta']['edited']),
                 'led_to_lead' => false,
+                'trigger_text' => trim((string)($threadAfter['last_inbound_text'] ?? '')),
             ));
         }
         set_flash('ok', 'Mensaje enviado por la misma línea de origen.');
@@ -4915,4 +5559,1069 @@ function action_submit_contrato_firma() {
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(array('ok' => true, 'message' => 'Contrato firmado correctamente.'));
     exit;
+}
+
+function action_tts() {
+    $text = trim((string)request_post('text'));
+    if ($text === '') {
+        http_response_code(400);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('ok' => false, 'error' => 'No text provided'));
+        exit;
+    }
+
+    // Preprocess: replace symbols for natural speech
+    $text = str_replace(array('€', '°C', '%'), array(' euros', ' grados', ' por ciento'), $text);
+
+    $cfg = voice_ai_config();
+    if (!$cfg['configured']) {
+        http_response_code(503);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('ok' => false, 'error' => 'AI not configured'));
+        exit;
+    }
+
+    $ttsCfg = voice_tts_config();
+    $voice = $ttsCfg['voice'] !== '' ? $ttsCfg['voice'] : 'nova';
+
+    // Build TTS URL based on provider (DeepSeek has no TTS → always use OpenAI)
+    $ttsUrl = ($cfg['provider'] === 'openai')
+        ? 'https://api.openai.com/v1/audio/speech'
+        : 'https://api.openai.com/v1/audio/speech'; // DeepSeek has no TTS API
+
+    $payload = array(
+        'model' => 'tts-1',
+        'input' => $text,
+        'voice' => $voice,
+        'response_format' => 'mp3',
+    );
+
+    $ch = curl_init($ttsUrl);
+    curl_setopt_array($ch, array(
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => array(
+            'Authorization: Bearer ' . $cfg['api_key'],
+            'Content-Type: application/json',
+        ),
+        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 20,
+        CURLOPT_CONNECTTIMEOUT => 5,
+    ));
+
+    $audio = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+    curl_close($ch);
+
+    if ($httpCode !== 200 || !is_string($audio) || $audio === '') {
+        http_response_code(502);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('ok' => false, 'error' => "TTS API returned $httpCode"));
+        exit;
+    }
+
+    header('Content-Type: ' . ($contentType ?: 'audio/mpeg'));
+    header('Content-Length: ' . strlen($audio));
+    header('Cache-Control: public, max-age=3600');
+    echo $audio;
+    exit;
+}
+
+function action_voice_check_reminders() {
+    $reminders = voice_check_reminders();
+    if (!headers_sent()) {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+    }
+    echo json_encode($reminders, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+// ── YouTube actions ─────────────────────────────────────────────────
+
+function action_youtube_search() {
+    $query = trim((string)request_post('query'));
+    if ($query === '') {
+        _youtube_json_response(array('ok' => false, 'error' => 'Query vacio', 'results' => array()));
+        return;
+    }
+
+    $results = youtube_search($query, 48);
+
+    // Guardar ultima busqueda en sesion
+    $_SESSION['youtube_last_search'] = array(
+        'query' => $query,
+        'results' => $results,
+        'searched_at' => now_datetime(),
+    );
+
+    _youtube_json_response(array('ok' => true, 'query' => $query, 'results' => $results));
+}
+
+function action_youtube_suggest() {
+    $history = storage_read('youtube_history.json');
+    if (!is_array($history)) $history = array();
+
+    $suggestions = youtube_ai_suggest($history, 5);
+
+    // Hacer busqueda real de cada sugerencia
+    $allSuggestions = array();
+    foreach ($suggestions as $term) {
+        $results = youtube_search($term);
+        if (!empty($results)) {
+            $allSuggestions[] = array(
+                'term' => $term,
+                'results' => array_slice($results, 0, 3),
+            );
+        }
+    }
+
+    // ── Fallback A: si no hay resultados, buscar por canales del historial ──
+    if (empty($allSuggestions)) {
+        $channelQueries = array();
+        foreach ($history as $item) {
+            $ch = trim((string)($item['channel_name'] ?? ''));
+            if ($ch !== '' && !isset($channelQueries[$ch])) {
+                $channelQueries[$ch] = true;
+            }
+        }
+        foreach (array_keys($channelQueries) as $chQuery) {
+            if (count($allSuggestions) >= 5) break;
+            $results = youtube_search($chQuery);
+            if (!empty($results)) {
+                $allSuggestions[] = array(
+                    'term' => 'Canal: ' . $chQuery,
+                    'results' => array_slice($results, 0, 3),
+                );
+            }
+        }
+    }
+
+    // ── Fallback B: queries populares evergreen ──
+    if (empty($allSuggestions)) {
+        $trendingQueries = array(
+            'música 2026 España',
+            'noticias hoy España',
+            'deportes highlights',
+            'música en español 2026',
+            'tendencias YouTube España',
+        );
+        foreach ($trendingQueries as $tq) {
+            if (count($allSuggestions) >= 5) break;
+            $results = youtube_search($tq);
+            if (!empty($results)) {
+                $allSuggestions[] = array(
+                    'term' => 'Tendencia: ' . $tq,
+                    'results' => array_slice($results, 0, 3),
+                );
+            }
+        }
+    }
+
+    _youtube_json_response(array('ok' => true, 'suggestions' => $allSuggestions));
+}
+
+function action_youtube_log_history() {
+    $videoId = trim((string)request_post('video_id'));
+    $title = trim((string)request_post('title'));
+    $thumbnail = trim((string)request_post('thumbnail'));
+    $channelName = trim((string)request_post('channel_name'));
+    $publishedTime = trim((string)request_post('published_time'));
+
+    if ($videoId === '') {
+        _youtube_json_response(array('ok' => false, 'error' => 'video_id requerido'));
+        return;
+    }
+
+    $history = storage_read('youtube_history.json');
+    if (!is_array($history)) $history = array();
+
+    // Evitar duplicados consecutivos
+    if (!empty($history) && $history[0]['video_id'] === $videoId) {
+        _youtube_json_response(array('ok' => true, 'skipped' => true));
+        return;
+    }
+
+    array_unshift($history, array(
+        'video_id' => $videoId,
+        'title' => $title,
+        'thumbnail' => $thumbnail,
+        'channel_name' => $channelName,
+        'published_time' => $publishedTime,
+        'listened_at' => now_datetime(),
+    ));
+
+    // Mantener solo los ultimos 100 items
+    if (count($history) > 100) {
+        $history = array_slice($history, 0, 100);
+    }
+
+    storage_write('youtube_history.json', $history);
+
+    _youtube_json_response(array('ok' => true));
+}
+
+function action_youtube_save_playlist() {
+    $id = trim((string)request_post('id'));
+    $name = trim((string)request_post('name'));
+
+    if ($name === '') {
+        if (isset($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+            _youtube_json_response(array('ok' => false, 'error' => 'Nombre requerido'));
+        } else {
+            set_flash('error', 'El nombre de la lista es obligatorio.');
+            redirect_to('index.php?page=josue&tab=reproductor');
+        }
+        return;
+    }
+
+    $playlists = storage_read('youtube_playlists.json');
+    if (!is_array($playlists)) $playlists = array();
+
+    $now = now_datetime();
+
+    if ($id !== '') {
+        // Editar existente
+        foreach ($playlists as &$pl) {
+            if ($pl['id'] === $id) {
+                $pl['name'] = $name;
+                $pl['updated_at'] = $now;
+                break;
+            }
+        }
+        unset($pl);
+    } else {
+        // Crear nueva
+        $playlists[] = array(
+            'id' => uniqid('pl_'),
+            'name' => $name,
+            'videos' => array(),
+            'created_at' => $now,
+            'updated_at' => $now,
+        );
+    }
+
+    storage_write('youtube_playlists.json', $playlists);
+
+    if (isset($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+        _youtube_json_response(array('ok' => true, 'playlists' => $playlists));
+    } else {
+        set_flash('ok', 'Lista guardada.');
+        redirect_to('index.php?page=josue&tab=reproductor');
+    }
+}
+
+function action_youtube_delete_playlist() {
+    $id = trim((string)request_post('id'));
+    if ($id === '') {
+        _youtube_json_response(array('ok' => false, 'error' => 'ID requerido'));
+        return;
+    }
+
+    $playlists = storage_read('youtube_playlists.json');
+    if (!is_array($playlists)) $playlists = array();
+
+    $playlists = array_values(array_filter($playlists, function ($pl) use ($id) {
+        return $pl['id'] !== $id;
+    }));
+
+    storage_write('youtube_playlists.json', $playlists);
+    _youtube_json_response(array('ok' => true, 'playlists' => $playlists));
+}
+
+function action_youtube_add_to_playlist() {
+    $playlistId = trim((string)request_post('playlist_id'));
+    $videoId = trim((string)request_post('video_id'));
+    $title = trim((string)request_post('title'));
+    $thumbnail = trim((string)request_post('thumbnail'));
+    $channelName = trim((string)request_post('channel_name'));
+
+    if ($playlistId === '' || $videoId === '') {
+        _youtube_json_response(array('ok' => false, 'error' => 'playlist_id y video_id requeridos'));
+        return;
+    }
+
+    $playlists = storage_read('youtube_playlists.json');
+    if (!is_array($playlists)) $playlists = array();
+
+    $found = false;
+    foreach ($playlists as &$pl) {
+        if ($pl['id'] === $playlistId) {
+            // Evitar duplicados
+            $alreadyExists = false;
+            foreach ($pl['videos'] as $v) {
+                if ($v['video_id'] === $videoId) {
+                    $alreadyExists = true;
+                    break;
+                }
+            }
+            if (!$alreadyExists) {
+                $pl['videos'][] = array(
+                    'video_id' => $videoId,
+                    'title' => $title,
+                    'thumbnail' => $thumbnail,
+                    'channel_name' => $channelName,
+                    'added_at' => now_datetime(),
+                );
+                $pl['updated_at'] = now_datetime();
+            }
+            $found = true;
+            break;
+        }
+    }
+    unset($pl);
+
+    if ($found) {
+        storage_write('youtube_playlists.json', $playlists);
+    }
+
+    _youtube_json_response(array('ok' => $found, 'playlists' => $playlists));
+}
+
+function action_youtube_remove_from_playlist() {
+    $playlistId = trim((string)request_post('playlist_id'));
+    $videoId = trim((string)request_post('video_id'));
+
+    if ($playlistId === '' || $videoId === '') {
+        _youtube_json_response(array('ok' => false, 'error' => 'playlist_id y video_id requeridos'));
+        return;
+    }
+
+    $playlists = storage_read('youtube_playlists.json');
+    if (!is_array($playlists)) $playlists = array();
+
+    foreach ($playlists as &$pl) {
+        if ($pl['id'] === $playlistId) {
+            $pl['videos'] = array_values(array_filter($pl['videos'], function ($v) use ($videoId) {
+                return $v['video_id'] !== $videoId;
+            }));
+            $pl['updated_at'] = now_datetime();
+            break;
+        }
+    }
+    unset($pl);
+
+    storage_write('youtube_playlists.json', $playlists);
+    _youtube_json_response(array('ok' => true, 'playlists' => $playlists));
+}
+
+function action_youtube_seed_channels() {
+    $channels = storage_read('youtube_channels.json');
+    if (!is_array($channels)) $channels = array();
+
+    // Solo seedear si esta vacio
+    if (empty($channels)) {
+        $channels = youtube_default_channels();
+        storage_write('youtube_channels.json', $channels);
+    }
+
+    // Tambien sugerir canales AI
+    $history = storage_read('youtube_history.json');
+    if (!is_array($history)) $history = array();
+    $aiChannels = youtube_ai_suggest_channels($history, 3);
+    $aiChannelList = array();
+
+    foreach ($aiChannels as $ac) {
+        // Evitar duplicados por nombre
+        $dup = false;
+        foreach ($channels as $ch) {
+            if (mb_strtolower($ch['name']) === mb_strtolower($ac['name'])) {
+                $dup = true;
+                break;
+            }
+        }
+        if (!$dup) {
+            $aiChannelList[] = array(
+                'id' => 'ai_' . uniqid(),
+                'name' => $ac['name'],
+                'query' => $ac['query'],
+                'icon' => '🤖',
+                'type' => 'ai_suggested',
+                'added_at' => now_datetime(),
+            );
+        }
+    }
+
+    _youtube_json_response(array(
+        'ok' => true,
+        'channels' => $channels,
+        'ai_suggested' => $aiChannelList,
+    ));
+}
+
+function action_youtube_create_topic_channel() {
+    $concept = trim((string)request_post('concept'));
+    if ($concept === '') {
+        _youtube_json_response(array('ok' => false, 'error' => 'Concepto requerido'));
+        return;
+    }
+
+    // La IA genera la query optimizada
+    $query = youtube_ai_generate_channel_query($concept);
+
+    $channels = storage_read('youtube_channels.json');
+    if (!is_array($channels)) $channels = array();
+
+    $id = 'ct_' . uniqid();
+    $newChannel = array(
+        'id' => $id,
+        'name' => $concept,
+        'query' => $query,
+        'icon' => '📺',
+        'type' => 'custom',
+        'added_at' => now_datetime(),
+    );
+
+    $channels[] = $newChannel;
+    storage_write('youtube_channels.json', $channels);
+
+    // Buscar videos con la query generada
+    $videos = youtube_search($query);
+
+    _youtube_json_response(array(
+        'ok' => true,
+        'channel' => $newChannel,
+        'channels' => $channels,
+        'query_used' => $query,
+        'videos' => $videos,
+    ));
+}
+
+function action_youtube_delete_topic_channel() {
+    $id = trim((string)request_post('id'));
+    if ($id === '') {
+        _youtube_json_response(array('ok' => false, 'error' => 'ID requerido'));
+        return;
+    }
+
+    $channels = storage_read('youtube_channels.json');
+    if (!is_array($channels)) $channels = array();
+
+    $channels = array_values(array_filter($channels, function ($ch) use ($id) {
+        return ($ch['id'] ?? '') !== $id;
+    }));
+
+    storage_write('youtube_channels.json', $channels);
+    _youtube_json_response(array('ok' => true, 'channels' => $channels));
+}
+
+function action_youtube_topic_channel_videos() {
+    $id = trim((string)request_post('id'));
+    if ($id === '') {
+        _youtube_json_response(array('ok' => false, 'error' => 'ID requerido', 'videos' => array()));
+        return;
+    }
+
+    $channels = storage_read('youtube_channels.json');
+    if (!is_array($channels)) $channels = array();
+
+    $query = '';
+    $name = '';
+    foreach ($channels as $ch) {
+        if (($ch['id'] ?? '') === $id) {
+            $query = trim((string)($ch['query'] ?? ''));
+            $name = trim((string)($ch['name'] ?? ''));
+            break;
+        }
+    }
+
+    if ($query === '') {
+        _youtube_json_response(array('ok' => false, 'error' => 'Canal no encontrado', 'videos' => array()));
+        return;
+    }
+
+    $videos = youtube_search($query, 48);
+
+    _youtube_json_response(array(
+        'ok' => true,
+        'channel_name' => $name,
+        'query' => $query,
+        'videos' => $videos,
+    ));
+}
+
+function action_youtube_reorder_playlist() {
+    $playlistId = trim((string)request_post('playlist_id'));
+    $videoIds = request_post('video_ids');
+    if (!is_array($videoIds)) $videoIds = array();
+
+    if ($playlistId === '') {
+        _youtube_json_response(array('ok' => false, 'error' => 'playlist_id requerido'));
+        return;
+    }
+
+    $playlists = storage_read('youtube_playlists.json');
+    if (!is_array($playlists)) $playlists = array();
+
+    foreach ($playlists as &$pl) {
+        if ($pl['id'] === $playlistId) {
+            $currentVideos = $pl['videos'] ?? array();
+            // Build a lookup map for fast reordering
+            $lookup = array();
+            foreach ($currentVideos as $v) {
+                $lookup[$v['video_id']] = $v;
+            }
+
+            // Rebuild videos in the order specified by video_ids
+            $reordered = array();
+            foreach ($videoIds as $vid) {
+                if (isset($lookup[$vid])) {
+                    $reordered[] = $lookup[$vid];
+                }
+            }
+            // Append any remaining videos not in the ordered list
+            foreach ($currentVideos as $v) {
+                if (!in_array($v['video_id'], $videoIds, true)) {
+                    $reordered[] = $v;
+                }
+            }
+
+            $pl['videos'] = $reordered;
+            $pl['updated_at'] = now_datetime();
+            break;
+        }
+    }
+    unset($pl);
+
+    storage_write('youtube_playlists.json', $playlists);
+    _youtube_json_response(array('ok' => true, 'playlists' => $playlists));
+}
+
+/**
+ * Proxy de audio de YouTube: extrae la URL del stream del video
+ * y la devuelve al frontend para usar con Web Audio API + GainNode.
+ */
+function action_youtube_audio_stream() {
+    $videoId = trim((string)request_post('video_id'));
+    if ($videoId === '') {
+        _youtube_json_response(array('ok' => false, 'error' => 'video_id requerido'));
+        return;
+    }
+
+    $stream = youtube_get_audio_stream($videoId);
+
+    if (!$stream || empty($stream['url'])) {
+        // Registrar el fallo para notificar al admin
+        _youtube_record_audio_error('No se pudo extraer el stream de audio', $videoId);
+        _youtube_json_response(array('ok' => false, 'error' => 'no_audio_stream', 'msg' => 'No se pudo obtener el stream de audio para este video.'));
+        return;
+    }
+
+    // Si funciono, resetear el contador de errores (el proxy esta sano)
+    _youtube_reset_audio_errors();
+
+    // Guardar la URL real en sesion para el proxy
+    $_SESSION['yt_audio_cache'][$videoId] = array(
+        'url' => $stream['url'],
+        'mime_type' => $stream['mime_type'],
+        'content_length' => $stream['content_length'] ?? null,
+        'expires' => time() + 3600, // 1 hora
+    );
+
+    // Devolver URL de nuestro proxy (mismo origen → sin CORS → AudioContext funciona)
+    $proxyUrl = 'index.php?action=youtube_audio_proxy&video_id=' . urlencode($videoId);
+
+    _youtube_json_response(array(
+        'ok' => true,
+        'url' => $proxyUrl,
+        'mime_type' => $stream['mime_type'],
+        'bitrate' => $stream['bitrate'],
+    ));
+}
+
+/**
+ * Proxy de streaming de audio: lee el audio de YouTube y lo sirve
+ * desde nuestro servidor para evitar problemas de CORS con AudioContext.
+ */
+function action_youtube_audio_proxy() {
+    $videoId = trim((string)(request_get('video_id', '')));
+    if ($videoId === '') {
+        header('HTTP/1.1 400 Bad Request');
+        echo 'video_id requerido';
+        exit;
+    }
+
+    // Extracción fresca en cada request (sin cache de sesión): las URLs de
+    // googlevideo llevan firma (sig/spc) que caduca y puede provocar 403.
+    $stream = youtube_get_audio_stream($videoId);
+    if (!$stream || empty($stream['url'])) {
+        _youtube_record_audio_error('No se pudo extraer el stream de audio', $videoId);
+        header('HTTP/1.1 502 Bad Gateway');
+        echo 'No se pudo obtener el stream de audio';
+        exit;
+    }
+
+    $audioUrl  = $stream['url'];
+    $mimeType  = $stream['mime_type'] ?: 'audio/mp4';
+    $totalSize = $stream['content_length'] ?? null;
+    $formatId  = $stream['format_id'] ?? 'bestaudio/best';
+    $duration  = (float)($stream['duration'] ?? 0);
+
+    // Range request support (seek byte-exacto)
+    $rangeStart = 0;
+    $rangeEnd = null;
+    $isRangeRequest = false;
+    $rangeHeader = $_SERVER['HTTP_RANGE'] ?? null;
+    if ($rangeHeader && $totalSize) {
+        if (preg_match('/bytes=(\d+)-(\d*)/', $rangeHeader, $m)) {
+            $rangeStart = (int)$m[1];
+            $rangeEnd = $m[2] !== '' ? (int)$m[2] : ($totalSize - 1);
+            $isRangeRequest = true;
+        }
+    }
+
+    // Cabeceras idénticas a las que envía yt-dlp al descargar de googlevideo
+    // (evita el 403 de bot-detection por UA truncado / falta de Sec-Fetch-Mode).
+    $ytHeaders = array(
+        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36',
+        'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language: en-us,en;q=0.5',
+        'Sec-Fetch-Mode: navigate',
+        'Accept-Encoding: identity',
+        'Connection: close',
+    );
+
+    // Probe ligero: valida que googlevideo no rechace la petición (403/429)
+    // ANTES de comprometer las cabeceras HTTP hacia el cliente.
+    $probeRange = $isRangeRequest ? "{$rangeStart}-{$rangeEnd}" : '0-0';
+    $probeCode = _youtube_probe_stream($audioUrl, $ytHeaders, $probeRange);
+
+    if ($probeCode >= 400) {
+        // FALLBACK: streaming completo vía yt-dlp (robusto ante bot-detection).
+        _youtube_stream_fallback_ytdlp($videoId, $mimeType, $formatId);
+        exit;
+    }
+
+    // ── Streaming principal vía curl (mismas cabeceras que yt-dlp) ──
+    $ch = curl_init($audioUrl);
+    $curlOpts = array(
+        CURLOPT_RETURNTRANSFER => false,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 300,
+        CURLOPT_CONNECTTIMEOUT => 15,
+        CURLOPT_HTTPHEADER => $ytHeaders,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => false,
+        CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4, // coherencia con --force-ipv4 de yt-dlp
+        // Stream directo: curl escribe la salida que PHP reenvia al cliente
+        CURLOPT_WRITEFUNCTION => function ($ch, $data) {
+            echo $data;
+            if (ob_get_level() > 0) ob_flush();
+            flush();
+            return strlen($data);
+        },
+    );
+    if ($isRangeRequest) {
+        $curlOpts[CURLOPT_RANGE] = "{$rangeStart}-{$rangeEnd}";
+    }
+    curl_setopt_array($ch, $curlOpts);
+
+    // Desactivar buffering de PHP para streaming fluido
+    if (ob_get_level() > 0) ob_end_clean();
+    // Headers para audio
+    if ($isRangeRequest && $totalSize) {
+        header('HTTP/1.1 206 Partial Content');
+        header("Content-Range: bytes {$rangeStart}-{$rangeEnd}/{$totalSize}");
+        header('Content-Length: ' . ($rangeEnd - $rangeStart + 1));
+    } else {
+        header('HTTP/1.1 200 OK');
+        if ($totalSize) header('Content-Length: ' . $totalSize);
+    }
+    header('Content-Type: ' . $mimeType);
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('Accept-Ranges: bytes');
+    // Desconectar la sesion para no bloquear otras requests
+    session_write_close();
+
+    curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode >= 400) {
+        // Si falla el streaming, no podemos cambiar headers (ya enviados)
+        // pero al menos registramos el error
+        _youtube_record_audio_error("Streaming fallo con HTTP {$httpCode}", $videoId);
+    }
+    exit;
+}
+
+/**
+ * Sondeo ligero de la URL de googlevideo: hace un GET de un solo byte
+ * (Range 0-0 o el rango solicitado) y devuelve el código HTTP.
+ * Permite detectar 403/429 antes de enviar cabeceras al cliente.
+ */
+function _youtube_probe_stream($url, $headers, $range) {
+    $ch = curl_init($url);
+    curl_setopt_array($ch, array(
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_RANGE => $range,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => false,
+        CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+    ));
+    curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return $code;
+}
+
+/**
+ * Fallback de streaming: descarga el audio vía yt-dlp (-o -) y lo sirve al
+ * cliente directamente. Se usa cuando el re-fetch por curl es rechazado
+ * (403/429). No soporta byte-range: sirve el stream completo desde 0.
+ */
+function _youtube_stream_fallback_ytdlp($videoId, $mimeType, $formatId) {
+    $cmd = sprintf(
+        'yt-dlp --force-ipv4 -f %s -o - --no-part --no-playlist --no-warnings --no-progress --socket-timeout 15 %s',
+        escapeshellarg($formatId),
+        escapeshellarg('https://www.youtube.com/watch?v=' . $videoId)
+    );
+
+    $proc = proc_open($cmd, array(
+        0 => array('pipe', 'r'),
+        1 => array('pipe', 'w'),
+        2 => array('file', '/dev/null', 'w'),
+    ), $pipes);
+
+    if (!is_resource($proc)) {
+        _youtube_record_audio_error('Fallback: no se pudo lanzar yt-dlp', $videoId);
+        header('HTTP/1.1 502 Bad Gateway');
+        echo 'No se pudo obtener el stream de audio';
+        exit;
+    }
+
+    fclose($pipes[0]);
+
+    if (ob_get_level() > 0) ob_end_clean();
+    header('HTTP/1.1 200 OK');
+    header('Content-Type: ' . $mimeType);
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    // Sin Content-Length (chunked): el navegador reproduce el stream igual.
+    session_write_close();
+    set_time_limit(0);
+
+    while (!feof($pipes[1])) {
+        $chunk = fread($pipes[1], 65536);
+        if ($chunk === false) break;
+        echo $chunk;
+        flush();
+    }
+    fclose($pipes[1]);
+    $status = proc_close($proc);
+
+    if ($status !== 0) {
+        _youtube_record_audio_error('Fallback yt-dlp fallo con exit ' . $status, $videoId);
+    }
+    exit;
+}
+
+/**
+ * Health check del proxy de audio. El frontend consulta esto al cargar
+ * para saber si puede activar el boost o no.
+ */
+function action_youtube_audio_health() {
+    // Primero mirar si ya tenemos un estado cached reciente (ultimos 30 min)
+    $errors = storage_read('youtube_audio_errors.json');
+    if (is_array($errors) && isset($errors['status'])) {
+        $lastCheck = strtotime($errors['last_checked'] ?? '2000-01-01');
+        if (time() - $lastCheck < 1800) {
+            // Cache fresco, devolver estado guardado
+            _youtube_json_response(array(
+                'ok' => true,
+                'proxy_working' => ($errors['status'] === 'ok'),
+                'cached' => true,
+            ));
+            return;
+        }
+    }
+
+    // Hacer health check real
+    $working = youtube_audio_proxy_health_check();
+
+    if ($working) {
+        _youtube_reset_audio_errors();
+    } else {
+        _youtube_record_audio_error('Health check fallido: no se pudo obtener stream de ningun video de prueba', 'health_check');
+    }
+
+    _youtube_json_response(array(
+        'ok' => true,
+        'proxy_working' => $working,
+        'cached' => false,
+    ));
+}
+
+/**
+ * Registra un error del proxy de audio para notificar al admin.
+ */
+function _youtube_record_audio_error($errorMsg, $videoId = '') {
+    $errors = storage_read('youtube_audio_errors.json');
+    if (!is_array($errors)) $errors = array();
+
+    $now = now_datetime();
+    $count = (int)($errors['error_count'] ?? 0) + 1;
+
+    $errors = array(
+        'status' => 'broken',
+        'first_failure' => $errors['first_failure'] ?? $now,
+        'last_failure' => $now,
+        'last_checked' => $now,
+        'error_count' => $count,
+        'last_error' => $errorMsg,
+        'last_video_id' => $videoId,
+    );
+
+    storage_write('youtube_audio_errors.json', $errors);
+
+    // Tambien loguear al error_log del servidor
+    error_log("[YoutubeAudioProxy] ERROR #{$count}: {$errorMsg}" . ($videoId ? " (video: {$videoId})" : ''));
+}
+
+/**
+ * Voice search fallback: transcribe audio via OpenAI Whisper API.
+ * Recibe audio/webm via POST y devuelve la transcripcion como JSON.
+ */
+function action_youtube_voice_search() {
+    if (empty($_FILES['audio']) || $_FILES['audio']['error'] !== UPLOAD_ERR_OK) {
+        _youtube_json_response(array('ok' => false, 'error' => 'No se recibio el audio', 'transcript' => ''));
+        return;
+    }
+
+    $tmpPath = $_FILES['audio']['tmp_name'];
+    $mimeType = $_FILES['audio']['type'] ?: 'audio/webm';
+
+    $apiKey = trim((string)getenv('OPENAI_API_KEY'));
+    if ($apiKey === '') {
+        // Fallback: try Publicista config
+        if (function_exists('publicista_ai_config')) {
+            $pubCfg = publicista_ai_config();
+            $apiKey = $pubCfg['api_key'] ?? '';
+        }
+    }
+    if ($apiKey === '') {
+        _youtube_json_response(array('ok' => false, 'error' => 'OPENAI_API_KEY no configurada', 'transcript' => ''));
+        return;
+    }
+
+    if (!function_exists('curl_file_create')) {
+        _youtube_json_response(array('ok' => false, 'error' => 'curl_file_create no disponible (PHP < 5.5)', 'transcript' => ''));
+        return;
+    }
+
+    $postFields = array(
+        'file' => curl_file_create($tmpPath, $mimeType, 'audio.webm'),
+        'model' => 'whisper-1',
+        'language' => 'es',
+        'response_format' => 'json',
+    );
+
+    $ch = curl_init('https://api.openai.com/v1/audio/transcriptions');
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+        'Authorization: Bearer ' . $apiKey,
+    ));
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
+
+    $body = curl_exec($ch);
+    $curlError = curl_error($ch);
+    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($curlError !== '') {
+        _youtube_json_response(array('ok' => false, 'error' => 'Error de conexion: ' . $curlError, 'transcript' => ''));
+        return;
+    }
+
+    if ($httpCode !== 200) {
+        _youtube_json_response(array('ok' => false, 'error' => 'Whisper API error HTTP ' . $httpCode, 'transcript' => ''));
+        return;
+    }
+
+    $decoded = json_decode((string)$body, true);
+    $transcript = trim((string)($decoded['text'] ?? ''));
+
+    _youtube_json_response(array('ok' => true, 'transcript' => $transcript));
+}
+
+/**
+ * Resetea el estado de errores del proxy cuando vuelve a funcionar.
+ */
+function _youtube_reset_audio_errors() {
+    storage_write('youtube_audio_errors.json', array(
+        'status' => 'ok',
+        'last_checked' => now_datetime(),
+        'last_success' => now_datetime(),
+    ));
+}
+
+function _youtube_json_response($data) {
+    if (!headers_sent()) {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+    }
+    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DIARY ACTIONS
+// ═══════════════════════════════════════════════════════════════════
+
+function action_get_diario_entries() {
+    $offset = (int)request_post('offset', 0);
+    $limit = min(20, max(1, (int)request_post('limit', 10)));
+    $search = trim((string)request_post('search', ''));
+
+    $data = voice_diary_read();
+    $entries = $data['entries'] ?? array();
+
+    // Ordenar por fecha descendente
+    usort($entries, function ($a, $b) {
+        return ($b['fecha'] ?? '') <=> ($a['fecha'] ?? '');
+    });
+
+    // Filtrar por búsqueda si hay
+    if ($search !== '') {
+        $searchLower = mb_strtolower($search);
+        $entries = array_filter($entries, function ($e) use ($searchLower) {
+            $haystack = mb_strtolower(($e['clean_text'] ?? '') . ' ' . implode(' ', $e['tags'] ?? array()));
+            return strpos($haystack, $searchLower) !== false;
+        });
+        $entries = array_values($entries);
+    }
+
+    $total = count($entries);
+    $page = array_slice($entries, $offset, $limit);
+
+    // Quitar embeddings de la respuesta (son vectores enormes, no se envían al front)
+    foreach ($page as &$entry) {
+        unset($entry['embedding']);
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(array(
+        'ok' => true,
+        'entries' => $page,
+        'total' => $total,
+        'has_more' => ($offset + $limit) < $total,
+    ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+function action_get_diario_entry() {
+    $fecha = trim((string)request_post('fecha', ''));
+    if ($fecha === '') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('ok' => false, 'error' => 'fecha requerida'), JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $data = voice_diary_read();
+    $entry = null;
+    foreach ($data['entries'] ?? array() as $e) {
+        if (($e['fecha'] ?? '') === $fecha) {
+            $entry = $e;
+            break;
+        }
+    }
+
+    if ($entry) {
+        unset($entry['embedding']);
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(array(
+        'ok' => true,
+        'entry' => $entry,
+    ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+function action_search_diario() {
+    $query = trim((string)request_post('query', ''));
+    if ($query === '') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array('ok' => false, 'error' => 'query requerida'), JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // Búsqueda semántica si hay embeddings, fallback a full-text
+    $results = voice_diary_search_similar($query, 5);
+
+    $entries = array();
+    foreach ($results as $r) {
+        $e = $r['entry'];
+        unset($e['embedding']);
+        $e['_score'] = $r['score'];
+        $entries[] = $e;
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(array(
+        'ok' => true,
+        'entries' => $entries,
+        'query' => $query,
+    ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+// ─────────────────────────────────────────────────────────
+//  Acciones del nuevo inbox comercial
+// ─────────────────────────────────────────────────────────
+
+function action_toggle_inbox_replies() {
+    $settings = inbox_get_settings();
+    $settings['replies_enabled'] = !empty($settings['replies_enabled']) ? false : true;
+    inbox_save_settings($settings);
+    $label = $settings['replies_enabled'] ? 'activadas' : 'desactivadas';
+    set_flash('ok', 'Respuestas automáticas ' . $label . '.');
+    $returnTab = trim((string)request_post('return_tab', 'conversaciones'));
+    redirect_to(inbox_page_url($returnTab));
+}
+
+function action_toggle_inbox_opener() {
+    $settings = inbox_get_settings();
+    $settings['opener_enabled'] = !empty($settings['opener_enabled']) ? false : true;
+    inbox_save_settings($settings);
+    $label = $settings['opener_enabled'] ? 'activado' : 'desactivado';
+    set_flash('ok', 'Inicio de conversaciones ' . $label . '.');
+    $returnTab = trim((string)request_post('return_tab', 'conversaciones'));
+    redirect_to(inbox_page_url($returnTab));
+}
+
+function action_inbox_toggle_thread_pause() {
+    $threadId = trim((string)request_post('thread_id'));
+    $returnStageFilter = trim((string)request_post('return_stage_filter', ''));
+    $returnViewThread = trim((string)request_post('return_view_thread', ''));
+
+    $threads = comercial_get_threads();
+    foreach ($threads as $thread) {
+        if ((string)($thread['id'] ?? '') !== $threadId) continue;
+        $thread = comercial_normalize_thread($thread);
+        // Unificamos inbox_paused + human_taken: si cualquiera está activo → reanudar ambos
+        $isEffectivelyPaused = !empty($thread['inbox_paused']) || !empty($thread['human_taken']);
+        if ($isEffectivelyPaused) {
+            $thread['inbox_paused'] = 0;
+            $thread['human_taken']  = 0;
+            $label = 'reactivada';
+        } else {
+            $thread['inbox_paused'] = 1;
+            $label = 'pausada';
+        }
+        comercial_upsert_thread($thread);
+        set_flash('ok', 'Conversación ' . $label . '.');
+        break;
+    }
+
+    redirect_to(inbox_page_url('conversaciones', array_filter(array(
+        'stage_filter' => $returnStageFilter,
+        'view_thread' => $returnViewThread !== '' ? $returnViewThread : $threadId,
+    ))));
 }

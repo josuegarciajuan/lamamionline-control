@@ -166,7 +166,7 @@ function sampleConversations(array $outcomeList, array $allThreads, int $max, in
         foreach ($sliceMsgs as $m) {
             $um = trim((string) ($m['user_msg'] ?? ''));
             $br = trim((string) ($m['bot_reply'] ?? ''));
-            $isManual = !empty($m['manual']);
+            $isManual = !empty($m['manual']) || !empty($m['from_me']);
             $label = $isManual ? 'Humano' : 'Bot';
             if ($um !== '') $convoLines[] = "Cliente: {$um}";
             if ($br !== '') $convoLines[] = "{$label}: {$br}";
@@ -217,7 +217,7 @@ function sampleHumanConversations(array $humanThreads, int $max, int $maxChars =
         foreach ($sliceMsgs as $m) {
             $um = trim((string) ($m['user_msg'] ?? ''));
             $br = trim((string) ($m['bot_reply'] ?? ''));
-            $isManual = !empty($m['manual']);
+            $isManual = !empty($m['manual']) || !empty($m['from_me']);
             $label = $isManual ? 'Humano' : 'Bot';
             if ($um !== '') $convoLines[] = "Cliente: {$um}";
             if ($br !== '') $convoLines[] = "{$label}: {$br}";
@@ -257,7 +257,7 @@ $totalHumanReplies = 0;
 foreach ($threads as $tid => $msgs) {
     $humanCount = 0;
     foreach ($msgs as $m) {
-        if (!empty($m['manual']) && !empty(trim((string) ($m['bot_reply'] ?? '')))) {
+        if ((!empty($m['manual']) || !empty($m['from_me'])) && !empty(trim((string) ($m['bot_reply'] ?? '')))) {
             $humanCount++;
         }
     }
@@ -422,7 +422,7 @@ echo "  Meta-prompt size: " . number_format(strlen($fullPrompt)) . " chars\n";
 echo "\nCalling DeepSeek API for analysis...\n";
 
 $apiKey     = _cfg('deepseek.api_key', '');
-$apiUrl     = _cfg('deepseek.chat_url', 'https://api.deepseek.com/v1/chat/completions');
+$apiUrl     = _cfg('deepseek.chat_url', 'https://api.deepseek.com/chat/completions');
 $model      = _cfg('deepseek.chat_model', 'deepseek-v4-pro');
 $temperature = 0.7;
 
@@ -432,7 +432,9 @@ $body = json_encode([
         ['role' => 'user', 'content' => $fullPrompt],
     ],
     'temperature' => $temperature,
-    'max_tokens'  => 4096,
+    'max_tokens'  => 16384,
+    'thinking'        => ['type' => 'enabled'],
+    'reasoning_effort' => 'high',
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 $ch = curl_init($apiUrl);
@@ -495,11 +497,9 @@ if (!is_array($response)) {
 }
 
 $content = $response['choices'][0]['message']['content'] ?? null;
-// DeepSeek V4 Pro sometimes returns reasoning_content but empty content.
-// Fallback to reasoning_content if main content is empty.
-if (($content === null || trim((string) $content) === '') && !empty($response['choices'][0]['message']['reasoning_content'])) {
-    $content = $response['choices'][0]['message']['reasoning_content'];
-}
+// Preferir SIEMPRE 'content' (respuesta final). NUNCA usar 'reasoning_content'
+// como playbook: es el razonamiento interno del modelo (en inglés) y contaminaría
+// el prompt del bot. Con max_tokens amplio, content ya no queda vacío.
 if ($content === null || trim((string) $content) === '') {
     echo "ERROR: No content in API response (prompt may be too large)\n";
     echo "Raw: " . mb_substr((string) $rawResponse, 0, 500) . "\n";

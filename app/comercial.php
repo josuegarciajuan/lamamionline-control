@@ -88,8 +88,8 @@ function comercial_default_settings() {
         'notify_only_after_second_reply' => 1,
         'ia_second_turn_enabled' => 1,
         'ia_learning_enabled' => 1,
-        'conversation_max_auto_turns' => 5,
-        'conversation_max_defers' => 2,
+        'conversation_max_auto_turns' => 999, // AGENT V2: sin límite efectivo de turnos
+        'conversation_max_defers' => 999,     // AGENT V2: sin límite efectivo de defers
     );
 }
 
@@ -498,8 +498,8 @@ function comercial_default_process_seed($slug) {
         'negative_keywords' => array('no', 'baja', 'stop', 'nada', 'molestes', 'interesa no'),
         'ia_context_prompt' => '',
         'signal_detection_rules' => array(),
-        'conversation_max_auto_turns' => 5,
-        'escalation_score_threshold' => 78,
+        'conversation_max_auto_turns' => 999, // AGENT V2: sin límite efectivo
+        'escalation_score_threshold' => 70,     // AGENT V2: threshold más sensible (era 78)
         'ia_learning_enabled' => 1,
         'auto_notify_operator' => 1,
         'auto_followup' => 1,
@@ -518,10 +518,11 @@ function comercial_default_process_seed($slug) {
         $base['nombre'] = 'Plaza';
         $base['source_type'] = 'mysql_recent';
         $base['source_mysql_query'] = "SELECT id, telefono, updatedsamp, nombre_comercial FROM f_clientes WHERE baja = 0 and provincia in (12,46,3,43,8,17,25,44,50,22,16,2,30,19,7) ORDER BY updatedsamp DESC LIMIT 300";
-        $base['message_templates'] = comercial_default_process_templates($slug, 'message_templates');
-        $base['followup_templates'] = comercial_default_process_templates($slug, 'followup_templates');
+        // Templates eliminados — el LLM genera todo dinámicamente vía comercial_agent_process()
+        $base['message_templates'] = array();
+        $base['followup_templates'] = array();
         $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal'));
-        $base['ia_context_prompt'] = "Eres un comercial para alquiler de habitaciones/plazas en Casa Burriana. Tono: cercano, profesional y directo. Objetivo: detectar chicas interesadas en plaza o alquiler y concertar visita.\n\nRegla crítica: NUNCA reveles que eres un bot, IA, asistente virtual o sistema automatizado. Hazte pasar siempre por una chica humana real de Casa Burriana. Si te preguntan si eres un bot o una máquina, responde que eres una chica del equipo atendiendo personalmente, cambia de tema con naturalidad y sigue la conversación.";
+        $base['ia_context_prompt'] = ''; // Ahora se usa comercial_knowledge_get('plaza')
         return $base;
     }
 
@@ -530,10 +531,11 @@ function comercial_default_process_seed($slug) {
         $base['source_type'] = 'mysql_recent';
         $base['source_mysql_query'] = "SELECT id, telefono, updatedsamp, nombre_comercial FROM f_clientes WHERE baja = 0 ORDER BY updatedsamp DESC LIMIT 300";
         $base['window_end_hour'] = 20;
-        $base['message_templates'] = comercial_default_process_templates($slug, 'message_templates');
-        $base['followup_templates'] = comercial_default_process_templates($slug, 'followup_templates');
+        // Templates eliminados — el LLM genera todo dinámicamente
+        $base['message_templates'] = array();
+        $base['followup_templates'] = array();
         $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal'));
-        $base['ia_context_prompt'] = "Eres La Mami Online, un servicio de publicista digital. Tono: cercano, profesional, entusiasta. Objetivo: conseguir que la clienta se dé de alta (29€) para recibir clientes extra.\n\nRegla crítica: NUNCA reveles que eres un bot, IA, asistente virtual o sistema automatizado. Hazte pasar siempre por una persona humana real de La Mami Online. Si te preguntan si eres un bot o una máquina, responde que eres una persona del equipo atendiendo personalmente, cambia de tema con naturalidad y sigue la conversación.";
+        $base['ia_context_prompt'] = ''; // Ahora se usa comercial_knowledge_get('lamami')
         return $base;
     }
 
@@ -545,10 +547,11 @@ function comercial_default_process_seed($slug) {
         $base['window_end_hour'] = 19;
         $base['min_interval_seconds'] = 5400;
         $base['max_interval_seconds'] = 7200;
-        $base['message_templates'] = comercial_default_process_templates($slug, 'message_templates');
-        $base['followup_templates'] = comercial_default_process_templates($slug, 'followup_templates');
+        // Templates eliminados — el LLM genera todo dinámicamente
+        $base['message_templates'] = array();
+        $base['followup_templates'] = array();
         $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal', 'publi10'));
-        $base['ia_context_prompt'] = "Eres comercial de Publiscort. Tono: cercano, profesional y breve. Objetivo: validar interés real, resolver dudas básicas y llevar la conversación a una siguiente acción clara (pedir info adicional o propuesta), sin insistencia agresiva.\n\nRegla crítica: NUNCA reveles que eres un bot, IA, asistente virtual o sistema automatizado. Hazte pasar siempre por una persona humana real de Publiscort. Si te preguntan si eres un bot o una máquina, responde que eres una persona del equipo atendiendo personalmente, cambia de tema con naturalidad y sigue la conversación.";
+        $base['ia_context_prompt'] = ''; // Ahora se usa comercial_knowledge_get('publiscort')
         return $base;
     }
 
@@ -558,10 +561,11 @@ function comercial_default_process_seed($slug) {
         $base['source_queue_files'] = comercial_default_queue_files('publicista');
         $base['min_interval_seconds'] = 3300;
         $base['max_interval_seconds'] = 5100;
-        $base['message_templates'] = comercial_default_process_templates($slug, 'message_templates');
-        $base['followup_templates'] = comercial_default_process_templates($slug, 'followup_templates');
+        // Templates eliminados — el LLM genera todo dinámicamente
+        $base['message_templates'] = array();
+        $base['followup_templates'] = array();
         $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal', 'publi10'));
-        $base['ia_context_prompt'] = "Eres comercial de CasaWasap captando colaboradores (publicistas, RRPP, fotógrafos, taxistas, agencias). Tono: directo, profesional, claro. Objetivo: conseguir que presenten casas para ganar comisión recurrente.\n\nINFORMACIÓN CLAVE:\n- El colaborador solo presenta. Nosotros cerramos, configuramos y damos soporte.\n- Comisión: pago único por activación + comisión mensual recurrente mientras la casa siga activa.\n- Sin herramientas, sin soporte, sin inversión.\n- Web de afiliado: https://casawasap.com/seller.html\n- Demo del producto: https://demo.casawasap.com\n- El producto tiene 10 DÍAS GRATIS de prueba para las casas (se vende solo).\n\nReglas:\n- Tono directo y profesional.\n- NO uses más de 1 emoji por mensaje.\n- Responde PRIMERO a lo que preguntó, con datos concretos.\n- Enfatiza: \"tú solo abres la puerta, nosotros hacemos el resto\".\n- NUNCA reveles que eres un bot o IA.\n- Máximo 800 caracteres.";
+        $base['ia_context_prompt'] = ''; // Ahora se usa comercial_knowledge_get('publicista')
         return $base;
     }
 
@@ -573,10 +577,11 @@ function comercial_default_process_seed($slug) {
         $base['max_interval_seconds'] = 6400;
         $base['window_start_hour'] = 7;
         $base['window_end_hour'] = 22;
-        $base['message_templates'] = comercial_default_process_templates($slug, 'message_templates');
-        $base['followup_templates'] = comercial_default_process_templates($slug, 'followup_templates');
+        // Templates eliminados — el LLM genera todo dinámicamente
+        $base['message_templates'] = array();
+        $base['followup_templates'] = array();
         $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal', 'publi10'));
-        $base['ia_context_prompt'] = "Eres comercial de CasaWasap, un asistente IA para WhatsApp que contesta 24/7, publica estados, fideliza clientes y da estadísticas de conversión. Tono: profesional, cálido y directo. Objetivo: vender el servicio a dueñas de casas.\n\nINFORMACIÓN DEL PRODUCTO:\n- Precio: 100€/semana después de 10 días GRATIS de prueba (sin tarjeta, sin permanencia)\n- Demo pública: https://demo.casawasap.com (sin registro, pueden chatear como cliente)\n- Funcionalidades: respuestas 24/7 con IA, publicación automática de estados de WhatsApp, dashboard de estadísticas, avisos por Telegram, recordatorios de ETA, anti-regateo, memoria de clientes recurrentes\n- Líneas extra: 25€/semana cada una adicional\n- Resultados reales: +30% visitas recuperadas, 94% mensajes contestados al instante\n- Onboarding: 3 pasos, 5 minutos, sin instalar nada\n\nReglas:\n- Tono profesional, cálido y directo. NUNCA uses coletillas infantiles como 'guapa', 'cariño', 'reina', 'Holaaa' con letras repetidas.\n- NO uses más de 1 emoji por mensaje.\n- Responde PRIMERO a lo que preguntó el cliente, con información concreta.\n- Menciona siempre el trial de 10 DÍAS GRATIS y la demo si es relevante.\n- NUNCA reveles que eres un bot o IA.\n- Si el cliente pregunta precios, condiciones o cómo empezar, sé concreto.\n- Si el cliente da señales de compra, cierra directamente.\n- Máximo 800 caracteres por respuesta.";
+        $base['ia_context_prompt'] = ''; // Ahora se usa comercial_knowledge_get('casawasap')
         return $base;
     }
 
@@ -1143,28 +1148,83 @@ function comercial_register_sent_phone($phone, $processSlug = '') {
     $phoneDigits = comercial_only_digits($phone);
     if ($phoneDigits === '') return null;
 
-    // ── Fix #4: deduplicación global + por rama ──
+    // ── Fix #5: deduplicación atómica con flock ──
+    // El read-check-write sobre el archivo global no era atómico.
+    // Dos procesos concurrentes podían leer, no encontrar el teléfono, y ambos registrarlo.
+    // Ahora usamos un archivo de lock dedicado para serializar el acceso al global.
 
-    // Evitar duplicados en el registro global
-    if (comercial_phone_was_contacted($phoneDigits)) return null;
+    $lockFile = DATA_PATH . '/comercial_sent_phones.lock';
+    $lockFh = @fopen($lockFile, 'c+');
+    if (!$lockFh) {
+        // Si no podemos crear el lock, hacer el check sin lock (best-effort)
+        if (comercial_phone_was_contacted($phoneDigits)) return null;
+        $entry = array(
+            'id' => generate_id('cmsent'),
+            'phone' => $phoneDigits,
+            'process_slug' => trim((string)$processSlug),
+            'sent_at' => now_datetime(),
+        );
+        storage_upsert('comercial_sent_phones.json', $entry);
+        if (trim((string)$processSlug) !== '') {
+            $branchFile = 'comercial_sent_phones_' . preg_replace('/[^a-z0-9_\-]/i', '_', trim((string)$processSlug)) . '.json';
+            $branchEntry = $entry;
+            $branchEntry['branch_file'] = $branchFile;
+            storage_upsert($branchFile, $branchEntry);
+        }
+        return $entry;
+    }
 
-    $processSlug = trim((string)$processSlug);
-    $entry = array(
-        'id' => generate_id('cmsent'),
-        'phone' => $phoneDigits,
-        'process_slug' => $processSlug,
-        'sent_at' => now_datetime(),
-    );
+    // Bloquear acceso exclusivo al global
+    if (!flock($lockFh, LOCK_EX)) {
+        fclose($lockFh);
+        if (comercial_phone_was_contacted($phoneDigits)) return null;
+        $entry = array(
+            'id' => generate_id('cmsent'),
+            'phone' => $phoneDigits,
+            'process_slug' => trim((string)$processSlug),
+            'sent_at' => now_datetime(),
+        );
+        storage_upsert('comercial_sent_phones.json', $entry);
+        if (trim((string)$processSlug) !== '') {
+            $branchFile = 'comercial_sent_phones_' . preg_replace('/[^a-z0-9_\-]/i', '_', trim((string)$processSlug)) . '.json';
+            $branchEntry = $entry;
+            $branchEntry['branch_file'] = $branchFile;
+            storage_upsert($branchFile, $branchEntry);
+        }
+        return $entry;
+    }
 
-    // 1. Registrar en el archivo global
-    storage_upsert('comercial_sent_phones.json', $entry);
+    // Bajo lock: re-leer y re-chequear (doble verificación)
+    try {
+        if (comercial_phone_was_contacted($phoneDigits)) {
+            flock($lockFh, LOCK_UN);
+            fclose($lockFh);
+            comercial_event_append('duplicate_blocked', array(
+                'phone' => $phoneDigits,
+                'process_slug' => trim((string)$processSlug),
+                'reason' => 'already_contacted_under_lock',
+            ));
+            return null;
+        }
 
-    // 2. Registrar en el archivo específico de la rama (si hay slug)
-    if ($processSlug !== '') {
-        $branchFile = 'comercial_sent_phones_' . preg_replace('/[^a-z0-9_\-]/i', '_', $processSlug) . '.json';
-        $branchEntry = $entry;
-        $branchEntry['branch_file'] = $branchFile;
-        storage_upsert($branchFile, $branchEntry);
+        $entry = array(
+            'id' => generate_id('cmsent'),
+            'phone' => $phoneDigits,
+            'process_slug' => trim((string)$processSlug),
+            'sent_at' => now_datetime(),
+        );
+
+        storage_upsert('comercial_sent_phones.json', $entry);
+
+        if (trim((string)$processSlug) !== '') {
+            $branchFile = 'comercial_sent_phones_' . preg_replace('/[^a-z0-9_\-]/i', '_', trim((string)$processSlug)) . '.json';
+            $branchEntry = $entry;
+            $branchEntry['branch_file'] = $branchFile;
+            storage_upsert($branchFile, $branchEntry);
+        }
+    } finally {
+        flock($lockFh, LOCK_UN);
+        fclose($lockFh);
     }
 
     return $entry;
@@ -1686,6 +1746,15 @@ function comercial_normalize_thread($row) {
         'prior_inbound_text' => '',
         'last_inbound_processed_at' => '',
         'hot_notified_at' => '',
+        'last_human_reply_at' => '',
+        'conversation_phase' => '',
+        'ai_semantic_interest' => false,
+        'ai_semantic_score' => 0,
+        'ai_semantic_reasoning' => '',
+        'manual_panel_include' => false,
+        'manual_panel_reason' => '',
+        'manual_panel_negocio' => '',
+        'manual_panel_at' => '',
     );
     $out = array_merge($defaults, $row);
     $out['human_taken'] = !empty($out['human_taken']) ? 1 : 0;
@@ -1694,7 +1763,106 @@ function comercial_normalize_thread($row) {
     $out['last_confidence'] = max(0, min(1, (float)($out['last_confidence'] ?? 0)));
     if ($out['target_phone'] !== '') $out['target_phone'] = comercial_only_digits($out['target_phone']);
     if ($out['line_phone'] !== '') $out['line_phone'] = comercial_only_digits($out['line_phone']);
+    $out['inbox_paused'] = !empty($out['inbox_paused']) ? 1 : 0;
     return $out;
+}
+
+/**
+ * Filtra threads para la vista de agente comercial.
+ * Últimos N días, IA genuino, very_hot/qualified, 2+ replies no descartados.
+ */
+function comercial_filter_agent_threads($threads, $cutoffDays = 4) {
+    $cutoffTs = time() - ($cutoffDays * 86400);
+    $out = array();
+    foreach ($threads as $thread) {
+        $stage = trim((string)($thread['stage'] ?? ''));
+        if (!empty($thread['manual_panel_include'])) { $out[] = $thread; continue; }
+        if (!empty($thread['ai_semantic_interest'])) { $out[] = $thread; continue; }
+        $updatedTs = strtotime((string)($thread['updated_at'] ?? ''));
+        if ($updatedTs < $cutoffTs) continue;
+        if (!empty($thread['ai_is_genuine'])) { $out[] = $thread; continue; }
+        if ($stage === 'very_hot' || $stage === 'qualified') { $out[] = $thread; continue; }
+        $hasAi = !empty($thread['ai_qualified_at']);
+        if ($hasAi && empty($thread['ai_is_genuine']) && $stage !== 'discarded') continue;
+        if ($stage === 'discarded') { $out[] = $thread; continue; }
+        $replies = (int)($thread['replies_count'] ?? 0);
+        if ($replies >= 2 && $stage !== 'autoresponder') {
+            $out[] = $thread;
+        }
+    }
+    return $out;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  AGENT V2: Máquina de Estados de Conversación
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Determina la fase actual de la conversación basándose en reglas deterministas.
+ * No depende del LLM — es pura lógica de negocio.
+ */
+function comercial_state_machine_determine_phase(array $thread, array $process, string $inboundText = ''): string {
+    $replies = (int)($thread['replies_count'] ?? 0);
+    $stage = (string)($thread['stage'] ?? '');
+    $inboundLower = trim(mb_strtolower((string)$inboundText, 'UTF-8'));
+
+    // Señales de descarte inmediato
+    if ($stage === 'discarded' || $stage === 'autoresponder') {
+        return 'DESCARTADO';
+    }
+
+    if (mb_stripos($inboundLower, 'no me interesa') !== false
+        || mb_stripos($inboundLower, 'no gracias') !== false
+        || mb_stripos($inboundLower, 'deja de escribirme') !== false
+        || mb_stripos($inboundLower, 'para de escribir') !== false) {
+        return 'DESCARTADO';
+    }
+
+    // Señales de compra → CIERRE
+    $buyingKeywords = array('activar', 'empiezo', 'empezar', 'darme de alta', 'prueba gratis',
+        'visita', 'ver la casa', 'cuándo puedo', 'me interesa', 'lo quiero', 'probarlo',
+        'dónde estáis', 'cómo llego', 'apuntarme', 'contratar');
+    $buyingCount = 0;
+    foreach ($buyingKeywords as $kw) {
+        if (mb_stripos($inboundLower, $kw) !== false) $buyingCount++;
+    }
+    if ($buyingCount >= 2 || $stage === 'very_hot') {
+        return 'CIERRE';
+    }
+
+    // Objeción detectada → MANEJO_OBJECIONES
+    $objecionKeywords = array('caro', 'carísimo', 'mucho dinero', 'no sé', 'no confío',
+        'ya tengo', 'no tengo tiempo', 'no funciona', 'no me convence', 'difícil',
+        'no puedo', 'lo pensaré', 'lo pienso', 'tengo que hablar', 'tengo que consultar',
+        'no me lo creo', 'demasiado', 'no estoy segura', 'no estoy seguro',
+        'déjame pensarlo', 'luego te digo');
+    foreach ($objecionKeywords as $kw) {
+        if (mb_stripos($inboundLower, $kw) !== false) {
+            return 'MANEJO_OBJECIONES';
+        }
+    }
+
+    // Por conteo de replies
+    if ($replies === 0) return 'SALUDO_INICIAL';
+    if ($replies === 1) return 'DESCUBRIMIENTO';
+    if ($replies >= 2) return 'PRESENTACION';
+
+    return 'DESCUBRIMIENTO';
+}
+
+/**
+ * Devuelve las reglas de formato para una fase (usado por el crítico).
+ */
+function comercial_state_machine_phase_rules(string $phase): array {
+    $rules = [
+        'SALUDO_INICIAL'     => ['max_lines' => 4, 'end_with_question' => true],
+        'DESCUBRIMIENTO'     => ['max_lines' => 5, 'end_with_question' => true],
+        'PRESENTACION'       => ['max_lines' => 5, 'end_with_question' => true],
+        'MANEJO_OBJECIONES'  => ['max_lines' => 4, 'end_with_question' => true],
+        'CIERRE'             => ['max_lines' => 4, 'end_with_question' => false],
+        'DESCARTADO'         => ['max_lines' => 0, 'end_with_question' => false],
+    ];
+    return $rules[$phase] ?? ['max_lines' => 5, 'end_with_question' => true];
 }
 
 function comercial_thread_apply_stage($thread, $stage) {
@@ -2042,6 +2210,7 @@ function comercial_ai_memory_get_rows() {
             'process_slug' => trim((string)($row['process_slug'] ?? '')),
             'kind' => trim((string)($row['kind'] ?? 'human_reply')),
             'text' => $text,
+            'trigger_text' => trim((string)($row['trigger_text'] ?? '')),
             'accepted_count' => max(0, (int)($row['accepted_count'] ?? 0)),
             'edited_count' => max(0, (int)($row['edited_count'] ?? 0)),
             'led_to_lead_count' => max(0, (int)($row['led_to_lead_count'] ?? 0)),
@@ -2076,6 +2245,7 @@ function comercial_ai_memory_store_feedback($processSlug, $kind, $text, $feedbac
     $text = trim((string)$text);
     $feedbackMeta = is_array($feedbackMeta) ? $feedbackMeta : array();
     if ($text === '') return;
+    $triggerText = trim((string)($feedbackMeta['trigger_text'] ?? ''));
 
     $rows = comercial_ai_memory_get_rows();
     $matchIndex = -1;
@@ -2093,6 +2263,7 @@ function comercial_ai_memory_store_feedback($processSlug, $kind, $text, $feedbac
             'process_slug' => $processSlug,
             'kind' => $kind !== '' ? $kind : 'human_reply',
             'text' => $text,
+            'trigger_text' => $triggerText,
             'accepted_count' => 0,
             'edited_count' => 0,
             'led_to_lead_count' => 0,
@@ -2105,6 +2276,9 @@ function comercial_ai_memory_store_feedback($processSlug, $kind, $text, $feedbac
     }
 
     $row = $rows[$matchIndex];
+    if ($triggerText !== '' && trim((string)($row['trigger_text'] ?? '')) === '') {
+        $row['trigger_text'] = $triggerText;
+    }
     $row['use_count'] = (int)$row['use_count'] + 1;
     if (!empty($feedbackMeta['accepted'])) $row['accepted_count'] = (int)$row['accepted_count'] + 1;
     if (!empty($feedbackMeta['edited'])) $row['edited_count'] = (int)$row['edited_count'] + 1;
@@ -2135,6 +2309,72 @@ function comercial_ai_memory_top_examples($processSlug, $kind = 'human_reply', $
         return $scoreB <=> $scoreA;
     });
     return array_slice($filtered, 0, $limit);
+}
+
+/**
+ * Selecciona respuestas humanas pasadas relevantes para el mensaje entrante actual.
+ * Scoring = overlap de keywords (con el texto entrante y el trigger guardado)
+ *           + score histórico (leads, aceptadas, usos).
+ * Sustituye al top estático de comercial_ai_memory_top_examples para "selección de respuestas".
+ *
+ * @param string $processSlug Slug del negocio
+ * @param string $inboundText Texto entrante del cliente (puede estar vacío en modo opener)
+ * @param string $phase       Fase actual (informativo, el texto entrante ya codifica la fase)
+ * @param int    $limit       Nº máximo de ejemplos
+ * @return array list<array>  Filas de memoria ordenadas por relevancia
+ */
+function comercial_ai_memory_relevant_examples($processSlug, $inboundText, $phase = '', $limit = 3) {
+    $processSlug = trim((string)$processSlug);
+    $inboundText = trim((string)$inboundText);
+    $limit = max(1, min(6, (int)$limit));
+
+    $rows = comercial_ai_memory_get_rows();
+    $inboundLower = mb_strtolower($inboundText, 'UTF-8');
+
+    // Tokenizar el texto entrante (palabras >= 3 chars, sin stopwords)
+    $stopwords = array('para', 'que', 'como', 'cuando', 'donde', 'estoy', 'tengo', 'quiero', 'saber', 'usted', 'ustedes', 'sobre', 'este', 'esta', 'esto', 'pero', 'mas', 'hay', 'con', 'por', 'una', 'uno', 'los', 'las', 'del', 'hola', 'buenas', 'buenos', 'buena', 'bueno', 'gracias', 'nada', 'todo', 'bien', 'muchas', 'muchos');
+    $tokens = preg_split('/[^a-z0-9áéíóúñü]+/u', $inboundLower, -1, PREG_SPLIT_NO_EMPTY);
+    $tokens = array_values(array_filter((array)$tokens, function ($t) use ($stopwords) {
+        return mb_strlen($t, 'UTF-8') >= 3 && !in_array($t, $stopwords, true);
+    }));
+
+    $scored = array();
+    foreach ($rows as $row) {
+        if ((string)($row['kind'] ?? 'human_reply') !== 'human_reply') continue;
+        if ($processSlug !== '' && (string)($row['process_slug'] ?? '') !== $processSlug) continue;
+        $text = trim((string)($row['text'] ?? ''));
+        if ($text === '') continue;
+
+        $trigger = mb_strtolower(trim((string)($row['trigger_text'] ?? '')), 'UTF-8');
+        $textLower = mb_strtolower($text, 'UTF-8');
+
+        $overlap = 0;
+        foreach ($tokens as $tok) {
+            if ($tok !== '' && (mb_stripos($textLower, $tok) !== false || ($trigger !== '' && mb_stripos($trigger, $tok) !== false))) {
+                $overlap++;
+            }
+        }
+
+        $histScore = ((int)($row['led_to_lead_count'] ?? 0) * 8)
+                   + ((int)($row['accepted_count'] ?? 0) * 3)
+                   - ((int)($row['edited_count'] ?? 0))
+                   + ((int)($row['use_count'] ?? 0));
+
+        $scored[] = array('row' => $row, 'overlap' => $overlap, 'score' => $overlap * 10 + $histScore);
+    }
+
+    usort($scored, function ($a, $b) {
+        if ($a['overlap'] === $b['overlap']) {
+            return $b['score'] <=> $a['score'];
+        }
+        return $b['overlap'] <=> $a['overlap'];
+    });
+
+    $out = array();
+    foreach (array_slice($scored, 0, $limit) as $item) {
+        $out[] = $item['row'];
+    }
+    return $out;
 }
 
 function comercial_build_contextual_followup_prompt($thread, $processSlug, $objective) {
@@ -2193,6 +2433,206 @@ function comercial_build_contextual_followup_prompt($thread, $processSlug, $obje
 }
 
 function comercial_ai_generate_contextual_followup($thread, $processSlug, $objective) {
+    // Delegar al nuevo agente LLM
+    return comercial_ai_legacy_generate_contextual_followup($thread, $processSlug, $objective);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  FOTOS DE HABITACIONES (rama Plaza / Casa Burriana)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Devuelve la lista de fotos de habitaciones subidas desde el CRM.
+ * Vive en data/plaza_room_photos.json (shortlinks de compartir.site).
+ */
+function plaza_room_photos_get(): array {
+    $rows = storage_read('plaza_room_photos.json');
+    if (!is_array($rows)) return array();
+    $out = array();
+    foreach ($rows as $r) {
+        if (is_array($r) && trim((string)($r['url'] ?? '')) !== '') {
+            $out[] = $r;
+        }
+    }
+    return $out;
+}
+
+/**
+ * Persiste la lista de fotos de habitaciones.
+ */
+function plaza_room_photos_save(array $rows): void {
+    storage_write('plaza_room_photos.json', array_values($rows));
+}
+
+/**
+ * Detecta si procede enviar fotos: el cliente las pide o el bot las ofrece.
+ */
+function comercial_plaza_wants_photos(string $inboundText, string $replyText): bool {
+    $haystack = mb_strtolower(trim($inboundText . ' ' . $replyText), 'UTF-8');
+    if ($haystack === '') return false;
+    // Normalizar acentos/ñ para matchear con independencia de tildes
+    $accents = array('á'=>'a','à'=>'a','ä'=>'a','â'=>'a','é'=>'e','è'=>'e','ë'=>'e','ê'=>'e','í'=>'i','ì'=>'i','ï'=>'i','î'=>'i','ó'=>'o','ò'=>'o','ö'=>'o','ô'=>'o','ú'=>'u','ù'=>'u','ü'=>'u','û'=>'u','ñ'=>'n');
+    $haystack = strtr($haystack, $accents);
+    return (bool) preg_match('/(fotos?|ensen|mandam|habitacion|verla|verlo|a ver|como es|como son)/u', $haystack);
+}
+
+/**
+ * Inyecta los enlaces de fotos de habitaciones en la respuesta automática
+ * de la rama Plaza. Es determinista: el LLM no inventa URLs.
+ */
+function comercial_plaza_inject_room_photos(string $processSlug, string $replyText, string $inboundText): string {
+    if (trim($processSlug) !== 'plaza') return $replyText;
+    if (mb_stripos($replyText, 'compartir.site') !== false) return $replyText; // ya lleva fotos
+
+    $photos = plaza_room_photos_get();
+    if (empty($photos)) return $replyText;
+    if (!comercial_plaza_wants_photos($inboundText, $replyText)) return $replyText;
+
+    $urls = array();
+    foreach ($photos as $p) {
+        $u = trim((string)($p['url'] ?? ''));
+        if ($u !== '') $urls[] = $u;
+    }
+    if (empty($urls)) return $replyText;
+
+    $urls = array_slice($urls, 0, 4); // máximo 4 fotos por mensaje
+
+    $replyText = rtrim($replyText);
+    $replyText .= "\n\n" . implode("\n", $urls);
+    return $replyText;
+}
+
+/**
+ * Pausa (segundos) entre el texto y cada enlace de foto al enviar varios mensajes.
+ * Mismo criterio que bot-casa (presend_sleep), más corto para comercial.
+ */
+if (!defined('COMERCIAL_PHOTO_LINK_SLEEP_SEC')) {
+    define('COMERCIAL_PHOTO_LINK_SLEEP_SEC', 4);
+}
+
+/**
+ * Separa el texto de las URLs de imagen para enviar cada enlace en un mensaje
+ * individual (mismo algoritmo que bot-casa / ImageSplitter):
+ *   - Primer mensaje: solo texto (sin URLs de imagen).
+ *   - Siguientes: una URL por mensaje.
+ */
+function comercial_split_image_messages(string $text): array {
+    $text = trim((string)$text);
+    if ($text === '') return array();
+
+    if (preg_match_all('#https?://[^\s<>"\')\]}]+#u', $text, $m) === false || empty($m[0])) {
+        return array($text);
+    }
+
+    $imageUrls = array();
+    foreach ($m[0] as $url) {
+        if (preg_match('#//(?:[^/]*\.)?compartir\.site/#i', $url)
+            || preg_match('/\.(?:jpg|jpeg|png|webp)(?:\?|#|$)/i', $url)) {
+            $imageUrls[] = $url;
+        }
+    }
+    if (empty($imageUrls)) return array($text);
+
+    $textOnly = $text;
+    foreach ($imageUrls as $u) {
+        $textOnly = str_replace($u, '', $textOnly);
+    }
+    $textOnly = trim((string)preg_replace('/\n{3,}/', "\n\n", $textOnly));
+
+    $messages = array();
+    if ($textOnly !== '') $messages[] = $textOnly;
+    foreach ($imageUrls as $u) {
+        $messages[] = $u;
+    }
+    return $messages;
+}
+
+/**
+ * Envía startTyping a WAHA ANTES de la llamada LLM para enmascarar la latencia
+ * del thinking (el cliente ve "escribiendo…" en lugar de silencio).
+ * Es fire-and-forget: no bloquea la generación.
+ */
+function comercial_start_typing_for_thread($thread) {
+    $thread = comercial_normalize_thread($thread);
+    $settings = comercial_get_settings();
+    $lines = comercial_list_lines_indexed();
+    $lineId = trim((string)($thread['line_id'] ?? ''));
+    if ($lineId === '' || !isset($lines[$lineId])) return;
+    $line = $lines[$lineId];
+    $port = trim((string)($line['waha_port'] ?? ''));
+    $chatId = comercial_to_chat_id(comercial_normalize_phone_spain((string)($thread['target_phone'] ?? '')));
+    if ($port === '' || $chatId === '') return;
+    $payload = array('session' => (string)$settings['waha_session'], 'chatId' => $chatId);
+    comercial_waha_post_json($settings, $port, 'api/startTyping', $payload);
+}
+
+/**
+ * Wrapper para generar respuesta con el nuevo agente LLM.
+ * Reemplaza comercial_pick_followup_or_improvise().
+ */
+function comercial_agent_generate_reply_wrapper($thread, $processSlug, $text) {
+    // Enmascarar latencia del LLM: avisar "escribiendo…" antes de pensar
+    comercial_start_typing_for_thread($thread);
+
+    // Si text está vacío y el thread tiene inbound text, usarlo
+    if (trim((string)$text) === '') {
+        $text = trim((string)($thread['last_inbound_text'] ?? ''));
+    }
+
+    $phase = (string)($thread['conversation_phase'] ?? 'DESCUBRIMIENTO');
+
+    // 1. Generator (GPT-4o-mini con prompt fase-específico)
+    $ai = comercial_agent_process($thread, $processSlug, 'reply', array(
+        'inbound_text' => $text,
+        'phase' => $phase,
+    ));
+
+    if (!empty($ai['ok']) && trim((string)($ai['text'] ?? '')) !== '') {
+        $reply = trim((string)$ai['text']);
+
+        // 2. Critic (DeepSeek) — solo si está disponible
+        if (function_exists('comercial_agent_critic_evaluate')) {
+            $phaseRules = comercial_state_machine_phase_rules($phase);
+            $criticResult = comercial_agent_critic_evaluate($reply, $phase, $phaseRules);
+
+            // Crítico pasó → usar texto original
+            if ($criticResult['score'] >= 89) {
+                $reply = $criticResult['text'];
+            }
+            // DeepSeek reescribió → usar versión corregida
+            elseif (!empty($criticResult['rewritten'])) {
+                comercial_event_append('critic_rewritten', array(
+                    'thread_id' => (string)$thread['id'],
+                    'phase' => $phase,
+                    'original_score' => $criticResult['score'],
+                    'reason' => $criticResult['reason'] ?? '',
+                ));
+                $reply = $criticResult['rewritten'];
+            }
+            // Crítico falló → fallback determinista
+            elseif (function_exists('comercial_agent_critic_fallback')) {
+                $fallback = comercial_agent_critic_fallback($processSlug, $phase);
+                if ($fallback !== '') {
+                    comercial_event_append('critic_fallback_used', array(
+                        'thread_id' => (string)$thread['id'],
+                        'phase' => $phase,
+                        'original_score' => $criticResult['score'],
+                    ));
+                    $reply = $fallback;
+                }
+            }
+        }
+
+        return comercial_plaza_inject_room_photos($processSlug, $reply, $text);
+    }
+
+    // Fallback: usar el viejo sistema si el agente falla
+    $process = comercial_get_process($processSlug);
+    if (!$process) $process = comercial_generic_inbound_process();
+    return comercial_plaza_inject_room_photos($processSlug, comercial_pick_followup_or_improvise($thread, $process, $text), $text);
+}
+
+function comercial_ai_legacy_generate_contextual_followup($thread, $processSlug, $objective) {
     if (!function_exists('publicista_openai_json_request') || !function_exists('publicista_response_output_text') || !function_exists('publicista_ai_config')) {
         return array('ok' => false, 'error' => 'ai_utilities_unavailable');
     }
@@ -2246,9 +2686,11 @@ function comercial_decision_score_confidence($thread, $classification, $text) {
     $text = trim((string)$text);
     $score = 0.45;
     if ($classification === 'very_hot') $score += 0.35;
-    if ($classification === 'qualified') $score += 0.25;
+    if ($classification === 'qualified') $score += 0.30;
     if (comercial_safe_len($text) >= 18) $score += 0.10;
-    if (preg_match('/\b(precio|zona|horario|cuando|cu[aá]ndo|ubicaci[oó]n|interesa|donde|d[oó]nde|direcci[oó]n|sitio|localizaci[oó]n)\b/ui', $text)) $score += 0.12;
+    // ── Señales fuertes de intención real ──
+    if (preg_match('/\b(precio|zona|horario|cuando|cu[aá]ndo|ubicaci[oó]n|interesa|donde|d[oó]nde|direcci[oó]n|sitio|localizaci[oó]n|estaci[oó]n|llegar|visita|habitaci[oó]n|alquilar|probar|activar|empezar)\b/ui', $text)) $score += 0.15;
+    if (preg_match('/\b(dale|perfecto|voy|me\s+apunto|me\s+interesa|quiero\s+ir|quiero\s+probar|quiero\s+empezar)\b/ui', $text)) $score += 0.15;
     if (comercial_inbound_has_risk_phrase($text)) $score -= 0.45;
     return max(0, min(1, $score));
 }
@@ -2290,13 +2732,16 @@ function comercial_decide_inbound_action($thread, $process, $classification, $te
     if ($risk) {
         return array('action' => 'escalate_human', 'confidence' => $confidence, 'risk' => true, 'reason' => 'risk_phrase');
     }
-    if ($thread['auto_turn_count'] >= $maxTurns) {
-        return array('action' => 'escalate_human', 'confidence' => $confidence, 'risk' => false, 'reason' => 'max_auto_turns_reached');
-    }
+    // ── AGENT V2: Sin límite de turnos. El bot responde hasta obtener lead o descalificar.
+    // La condición max_turns se comenta; la decisión ahora viene del LLM vía comercial_agent_decide_escalation().
+    // Mantenemos el mecanismo por si se usa como fallback, pero con umbral muy alto.
+    // if ($thread['auto_turn_count'] >= $maxTurns) {
+    //     return array('action' => 'escalate_human', ...);
+    // }
     if ($classification === 'negative') {
         return array('action' => 'defer', 'confidence' => $confidence, 'risk' => false, 'reason' => 'negative_intent_defer');
     }
-    if (in_array((string)$classification, array('responded', 'very_hot', 'qualified', 'greeting', 'curious'), true)) {
+    if (in_array((string)$classification, array('responded', 'very_hot', 'qualified', 'greeting', 'curious', 'asking_info'), true)) {
         return array('action' => 'auto_reply_second_turn', 'confidence' => $confidence, 'risk' => false, 'reason' => 'eligible');
     }
     return array('action' => 'auto_reply_second_turn', 'confidence' => $confidence, 'risk' => false, 'reason' => 'default_reply');
@@ -2815,6 +3260,12 @@ function comercial_webhook_extract_payload($request = array()) {
 
     $fromMe = !empty($body['fromMe']) || !empty($payload['fromMe']) || !empty($data['fromMe']);
 
+    $source = comercial_first_nonempty_value(array(
+        $body['source'] ?? '',
+        $payload['source'] ?? '',
+    ));
+    $linePhone = comercial_only_digits((string)($me['id'] ?? ''));
+
     return array(
         'from' => comercial_only_digits($from),
         'to' => comercial_only_digits($to),
@@ -2822,6 +3273,8 @@ function comercial_webhook_extract_payload($request = array()) {
         'port' => trim((string)$linePort),
         'message_id' => $messageId,
         'from_me' => $fromMe ? 1 : 0,
+        'source' => trim((string)$source),
+        'line_phone' => $linePhone,
         'is_status_broadcast' => $isStatusBroadcast ? 1 : 0,
         'is_group' => $isGroupMessage ? 1 : 0,
         'raw' => $body,
@@ -2900,9 +3353,61 @@ function comercial_handle_webhook_http() {
         $logContext = comercial_webhook_payload_log_context($payload);
 
         if (!empty($payload['from_me'])) {
+            // ── fromMe=true → un humano respondió desde WhatsApp nativo ──
+            // source=api ⇒ lo envió el propio bot vía WAHA API y ya está
+            // registrado (manual_outbound_sent / send_ok); lo saltamos para
+            // no duplicar el historial ni marcar human_taken indebidamente.
+            if (($payload['source'] ?? '') === 'api') {
+                comercial_webhook_log_append('received_parsed', $logContext);
+                comercial_webhook_log_append('from_me_api_skipped', $logContext + array('http_status' => 200));
+                voice_json_response(array('ok' => true, 'from_me' => true, 'source' => 'api', 'skipped' => true));
+            }
+
+            // Buscar el thread activo para marcar human_taken y persistir el mensaje
+            // - $toPhone   = cliente real (RecipientAlt)
+            // - $fromPhone = línea real (me.id), no el LID de payload.from
+            $toPhone = (string)($payload['to'] ?? '');
+            $fromPhone = (string)($payload['line_phone'] ?? $payload['from'] ?? '');
+            $msgText = trim((string)($payload['text'] ?? ''));
+            if ($toPhone !== '' && $fromPhone !== '') {
+                $fromMeThread = comercial_find_open_thread_for_inbound($toPhone, $fromPhone, (string)($payload['port'] ?? ''));
+                if ($fromMeThread) {
+                    $fromMeThread['human_taken'] = 1;
+                    $fromMeThread['inbox_paused'] = 1;
+                    $fromMeThread['last_human_reply_at'] = now_datetime();
+                    // Persistir el texto del mensaje en el thread para que aparezca en el historial
+                    if ($msgText !== '') {
+                        $fromMeThread['last_outbound_text'] = $msgText;
+                    }
+                    comercial_upsert_thread($fromMeThread);
+                    // ── Aprendizaje IA: alimentar la memoria con la respuesta humana nativa ──
+                    if ($msgText !== '' && !empty(comercial_get_settings()['ia_learning_enabled'])) {
+                        $processSlug = trim((string)($fromMeThread['process_slug'] ?? ''));
+                        if ($processSlug === '') $processSlug = 'inbound';
+                        comercial_ai_memory_store_feedback($processSlug, 'human_reply', $msgText, array(
+                            'trigger_text' => trim((string)($fromMeThread['last_inbound_text'] ?? '')),
+                            'led_to_lead' => false,
+                        ));
+                    }
+                    // Evento visible en el timeline (mismo tipo que los envíos desde el panel)
+                    if ($msgText !== '') {
+                        comercial_event_append('manual_outbound_sent', array(
+                            'thread_id' => $fromMeThread['id'],
+                            'target_phone' => $toPhone,
+                            'text' => $msgText,
+                            'source' => 'native_wa',
+                        ));
+                    }
+                    comercial_event_append('human_taken_from_native', array(
+                        'thread_id' => $fromMeThread['id'],
+                        'target_phone' => $toPhone,
+                        'text_preview' => voice_safe_substr($msgText, 0, 100),
+                    ));
+                }
+            }
             comercial_webhook_log_append('received_parsed', $logContext);
-            comercial_webhook_log_append('ignored_from_me', $logContext + array('http_status' => 200));
-            voice_json_response(array('ok' => true, 'ignored' => 'from_me'));
+            comercial_webhook_log_append('from_me_persisted', $logContext + array('http_status' => 200));
+            voice_json_response(array('ok' => true, 'from_me' => true, 'persisted' => !empty($fromMeThread)));
         }
 
         if (!empty($payload['is_status_broadcast']) || !empty($payload['is_group'])) {
@@ -3240,6 +3745,34 @@ function comercial_reply_positive_reason($text, $process) {
         'ok cuentame',
         'claro cuentame',
         'perfecto pasame info',
+        // ── Nuevas señales de qualified (plan mejora comercial 2026-07) ──
+        'me apunto',
+        'voy',
+        'vamos',
+        'como hago',
+        'que necesitas',
+        'que necesito',
+        'como empezamos',
+        'como me activo',
+        'quiero empezar',
+        'quiero probar',
+        'me gustaria probar',
+        'quiero verlo',
+        'a ver',
+        'cuentame como es',
+        'dime como va',
+        'como es el proceso',
+        'que tengo que hacer',
+        'como va eso',
+        'me cuadra',
+        'me viene bien',
+        'estoy interesado',
+        'estoy interesada',
+        'donde te ubicas',
+        'donde estas ubicado',
+        'donde esta',
+        'para cuando',
+        'desde cuando',
     );
     foreach ($positivePhrases as $phrase) {
         if (comercial_text_contains_keyword($normalizedText, $phrase)) {
@@ -3367,10 +3900,27 @@ function comercial_is_likely_autoresponder($text, $thread = array()) {
 
 function comercial_generic_inbound_process() {
     return array(
-        'positive_keywords' => array('info', 'interesa', 'precio', 'como', 'cómo', 'vale', 'ok', 'si', 'sí', 'dale', 'claro', 'perfecto'),
-        'negative_keywords' => array('baja', 'stop', 'nada', 'molestes', 'no me interesa', 'no quiero'),
-        'auto_followup' => 0,
+        'id' => 'comproc_inbound',
+        'slug' => 'inbound',
+        'nombre' => 'Inbound genérico',
+        'auto_followup' => 1,
+        'conversation_max_auto_turns' => 5,
+        'positive_keywords' => array(
+            'info', 'interesa', 'precio', 'cuanto', 'donde', 'cuando',
+            'direccion', 'hora', 'visita', 'ver', 'probar', 'dale',
+            'perfecto', 'voy', 'quiero', 'me interesa', 'disponible', 'libre',
+            'cerca', 'estacion', 'llegar', 'mañana', 'hoy', 'empezar',
+            'activar', 'contacto', 'whatsapp', 'telefono', 'hablar',
+            'si', 'sí', 'claro', 'ok', 'vale', 'como', 'cómo',
+        ),
+        'negative_keywords' => array(
+            'baja', 'stop', 'nada', 'molestes', 'deja de', 'bloqueo',
+            'denuncia', 'no me interesa', 'no quiero', 'fuera',
+        ),
+        'ia_learning_enabled' => 1,
+        'auto_notify_operator' => 1,
         'auto_create_lead' => 0,
+        'ia_context_prompt' => "Eres una persona real atendiendo un mensaje entrante por WhatsApp. No sabes quién te escribe ni por qué. Tu objetivo es descubrir qué necesita esta persona de forma natural y amable, y si hay oportunidad de ofrecerle algún servicio de los que manejas (habitaciones en Casa Burriana, publicidad con LaMami Online, el asistente CasaWasap para dueñas de casas, o servicios de publicidad Publiscort), detectar cuál encaja y mover la conversación hacia ahí sin ser agresivo.\n\nREGLAS CRÍTICAS:\n- NUNCA reveles que eres un bot, IA o sistema automatizado. Eres una persona real.\n- NO uses más de 1 emoji por mensaje, y solo si es funcional.\n- Responde de forma natural, como lo harías en una conversación real de WhatsApp.\n- Si la persona pregunta algo concreto (precios, dirección, horarios), responde PRIMERO a eso con información real.\n- Si no tienes información suficiente, pregunta con naturalidad, no como un formulario.\n- NO enumeres servicios como un menú. Detecta por el contexto cuál podría interesarle.\n- Tono: natural, cercano, profesional. NADA de coletillas infantiles (\"guapa\", \"cariño\", \"reina\").\n- Sé breve. Entre 1 y 4 líneas de WhatsApp.\n- Si la persona muestra interés real en algo, ofrece información concreta y un siguiente paso natural.\n- NUNCA menciones que hay varios servicios o que eres un servicio de atención al cliente. Eres una persona que responde un mensaje.",
     );
 }
 
@@ -3580,6 +4130,9 @@ function comercial_send_hot_notification_whatsapp($ownerPhone, $message) {
 
     foreach ($lines as $line) {
         if (trim((string)($line['waha_port'] ?? '')) === '') continue;
+        // No usar la línea personal del dueño (654464023) como emisor: no puede
+        // auto-enviarse un WhatsApp a sí misma y siempre fallaría.
+        if (comercial_only_digits((string)($line['tfono'] ?? '')) === '654464023') continue;
         $state = isset($line['comercial_state']) ? $line['comercial_state'] : array();
         $status = trim((string)($state['status'] ?? 'active'));
         $health = trim((string)($state['health_status'] ?? ''));
@@ -4060,6 +4613,28 @@ function comercial_build_qualify_lead_prompt($thread, $process, $history) {
     $stage = trim((string)($thread['stage'] ?? ''));
     $lastInbound = trim((string)($thread['last_inbound_text'] ?? ''));
 
+    // ── Contexto temporal para el prompt ──
+    $createdTs = strtotime((string)($thread['created_at'] ?? ''));
+    $updatedTs = strtotime((string)($thread['updated_at'] ?? ''));
+    $now = time();
+    $hoursSinceFirst = $createdTs > 0 ? max(1, round(($now - $createdTs) / 3600)) : 0;
+    $hoursSinceLast = $updatedTs > 0 ? max(0, round(($now - $updatedTs) / 3600)) : 0;
+    $inactivo48h = ($hoursSinceLast > 48);
+
+    $temporalInfo = '';
+    if ($hoursSinceFirst > 0 && $hoursSinceLast > 0) {
+        $temporalInfo = "Conversación activa desde hace {$hoursSinceFirst} horas, última respuesta hace {$hoursSinceLast} horas.";
+    } elseif ($hoursSinceLast > 0) {
+        $temporalInfo = "Última respuesta hace {$hoursSinceLast} horas.";
+    }
+
+    $stageHint = '';
+    if ($stage === 'very_hot') {
+        $stageHint = "\nNOTA: El sistema ya ha marcado esta conversación como MUY PROMETEDORA (very_hot).";
+    } elseif ($stage === 'qualified') {
+        $stageHint = "\nNOTA: El sistema ya ha clasificado esta conversación como cualificada (qualified).";
+    }
+
     $contextShort = '';
     if ($iaContext !== '') {
         $lines = explode("\n", $iaContext);
@@ -4067,7 +4642,7 @@ function comercial_build_qualify_lead_prompt($thread, $process, $history) {
     }
 
     return trim("
-Eres un filtro ANTI-RUIDO para un negocio. Tu trabajo es leer conversaciones de WhatsApp y decidir si la persona está REALMENTE interesada en comprar/contratar. Sé MUY ESTRICTO: la mayoría de conversaciones son ruido. Solo deben pasar leads donde el cliente muestre intención clara de compra.
+Eres un filtro ANTI-RUIDO para un negocio. Tu trabajo es leer conversaciones de WhatsApp y decidir si la persona está REALMENTE interesada en comprar/contratar. Sé ESTRICTO: la mayoría de conversaciones son ruido. Solo deben pasar leads donde el cliente muestre intención clara de compra.
 
 PROCESO COMERCIAL: {$processName} ({$processSlug})
 " . ($contextShort !== '' ? "CONTEXTO DEL NEGOCIO:\n{$contextShort}\n" : "") . "
@@ -4078,8 +4653,8 @@ CONVERSACIÓN COMPLETA:
 ---
 
 ÚLTIMO MENSAJE DEL CLIENTE: «{$lastInbound}»
-DATOS: {$repliesCount} respuestas del cliente, etapa: {$stage}
-
+DATOS: {$repliesCount} respuestas del cliente, etapa: {$stage}" . ($temporalInfo !== '' ? ", {$temporalInfo}" : "") . "
+" . ($stageHint !== '' ? "{$stageHint}\n" : "") . "
 ═══════════════════════════════════
 FILTRO ESTRICTO — SOLO PASAN SI:
 ═══════════════════════════════════
@@ -4106,7 +4681,7 @@ SEÑALES DE RUIDO — DESCARTA AUTOMÁTICAMENTE SI:
 ✗ Auto-responder: \"Estoy ocupado\", \"No puedo hablar ahora\", \"Te escribo luego\" (y no vuelve)
 ✗ Tono agresivo, grosero, quejas, amenazas de denuncia
 ✗ Solo preguntó \"precio?\" o \"info?\" con 1 palabra y no siguió la conversación
-✗ La conversación tiene más de 3 días sin actividad
+✗ La conversación tiene más de 3 días sin actividad" . ($inactivo48h ? " ⚠ ACTUALMENTE INACTIVA {$hoursSinceLast}h sin respuesta" : "") . "
 ✗ Pregunta algo genérico tipo \"qué tal\" o \"cómo estás\" sin interés comercial
 
 ═══════════════════════════════════
@@ -4118,10 +4693,10 @@ REGLAS DE DECISIÓN (OBLIGATORIAS):
 4. Si solo saludó sin preguntar nada → is_genuine_lead = false
 5. Si las respuestas son vagas/genéricas → is_genuine_lead = false
 6. Si el cliente dejó de responder hace más de 48h → is_genuine_lead = false
-7. EXCEPCIÓN: si pregunta precio Y ubicación juntos → is_genuine_lead = true (1 sola señal doble basta)
+7. Si pregunta precio Y ubicación en la misma conversación → cuentan como 2 buying signals separados (cumplen el mínimo de 2)
 8. Si stage es \"very_hot\" → is_genuine_lead = true (ya validado por el sistema)
 
-IMPORTANTE: PREFIERE EL SILENCIO AL RUIDO. De cada 10 conversaciones, solo 1-3 deberían pasar. Si tienes la más mínima duda, RECHAZA.
+IMPORTANTE: PREFIERE EL SILENCIO AL RUIDO. De cada 10 conversaciones, solo 2-4 deberían pasar. Si tienes la más mínima duda, RECHAZA.
 
 ═══════════════════════════════════
 RESUMEN Y CONSEJO:
@@ -4152,6 +4727,8 @@ RESPONDE ÚNICAMENTE con un objeto JSON. Sin markdown ni explicaciones.
 
 /**
  * Fallback basado en reglas si la IA no está disponible o falla al devolver JSON.
+ * Analiza el último mensaje + un historial reducido (últimos 3 mensajes) para
+ * detectar preguntas acumuladas, urgencia y señales de contacto.
  */
 function comercial_ai_qualify_lead_fallback($thread, $rawOutput = '') {
     $stage = trim((string)($thread['stage'] ?? ''));
@@ -4163,7 +4740,13 @@ function comercial_ai_qualify_lead_fallback($thread, $rawOutput = '') {
     $signals = array();
     $risks = array();
 
-    // already qualified by existing system
+    // ── Recoger últimos 3 mensajes del historial como contexto extra ──
+    $recentHistoryText = '';
+    if (function_exists('comercial_thread_recent_history_text')) {
+        $recentHistoryText = comercial_thread_recent_history_text($thread, 3);
+    }
+
+    // ── Already qualified by existing system ──
     if ($stage === 'very_hot') {
         $score = 90;
         $isGenuine = true;
@@ -4174,39 +4757,84 @@ function comercial_ai_qualify_lead_fallback($thread, $rawOutput = '') {
         $signals[] = 'stage_qualified';
     }
 
-    // Rule-based signals
-    if (preg_match('/[?¿]/u', $lastInbound) || preg_match('/\b(que|qué|cual|cu[aá]l|como|c[oó]mo|cu[aá]ndo|donde|d[oó]nde|cu[aá]nto|por qu[eé]|precio|info|informaci[oó]n)\b/ui', $lastInbound)) {
+    // ── Rule-based signals ──
+
+    // Pregunta cualificada: texto >= 20 chars con interrogación o palabras clave
+    $hasQuestionRegex = preg_match('/[?¿]/u', $lastInbound)
+        || preg_match('/\b(que|qué|cual|cu[aá]l|como|c[oó]mo|cu[aá]ndo|donde|d[oó]nde|cu[aá]nto|por qu[eé]|precio|info|informaci[oó]n)\b/ui', $lastInbound);
+
+    if ($hasQuestionRegex && $textLen >= 20) {
         $score += 15;
         $signals[] = 'hizo_pregunta';
+    } elseif ($hasQuestionRegex && $textLen < 20) {
+        // Pregunta corta ("precio?", "info?") → señal débil
+        $score += 5;
+        $signals[] = 'pregunta_corta';
     }
+
+    // Preguntas acumuladas en el historial reciente (más de 1 ? en los últimos mensajes)
+    if ($recentHistoryText !== '') {
+        $questionCount = preg_match_all('/[?¿]/u', $recentHistoryText);
+        if ($questionCount >= 2) {
+            $score += 8;
+            $signals[] = 'preguntas_multiples';
+        }
+    }
+
     if ($textLen >= 50) {
         $score += 10;
         $signals[] = 'respuesta_larga';
     }
+
     if (preg_match('/\b(interesa|quiero|gustar[íi]a|ap[uú]ntame|dime|contactar|llamad?me|escribid?me)\b/ui', $lastInbound)) {
         $score += 15;
         $signals[] = 'mostro_interes';
     }
+
     if ($replies >= 2) {
         $score += 10;
         $signals[] = 'multiples_respuestas';
     }
 
-    // Risks
+    // Datos de contacto voluntarios: email, teléfono español, nombre completo
+    if (preg_match('/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/', $lastInbound)
+        || preg_match('/\b[679]\d{2}[\s.-]?\d{2}[\s.-]?\d{2}[\s.-]?\d{2}\b/', $lastInbound)
+        || preg_match('/\b(?:mi nombre es|me llamo|soy)\s+\w+/ui', $lastInbound)) {
+        $score += 10;
+        $signals[] = 'dio_datos_contacto';
+    }
+
+    // Señales de urgencia
+    if (preg_match('/\b(ya\b|urgente|hoy|mañana|cu[aá]nto antes|lo antes posible|este finde)\b/ui', $lastInbound)) {
+        $score += 10;
+        $signals[] = 'urgencia';
+    }
+
+    // ── Risks ──
+
+    // Saludo vacío: ≤4 palabras, solo saludos/gracias/emojis sin contenido semántico
+    $wordCount = count(preg_split('/\s+/u', $lastInbound, -1, PREG_SPLIT_NO_EMPTY));
+    if ($wordCount <= 4 && preg_match('/^(hola|buenas|ok|gracias|bien|vale|perfecto|s[iíi]+|buen[aá]s|grax|tnx|👍|👋|😊)[\s!]*$/ui', $lastInbound)) {
+        $risks[] = 'saludo_vacio';
+        $score = max(0, $score - 20);
+    }
+
     if ($textLen <= 15 && !$isGenuine) {
         $risks[] = 'respuesta_muy_corta';
         if ($score < 30) $isGenuine = false;
     }
-    if (preg_match('/\b(no gracias|no me interesa|otro d[ií]a|para nada)\b/ui', $lastInbound)) {
+    if (preg_match('/\b(no gracias|no me interesa|otro d[ií]a|para nada|no,?\s*gracias|deja\w*|d[ée]jame)\b/ui', $lastInbound)) {
         $risks[] = 'rechazo_explicito';
         $isGenuine = false;
         $score = 0;
     }
 
-    if ($score >= 60 && count($signals) >= 2 && empty($risks)) {
+    // ── Final classification ──
+    // Umbrales ajustados: 50 + 2 señales (era 60), 70 pase directo (era 75)
+    if ($score >= 50 && count($signals) >= 2 && empty($risks)) {
         $isGenuine = true;
     }
-    if ($score >= 75) {
+    if ($score >= 70) {
         $isGenuine = true;
     }
     if (count($risks) > 0) {
@@ -4281,18 +4909,26 @@ function comercial_ai_qualify_lead($thread, $process = array()) {
     }
 
     // Si es very_hot y ya tiene ai_summary, no re-analizar (24h cache)
+    // PERO: invalidar cache si llegaron mensajes nuevos desde el último análisis
     $lastAnalysis = trim((string)($thread['ai_qualified_at'] ?? ''));
     if ($stage === 'very_hot' && $lastAnalysis !== '' && strtotime($lastAnalysis) > time() - 86400) {
-        return array(
-            'ok' => true, 'is_genuine_lead' => !empty($thread['ai_is_genuine']),
-            'interest_score' => (int)($thread['ai_interest_score'] ?? 85),
-            'summary' => trim((string)($thread['ai_summary'] ?? '')),
-            'action_advice' => trim((string)($thread['ai_action_advice'] ?? '')),
-            'reason' => 'cached_very_hot',
-            'buying_signals' => (array)($thread['ai_buying_signals'] ?? array()),
-            'risk_signals' => (array)($thread['ai_risk_signals'] ?? array()),
-            'suggested_priority' => trim((string)($thread['ai_suggested_priority'] ?? 'hot')),
-        );
+        // Comprobar si hay actividad nueva desde el último análisis
+        $lastMsgTs = strtotime((string)($thread['updated_at'] ?? ''));
+        $lastAnalysisTs = strtotime($lastAnalysis);
+        if ($lastMsgTs <= $lastAnalysisTs) {
+            // Sin mensajes nuevos → usar cache
+            return array(
+                'ok' => true, 'is_genuine_lead' => !empty($thread['ai_is_genuine']),
+                'interest_score' => (int)($thread['ai_interest_score'] ?? 85),
+                'summary' => trim((string)($thread['ai_summary'] ?? '')),
+                'action_advice' => trim((string)($thread['ai_action_advice'] ?? '')),
+                'reason' => 'cached_very_hot',
+                'buying_signals' => (array)($thread['ai_buying_signals'] ?? array()),
+                'risk_signals' => (array)($thread['ai_risk_signals'] ?? array()),
+                'suggested_priority' => trim((string)($thread['ai_suggested_priority'] ?? 'hot')),
+            );
+        }
+        // Hay mensajes nuevos → re-analizar (no devolvemos cache)
     }
 
     // ── Construir historial y prompt ──
@@ -5205,17 +5841,37 @@ function comercial_send_thread_message($thread, $text, $options = array()) {
         $process['test_probe'] = 1;
         $process['test_key'] = trim((string)($thread['test_key'] ?? comercial_test_probe_key()));
     }
-    $send = comercial_send_text_via_line($line, (string)($thread['target_phone'] ?? ''), $text, $process ?: array());
-    if (empty($send['ok'])) {
-        return $send;
+    // ── Split automático: texto primero, luego cada enlace de foto en mensaje individual ──
+    // Solo en respuestas automáticas; las manuales (human_taken) se envían tal cual.
+    $isAuto = empty($options['human_taken']);
+    $messages = $isAuto ? comercial_split_image_messages($text) : array($text);
+    $messages = array_values(array_filter(array_map(function($m) { return trim((string)$m); }, $messages), function($m) { return $m !== ''; }));
+    if (empty($messages)) {
+        return array('ok' => false, 'error' => 'Mensaje vacío');
     }
 
-    $thread['messages_sent_count'] = (int)$thread['messages_sent_count'] + 1;
+    $sentCount = 0;
+    $send = null;
+    foreach ($messages as $i => $msg) {
+        if ($i > 0) {
+            sleep((int)COMERCIAL_PHOTO_LINK_SLEEP_SEC);
+        }
+        $send = comercial_send_text_via_line($line, (string)($thread['target_phone'] ?? ''), $msg, $process ?: array());
+        if (!empty($send['ok'])) $sentCount++;
+    }
+
+    if ($sentCount === 0) {
+        return $send !== null ? $send : array('ok' => false, 'error' => 'Envío fallido');
+    }
+
+    $thread['messages_sent_count'] = (int)$thread['messages_sent_count'] + $sentCount;
     $thread['last_outbound_text'] = $text;
     $thread['last_contact_at'] = now_datetime();
     $thread['updated_at'] = now_datetime();
     if (!empty($options['human_taken'])) {
         $thread['human_taken'] = 1;
+        // Pausar el bot en esta conversación: el humano ha tomado el control.
+        $thread['inbox_paused'] = 1;
     }
     if (!empty($options['qualified_reply_sent'])) {
         $thread['qualified_reply_sent_at'] = now_datetime();
@@ -5239,6 +5895,8 @@ function comercial_send_thread_message($thread, $text, $options = array()) {
     }
     comercial_event_append(trim((string)($options['event_type'] ?? 'thread_message_sent')), $eventPayload);
 
+    if ($send === null) $send = array();
+    $send['ok'] = true; // al menos un mensaje se envió correctamente
     $send['thread'] = $thread;
     return $send;
 }
@@ -5445,8 +6103,11 @@ function comercial_pick_candidate_from_mysql($process) {
         'host' => trim((string)$process['source_mysql_host']),
         'db' => trim((string)$process['source_mysql_db']),
         'user' => (string)$process['source_mysql_user'],
-        'pass' => (string)$process['source_mysql_pass'],
     );
+    $pass = trim((string)$process['source_mysql_pass']);
+    if ($pass !== '') {
+        $config['pass'] = $pass;
+    }
     $sql = trim((string)$process['source_mysql_query']);
     if ($config['host'] === '' || $config['db'] === '' || $sql === '') {
         return array('ok' => false, 'reason' => 'Configuración MySQL incompleta');
@@ -5592,6 +6253,31 @@ function comercial_run_tick($forceProcessId = '') {
             comercial_upsert_process($process);
             $results[] = array('process' => $process['nombre'], 'ok' => false, 'reason' => $process['last_error']);
             continue;
+        }
+
+        // ── Inbox toggle: ¿las líneas de este proceso están bajo control del inbox? ──
+        $inboxLineIds = function_exists('inbox_get_process_line_ids') ? inbox_get_process_line_ids() : array();
+        $processLineIds = (array)($process['assigned_line_ids'] ?? array());
+        $allLinesInbox = !empty($processLineIds) && !empty($inboxLineIds);
+        if ($allLinesInbox) {
+            $allInInbox = true;
+            foreach ($processLineIds as $plid) {
+                if (!in_array(trim((string)$plid), $inboxLineIds, true)) {
+                    $allInInbox = false;
+                    break;
+                }
+            }
+            if ($allInInbox) {
+                $inboxSettings = function_exists('inbox_get_settings') ? inbox_get_settings() : array();
+                if (empty($inboxSettings['opener_enabled'])) {
+                    $process['last_error'] = 'Inbox opener desactivado';
+                    $process['last_result'] = 'skip';
+                    $process = comercial_schedule_next_run($process);
+                    comercial_upsert_process($process);
+                    $results[] = array('process' => $process['nombre'], 'ok' => false, 'reason' => $process['last_error']);
+                    continue;
+                }
+            }
         }
 
         if ((string)$process['source_type'] === 'mysql_recent') {
@@ -5786,6 +6472,7 @@ function comercial_promote_thread_to_lead($threadId) {
             'accepted' => !empty($thread['last_ai_feedback_meta']['accepted']),
             'edited' => !empty($thread['last_ai_feedback_meta']['edited']),
             'led_to_lead' => true,
+            'trigger_text' => trim((string)($thread['last_inbound_text'] ?? '')),
         ));
     }
     $thread = comercial_thread_apply_stage($thread, (string)($thread['stage'] ?? '') === 'very_hot' ? 'very_hot' : 'qualified');
@@ -5798,6 +6485,24 @@ function comercial_promote_thread_to_lead($threadId) {
     }
     comercial_event_append('lead_created', $eventPayload);
     return array(true, $lead);
+}
+
+function comercial_text_is_ack_only($text) {
+    $normalized = comercial_text_fold(trim((string)$text));
+    if ($normalized === '') return false;
+    // Si el mensaje tiene más de 20 caracteres normalizados, no es solo acuse
+    if (mb_strlen($normalized, 'UTF-8') > 20) return false;
+    $ackPhrases = array(
+        'ok', 'okey', 'oki', 'vale', 'si', 'sí', 'gracias', 'bien',
+        'de acuerdo', 'entendido', 'genial', 'bien ahi',
+        'ok gracias', 'vale gracias', 'si gracias',
+        'ok perfecto', 'vale perfecto',
+        'ok me parece bien', 'vale me parece bien',
+    );
+    foreach ($ackPhrases as $ack) {
+        if ($normalized === comercial_text_fold($ack)) return true;
+    }
+    return false;
 }
 
 function comercial_classify_reply($process, $text, $thread = null) {
@@ -5852,7 +6557,18 @@ function comercial_classify_reply($process, $text, $thread = null) {
     $infoQuestions = array('cuanto', 'precio', 'cuota', 'cuotas', 'pago', 'cuesta',
         'valor', 'tarifa', 'gratis', 'coste', 'inversion', 'inversión',
         'requisitos', 'necesito', 'hace falta', 'como funciona', 'como es',
-        'cuando', 'donde', 'ubicacion', 'direccion', 'horario', 'hora');
+        'cuando', 'donde', 'ubicacion', 'direccion', 'horario', 'hora',
+        // ── Nuevas señales de qualified (plan mejora comercial 2026-07) ──
+        'cerca', 'estacion', 'estación', 'llego', 'llegar', 'llegada',
+        'mañana', 'hoy', 'cuando puedo', 'a que hora', 'disponible',
+        'libre', 'visita', 'visitar', 'ver la casa', 'conocer',
+        'habitacion', 'habitación', 'alquiler', 'alquilarme',
+        'empezar', 'activar', 'activarme', 'probar', 'prueba',
+        'donde estas', 'donde estan', 'como llegar', 'como llego',
+        'a que hora puedo', 'puedo ir', 'quiero ir', 'para ir',
+        'anuncios', 'anuncio', 'publicidad', 'publicar',
+        'cuanto cobras', 'como cobras', 'como se paga', 'forma de pago',
+    );
     foreach ($infoQuestions as $word) {
         if (comercial_text_contains_keyword($normalizedText, $word)) {
             return array('classification' => 'qualified', 'reason' => 'info_question:' . $word);
@@ -5884,6 +6600,40 @@ function comercial_pick_generic_unmatched_followup($thread, $text) {
     );
     $index = mt_rand(0, count($pool) - 1);
     return (string)$pool[$index];
+}
+
+/**
+ * AGENT V2: traduce el intent del clasificador LLM al vocabulario legacy
+ * que usa el switch de comercial_handle_inbound_message.
+ *
+ * El LLM devuelve: greeting|asking_info|asking_price|negotiating|objection|
+ *   interested|ready_to_buy|not_interested|off_topic|ack_only
+ * El handler solo reconoce: negative|autoresponder|greeting|curious|asking_info|
+ *   responded|very_hot|qualified
+ *
+ * Sin esta traducción, los intents "calientes" (asking_price, negotiating,
+ * interested, ready_to_buy, ...) caían al fall-through 'saved' y el bot
+ * dejaba de responder justo cuando la conversación se ponía interesante.
+ *
+ * Mapeo:
+ *   - asking_price, negotiating, objection, off_topic → asking_info (responder/continuar)
+ *   - interested, ready_to_buy → very_hot (responder + notificar dueño, sin silenciar)
+ *   - not_interested → negative (despedida + descarte)
+ *   - resto se mantiene igual (greeting, asking_info, ack_only, ...)
+ */
+function comercial_agent_normalize_intent_for_handler($classification) {
+    $classification = trim((string)$classification);
+    $hotReplies = array('asking_price', 'negotiating', 'objection', 'off_topic');
+    if (in_array($classification, $hotReplies, true)) {
+        return 'asking_info';
+    }
+    if ($classification === 'interested' || $classification === 'ready_to_buy') {
+        return 'very_hot';
+    }
+    if ($classification === 'not_interested') {
+        return 'negative';
+    }
+    return $classification;
 }
 
 function comercial_handle_inbound_message($payload) {
@@ -5926,8 +6676,17 @@ function comercial_handle_inbound_message($payload) {
         }
         // No enviar followup si es auto-responder
         if ($originalClassification !== 'autoresponder') {
-        if ($originalClassification === 'greeting' || $originalClassification === 'curious') {
-            $genericFollowup = comercial_pick_generic_unmatched_followup($thread, $text);
+            // ── Usar LLM agent para generar respuesta contextual personalizada ──
+            $thread['process_slug'] = 'inbound';
+            $thread['process_id'] = 'comproc_inbound';
+            $genericFollowup = '';
+            $ai = comercial_agent_process($thread, 'inbound', 'reply', array('inbound_text' => $text));
+            if (!empty($ai['ok']) && trim((string)($ai['text'] ?? '')) !== '') {
+                $genericFollowup = trim((string)$ai['text']);
+            } else {
+                // Fallback: pool estático solo si la IA falla
+                $genericFollowup = comercial_pick_generic_unmatched_followup($thread, $text);
+            }
             if ($genericFollowup !== '') {
                 $send = comercial_send_thread_message($thread, $genericFollowup, array('event_type' => 'unmatched_greeting_reply'));
                 if (!empty($send['ok'])) {
@@ -5937,7 +6696,6 @@ function comercial_handle_inbound_message($payload) {
                     $thread['auto_turn_count'] = 1;
                 }
             }
-        }
         } // fin bloque autoresponder exclusion
         comercial_upsert_thread($thread);
         comercial_event_append('inbound_unmatched', array(
@@ -5966,15 +6724,10 @@ function comercial_handle_inbound_message($payload) {
         // Otro request ya está procesando este hilo → actualización ligera sin auto-reply
         $thread['replies_count'] = (int)$thread['replies_count'] + 1;
         $thread['last_inbound_text'] = $text;
-        $thread['prior_inbound_text'] = $text; // Actualizar para que el cooldown funcione correctamente en ráfagas
+        $thread['prior_inbound_text'] = $text;
         $thread['last_contact_at'] = now_datetime();
         $thread['updated_at'] = now_datetime();
         $thread['last_inbound_processed_at'] = now_datetime();
-        // Fix Bug 1: si ya había una respuesta del bot reciente, extender last_bot_reply_at
-        // para que el cooldown de 180s funcione correctamente cuando se libere el lock.
-        if (trim((string)($thread['last_bot_reply_at'] ?? '')) !== '') {
-            $thread['last_bot_reply_at'] = now_datetime();
-        }
         comercial_upsert_thread($thread);
         comercial_event_append('thread_busy', array(
             'thread_id' => (string)$thread['id'],
@@ -6022,6 +6775,9 @@ function comercial_handle_inbound_message($payload) {
         }
     }
 
+    // ── AGENT V2: determinar fase de conversación (state machine) ──
+    $thread['conversation_phase'] = comercial_state_machine_determine_phase($thread, $process, $text);
+
     // ── Fix Bug 3c (v2): resetear auto_turn_count si el último contacto fue hace más de 24h ──
     // Se hace aquí (en el handler) en vez de en comercial_decide_inbound_action para que
     // el cambio se persista al llamar a comercial_upsert_thread más adelante.
@@ -6036,39 +6792,101 @@ function comercial_handle_inbound_message($payload) {
         ));
     }
 
-    // ── Fix #1: cooldown anti-duplicado (protege también contra ráfagas con textos distintos) ──
-    // Si el bot ya contestó hace menos de 180s, no volvemos a enviar otra respuesta automática
-    // independientemente de si el texto es similar o no (ráfaga "Hola" + "Me interesa").
-    $botCooldownSec = 180;
-    $lastBotReplyAt = trim((string)($thread['last_bot_reply_at'] ?? ''));
-    $lastBotReplyTs = $lastBotReplyAt !== '' ? strtotime($lastBotReplyAt) : 0;
-    $inCooldown = ($lastBotReplyTs > 0 && (time() - $lastBotReplyTs) < $botCooldownSec);
-    if ($inCooldown) {
-        $thread['prior_inbound_text'] = $text;
-        comercial_upsert_thread($thread);
-        comercial_event_append('reply_received', array(
-            'thread_id' => $thread['id'],
-            'process_slug' => $thread['process_slug'],
-            'target_phone' => $thread['target_phone'],
-            'classification' => 'cooldown_skip',
-            'intent_reason' => 'bot_reply_cooldown_burst',
-            'decision' => 'skipped_burst',
-            'text' => $text,
-        ));
-        return array(
-            'ok' => true,
-            'thread_id' => $thread['id'],
-            'classification' => 'cooldown_skip',
-            'intent_reason' => 'bot_reply_cooldown_burst',
-            'action' => 'skipped_burst',
-            'target_phone' => (string)$thread['target_phone'],
-        );
+    // ── Fix #1 (v2): filtro de acuse — no responder si el mensaje entrante es solo
+    // un monosílabo de confirmación ("ok", "vale", "si", etc.) sin contenido adicional,
+    // justo después de que el bot acaba de responder. Esto evita loops de "ok" → "de nada" → "ok".
+    // Sustituye al cooldown temporal (antes 180s) que era demasiado rígido.
+    $inCooldown = false;
+    if (comercial_text_is_ack_only($text)) {
+        $lastBotReplyAt = trim((string)($thread['last_bot_reply_at'] ?? ''));
+        $lastBotTs = $lastBotReplyAt !== '' ? strtotime($lastBotReplyAt) : 0;
+        // Solo filtrar si el bot respondió hace menos de 5 minutos (ventana de conversación activa)
+        if ($lastBotTs > 0 && (time() - $lastBotTs) < 300) {
+            $thread['prior_inbound_text'] = $text;
+            comercial_upsert_thread($thread);
+            comercial_event_append('reply_received', array(
+                'thread_id' => $thread['id'],
+                'process_slug' => $thread['process_slug'],
+                'target_phone' => $thread['target_phone'],
+                'classification' => 'ack_only_skip',
+                'intent_reason' => 'ack_only',
+                'decision' => 'skipped_ack',
+                'text' => $text,
+            ));
+            return array(
+                'ok' => true,
+                'thread_id' => $thread['id'],
+                'classification' => 'ack_only_skip',
+                'intent_reason' => 'ack_only',
+                'action' => 'skipped_ack',
+                'target_phone' => (string)$thread['target_phone'],
+            );
+        }
     }
 
-    $classificationData = comercial_classify_reply($process, $text, $thread);
-    $classification = (string)($classificationData['classification'] ?? 'responded');
-    $intentReason = (string)($classificationData['reason'] ?? '');
-    $decision = comercial_decide_inbound_action($thread, $process, $classification, $text);
+    // ── Inbox toggle: comprobar si esta línea está bajo control del inbox ──
+    $threadLineId = trim((string)($thread['line_id'] ?? ''));
+    $inboxLineIds = array();
+    if (function_exists('inbox_get_process_line_ids')) {
+        $inboxLineIds = inbox_get_process_line_ids();
+    }
+    $isInboxLine = $threadLineId !== '' && in_array($threadLineId, $inboxLineIds, true);
+    if ($isInboxLine) {
+        $inboxSettings = function_exists('inbox_get_settings') ? inbox_get_settings() : array();
+        if (empty($inboxSettings['replies_enabled'])) {
+            $thread['prior_inbound_text'] = $text;
+            comercial_upsert_thread($thread);
+            comercial_event_append('reply_received', array(
+                'thread_id' => $thread['id'],
+                'process_slug' => $thread['process_slug'],
+                'target_phone' => $thread['target_phone'],
+                'classification' => 'inbox_replies_off',
+                'intent_reason' => 'replies_disabled',
+                'decision' => 'skipped_by_inbox_toggle',
+                'text' => $text,
+            ));
+            return array('ok' => true, 'thread_id' => $thread['id'], 'classification' => 'inbox_replies_off', 'action' => 'skipped_by_inbox_toggle', 'target_phone' => (string)$thread['target_phone']);
+        }
+        // Per-conversation toggle
+        if (!empty($thread['inbox_paused'])) {
+            $thread['prior_inbound_text'] = $text;
+            comercial_upsert_thread($thread);
+            comercial_event_append('reply_received', array(
+                'thread_id' => $thread['id'],
+                'process_slug' => $thread['process_slug'],
+                'target_phone' => $thread['target_phone'],
+                'classification' => 'thread_paused',
+                'intent_reason' => 'per_thread_pause',
+                'decision' => 'skipped_by_thread_pause',
+                'text' => $text,
+            ));
+            return array('ok' => true, 'thread_id' => $thread['id'], 'classification' => 'thread_paused', 'action' => 'skipped_by_thread_pause', 'target_phone' => (string)$thread['target_phone']);
+        }
+    }
+
+    // ── NUEVO: Clasificación y decisión por LLM ──
+    $processSlug = (string)($thread['process_slug'] ?? $process['slug'] ?? 'inbound');
+    $classifyResult = comercial_agent_process($thread, $processSlug, 'classify', array('inbound_text' => $text));
+    if (!empty($classifyResult['ok'])) {
+        $classification = (string)($classifyResult['intent'] ?? 'responded');
+        $intentReason = (string)($classifyResult['reasoning'] ?? 'llm_classified');
+        $decision = comercial_agent_decide_escalation($classifyResult, $thread, $process);
+        $thread['ai_semantic_interest'] = !empty($classifyResult['genuine_interest']);
+        $thread['ai_semantic_score'] = max(0, min(100, (int)($classifyResult['lead_score'] ?? 0)));
+        $thread['ai_semantic_reasoning'] = trim((string)($classifyResult['interest_evidence'] ?? $classifyResult['reasoning'] ?? ''));
+    } else {
+        // Fallback: keyword classification si LLM falla
+        $classificationData = comercial_classify_reply($process, $text, $thread);
+        $classification = (string)($classificationData['classification'] ?? 'responded');
+        $intentReason = (string)($classificationData['reason'] ?? 'keyword_fallback');
+        $decision = comercial_decide_inbound_action($thread, $process, $classification, $text);
+    }
+
+    // ── AGENT V2: normalizar intent LLM → vocabulario legacy del handler ──
+    // Sin esto, intents calientes (asking_price, negotiating, interested, etc.)
+    // caían al fall-through 'saved' y el bot dejaba de hablar.
+    $classification = comercial_agent_normalize_intent_for_handler($classification);
+
     $thread['last_decision'] = trim((string)($decision['action'] ?? 'legacy'));
     $thread['last_confidence'] = (float)($decision['confidence'] ?? 0);
     $eventPayload = array(
@@ -6095,6 +6913,20 @@ function comercial_handle_inbound_message($payload) {
     ));
 
     if ($classification === 'negative') {
+        // AGENT V2: despedida cordial antes de descartar (no dejar al cliente en silencio).
+        $farewell = '';
+        if (function_exists('comercial_agent_critic_fallback')) {
+            $farewell = trim((string)comercial_agent_critic_fallback($processSlug, 'DESCARTADO'));
+        }
+        if ($farewell === '') {
+            $farewell = 'De acuerdo, gracias por tu tiempo.';
+        }
+        $sendFarewell = comercial_send_thread_message($thread, $farewell, array('event_type' => 'disqualify_farewell_sent'));
+        if (!empty($sendFarewell['ok'])) {
+            $thread = comercial_normalize_thread((array)($sendFarewell['thread'] ?? $thread));
+            $thread['last_bot_reply_at'] = now_datetime();
+            $thread['last_bot_reply_text'] = $farewell;
+        }
         $thread = comercial_thread_apply_stage($thread, 'discarded');
         comercial_upsert_thread($thread);
         comercial_create_reply_aviso($thread, $classification, $text, $intentReason, $messageId);
@@ -6134,8 +6966,8 @@ function comercial_handle_inbound_message($payload) {
 
     $autoFollowup = !empty($process['auto_followup']) && !empty(comercial_get_settings()['auto_followup_enabled']);
 
-    // ── greeting y curious → usar followup_templates del proceso (igual que responded/qualified) ──
-    if ($classification === 'greeting' || $classification === 'curious') {
+    // ── greeting, curious y asking_info → usar followup_templates del proceso (igual que responded/qualified) ──
+    if ($classification === 'greeting' || $classification === 'curious' || $classification === 'asking_info') {
         $autoFollowup = !empty($process['auto_followup']) && !empty(comercial_get_settings()['auto_followup_enabled']);
         $maxTurnsGc = max(1, (int)($process['conversation_max_auto_turns'] ?? comercial_get_settings()['conversation_max_auto_turns'] ?? 2));
         $gcReplied = false;
@@ -6145,10 +6977,15 @@ function comercial_handle_inbound_message($payload) {
         $isGreetingOnly = ($classification === 'greeting');
         $thread['_greeting_only'] = $isGreetingOnly;
 
-        if ($autoFollowup && ($decision['action'] ?? '') === 'auto_reply_second_turn' && !$inCooldown && comercial_can_send_auto_followup($thread, $maxTurnsGc) && (int)$thread['auto_turn_count'] < $maxTurnsGc) {
-            // Usar siempre los followup_templates configurados en el proceso.
-            // Si ya se agotaron los textos y quedan turnos disponibles, improvisar con IA.
-            $followup = comercial_pick_followup_or_improvise($thread, $process, $text);
+        $decisionAction = ($decision['action'] ?? '');
+        // AGENT V2: responder también en 'escalate_to_human' y 'continue' —
+        // detectar lead no debe silenciar al bot (responde y, si aplica, notifica).
+        $shouldReply = ($classification === 'asking_info')
+            || ($decisionAction === 'auto_reply_second_turn')
+            || ($decisionAction === 'continue');
+        if ($autoFollowup && $shouldReply && !$inCooldown && comercial_can_send_auto_followup($thread, $maxTurnsGc) && (int)$thread['auto_turn_count'] < $maxTurnsGc) {
+            // Usar LLM agent para generar respuesta contextual
+            $followup = comercial_agent_generate_reply_wrapper($thread, $processSlug, $text);
             $lastBotText = trim((string)($thread['last_bot_reply_text'] ?? ''));
             if ($lastBotText !== '' && comercial_text_fold($lastBotText) === comercial_text_fold($followup)) {
                 comercial_event_append('auto_reply_duplicate_skipped', array('thread_id' => $thread['id'], 'reason' => 'same_text_as_previous'));
@@ -6229,8 +7066,8 @@ function comercial_handle_inbound_message($payload) {
         $settings = comercial_get_settings();
         $maxTurns = max(1, (int)($process['conversation_max_auto_turns'] ?? $settings['conversation_max_auto_turns'] ?? 2));
         if (($decision['action'] ?? '') === 'auto_reply_second_turn' && $autoFollowup && !$inCooldown && comercial_can_send_auto_followup($thread, $maxTurns) && (int)$thread['auto_turn_count'] < $maxTurns) {
-            // Usar templates configurados o improvisar con IA cuando se agotan
-            $followup = comercial_pick_followup_or_improvise($thread, $process, $text);
+            // Usar LLM agent para generar respuesta contextual
+            $followup = comercial_agent_generate_reply_wrapper($thread, $processSlug, $text);
             $replied = false;
             if ($followup !== '') {
                 $lastBotText = trim((string)($thread['last_bot_reply_text'] ?? ''));
@@ -6268,7 +7105,7 @@ function comercial_handle_inbound_message($payload) {
         }
         // Fallback: can_send_auto_followup no aplica pero quedan turnos y no hay cooldown
         if (($decision['action'] ?? '') === 'auto_reply_second_turn' && $autoFollowup && !$inCooldown && (int)$thread['auto_turn_count'] < $maxTurns) {
-            $fallbackMsg = comercial_pick_followup_or_improvise($thread, $process, $text);
+            $fallbackMsg = comercial_agent_generate_reply_wrapper($thread, $processSlug, $text);
             if ($fallbackMsg !== '') {
                 $lastBotText = trim((string)($thread['last_bot_reply_text'] ?? ''));
                 if ($lastBotText === '' || comercial_text_fold($lastBotText) !== comercial_text_fold($fallbackMsg)) {
@@ -6301,7 +7138,9 @@ function comercial_handle_inbound_message($payload) {
     if ($classification === 'very_hot') {
         $aiSecondTurnSent = false;
         $aiSecondTurnError = '';
-        if (($decision['action'] ?? '') === 'auto_reply_second_turn' && comercial_decision_allows_ai_second_turn($thread, $classification, $process)) {
+        // AGENT V2: enviar respuesta y notificar al dueño aunque el LLM haya
+        // decidido escalar (interested/ready_to_buy) — no silenciar al bot.
+        if (comercial_decision_allows_ai_second_turn($thread, $classification, $process)) {
             $objective = 'responder segunda vuelta, mantener interés y mover a cierre o llamada';
             $ai = comercial_ai_generate_contextual_followup($thread, (string)($thread['process_slug'] ?? ''), $objective);
             if (!empty($ai['ok']) && trim((string)($ai['text'] ?? '')) !== '') {
@@ -6351,8 +7190,8 @@ function comercial_handle_inbound_message($payload) {
         $followupError = '';
         $maxTurnsQ = max(1, (int)($process['conversation_max_auto_turns'] ?? comercial_get_settings()['conversation_max_auto_turns'] ?? 2));
         if ($autoFollowup && !$inCooldown && comercial_can_send_auto_followup($thread, $maxTurnsQ) && (int)$thread['auto_turn_count'] < $maxTurnsQ) {
-            // Usar templates configurados o improvisar con IA cuando se agotan
-            $followup = comercial_pick_followup_or_improvise($thread, $process, $text);
+            // Usar LLM agent para generar respuesta contextual
+            $followup = comercial_agent_generate_reply_wrapper($thread, $processSlug, $text);
             if ($followup !== '') {
                 $send = comercial_send_thread_message($thread, $followup, array(
                     'qualified_reply_sent' => true,
@@ -6795,6 +7634,45 @@ function render_comercial_page() {
             echo '<input type="hidden" name="process_id" value="' . e($selectedProcess['id']) . '">';
             echo '<button type="submit" class="btn-secondary-mini">Lanzar solo este proceso</button>';
             echo '</form>';
+
+            // ── Fotos de habitaciones (solo rama Plaza / Casa Burriana) ──
+            if ((string)($selectedProcess['slug'] ?? '') === 'plaza') {
+                $roomPhotos = plaza_room_photos_get();
+                echo '<section class="panel" style="margin-top:16px;">';
+                echo '<h2>📷 Fotos de habitaciones</h2>';
+                echo '<p class="muted" style="margin-top:0;">Fotos que el bot envía automáticamente por WhatsApp cuando alguien las pide en la rama Plaza (Casa Burriana). Se suben a compartir.site, el mismo sistema que usa bot-casa.</p>';
+
+                echo '<form method="post" enctype="multipart/form-data">';
+                echo '<input type="hidden" name="action" value="upload_plaza_room_photo">';
+                echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
+                echo '<div class="field"><label>Selecciona fotos (jpg, png o webp)</label><input type="file" name="photos[]" multiple accept="image/jpeg,image/png,image/webp"></div>';
+                echo '<div class="toolbar"><button type="submit" class="btn-primary">Subir fotos</button></div>';
+                echo '</form>';
+
+                if (empty($roomPhotos)) {
+                    echo '<div class="muted" style="margin-top:10px;">Aún no hay fotos subidas.</div>';
+                } else {
+                    echo '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:14px;">';
+                    foreach ($roomPhotos as $i => $photo) {
+                        $url = trim((string)($photo['url'] ?? ''));
+                        $img = trim((string)($photo['img'] ?? ''));
+                        if ($url === '') continue;
+                        $thumb = $img !== '' ? $img : preg_replace('~/([a-z0-9]+)/$~', '/$1/$1.jpg', $url);
+                        echo '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px;text-align:center;background:#fff;">';
+                        echo '<a href="' . e($url) . '" target="_blank" rel="noopener"><img src="' . e($thumb) . '" alt="Habitación" style="width:130px;height:130px;object-fit:cover;border-radius:6px;display:block;"></a>';
+                        echo '<div style="margin-top:6px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><a class="mini-link" href="' . e($url) . '" target="_blank" rel="noopener">' . e((string)basename(rtrim($url, '/'))) . '</a></div>';
+                        echo '<form method="post" style="margin-top:6px;" onsubmit="return confirm(\'¿Eliminar esta foto?\')">';
+                        echo '<input type="hidden" name="action" value="delete_plaza_room_photo">';
+                        echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
+                        echo '<input type="hidden" name="index" value="' . (int)$i . '">';
+                        echo '<button type="submit" class="btn-danger-soft">Eliminar</button>';
+                        echo '</form>';
+                        echo '</div>';
+                    }
+                    echo '</div>';
+                }
+                echo '</section>';
+            }
         }
         echo '</section>';
         echo '</div>';
@@ -7128,350 +8006,62 @@ HTML;
     }
 
     if ($tab === 'conversaciones') {
+        require_once __DIR__ . '/inbox_shared.php';
+
         $stageFilter = trim((string)request_get('stage_filter', 'all'));
         $quickFilter = trim((string)request_get('quick_filter', 'all'));
         $lineFilter = trim((string)request_get('line_filter', 'all'));
         $processFilter = trim((string)request_get('process_filter', 'all'));
         $viewThreadId = trim((string)request_get('view_thread', ''));
+
+        $ctx = array(
+            'id'                => 'comercial',
+            'url_fn'            => 'comercial_page_url',
+            'tab_name'          => 'conversaciones',
+            'page_name'         => 'comercial',
+            'feed_url'          => (comercial_base_url() !== '' ? comercial_base_url() : '') . '/comercial_thread_feed.php',
+            'can_toggle_thread' => false,
+            'show_export'       => true,
+        );
+
         $viewThread = null;
-        $snippetOneLine = function ($text, $max = 120) {
-            $clean = preg_replace('/\s+/u', ' ', trim((string)$text));
-            if ($clean === '') {
-                return '—';
-            }
-            if (function_exists('mb_strlen') && function_exists('mb_substr')) {
-                if (mb_strlen($clean, 'UTF-8') > $max) {
-                    return mb_substr($clean, 0, $max - 1, 'UTF-8') . '…';
-                }
-                return $clean;
-            }
-            if (strlen($clean) > $max) {
-                return substr($clean, 0, $max - 1) . '…';
-            }
-            return $clean;
-        };
-        $triageLevel = function ($thread) {
-            $stage = trim((string)($thread['stage'] ?? ''));
-            $humanTaken = !empty($thread['human_taken']);
-            $hasReply = (int)($thread['replies_count'] ?? 0) > 0;
-            $hasLead = trim((string)($thread['lead_id'] ?? '')) !== '';
-            if ($stage === 'very_hot' || (!$humanTaken && $hasReply && $stage !== 'discarded')) {
-                return 'P1';
-            }
-            if ($stage === 'discarded' || $hasLead) {
-                return 'P3';
-            }
-            return 'P2';
-        };
-        $isRecentReply = function ($thread) {
-            if ((int)($thread['replies_count'] ?? 0) <= 0) {
-                return false;
-            }
-            $ts = trim((string)($thread['updated_at'] ?? ''));
-            if ($ts === '') {
-                return false;
-            }
-            $when = strtotime($ts);
-            if ($when === false) {
-                return false;
-            }
-            return $when >= (time() - 36 * 3600);
-        };
-        $threadPassesExtraFilters = function ($thread) use ($quickFilter, $lineFilter, $processFilter, $isRecentReply) {
-            $threadLineId = trim((string)($thread['line_id'] ?? ''));
-            $threadProcess = trim((string)($thread['process_slug'] ?? ''));
-            if ($lineFilter !== '' && $lineFilter !== 'all' && $threadLineId !== $lineFilter) {
-                return false;
-            }
-            if ($processFilter !== '' && $processFilter !== 'all' && $threadProcess !== $processFilter) {
-                return false;
-            }
-            if ($quickFilter === 'unhandled' && !empty($thread['human_taken'])) {
-                return false;
-            }
-            if ($quickFilter === 'without_lead' && trim((string)($thread['lead_id'] ?? '')) !== '') {
-                return false;
-            }
-            if ($quickFilter === 'recent_replies' && !$isRecentReply($thread)) {
-                return false;
-            }
-            return true;
-        };
         foreach ($threads as $tmpThread) {
             if ((string)($tmpThread['id'] ?? '') === $viewThreadId) {
                 $viewThread = $tmpThread;
                 break;
             }
         }
-        $availableFilters = array(
-            'all' => 'Todas',
-            'opened' => 'Abiertas directas',
-            'responded' => 'Respondidas',
-            'qualified' => 'Qualifieds',
-            'very_hot' => 'Muy calientes',
-            'discarded' => 'Descartadas',
-        );
+
         echo '<section class="panel">';
         echo '<h2>Conversaciones</h2>';
-        echo '<div class="commercial-filter-bar">';
-        foreach ($availableFilters as $filterKey => $filterLabel) {
-            $count = 0;
-            foreach ($threads as $countThread) {
-                if (comercial_thread_matches_filter($countThread, $filterKey)) {
-                    $count++;
-                }
-            }
-            $activeClass = $stageFilter === $filterKey ? ' active' : '';
-            echo '<span class="commercial-filter-chip' . $activeClass . '">';
-            echo '<a href="' . e(comercial_page_url('conversaciones', array('stage_filter' => $filterKey))) . '">' . e($filterLabel) . ' · ' . e((string)$count) . '</a>';
-            echo ' <form method="post" style="display:inline-block; margin-left:6px;">';
-            echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
-            echo '<input type="hidden" name="action" value="comercial_export_threads_csv">';
-            echo '<input type="hidden" name="stage_filter" value="' . e($filterKey) . '">';
-            echo '<input type="hidden" name="redirect" value="' . e(comercial_page_url('conversaciones', array('stage_filter' => $filterKey))) . '">';
-            echo '<button type="submit" class="btn-secondary-mini">Exportar a Excel</button>';
-            echo '</form>';
-            echo '</span>';
-        }
-        echo '</div>';
-        $lineFilterOptions = array('all' => 'Todas las líneas');
-        foreach ($lines as $line) {
-            $lineId = (string)($line['id'] ?? '');
-            if ($lineId === '') {
-                continue;
-            }
-            $lineFilterOptions[$lineId] = trim((string)($line['nombre'] ?? '')) !== '' ? (string)$line['nombre'] : ('Línea ' . $lineId);
-        }
-        $processFilterOptions = array('all' => 'Todos los procesos');
-        foreach ($processes as $process) {
-            $slug = trim((string)($process['slug'] ?? ''));
-            if ($slug !== '') {
-                $processFilterOptions[$slug] = trim((string)($process['nombre'] ?? $slug));
-            }
-        }
+
+        // Quick filters form
         echo '<form method="get" class="commercial-quick-filters">';
         echo '<input type="hidden" name="page" value="comercial">';
         echo '<input type="hidden" name="tab" value="conversaciones">';
         echo '<input type="hidden" name="stage_filter" value="' . e($stageFilter !== '' ? $stageFilter : 'all') . '">';
-        echo '<div class="commercial-filter-bar">';
-        $quickFilters = array(
-            'all' => 'Todo',
-            'unhandled' => 'Sin gestionar',
-            'without_lead' => 'Sin lead',
-            'recent_replies' => 'Respuestas recientes',
-        );
-        foreach ($quickFilters as $qKey => $qLabel) {
-            $qClass = $quickFilter === $qKey ? ' active' : '';
-            echo '<button type="submit" name="quick_filter" value="' . e($qKey) . '" class="commercial-filter-chip commercial-filter-btn' . $qClass . '">' . e($qLabel) . '</button>';
-        }
-        echo '</div>';
-        echo '<div class="form-grid-2">';
-        echo '<div class="field"><label>Línea</label><select name="line_filter">';
-        foreach ($lineFilterOptions as $value => $text) {
-            echo '<option value="' . e((string)$value) . '"' . ((string)$lineFilter === (string)$value ? ' selected' : '') . '>' . e((string)$text) . '</option>';
-        }
-        echo '</select></div>';
-        echo '<div class="field"><label>Proceso</label><select name="process_filter">';
-        foreach ($processFilterOptions as $value => $text) {
-            echo '<option value="' . e((string)$value) . '"' . ((string)$processFilter === (string)$value ? ' selected' : '') . '>' . e((string)$text) . '</option>';
-        }
-        echo '</select></div>';
-        echo '</div>';
-        echo '<div class="commercial-inline-checks"><button type="submit" class="btn-secondary-mini">Aplicar filtros</button></div>';
+        inbox_render_quick_filters($ctx, $lines, $processes, $stageFilter, $quickFilter, $lineFilter, $processFilter);
         echo '</form>';
-        $filteredThreads = array();
-        foreach ($threads as $thread) {
-            if (!comercial_thread_matches_filter($thread, $stageFilter)) {
-                continue;
-            }
-            if (!$threadPassesExtraFilters($thread)) {
-                continue;
-            }
-            $filteredThreads[] = $thread;
-        }
+
+        // Stage filter chips
+        inbox_render_stage_filters($ctx, $threads, $stageFilter);
+
+        // Filter threads
+        $filteredThreads = inbox_filter_threads($threads, $stageFilter, $quickFilter, $lineFilter, $processFilter);
+
+        // Thread detail view
         if ($viewThread) {
             $snapshot = comercial_thread_live_payload((string)($viewThread['id'] ?? ''));
-            $viewStage = trim((string)($viewThread['stage'] ?? ''));
-            $viewLineName = isset($linesIndexed[(string)($viewThread['line_id'] ?? '')]) ? trim((string)($linesIndexed[(string)$viewThread['line_id']]['nombre'] ?? '')) : '';
-            echo '<div class="commercial-thread-view">';
-            echo '<div class="commercial-thread-view-head">';
-            echo '<div><strong>Conversación completa · </strong>';
-            crm_render_phone_value((string)($viewThread['target_phone'] ?? ''), array('strong' => true));
-            echo '</div>';
-            echo '<a class="mini-link" href="' . e(comercial_page_url('conversaciones', array('stage_filter' => $stageFilter !== '' ? $stageFilter : 'all'))) . '">Cerrar</a>';
-            echo '</div>';
-            echo '<div class="commercial-thread-subhead" id="commercialThreadHeader"'
-                . ' data-updated-at="' . e((string)($snapshot['updated_at'] ?? '')) . '"'
-                . ' data-thread-id="' . e((string)($viewThread['id'] ?? '')) . '"'
-                . ' data-feed-url="' . e((comercial_base_url() !== '' ? comercial_base_url() : '') . '/comercial_thread_feed.php') . '">';
-            echo '<div><span class="muted-small">Proceso: <strong id="commercialThreadProcess">' . e((string)($viewThread['process_slug'] ?? '')) . '</strong> · Estado: <span id="commercialThreadStageLabel" class="status-pill ' . e(comercial_thread_stage_css_class($viewStage)) . '">' . e(comercial_thread_stage_label($viewStage)) . '</span></span></div>';
-            echo '<div><span class="muted-small">WhatsApp origen desde el que se habla:</span> <span id="commercialThreadLine">';
-            crm_render_phone_value((string)($viewThread['line_phone'] ?? ''));
-            echo ($viewLineName !== '' ? ' · ' . e($viewLineName) : '');
-            echo '</span></div>';
-            echo '</div>';
-            echo '<div class="commercial-thread-top-actions">';
-            if ($viewStage !== 'qualified' && $viewStage !== 'very_hot') {
-                echo '<form method="post">';
-                echo '<input type="hidden" name="action" value="comercial_set_thread_stage">';
-                echo '<input type="hidden" name="thread_id" value="' . e((string)$viewThread['id']) . '">';
-                echo '<input type="hidden" name="stage" value="qualified">';
-                echo '<input type="hidden" name="return_stage_filter" value="' . e($stageFilter !== '' ? $stageFilter : 'all') . '">';
-                echo '<input type="hidden" name="return_view_thread" value="' . e((string)$viewThread['id']) . '">';
-                echo '<button type="submit" class="btn-secondary-mini">Marcar cualificado</button>';
-                echo '</form>';
-            }
-            if ($viewStage !== 'very_hot' && $viewStage !== 'discarded') {
-                echo '<form method="post">';
-                echo '<input type="hidden" name="action" value="comercial_set_thread_stage">';
-                echo '<input type="hidden" name="thread_id" value="' . e((string)$viewThread['id']) . '">';
-                echo '<input type="hidden" name="stage" value="very_hot">';
-                echo '<input type="hidden" name="return_stage_filter" value="' . e($stageFilter !== '' ? $stageFilter : 'all') . '">';
-                echo '<input type="hidden" name="return_view_thread" value="' . e((string)$viewThread['id']) . '">';
-                echo '<button type="submit" class="btn-secondary-mini">Marcar muy caliente</button>';
-                echo '</form>';
-            }
-            if ($viewStage !== 'discarded') {
-                echo '<form method="post">';
-                echo '<input type="hidden" name="action" value="comercial_set_thread_stage">';
-                echo '<input type="hidden" name="thread_id" value="' . e((string)$viewThread['id']) . '">';
-                echo '<input type="hidden" name="stage" value="discarded">';
-                echo '<input type="hidden" name="return_stage_filter" value="' . e($stageFilter !== '' ? $stageFilter : 'all') . '">';
-                echo '<input type="hidden" name="return_view_thread" value="' . e((string)$viewThread['id']) . '">';
-                echo '<button type="submit" class="btn-secondary-mini btn-danger-soft">Descartar conversación</button>';
-                echo '</form>';
-            }
-            echo '</div>';
-            echo '<div class="commercial-thread-chat-shell">';
-            echo '<div class="commercial-thread-chat-bar">WhatsApp en vivo · se actualiza solo</div>';
-            echo '<div id="commercialThreadTimelineWrap">';
-            echo (string)($snapshot['timeline_html'] ?? '');
-            echo '</div>';
-            echo '<form method="post" class="commercial-thread-view-reply-form">';
-            echo '<input type="hidden" name="action" value="comercial_send_thread_message">';
-            echo '<input type="hidden" name="thread_id" value="' . e((string)$viewThread['id']) . '">';
-            echo '<input type="hidden" name="return_stage_filter" value="' . e($stageFilter !== '' ? $stageFilter : 'all') . '">';
-            echo '<input type="hidden" name="return_view_thread" value="' . e((string)$viewThread['id']) . '">';
-            echo '<textarea name="manual_text" rows="3" placeholder="Escribe aquí para responder desde este mismo WhatsApp origen..."></textarea>';
-            echo '<button type="submit" class="btn-primary">Responder desde este móvil origen</button>';
-            echo '</form>';
-            echo '</div>';
-            echo '<div class="commercial-thread-webhook-block">';
-            echo '<strong>Log webhook / inbound</strong>';
-            echo '<div id="commercialThreadWebhookWrap">';
-            echo (string)($snapshot['webhook_log_html'] ?? '');
-            echo '</div>';
-            echo '</div>';
-            echo '</div>';
+            inbox_render_thread_detail($ctx, $viewThread, $snapshot, $linesIndexed, $stageFilter, $quickFilter, $lineFilter, $processFilter);
         }
-        $triageGroups = array('P1' => array(), 'P2' => array(), 'P3' => array());
-        foreach ($filteredThreads as $thread) {
-            $triage = $triageLevel($thread);
-            if (!isset($triageGroups[$triage])) {
-                $triageGroups[$triage] = array();
-            }
-            $triageGroups[$triage][] = $thread;
-        }
-        echo '<div class="table-wrap"><table><thead><tr><th>Proceso</th><th>Cliente</th><th>Estado</th><th>Vista rápida</th><th></th></tr></thead><tbody>';
-        foreach (array('P1', 'P2', 'P3') as $triage) {
-            $groupRows = isset($triageGroups[$triage]) ? (array)$triageGroups[$triage] : array();
-            if (empty($groupRows)) {
-                continue;
-            }
-            echo '<tr class="commercial-triage-group-row"><td colspan="5"><span class="commercial-triage-badge ' . e(strtolower($triage)) . '">' . e($triage) . '</span> <strong>Prioridad ' . e($triage) . '</strong> <span class="muted-small">· ' . e((string)count($groupRows)) . ' conversaciones</span></td></tr>';
-            foreach ($groupRows as $thread) {
-            $stage = trim((string)($thread['stage'] ?? ''));
-            $lineName = isset($linesIndexed[(string)($thread['line_id'] ?? '')]) ? trim((string)($linesIndexed[(string)$thread['line_id']]['nombre'] ?? '')) : '';
-            echo '<tr class="commercial-thread-row stage-' . e($stage) . '">';
-            echo '<td>' . e((string)$thread['process_slug']) . '<br><span class="muted-small">línea </span>';
-            crm_render_phone_value((string)($thread['line_phone'] ?? ''));
-            if ($lineName !== '') {
-                echo '<span class="muted-small"> · ' . e($lineName) . '</span>';
-            }
-            echo '</td>';
-            echo '<td>';
-            crm_render_phone_value((string)($thread['target_phone'] ?? ''), array('strong' => true));
-            echo '<br><span class="muted-small">replies: ' . e((string)$thread['replies_count']) . ' · envíos: ' . e((string)$thread['messages_sent_count']) . ' · enviado: ' . e((string)($thread['created_at'] ?? '')) . '</span>';
-            echo '</td>';
-            echo '<td><span class="status-pill ' . e(comercial_thread_stage_css_class($stage)) . '">' . e(comercial_thread_stage_label($stage)) . '</span></td>';
-            echo '<td><div class="commercial-row-preview">';
-            echo '<div class="commercial-row-snippet in"><strong>IN</strong> ' . e($snippetOneLine((string)($thread['last_inbound_text'] ?? ''))) . '</div>';
-            echo '<div class="commercial-row-snippet out"><strong>OUT</strong> ' . e($snippetOneLine((string)($thread['last_outbound_text'] ?? ''))) . '</div>';
-            echo '</div></td>';
-            echo '<td class="commercial-thread-actions-cell">';
-            if ($stage !== 'qualified' && $stage !== 'very_hot') {
-                echo '<form method="post" style="display:inline-block; margin-bottom:6px;">';
-                echo '<input type="hidden" name="action" value="comercial_set_thread_stage">';
-                echo '<input type="hidden" name="thread_id" value="' . e((string)$thread['id']) . '">';
-                echo '<input type="hidden" name="stage" value="qualified">';
-                echo '<input type="hidden" name="return_stage_filter" value="' . e($stageFilter !== '' ? $stageFilter : 'all') . '">';
-                echo '<button type="submit" class="btn-secondary-mini">Marcar cualificado</button>';
-                echo '</form><br>';
-            }
-            if ($stage !== 'very_hot' && $stage !== 'discarded') {
-                echo '<form method="post" style="display:inline-block; margin-bottom:6px;">';
-                echo '<input type="hidden" name="action" value="comercial_set_thread_stage">';
-                echo '<input type="hidden" name="thread_id" value="' . e((string)$thread['id']) . '">';
-                echo '<input type="hidden" name="stage" value="very_hot">';
-                echo '<input type="hidden" name="return_stage_filter" value="' . e($stageFilter !== '' ? $stageFilter : 'all') . '">';
-                echo '<button type="submit" class="btn-secondary-mini">Marcar muy caliente</button>';
-                echo '</form><br>';
-            }
-            if ($stage !== 'discarded') {
-                echo '<form method="post" style="display:inline-block; margin-bottom:6px;">';
-                echo '<input type="hidden" name="action" value="comercial_set_thread_stage">';
-                echo '<input type="hidden" name="thread_id" value="' . e((string)$thread['id']) . '">';
-                echo '<input type="hidden" name="stage" value="discarded">';
-                echo '<input type="hidden" name="return_stage_filter" value="' . e($stageFilter !== '' ? $stageFilter : 'all') . '">';
-                echo '<button type="submit" class="btn-secondary-mini btn-danger-soft">Descartar</button>';
-                echo '</form><br>';
-            }
-            echo '<form method="post" style="display:inline-block;">';
-            echo '<input type="hidden" name="action" value="comercial_promote_thread">';
-            echo '<input type="hidden" name="thread_id" value="' . e((string)$thread['id']) . '">';
-            echo '<button type="submit" class="btn-primary btn-small">Crear lead</button>';
-            echo '</form>';
-            echo '<br><a class="mini-link commercial-open-thread-cta" href="' . e(comercial_page_url('conversaciones', array('stage_filter' => $stageFilter !== '' ? $stageFilter : 'all', 'quick_filter' => $quickFilter !== '' ? $quickFilter : 'all', 'line_filter' => $lineFilter !== '' ? $lineFilter : 'all', 'process_filter' => $processFilter !== '' ? $processFilter : 'all', 'view_thread' => (string)$thread['id']))) . '">Abrir hilo completo</a>';
-            echo '</td>';
-            echo '</tr>';
-            }
-        }
-        echo '</tbody></table></div>';
+
+        // Thread table with triage
+        inbox_render_thread_table($ctx, $filteredThreads, $linesIndexed, $stageFilter, $quickFilter, $lineFilter, $processFilter);
+
         if ($viewThread) {
-            echo '<script>(function(){'
-                . 'const root=document.getElementById("commercialThreadHeader");'
-                . 'if(!root){return;}'
-                . 'const feedUrl=root.getAttribute("data-feed-url");'
-                . 'const threadId=root.getAttribute("data-thread-id");'
-                . 'const timeline=document.getElementById("commercialThreadTimelineWrap");'
-                . 'const webhook=document.getElementById("commercialThreadWebhookWrap");'
-                . 'const stageLabel=document.getElementById("commercialThreadStageLabel");'
-                . 'let currentUpdated=root.getAttribute("data-updated-at")||"";'
-                . 'let busy=false;'
-                . 'function tick(){'
-                . 'if(busy||document.hidden){return;}'
-                . 'busy=true;'
-                . 'fetch(feedUrl+"?thread_id="+encodeURIComponent(threadId)+"&_="+Date.now(),{credentials:"same-origin"})'
-                . '.then(function(r){return r.json();})'
-                . '.then(function(data){'
-                . 'if(!data||!data.ok||!data.thread){return;}'
-                . 'const next=data.thread.updated_at||"";'
-                . 'if(next!==""&&next!==currentUpdated){'
-                . 'currentUpdated=next;'
-                . 'root.setAttribute("data-updated-at",next);'
-                . 'if(stageLabel){stageLabel.textContent=data.thread.stage_label||"";stageLabel.className="status-pill "+(data.thread.stage_css||"muted");}'
-                . 'if(timeline){timeline.innerHTML=data.thread.timeline_html||""; const el=timeline.querySelector(".commercial-thread-timeline"); if(el){el.scrollTop=el.scrollHeight;}}'
-                . 'if(webhook){webhook.innerHTML=data.thread.webhook_log_html||"";}'
-                . '}'
-                . '})'
-                . '.catch(function(){})'
-                . '.finally(function(){busy=false;});'
-                . '}'
-                . 'if(timeline){const first=timeline.querySelector(".commercial-thread-timeline"); if(first){first.scrollTop=first.scrollHeight;}}'
-                . 'tick();'
-                . 'window.setInterval(tick,4000);'
-                . '})();</script>';
+            inbox_render_polling_js();
         }
+
         echo '</section>';
         return;
     }
@@ -7497,35 +8087,7 @@ HTML;
     if ($tab === 'agente') {
         require_once __DIR__ . '/comercial_agent_table.php';
 
-        // ── Filtrar solo threads de los últimos 4 días ──
-        $cutoffTs = time() - (4 * 86400);
-        $agentThreads = array();
-        foreach ($threads as $thread) {
-            $stage = trim((string)($thread['stage'] ?? ''));
-            $updatedTs = strtotime((string)($thread['updated_at'] ?? ''));
-
-            // Solo últimos 4 días
-            if ($updatedTs < $cutoffTs) continue;
-
-            // Ya analizado por IA y pasó el filtro
-            if (!empty($thread['ai_is_genuine'])) {
-                $agentThreads[] = $thread;
-                continue;
-            }
-
-            // very_hot o qualified: pasan directamente
-            if ($stage === 'very_hot' || $stage === 'qualified') {
-                $agentThreads[] = $thread;
-                continue;
-            }
-
-            // Con 2+ respuestas y no descartado ni auto-responder
-            $replies = (int)($thread['replies_count'] ?? 0);
-            if ($replies >= 2 && $stage !== 'discarded' && $stage !== 'autoresponder') {
-                $agentThreads[] = $thread;
-                continue;
-            }
-        }
+        $agentThreads = comercial_filter_agent_threads($threads);
 
         echo '<section class="panel">';
         echo '<h2>📋 Bandeja del Comercial</h2>';

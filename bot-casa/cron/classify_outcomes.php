@@ -121,8 +121,8 @@ foreach ($lines as $line) {
         $threads[$tid]['phone'] = $phone;
     }
 
-    // Track human (manual) replies for style learning
-    if (!empty($rec['manual']) && !empty(trim((string) ($rec['bot_reply'] ?? '')))) {
+    // Track human replies (manual panel + native WA fromMe) for style learning
+    if ((!empty($rec['manual']) || !empty($rec['from_me'])) && !empty(trim((string) ($rec['bot_reply'] ?? '')))) {
         $threads[$tid]['human_reply_count'] = ($threads[$tid]['human_reply_count'] ?? 0) + 1;
     }
 
