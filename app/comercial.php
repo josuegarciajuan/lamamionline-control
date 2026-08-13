@@ -1487,16 +1487,48 @@ function comercial_save_autoregulation_meta($meta) {
 function comercial_line_failure_counts_as_ban($httpCode, $errorText = '') {
     $httpCode = (int)$httpCode;
     $errorText = trim((string)$errorText);
+
+    // Éxito: nunca es ban.
     if ($httpCode === 201) {
         return false;
     }
+
+    // Transitorio: WAHA inalcanzable (conexión rehusada / timeout / curl error).
     if ($httpCode === 0) {
+        return false;
+    }
+
+    // Transitorio: WAHA sobrecargado o caído.
+    if ($httpCode >= 500) {
+        return false;
+    }
+
+    // Transitorio: rate limit / sesión ocupada.
+    if ($httpCode === 429) {
+        return false;
+    }
+
+    // Transitorio: la sesión está arrancando, esperando QR o parada (reinicio de
+    // WAHA). El body de WAHA incluye "status":"STARTING"|"SCAN_QR_CODE"|"STOPPED".
+    if (preg_match('/"status"\s*:\s*"(STARTING|SCAN_QR_CODE|SCAN_QR|STOPPED)"/i', $errorText)) {
+        return false;
+    }
+    if (stripos($errorText, 'Session status is not as expected') !== false) {
+        return false;
+    }
+
+    // Ban real: WAHA rechaza la petición (auth inválida / cuenta deslogueada).
+    if ($httpCode === 401 || $httpCode === 403) {
         return true;
     }
-    if ($httpCode >= 400) {
+
+    // Ban real: señal explícita en el mensaje de error.
+    if (preg_match('/\b(bann?ed|logged\s*out|not\s*authenticated|unauthenticated|auth\s*failed|blocked)\b/i', $errorText)) {
         return true;
     }
-    return $errorText !== '';
+
+    // Resto de 4xx (400/404/409/422...): ambiguo, no lo tratamos como ban.
+    return false;
 }
 
 function comercial_maybe_raise_line_power($lineId, $state) {

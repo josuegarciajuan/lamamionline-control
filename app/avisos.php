@@ -3150,6 +3150,9 @@ function avisos_generate_line_ban() {
     $now = time();
     foreach (aviso_ops_line_states() as $line) {
         $state = isset($line['comercial_state']) && is_array($line['comercial_state']) ? $line['comercial_state'] : array();
+        // last_ban_at solo se marca ante señales reales de baneo (ver
+        // comercial_line_failure_counts_as_ban): HTTP 401/403 o error explícito.
+        // Los fallos transitorios (STARTING, conexión, 5xx, 429) ya no lo fijan.
         $banAt = trim((string)($state['last_ban_at'] ?? ''));
         if ($banAt === '') continue;
         $ts = strtotime($banAt);
@@ -3161,7 +3164,7 @@ function avisos_generate_line_ban() {
             'ops',
             'line_ban_' . ($line['id'] ?? '') . '_' . date('Y-m-d'),
             'Línea de WhatsApp baneada',
-            'La línea ' . ($name !== '' ? $name . ' (' . $phone . ')' : $phone) . ' ha sido marcada como baneada (' . $banAt . '). Revisa si deja de enviar mensajes.',
+            'La línea ' . ($name !== '' ? $name . ' (' . $phone . ')' : $phone) . ' ha detectado una señal real de baneo (' . $banAt . '). Revisa si deja de enviar mensajes.',
             'alta',
             array('line_id' => $line['id'] ?? '', 'line_name' => $name, 'line_phone' => $phone, 'kind' => 'line_ban'),
             true
@@ -3213,14 +3216,30 @@ function avisos_generate_waha_down() {
         $ts = $checkAt !== '' ? strtotime($checkAt) : 0;
         if (!$ts || ($now - $ts) > 6 * 3600) continue;
 
+        // STARTING es transitorio durante reinicios de WAHA: no generar alerta
+        // hasta que lleve más de una hora sin volver a WORKING (evita falsos
+        // positivos por reinicios puntuales).
+        $startingGraceSec = 3600;
+        if ($health === 'starting' && ($now - $lastOkTs) <= $startingGraceSec) {
+            continue;
+        }
+
         $name = trim((string)($line['nombre'] ?? ''));
         $phone = comercial_only_digits((string)($line['tfono'] ?? ''));
+        $isStarting = ($health === 'starting');
+        $minutesDown = (int)round(($now - $lastOkTs) / 60);
+        $title = $isStarting ? 'Sesión de WhatsApp atascada en arranque' : 'Sesión de WhatsApp caída';
+        $severity = $isStarting ? 'media' : 'alta';
+        $message = $isStarting
+            ? 'La sesión WAHA de la línea ' . ($name !== '' ? $name . ' (' . $phone . ')' : $phone) . ' lleva ' . $minutesDown . ' min en estado STARTING sin volver a WORKING. Revisa si necesita reinicio manual.'
+            : 'La sesión WAHA de la línea ' . ($name !== '' ? $name . ' (' . $phone . ')' : $phone) . ' está en estado ' . strtoupper($health) . '. El bot o la línea puede haber dejado de responder.';
+
         $generated[] = aviso_make(
             'ops',
             'waha_down_' . ($line['id'] ?? '') . '_' . date('Y-m-d'),
-            'Sesión de WhatsApp caída',
-            'La sesión WAHA de la línea ' . ($name !== '' ? $name . ' (' . $phone . ')' : $phone) . ' está en estado ' . strtoupper($health) . '. El bot o la línea puede haber dejado de responder.',
-            'alta',
+            $title,
+            $message,
+            $severity,
             array('line_id' => $line['id'] ?? '', 'line_name' => $name, 'line_phone' => $phone, 'health_status' => $health, 'kind' => 'waha_down'),
             true
         );
