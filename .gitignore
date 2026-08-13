@@ -13,7 +13,8 @@ node_modules/
 
 # ── Logs ──
 *.log
-!data/comercial_events.jsonl
+# data/comercial_events.jsonl contiene PII (teléfonos + mensajes reales).
+# NO se trackea en git (se eliminó la excepción que lo incluía).
 
 # ── Archivos sensibles ──
 /contrato_firmado.php

@@ -78,6 +78,17 @@ function comercial_agent_load_playbook(string $processSlug): string {
     if (!file_exists($file)) return '';
     $content = trim((string)@file_get_contents($file));
     if ($content === '') return '';
+    // Limitar lo que se inyecta al prompt por mensaje (el playbook completo sigue en disco
+    // para el pipeline de learn). Evita coste/latencia excesivos sin perder el grueso del insight.
+    $maxChars = 5000;
+    if (function_exists('mb_strlen') && mb_strlen($content, 'UTF-8') > $maxChars) {
+        $content = mb_substr($content, 0, $maxChars, 'UTF-8');
+        // Cortar en el último salto de línea para no dejar una frase a medias
+        $lastNl = mb_strrpos($content, "\n", 0, 'UTF-8');
+        if ($lastNl !== false && $lastNl > 100) {
+            $content = mb_substr($content, 0, $lastNl, 'UTF-8');
+        }
+    }
     return $content;
 }
 

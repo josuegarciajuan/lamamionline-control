@@ -97,6 +97,11 @@ function comercial_classify_thread_outcome(array $thread, int $now = 0): array {
         $outcome = 'mareador';
         $confidence = 0.8;
         $reason = 'high_replies_' . $replies;
+    } elseif ($replies === 0) {
+        // Opener enviado sin respuesta (campaña en frío) → señal de "apertura que no engancha"
+        $outcome = 'no_respuesta';
+        $confidence = 0.9;
+        $reason = 'no_response';
     } elseif ($replies <= comercial_learning_dead_max_messages()) {
         $outcome = 'muerta';
         $confidence = 0.8;
