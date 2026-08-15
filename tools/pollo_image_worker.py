@@ -12,8 +12,10 @@ Compatibilidad:
 """
 
 import argparse
+import fcntl
 import json
 import os
+import stat
 import sys
 import time
 import urllib.parse
@@ -570,25 +572,76 @@ def save_multiple_outputs(client, result, generation_id, output_dir, output_pref
         )
     return saved
 
+def _open_shared_lock(lock_file):
+    try:
+        fd = os.open(lock_file, os.O_RDWR | os.O_CREAT, 0o666)
+        try:
+            os.fchmod(fd, 0o666)
+        except OSError:
+            pass
+        return os.fdopen(fd, "r+")
+    except PermissionError:
+        # flock funciona sobre descriptor de solo lectura; útil para locks 0644
+        # creados por el otro usuario del servicio.
+        fd = os.open(lock_file, os.O_RDONLY)
+        return os.fdopen(fd, "r")
+
+
 def _write_exhausted_status(status_file, label):
     """Actualiza el archivo de estado marcando una cuenta como agotada."""
     if not status_file:
         return
     try:
         os.makedirs(os.path.dirname(os.path.abspath(status_file)), exist_ok=True)
-        data = {}
-        if os.path.exists(status_file):
-            with open(status_file, "r") as fh:
-                data = json.loads(fh.read() or "{}")
-        if label not in data:
-            data[label] = {}
-        was_exhausted = bool(data[label].get("credits_exhausted"))
-        if not was_exhausted:
-            data[label].pop("exhaustion_notified_at", None)
-        data[label]["credits_exhausted"] = True
-        data[label]["exhausted_at"] = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
-        with open(status_file, "w") as fh:
-            json.dump(data, fh, indent=2, ensure_ascii=False)
+        lock_file = status_file + ".lock"
+        with _open_shared_lock(lock_file) as lock_fh:
+            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+            try:
+                data = {}
+                if os.path.exists(status_file):
+                    with open(status_file, "r") as fh:
+                        decoded = json.loads(fh.read())
+                        if not isinstance(decoded, dict):
+                            raise ValueError("El estado Pollo existente no contiene un objeto JSON")
+                        data = decoded
+                if label not in data or not isinstance(data[label], dict):
+                    data[label] = {}
+                was_exhausted = bool(data[label].get("credits_exhausted"))
+                if not was_exhausted:
+                    data[label]["exhaustion_cycle"] = max(0, int(data[label].get("exhaustion_cycle") or 0)) + 1
+                    data[label].pop("exhaustion_notified_at", None)
+                    data[label].pop("exhaustion_aviso_id", None)
+                    data[label].pop("exhaustion_notification_claim", None)
+                    data[label].pop("recovery_notification_claim", None)
+                    data[label]["exhausted_at"] = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
+                data[label]["credits_exhausted"] = True
+                tmp_file = "%s.tmp.%s.%s" % (status_file, os.getpid(), time.time_ns())
+                destination_mode = 0o664
+                destination_uid = None
+                destination_gid = None
+                if os.path.isfile(status_file):
+                    destination_stat = os.stat(status_file)
+                    destination_mode = stat.S_IMODE(destination_stat.st_mode) or 0o664
+                    destination_uid = destination_stat.st_uid
+                    destination_gid = destination_stat.st_gid
+                try:
+                    fd = os.open(tmp_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, destination_mode)
+                    with os.fdopen(fd, "w") as fh:
+                        json.dump(data, fh, indent=2, ensure_ascii=False)
+                        fh.flush()
+                        os.fsync(fh.fileno())
+                    if destination_uid is not None and destination_gid is not None:
+                        try:
+                            os.chown(tmp_file, destination_uid, destination_gid)
+                        except PermissionError:
+                            pass
+                    os.chmod(tmp_file, destination_mode)
+                    os.replace(tmp_file, status_file)
+                finally:
+                    if os.path.exists(tmp_file):
+                        os.unlink(tmp_file)
+            finally:
+                fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
         print("POLLO_STATUS: cuenta '%s' marcada como sin créditos en %s" % (label, status_file), file=sys.stderr)
     except Exception as exc:
         print("POLLO_STATUS: no se pudo escribir %s: %s" % (status_file, exc), file=sys.stderr)

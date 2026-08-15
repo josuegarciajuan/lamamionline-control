@@ -11109,83 +11109,296 @@ function publicista_pollo_status_read() {
     return is_array($data) ? $data : array();
 }
 
-function publicista_pollo_status_write($data) {
+function publicista_pollo_status_lock_file() {
+    return publicista_pollo_status_file() . '.lock';
+}
+
+function publicista_pollo_status_log_failure($message) {
+    @error_log('pollo_status | ' . trim((string)$message));
+}
+
+function publicista_pollo_status_open_lock() {
+    $path = publicista_pollo_status_lock_file();
+    $created = !file_exists($path);
+    $oldUmask = umask(0000);
+    $lock = @fopen($path, 'c+');
+    umask($oldUmask);
+    if ($lock) {
+        if ($created || is_writable($path)) @chmod($path, 0666);
+        return $lock;
+    }
+    $lock = @fopen($path, 'r');
+    if ($lock) return $lock;
+    publicista_pollo_status_log_failure('no se pudo abrir lock compartido: ' . $path);
+    return false;
+}
+
+function publicista_pollo_status_write_unlocked($data) {
     $path = publicista_pollo_status_file();
     $dir = dirname($path);
     if (!is_dir($dir)) @mkdir($dir, 0755, true);
-    @file_put_contents($path, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), LOCK_EX);
+    $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    if ($json === false) {
+        publicista_pollo_status_log_failure('no se pudo codificar estado');
+        return false;
+    }
+    $existingStat = is_file($path) ? @stat($path) : false;
+    $mode = is_array($existingStat) ? ((int)$existingStat['mode'] & 0777) : 0664;
+    if ($mode <= 0) $mode = 0664;
+    $tmpPath = $path . '.tmp.' . getmypid() . '.' . str_replace('.', '', uniqid('', true));
+    if (@file_put_contents($tmpPath, $json) === false) {
+        publicista_pollo_status_log_failure('falló escritura temporal: ' . $tmpPath);
+        return false;
+    }
+    if (is_array($existingStat)) {
+        @chown($tmpPath, (int)$existingStat['uid']);
+        @chgrp($tmpPath, (int)$existingStat['gid']);
+    }
+    @chmod($tmpPath, $mode);
+    if (@rename($tmpPath, $path)) return true;
+    publicista_pollo_status_log_failure('falló reemplazo atómico: ' . $tmpPath . ' -> ' . $path);
+    @unlink($tmpPath);
+    return false;
+}
+
+function publicista_pollo_status_update($callback) {
+    $path = publicista_pollo_status_file();
+    $dir = dirname($path);
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    $lock = publicista_pollo_status_open_lock();
+    if (!$lock || !@flock($lock, LOCK_EX)) {
+        if ($lock) @fclose($lock);
+        publicista_pollo_status_log_failure('no se pudo adquirir lock exclusivo');
+        return array('ok' => false, 'result' => null);
+    }
+
+    try {
+        if (file_exists($path)) {
+            if (!is_file($path) || !is_readable($path)) {
+                publicista_pollo_status_log_failure('estado existente no legible: ' . $path);
+                return array('ok' => false, 'result' => null);
+            }
+            $raw = @file_get_contents($path);
+            $data = $raw === false ? null : json_decode((string)$raw, true);
+            $trimmed = ltrim((string)$raw);
+            if ($raw === false || $trimmed === '' || $trimmed[0] !== '{' || !is_array($data) || json_last_error() !== JSON_ERROR_NONE) {
+                publicista_pollo_status_log_failure('estado JSON malformado; se conserva sin cambios: ' . $path);
+                return array('ok' => false, 'result' => null);
+            }
+        } else {
+            $data = array();
+        }
+        $update = call_user_func($callback, $data);
+        if (!is_array($update) || !isset($update['data']) || !is_array($update['data'])) {
+            return array('ok' => false, 'result' => null);
+        }
+        $changed = !empty($update['changed']);
+        $ok = !$changed || publicista_pollo_status_write_unlocked($update['data']);
+        return array('ok' => $ok, 'result' => $update['result'] ?? null);
+    } finally {
+        @flock($lock, LOCK_UN);
+        @fclose($lock);
+    }
+}
+
+function publicista_pollo_status_write($data) {
+    $result = publicista_pollo_status_update(function ($current) use ($data) {
+        return array('data' => is_array($data) ? $data : array(), 'changed' => true, 'result' => true);
+    });
+    return !empty($result['ok']);
 }
 
 function publicista_pollo_mark_exhausted($label) {
     $label = trim((string)$label);
     if ($label === '') return;
-    $status = publicista_pollo_status_read();
-    if (!isset($status[$label]) || !is_array($status[$label])) {
-        $status[$label] = array();
-    }
-    if (!empty($status[$label]['credits_exhausted'])) return;
-    $status[$label]['credits_exhausted'] = true;
-    $status[$label]['exhausted_at'] = gmdate('Y-m-d H:i:s');
-    unset($status[$label]['exhaustion_notified_at']);
-    publicista_pollo_status_write($status);
+    publicista_pollo_status_update(function ($status) use ($label) {
+        if (!isset($status[$label]) || !is_array($status[$label])) $status[$label] = array();
+        if (!empty($status[$label]['credits_exhausted'])) {
+            return array('data' => $status, 'changed' => false, 'result' => false);
+        }
+        $status[$label]['exhaustion_cycle'] = max(0, (int)($status[$label]['exhaustion_cycle'] ?? 0)) + 1;
+        $status[$label]['credits_exhausted'] = true;
+        $status[$label]['exhausted_at'] = gmdate('Y-m-d H:i:s');
+        unset($status[$label]['exhaustion_notified_at']);
+        unset($status[$label]['exhaustion_aviso_id']);
+        unset($status[$label]['exhaustion_notification_claim']);
+        unset($status[$label]['recovery_notification_claim']);
+        return array('data' => $status, 'changed' => true, 'result' => true);
+    });
 }
 
 function publicista_pollo_mark_recovered($label) {
     $label = trim((string)$label);
     if ($label === '') return;
 
-    $status = publicista_pollo_status_read();
-    if (empty($status[$label]['credits_exhausted'])) return;
+    publicista_pollo_status_update(function ($status) use ($label) {
+        if (empty($status[$label]['credits_exhausted'])) {
+            return array('data' => $status, 'changed' => false, 'result' => false);
+        }
+        $status[$label]['credits_exhausted'] = false;
+        $status[$label]['recovered_at'] = gmdate('Y-m-d H:i:s');
+        unset($status[$label]['recovery_notified_at']);
+        unset($status[$label]['exhaustion_notification_claim']);
+        unset($status[$label]['recovery_notification_claim']);
+        return array('data' => $status, 'changed' => true, 'result' => true);
+    });
+}
 
-    $status[$label]['credits_exhausted'] = false;
-    $status[$label]['recovered_at'] = gmdate('Y-m-d H:i:s');
-    unset($status[$label]['recovery_notified_at']);
-    publicista_pollo_status_write($status);
+function publicista_pollo_matching_active_avisos($label, $type) {
+    if (!function_exists('avisos_all')) return array();
+    $label = trim((string)$label);
+    $expectedTitle = $type === 'recovery'
+        ? 'Pollo.ai: cuenta ' . $label . ' con créditos de nuevo'
+        : 'Pollo.ai: cuenta ' . $label . ' sin créditos';
+    $prefix = $type === 'recovery' ? 'pollo_recovered_' : 'pollo_exhausted_';
+    $expectedSource = $prefix . md5((string)$label);
+    $status = publicista_pollo_status_read();
+    $transitionField = $type === 'recovery' ? 'recovered_at' : 'exhausted_at';
+    $transitionTs = strtotime((string)($status[$label][$transitionField] ?? ''));
+    $transitionCycle = (int)($status[$label]['exhaustion_cycle'] ?? 0);
+    $matches = array();
+    foreach ((array)avisos_all() as $aviso) {
+        if (($aviso['engine'] ?? '') !== 'pollo' || ($aviso['status'] ?? '') !== 'active') continue;
+        $sameAccount = trim((string)($aviso['meta']['account'] ?? '')) === $label;
+        $sameTitle = trim((string)($aviso['title'] ?? '')) === $expectedTitle;
+        $sameSource = trim((string)($aviso['source_key'] ?? '')) === $expectedSource;
+        if (!$sameSource && !($sameTitle && $sameAccount)) continue;
+        $avisoCycle = (int)($aviso['meta']['exhaustion_cycle'] ?? 0);
+        if ($avisoCycle > 0 && $transitionCycle > 0 && $avisoCycle !== $transitionCycle) continue;
+        $createdTs = strtotime((string)($aviso['created_at'] ?? ''));
+        if ($avisoCycle <= 0 && $transitionTs && $createdTs && $createdTs < $transitionTs) continue;
+        $matches[] = $aviso;
+    }
+    return $matches;
+}
+
+function publicista_pollo_claim_notification($label, $type, $adoptAvisoId = '') {
+    $claimKey = $type === 'recovery' ? 'recovery_notification_claim' : 'exhaustion_notification_claim';
+    $markerKey = $type === 'recovery' ? 'recovery_notified_at' : 'exhaustion_notified_at';
+    $token = sha1(uniqid((string)getmypid(), true) . '|' . $label . '|' . $type);
+    $result = publicista_pollo_status_update(function ($status) use ($label, $type, $adoptAvisoId, $claimKey, $markerKey, $token) {
+        $account = is_array($status[$label] ?? null) ? $status[$label] : array();
+        $cycle = (int)($account['exhaustion_cycle'] ?? 0);
+        $eligible = $type === 'recovery'
+            ? (empty($account['credits_exhausted']) && !empty($account['recovered_at']))
+            : !empty($account['credits_exhausted']);
+        if (!$eligible || !empty($account[$markerKey])) {
+            return array('data' => $status, 'changed' => false, 'result' => null);
+        }
+        if ($adoptAvisoId !== '') {
+            $account[$markerKey] = gmdate('Y-m-d H:i:s');
+            if ($type === 'exhaustion') $account['exhaustion_aviso_id'] = $adoptAvisoId;
+            unset($account[$claimKey]);
+            $status[$label] = $account;
+            return array('data' => $status, 'changed' => true, 'result' => 'adopted');
+        }
+        $claim = is_array($account[$claimKey] ?? null) ? $account[$claimKey] : array();
+        $claimedAt = strtotime((string)($claim['claimed_at'] ?? ''));
+        if (!empty($claim['token']) && (int)($claim['cycle'] ?? 0) === $cycle && $claimedAt && $claimedAt > (time() - 900)) {
+            return array('data' => $status, 'changed' => false, 'result' => null);
+        }
+        $account[$claimKey] = array('token' => $token, 'cycle' => $cycle, 'claimed_at' => gmdate('Y-m-d H:i:s'));
+        $status[$label] = $account;
+        return array('data' => $status, 'changed' => true, 'result' => $token);
+    });
+    return !empty($result['ok']) ? $result['result'] : null;
+}
+
+function publicista_pollo_dismiss_exhaustion_avisos($label) {
+    $matches = publicista_pollo_matching_active_avisos($label, 'exhaustion');
+    if (empty($matches)) return true;
+    if (!function_exists('aviso_dismiss')) return false;
+    foreach ($matches as $match) {
+        $id = trim((string)($match['id'] ?? ''));
+        if ($id !== '' && aviso_dismiss($id) !== true) return false;
+    }
+    return true;
+}
+
+function publicista_pollo_execute_claimed_notification($label, $type, $token, $exhaustionCycle) {
+    $claimKey = $type === 'recovery' ? 'recovery_notification_claim' : 'exhaustion_notification_claim';
+    $markerKey = $type === 'recovery' ? 'recovery_notified_at' : 'exhaustion_notified_at';
+    return publicista_pollo_status_update(function ($status) use ($label, $type, $token, $exhaustionCycle, $claimKey, $markerKey) {
+        $account = is_array($status[$label] ?? null) ? $status[$label] : array();
+        $eligible = $type === 'recovery'
+            ? (empty($account['credits_exhausted']) && !empty($account['recovered_at']))
+            : !empty($account['credits_exhausted']);
+        $claimMatches = ($account[$claimKey]['token'] ?? '') === $token
+            && (int)($account[$claimKey]['cycle'] ?? 0) === (int)($account['exhaustion_cycle'] ?? 0)
+            && (int)($account['exhaustion_cycle'] ?? 0) === (int)$exhaustionCycle;
+        if (!$eligible || !$claimMatches) {
+            return array('data' => $status, 'changed' => false, 'result' => false);
+        }
+
+        // El lock de estado se mantiene durante persistencia + envío. El envío
+        // está acotado por los timeouts/reintentos de avisos y evita alertas stale.
+        if ($type === 'recovery' && !publicista_pollo_dismiss_exhaustion_avisos($label)) {
+            unset($account[$claimKey]);
+            $status[$label] = $account;
+            return array('data' => $status, 'changed' => true, 'result' => false);
+        }
+
+        $existing = publicista_pollo_matching_active_avisos($label, $type);
+        $avisoId = trim((string)($existing[0]['id'] ?? ''));
+        if ($avisoId === '') {
+            try {
+                $avisoId = $type === 'recovery'
+                    ? avisos_create_active(
+                        'Pollo.ai: cuenta ' . $label . ' con créditos de nuevo',
+                        'La cuenta ' . e($label) . ' de Pollo.ai se ha marcado con créditos de nuevo y vuelve a estar disponible.',
+                        'media', 'pollo', array('account' => $label, 'exhaustion_cycle' => $exhaustionCycle), true,
+                        'pollo_recovered_' . md5((string)$label)
+                    )
+                    : avisos_create_active(
+                        'Pollo.ai: cuenta ' . $label . ' sin créditos',
+                        'Se agotaron los créditos de la cuenta ' . e($label) . ' en Pollo.ai. Se usará otra cuenta como fallback si está disponible.',
+                        'alta', 'pollo', array('account' => $label, 'exhaustion_cycle' => $exhaustionCycle), true,
+                        'pollo_exhausted_' . md5((string)$label)
+                    );
+            } catch (Throwable $e) {
+                $avisoId = false;
+            }
+        }
+
+        unset($account[$claimKey]);
+        if (!$avisoId) {
+            $status[$label] = $account;
+            return array('data' => $status, 'changed' => true, 'result' => false);
+        }
+        $account[$markerKey] = gmdate('Y-m-d H:i:s');
+        if ($type === 'exhaustion') $account['exhaustion_aviso_id'] = trim((string)$avisoId);
+        $status[$label] = $account;
+        return array('data' => $status, 'changed' => true, 'result' => true);
+    });
 }
 
 function publicista_pollo_check_and_alert() {
-    $status = publicista_pollo_status_read();
+    if (!function_exists('avisos_create_active')) return;
     $accounts = publicista_pollo_accounts();
-    $statusChanged = false;
 
     foreach ($accounts as $acc) {
         $label = trim((string)($acc['label'] ?? ''));
         if ($label === '') continue;
+        $status = publicista_pollo_status_read();
         $creditsExhausted = !empty($status[$label]['credits_exhausted']);
         if ($creditsExhausted && empty($status[$label]['exhaustion_notified_at'])) {
-            if (function_exists('avisos_create_active')) {
-                avisos_create_active(
-                    'Pollo.ai: cuenta ' . $label . ' sin créditos',
-                    'Se agotaron los créditos de la cuenta ' . e($label) . ' en Pollo.ai. Se usará otra cuenta como fallback si está disponible.',
-                    'alta',
-                    'pollo',
-                    array('account' => $label),
-                    true,
-                    'pollo_exhausted_' . md5((string)$label)
-                );
+            $exhaustionCycle = (int)($status[$label]['exhaustion_cycle'] ?? 0);
+            $existing = publicista_pollo_matching_active_avisos($label, 'exhaustion');
+            $existingId = trim((string)($existing[0]['id'] ?? ''));
+            $claim = publicista_pollo_claim_notification($label, 'exhaustion', $existingId);
+            if ($claim && $claim !== 'adopted') {
+                publicista_pollo_execute_claimed_notification($label, 'exhaustion', $claim, $exhaustionCycle);
             }
-            $status[$label]['exhaustion_notified_at'] = gmdate('Y-m-d H:i:s');
-            $statusChanged = true;
+            continue;
         }
 
         if (!$creditsExhausted && !empty($status[$label]['recovered_at']) && empty($status[$label]['recovery_notified_at'])) {
-            if (function_exists('avisos_create_active')) {
-                avisos_create_active(
-                    'Pollo.ai: cuenta ' . $label . ' con créditos de nuevo',
-                    'La cuenta ' . e($label) . ' de Pollo.ai se ha marcado con créditos de nuevo y vuelve a estar disponible.',
-                    'media',
-                    'pollo',
-                    array('account' => $label),
-                    true,
-                    'pollo_recovered_' . md5((string)$label)
-                );
+            $exhaustionCycle = (int)($status[$label]['exhaustion_cycle'] ?? 0);
+            $claim = publicista_pollo_claim_notification($label, 'recovery');
+            if ($claim) {
+                publicista_pollo_execute_claimed_notification($label, 'recovery', $claim, $exhaustionCycle);
             }
-            $status[$label]['recovery_notified_at'] = gmdate('Y-m-d H:i:s');
-            $statusChanged = true;
         }
-    }
-    if ($statusChanged) {
-        publicista_pollo_status_write($status);
     }
 }
 

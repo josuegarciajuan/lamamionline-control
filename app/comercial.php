@@ -3008,22 +3008,27 @@ function comercial_reset_test_probe() {
     }
     storage_write('comercial_leads.json', array_values($keptLeads));
 
-    $avisos = storage_read('avisos.json');
-    $keptAvisos = array();
-    foreach ((array)$avisos as $aviso) {
-        $sourceKey = trim((string)($aviso['source_key'] ?? ''));
-        $message = trim((string)($aviso['message'] ?? ''));
-        $isProbeAviso = strpos($sourceKey, 'comercial_reply_') === 0
-            && (
-                strpos($message, $probePhone) !== false
-                || strpos($message, comercial_phone_identity($probePhone)) !== false
-            );
-        if ($isProbeAviso) {
-            continue;
-        }
-        $keptAvisos[] = $aviso;
+    if (function_exists('avisos_rows_update_atomic')) {
+        avisos_rows_update_atomic(function ($avisos) use ($probePhone) {
+            $keptAvisos = array();
+            $changed = false;
+            foreach ((array)$avisos as $aviso) {
+                $sourceKey = trim((string)($aviso['source_key'] ?? ''));
+                $message = trim((string)($aviso['message'] ?? ''));
+                $isProbeAviso = strpos($sourceKey, 'comercial_reply_') === 0
+                    && (
+                        strpos($message, $probePhone) !== false
+                        || strpos($message, comercial_phone_identity($probePhone)) !== false
+                    );
+                if ($isProbeAviso) {
+                    $changed = true;
+                    continue;
+                }
+                $keptAvisos[] = $aviso;
+            }
+            return array('rows' => $keptAvisos, 'changed' => $changed, 'result' => $changed);
+        });
     }
-    storage_write('avisos.json', array_values($keptAvisos));
 
     $path = DATA_PATH . '/comercial_events.jsonl';
     if (is_file($path)) {

@@ -357,6 +357,9 @@ function aviso_whatsapp_should_retry($aviso) {
     if (trim((string)($aviso['status'] ?? '')) !== 'active') {
         return false;
     }
+    if (!empty($aviso['whatsapp_delivery_claim'])) {
+        return false;
+    }
 
     if (trim((string)($aviso['whatsapp_sent_at'] ?? '')) === '') {
         return true;
@@ -586,7 +589,7 @@ function avisos_active_rows_sorted($rows) {
     return $out;
 }
 
-function avisos_snapshot_build_from_rows($rows) {
+function avisos_snapshot_build_from_rows($rows, $sourceFingerprint = array()) {
     $activeRows = avisos_active_rows_sorted($rows);
     $existsAny = array();
     foreach ((array)$rows as $row) {
@@ -598,6 +601,8 @@ function avisos_snapshot_build_from_rows($rows) {
 
     return array(
         'generated_at' => now_datetime(),
+        'source_hash' => trim((string)($sourceFingerprint['hash'] ?? '')),
+        'source_size' => (int)($sourceFingerprint['size'] ?? 0),
         'active_rows' => array_values($activeRows),
         'active_ids' => array_values(array_map(function ($row) {
             return (string)($row['id'] ?? '');
@@ -606,24 +611,71 @@ function avisos_snapshot_build_from_rows($rows) {
     );
 }
 
+function avisos_canonical_fingerprint() {
+    $path = DATA_PATH . '/avisos.json';
+    if (!is_file($path) || !is_readable($path)) return array('hash' => '', 'size' => -1);
+    $hash = @hash_file('sha256', $path);
+    $size = @filesize($path);
+    return array('hash' => is_string($hash) ? $hash : '', 'size' => $size === false ? -1 : (int)$size);
+}
+
+function avisos_read_canonical_json_strict(&$error = '') {
+    $error = '';
+    $path = DATA_PATH . '/avisos.json';
+    if (!file_exists($path)) return array();
+    if (!is_file($path) || !is_readable($path)) {
+        $error = 'canonical no legible: ' . $path;
+        return false;
+    }
+    $raw = @file_get_contents($path);
+    if ($raw === false) {
+        $error = 'falló lectura canonical: ' . $path;
+        return false;
+    }
+    $trimmed = ltrim((string)$raw);
+    $rows = json_decode($raw, true);
+    if ($trimmed === '' || $trimmed[0] !== '[' || !is_array($rows) || json_last_error() !== JSON_ERROR_NONE) {
+        $error = 'canonical JSON malformado: ' . json_last_error_msg();
+        return false;
+    }
+    return $rows;
+}
+
 function avisos_snapshot_refresh($rows = null) {
     if (!is_array($rows)) {
-        $rows = storage_read('avisos.json');
+        $mode = function_exists('storage_backend_mode') ? storage_backend_mode() : 'json';
+        if ($mode === 'json') {
+            $error = '';
+            $rows = avisos_read_canonical_json_strict($error);
+            if ($rows === false) {
+                avisos_storage_log_failure($error);
+                return array('generated_at' => now_datetime(), 'source_hash' => '', 'source_size' => -1, 'active_rows' => array(), 'active_ids' => array(), 'exists_engine_source_any' => array());
+            }
+        } else {
+            $rows = storage_read('avisos.json');
+        }
     }
-    $snapshot = avisos_snapshot_build_from_rows($rows);
-    @file_put_contents(avisos_snapshot_path(), json_encode($snapshot, JSON_UNESCAPED_UNICODE), LOCK_EX);
+    $snapshot = avisos_snapshot_build_from_rows($rows, avisos_canonical_fingerprint());
+    if (!avisos_json_write_atomic_unlocked(avisos_snapshot_path(), $snapshot, false)) {
+        avisos_storage_log_failure('falló actualización de snapshot; se devuelve canonical en memoria');
+    }
     return $snapshot;
 }
 
 function avisos_snapshot_read() {
     $path = avisos_snapshot_path();
-    if (!is_file($path)) {
-        return avisos_snapshot_refresh();
-    }
+    if (!is_file($path)) return avisos_snapshot_refresh();
 
     $raw = @file_get_contents($path);
     $decoded = json_decode((string)$raw, true);
-    if (!is_array($decoded) || !isset($decoded['active_rows']) || !is_array($decoded['active_rows'])) {
+    $canonical = avisos_canonical_fingerprint();
+    $mode = function_exists('storage_backend_mode') ? storage_backend_mode() : 'json';
+    $canonicalUsable = $mode !== 'json' || trim((string)($canonical['hash'] ?? '')) !== '';
+    $snapshotFresh = is_array($decoded)
+        && $canonicalUsable
+        && hash_equals((string)($canonical['hash'] ?? ''), (string)($decoded['source_hash'] ?? ''))
+        && (int)($canonical['size'] ?? -1) === (int)($decoded['source_size'] ?? -2);
+    if (!$snapshotFresh || !isset($decoded['active_rows']) || !is_array($decoded['active_rows'])) {
         return avisos_snapshot_refresh();
     }
 
@@ -633,9 +685,160 @@ function avisos_snapshot_read() {
     return $decoded;
 }
 
+function avisos_rows_lock_path() {
+    return DATA_PATH . '/avisos.json.lock';
+}
+
+function avisos_storage_log_failure($message) {
+    $line = 'avisos_storage | ' . trim((string)$message);
+    @error_log($line);
+}
+
+function avisos_open_shared_lock() {
+    $path = avisos_rows_lock_path();
+    $created = !file_exists($path);
+    $oldUmask = umask(0000);
+    $lock = @fopen($path, 'c+');
+    umask($oldUmask);
+    if ($lock) {
+        if ($created || is_writable($path)) @chmod($path, 0666);
+        return $lock;
+    }
+
+    // Un lock 0644 creado por otro usuario sigue siendo válido para flock.
+    $lock = @fopen($path, 'r');
+    if ($lock) return $lock;
+    avisos_storage_log_failure('no se pudo abrir lock compartido: ' . $path);
+    return false;
+}
+
+function avisos_json_write_atomic_unlocked($path, $data, $pretty = false) {
+    $json = function_exists('storage_json_encode')
+        ? storage_json_encode($data, $pretty)
+        : json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | ($pretty ? JSON_PRETTY_PRINT : 0));
+    if (!is_string($json)) {
+        avisos_storage_log_failure('no se pudo codificar JSON: ' . $path);
+        return false;
+    }
+    $dir = dirname($path);
+    if (!is_dir($dir) && !@mkdir($dir, 0775, true)) {
+        avisos_storage_log_failure('no se pudo crear directorio: ' . $dir);
+        return false;
+    }
+    $existingStat = is_file($path) ? @stat($path) : false;
+    $mode = is_array($existingStat) ? ((int)$existingStat['mode'] & 0777) : 0664;
+    if ($mode <= 0) $mode = 0664;
+    $tmpPath = $path . '.tmp.' . getmypid() . '.' . str_replace('.', '', uniqid('', true));
+    $written = @file_put_contents($tmpPath, $json);
+    if ($written === false) {
+        avisos_storage_log_failure('falló escritura temporal: ' . $tmpPath);
+        return false;
+    }
+    if (is_array($existingStat)) {
+        @chown($tmpPath, (int)$existingStat['uid']);
+        @chgrp($tmpPath, (int)$existingStat['gid']);
+    }
+    @chmod($tmpPath, $mode);
+    if (!@rename($tmpPath, $path)) {
+        avisos_storage_log_failure('falló reemplazo atómico: ' . $tmpPath . ' -> ' . $path);
+        @unlink($tmpPath);
+        return false;
+    }
+    return true;
+}
+
+function avisos_rows_persist_unlocked($rows) {
+    $rows = array_values((array)$rows);
+    $mode = function_exists('storage_backend_mode') ? storage_backend_mode() : 'json';
+    $ok = false;
+
+    if ($mode === 'mysql') {
+        $ok = function_exists('storage_mysql_write') && storage_mysql_write('avisos.json', $rows);
+    } elseif ($mode === 'dual') {
+        $mysqlOk = function_exists('storage_mysql_write') && storage_mysql_write('avisos.json', $rows);
+        if (!$mysqlOk) {
+            avisos_storage_log_failure('falló persistencia MySQL canónica en modo dual; mirror JSON no modificado');
+            $ok = false;
+        } else {
+            $jsonOk = avisos_json_write_atomic_unlocked(DATA_PATH . '/avisos.json', $rows, false);
+            if (!$jsonOk) {
+                // MySQL ya confirmó la mutación canónica; el mirror se reparará después.
+                avisos_storage_log_failure('MySQL canónico persistido; falló mirror JSON en modo dual');
+            }
+            $ok = true;
+        }
+    } else {
+        $ok = avisos_json_write_atomic_unlocked(DATA_PATH . '/avisos.json', $rows, false);
+    }
+    if (function_exists('storage_invalidate_cache')) {
+        storage_invalidate_cache('avisos.json');
+    }
+
+    return $ok;
+}
+
+function avisos_rows_update_atomic($callback) {
+    if (!is_callable($callback)) return array('ok' => false, 'result' => false);
+    if (!is_dir(DATA_PATH) && !@mkdir(DATA_PATH, 0775, true)) {
+        return array('ok' => false, 'result' => false);
+    }
+    $lock = avisos_open_shared_lock();
+    if (!$lock || !@flock($lock, LOCK_EX)) {
+        if ($lock) @fclose($lock);
+        avisos_storage_log_failure('no se pudo adquirir lock exclusivo');
+        return array('ok' => false, 'result' => false);
+    }
+
+    try {
+        if (function_exists('storage_invalidate_cache')) storage_invalidate_cache('avisos.json');
+        $mode = function_exists('storage_backend_mode') ? storage_backend_mode() : 'json';
+        if ($mode === 'json') {
+            $readError = '';
+            $rows = avisos_read_canonical_json_strict($readError);
+            if ($rows === false) {
+                avisos_storage_log_failure($readError);
+                return array('ok' => false, 'result' => false);
+            }
+        } else {
+            if (!function_exists('storage_mysql_read')) {
+                avisos_storage_log_failure('storage_mysql_read no disponible para backend ' . $mode);
+                return array('ok' => false, 'result' => false);
+            }
+            $mysqlRead = storage_mysql_read('avisos.json');
+            if (!is_array($mysqlRead) || empty($mysqlRead['ok']) || !isset($mysqlRead['data']) || !is_array($mysqlRead['data'])) {
+                avisos_storage_log_failure('falló lectura MySQL canónica para backend ' . $mode);
+                return array('ok' => false, 'result' => false);
+            }
+            // Un resultado vacío válido sigue siendo canónico; no se consulta JSON.
+            $rows = $mysqlRead['data'];
+        }
+        $update = call_user_func($callback, is_array($rows) ? $rows : array());
+        if (!is_array($update) || !isset($update['rows']) || !is_array($update['rows'])) {
+            return array('ok' => false, 'result' => false);
+        }
+        if (empty($update['changed'])) {
+            return array('ok' => true, 'result' => $update['result'] ?? false);
+        }
+        if (!avisos_rows_persist_unlocked($update['rows'])) {
+            return array('ok' => false, 'result' => false);
+        }
+        $snapshot = avisos_snapshot_build_from_rows($update['rows'], avisos_canonical_fingerprint());
+        if (!avisos_json_write_atomic_unlocked(avisos_snapshot_path(), $snapshot, false)) {
+            avisos_storage_log_failure('avisos persistidos, pero falló snapshot');
+        }
+        return array('ok' => true, 'result' => $update['result'] ?? true);
+    } finally {
+        @flock($lock, LOCK_UN);
+        @fclose($lock);
+    }
+}
+
 function avisos_write_rows($rows) {
-    storage_write('avisos.json', array_values((array)$rows));
-    avisos_snapshot_refresh($rows);
+    $replacement = array_values((array)$rows);
+    $result = avisos_rows_update_atomic(function ($current) use ($replacement) {
+        return array('rows' => $replacement, 'changed' => true, 'result' => true);
+    });
+    return !empty($result['ok']) && !empty($result['result']);
 }
 
 function avisos_active_unread_ids() {
@@ -905,6 +1108,8 @@ function aviso_casawasap_cliente_last_pago_ts($clienteId) {
 }
 
 function avisos_all() {
+    // Evita cache de proceso obsoleta frente a escritores concurrentes.
+    if (function_exists('storage_invalidate_cache')) storage_invalidate_cache('avisos.json');
     return storage_read('avisos.json');
 }
 
@@ -954,11 +1159,10 @@ function avisos_get_history() {
 }
 
 function avisos_create_manual_planned($title, $message, $scheduledFor, $severity = 'media') {
-    $rows = storage_read('avisos.json');
     $now = now_datetime();
     $id = generate_id('aviso');
 
-    $rows[] = array(
+    $row = array(
         'id' => $id,
         'engine' => 'manual',
         'source_key' => 'manual_planned_' . $id,
@@ -988,12 +1192,14 @@ function avisos_create_manual_planned($title, $message, $scheduledFor, $severity
         'whatsapp_last_log' => array(),
     );
 
-    avisos_write_rows($rows);
-    return $id;
+    $result = avisos_rows_update_atomic(function ($rows) use ($row, $id) {
+        $rows[] = $row;
+        return array('rows' => $rows, 'changed' => true, 'result' => $id);
+    });
+    return !empty($result['ok']) ? $result['result'] : false;
 }
 
 function avisos_create_active($title, $message, $severity = 'media', $engine = 'manual', $meta = array(), $sendWhatsapp = false, $sourceKey = '') {
-    $rows = storage_read('avisos.json');
     $now = now_datetime();
     $id = generate_id('aviso');
     $sourceKey = trim((string)$sourceKey);
@@ -1029,180 +1235,218 @@ function avisos_create_active($title, $message, $severity = 'media', $engine = '
         'whatsapp_last_log' => array(),
     );
 
-    if ($sendWhatsapp) {
-        try {
-            $sendResult = aviso_send_whatsapp($row);
-        } catch (Throwable $e) {
-            $sendResult = array(
-                'ok' => false,
-                'status' => 'error',
-                'attempted_at' => $now,
-                'phones' => array(),
-                'error' => 'Excepción enviando WhatsApp: ' . $e->getMessage(),
-            );
-        }
-
-        $row = aviso_apply_whatsapp_send_result($row, $sendResult, $now);
+    $persisted = avisos_rows_update_atomic(function ($rows) use ($row, $id) {
+        $rows[] = $row;
+        return array('rows' => $rows, 'changed' => true, 'result' => $id);
+    });
+    if (empty($persisted['ok']) || ($persisted['result'] ?? false) !== $id) {
+        return false;
     }
 
-    $rows[] = $row;
-    avisos_write_rows($rows);
+    if ($sendWhatsapp) {
+        avisos_send_and_store_result($row, $now);
+    }
+
     return $id;
 }
 
-function avisos_delete_planned($id) {
-    $rows = storage_read('avisos.json');
-    $out = array();
-
-    foreach ($rows as $row) {
-        if (($row['id'] ?? '') === $id && ($row['status'] ?? '') === 'planned') {
-            continue;
+function avisos_store_whatsapp_result_atomic($id, $row) {
+    $claimToken = trim((string)($row['whatsapp_delivery_claim']['token'] ?? ''));
+    return avisos_rows_update_atomic(function ($rows) use ($id, $row, $claimToken) {
+        foreach ($rows as $index => $current) {
+            if (($current['id'] ?? '') !== $id) continue;
+            if ($claimToken === '' || trim((string)($current['whatsapp_delivery_claim']['token'] ?? '')) !== $claimToken) {
+                return array('rows' => $rows, 'changed' => false, 'result' => false);
+            }
+            $rows[$index] = array_merge($current, array(
+                'whatsapp_sent_at' => $row['whatsapp_sent_at'],
+                'whatsapp_last_attempt_at' => $row['whatsapp_last_attempt_at'],
+                'whatsapp_last_result' => $row['whatsapp_last_result'],
+                'whatsapp_last_error' => $row['whatsapp_last_error'],
+                'whatsapp_last_log' => $row['whatsapp_last_log'],
+                'whatsapp_delivery_claim' => array(),
+            ));
+            return array('rows' => $rows, 'changed' => true, 'result' => true);
         }
-        $out[] = $row;
-    }
+        return array('rows' => $rows, 'changed' => false, 'result' => false);
+    });
+}
 
-    avisos_write_rows($out);
+function avisos_claim_whatsapp_delivery($id, $now = '') {
+    $id = trim((string)$id);
+    if ($id === '') return false;
+    $now = trim((string)$now);
+    if ($now === '') $now = now_datetime();
+    $token = sha1($id . '|' . uniqid((string)getmypid(), true));
+    $result = avisos_rows_update_atomic(function ($rows) use ($id, $now, $token) {
+        foreach ($rows as $index => $row) {
+            if (($row['id'] ?? '') !== $id) continue;
+            if (trim((string)($row['status'] ?? '')) !== 'active') {
+                return array('rows' => $rows, 'changed' => false, 'result' => false);
+            }
+            if (trim((string)($row['whatsapp_sent_at'] ?? '')) !== '') {
+                return array('rows' => $rows, 'changed' => false, 'result' => false);
+            }
+            if (in_array(trim((string)($row['whatsapp_last_result'] ?? '')), array('sent', 'partial'), true)) {
+                return array('rows' => $rows, 'changed' => false, 'result' => false);
+            }
+            // Un claim persistido sin resultado es ambiguo: at-most-once, no se roba.
+            if (!empty($row['whatsapp_delivery_claim'])) {
+                return array('rows' => $rows, 'changed' => false, 'result' => false);
+            }
+            $rows[$index]['whatsapp_delivery_claim'] = array(
+                'token' => $token,
+                'claimed_at' => $now,
+                'state' => 'in_flight',
+            );
+            return array('rows' => $rows, 'changed' => true, 'result' => $rows[$index]);
+        }
+        return array('rows' => $rows, 'changed' => false, 'result' => false);
+    });
+    return !empty($result['ok']) && is_array($result['result']) ? $result['result'] : false;
+}
+
+function avisos_send_and_store_result($row, $now = '') {
+    $now = trim((string)$now);
+    if ($now === '') $now = now_datetime();
+    $claimedRow = avisos_claim_whatsapp_delivery((string)($row['id'] ?? ''), $now);
+    if (!$claimedRow) {
+        return array('ok' => false, 'status' => 'skipped_claimed', 'attempted_at' => $now, 'phones' => array(), 'error' => 'Entrega ya enviada o en estado ambiguo.');
+    }
+    $row = $claimedRow;
+    try {
+        $sendResult = aviso_send_whatsapp($row);
+    } catch (Throwable $e) {
+        $sendResult = array(
+            'ok' => false,
+            'status' => 'error',
+            'attempted_at' => $now,
+            'phones' => array(),
+            'error' => 'Excepción enviando WhatsApp: ' . $e->getMessage(),
+        );
+    }
+    $updated = aviso_apply_whatsapp_send_result($row, $sendResult, $now);
+    avisos_store_whatsapp_result_atomic((string)($row['id'] ?? ''), $updated);
+    return $sendResult;
+}
+
+function avisos_delete_planned($id) {
+    avisos_rows_update_atomic(function ($rows) use ($id) {
+        $out = array();
+        $changed = false;
+        foreach ($rows as $row) {
+            if (($row['id'] ?? '') === $id && ($row['status'] ?? '') === 'planned') {
+                $changed = true;
+                continue;
+            }
+            $out[] = $row;
+        }
+        return array('rows' => $out, 'changed' => $changed, 'result' => $changed);
+    });
 }
 
 function avisos_activate_planned_manuals($sendWhatsapp = true) {
-    $rows = storage_read('avisos.json');
     $now = now_datetime();
     $nowTs = time();
-    $activated = 0;
-
-    foreach ($rows as &$row) {
-        if (($row['status'] ?? '') !== 'planned') continue;
-
-        $scheduledTs = aviso_ts($row['scheduled_for'] ?? '');
-        if (!$scheduledTs || $scheduledTs > $nowTs) continue;
-
-        $row['status'] = 'active';
-        $row['activated_at'] = $now;
-        $row['created_at'] = $now;
-        $row['updated_at'] = $now;
-        $row['last_seen_at'] = $now;
-        $row['last_eval_action'] = 'activated_from_planned';
-        $row['occurrences'] = max(1, (int)($row['occurrences'] ?? 0));
-
-        if ($sendWhatsapp) {
-            try {
-                $sendResult = aviso_send_whatsapp($row);
-            } catch (Throwable $e) {
-                $sendResult = array(
-                    'ok' => false,
-                    'status' => 'error',
-                    'attempted_at' => $now,
-                    'phones' => array(),
-                    'error' => 'Excepción enviando WhatsApp: ' . $e->getMessage(),
-                );
-            }
-
-            $row = aviso_apply_whatsapp_send_result($row, $sendResult, $now);
+    $toSend = array();
+    $result = avisos_rows_update_atomic(function ($rows) use ($now, $nowTs, $sendWhatsapp, &$toSend) {
+        $activated = 0;
+        foreach ($rows as $index => $row) {
+            if (($row['status'] ?? '') !== 'planned') continue;
+            $scheduledTs = aviso_ts($row['scheduled_for'] ?? '');
+            if (!$scheduledTs || $scheduledTs > $nowTs) continue;
+            $rows[$index]['status'] = 'active';
+            $rows[$index]['activated_at'] = $now;
+            $rows[$index]['created_at'] = $now;
+            $rows[$index]['updated_at'] = $now;
+            $rows[$index]['last_seen_at'] = $now;
+            $rows[$index]['last_eval_action'] = 'activated_from_planned';
+            $rows[$index]['occurrences'] = max(1, (int)($row['occurrences'] ?? 0));
+            if ($sendWhatsapp) $toSend[] = $rows[$index];
+            $activated++;
         }
-
-        $activated++;
+        return array('rows' => $rows, 'changed' => $activated > 0, 'result' => $activated);
+    });
+    $activated = !empty($result['ok']) ? (int)$result['result'] : 0;
+    if (!empty($result['ok'])) {
+        foreach ($toSend as $row) {
+            avisos_send_and_store_result($row, $now);
+        }
     }
-    unset($row);
-
-    if ($activated > 0) {
-        avisos_write_rows($rows);
-    }
-
     return $activated;
 }
 
 function avisos_mark_as_read($ids) {
     if (empty($ids)) return;
-
-    $rows = storage_read('avisos.json');
-    $changed = false;
-
-    foreach ($rows as &$row) {
-        if (in_array($row['id'] ?? '', $ids, true) && ($row['status'] ?? '') === 'active' && empty($row['read_at'])) {
-            $row['read_at'] = now_datetime();
-            $row['updated_at'] = now_datetime();
+    avisos_rows_update_atomic(function ($rows) use ($ids) {
+        $changed = false;
+        foreach ($rows as $index => $row) {
+            if (!in_array($row['id'] ?? '', $ids, true) || ($row['status'] ?? '') !== 'active' || !empty($row['read_at'])) continue;
+            $now = now_datetime();
+            $rows[$index]['read_at'] = $now;
+            $rows[$index]['updated_at'] = $now;
             $changed = true;
         }
-    }
-    unset($row);
-
-    if ($changed) {
-        avisos_write_rows($rows);
-    }
+        return array('rows' => $rows, 'changed' => $changed, 'result' => $changed);
+    });
 }
 
 function avisos_mark_as_read_and_dismiss($ids) {
     if (empty($ids)) return;
 
-    $rows = storage_read('avisos.json');
-    $changed = false;
-
-    foreach ($rows as &$row) {
-        if (!in_array($row['id'] ?? '', $ids, true)) continue;
-        if (($row['status'] ?? '') !== 'active') continue;
-
-        $now = now_datetime();
-        if (empty($row['read_at'])) {
-            $row['read_at'] = $now;
+    avisos_rows_update_atomic(function ($rows) use ($ids) {
+        $changed = false;
+        foreach ($rows as $index => $row) {
+            if (!in_array($row['id'] ?? '', $ids, true) || ($row['status'] ?? '') !== 'active') continue;
+            $now = now_datetime();
+            if (empty($row['read_at'])) $rows[$index]['read_at'] = $now;
+            $rows[$index]['status'] = 'dismissed';
+            $rows[$index]['dismissed_at'] = $now;
+            $rows[$index]['updated_at'] = $now;
+            $changed = true;
         }
-        $row['status'] = 'dismissed';
-        $row['dismissed_at'] = $now;
-        $row['updated_at'] = $now;
-        $changed = true;
-    }
-    unset($row);
-
-    if ($changed) {
-        avisos_write_rows($rows);
-    }
+        return array('rows' => $rows, 'changed' => $changed, 'result' => $changed);
+    });
 }
 
 function aviso_dismiss($id) {
-    $rows = storage_read('avisos.json');
-    $changed = false;
-
-    foreach ($rows as &$row) {
-        if (($row['id'] ?? '') === $id) {
-            $row['status'] = 'dismissed';
-            $row['dismissed_at'] = now_datetime();
-            $row['updated_at'] = now_datetime();
-            $changed = true;
-            break;
+    $id = trim((string)$id);
+    if ($id === '') return false;
+    $result = avisos_rows_update_atomic(function ($rows) use ($id) {
+        foreach ($rows as $index => $row) {
+            if (($row['id'] ?? '') !== $id) continue;
+            $now = now_datetime();
+            $rows[$index]['status'] = 'dismissed';
+            $rows[$index]['dismissed_at'] = $now;
+            $rows[$index]['updated_at'] = $now;
+            return array('rows' => $rows, 'changed' => true, 'result' => true);
         }
-    }
-    unset($row);
-
-    if ($changed) {
-        avisos_write_rows($rows);
-    }
+        return array('rows' => $rows, 'changed' => false, 'result' => false);
+    });
+    return !empty($result['ok']) && !empty($result['result']);
 }
 
 function avisos_dismiss_destacamos_publish_reminders() {
-    $rows = storage_read('avisos.json');
-    $changed = 0;
     $now = now_datetime();
-
-    foreach ($rows as &$row) {
-        $engine = trim((string)($row['engine'] ?? ''));
-        $sourceKey = trim((string)($row['source_key'] ?? ''));
-        $kind = trim((string)($row['meta']['kind'] ?? ''));
-        $status = trim((string)($row['status'] ?? ''));
-        if (!in_array($status, array('active', 'planned'), true)) continue;
-        if ($kind !== 'destacamos_publish' && strpos($sourceKey, 'destacamos_publish_') !== 0) continue;
-        $row['status'] = 'dismissed';
-        $row['dismissed_at'] = $now;
-        $row['updated_at'] = $now;
-        $row['last_eval_action'] = 'dismissed_by_publicista_free_bump';
-        $row['engine'] = $engine !== '' ? $engine : 'recurring';
-        $changed++;
-    }
-    unset($row);
-
-    if ($changed > 0) {
-        avisos_write_rows($rows);
-    }
-
-    return $changed;
+    $result = avisos_rows_update_atomic(function ($rows) use ($now) {
+        $changed = 0;
+        foreach ($rows as $index => $row) {
+            $engine = trim((string)($row['engine'] ?? ''));
+            $sourceKey = trim((string)($row['source_key'] ?? ''));
+            $kind = trim((string)($row['meta']['kind'] ?? ''));
+            $status = trim((string)($row['status'] ?? ''));
+            if (!in_array($status, array('active', 'planned'), true)) continue;
+            if ($kind !== 'destacamos_publish' && strpos($sourceKey, 'destacamos_publish_') !== 0) continue;
+            $rows[$index]['status'] = 'dismissed';
+            $rows[$index]['dismissed_at'] = $now;
+            $rows[$index]['updated_at'] = $now;
+            $rows[$index]['last_eval_action'] = 'dismissed_by_publicista_free_bump';
+            $rows[$index]['engine'] = $engine !== '' ? $engine : 'recurring';
+            $changed++;
+        }
+        return array('rows' => $rows, 'changed' => $changed > 0, 'result' => $changed);
+    });
+    return !empty($result['ok']) ? (int)$result['result'] : 0;
 }
 function aviso_safe_substr($text, $start, $length) {
     if (!is_string($text)) {
@@ -1358,7 +1602,6 @@ function aviso_send_whatsapp($aviso) {
 }
 
 function avisos_sync_generated($generated, $engine = 'general', $sendWhatsapp = true, $runId = '') {
-    $rows = storage_read('avisos.json');
     $generated = is_array($generated) ? $generated : array();
     $generatedByKey = array();
     $stats = array(
@@ -1381,250 +1624,112 @@ function avisos_sync_generated($generated, $engine = 'general', $sendWhatsapp = 
 
     $stats['generated'] = count($generatedByKey);
     $now = now_datetime();
-
-    foreach ($generatedByKey as $sourceKey => $item) {
-        $foundIndex = null;
-
-        foreach ($rows as $i => $row) {
-            if (($row['engine'] ?? '') === $engine && ($row['source_key'] ?? '') === $sourceKey) {
-                $foundIndex = $i;
-                break;
+    $toSend = array();
+    $persisted = avisos_rows_update_atomic(function ($rows) use ($generatedByKey, $engine, $runId, $now, $sendWhatsapp, &$stats, &$toSend) {
+        $changed = false;
+        foreach ($generatedByKey as $sourceKey => $item) {
+            $foundIndex = null;
+            foreach ($rows as $i => $row) {
+                if (($row['engine'] ?? '') === $engine && ($row['source_key'] ?? '') === $sourceKey) {
+                    $foundIndex = $i;
+                    break;
+                }
             }
+            if ($foundIndex === null) {
+                $newRow = array(
+                    'id' => generate_id('aviso'), 'engine' => $engine, 'source_key' => $sourceKey,
+                    'title' => $item['title'] ?? 'Aviso', 'message' => $item['message'] ?? '',
+                    'severity' => aviso_normalize_severity($item['severity'] ?? 'media'),
+                    'meta' => $item['meta'] ?? array(), 'status' => 'active',
+                    'auto_resolve' => !empty($item['auto_resolve']), 'created_at' => $now,
+                    'updated_at' => $now, 'last_seen_at' => $now, 'last_run_id' => $runId,
+                    'last_eval_action' => 'created', 'occurrences' => 1, 'read_at' => '',
+                    'dismissed_at' => '', 'resolved_at' => '', 'whatsapp_sent_at' => '',
+                    'whatsapp_last_attempt_at' => '', 'whatsapp_last_result' => '',
+                    'whatsapp_last_error' => '', 'whatsapp_last_log' => array(),
+                );
+                $rows[] = $newRow;
+                if ($sendWhatsapp) $toSend[] = $newRow;
+                $stats['created']++;
+                $changed = true;
+                continue;
+            }
+            $existing = $rows[$foundIndex];
+            $oldStatus = $existing['status'] ?? 'active';
+            $existing['title'] = $item['title'] ?? ($existing['title'] ?? 'Aviso');
+            $existing['message'] = $item['message'] ?? ($existing['message'] ?? '');
+            $existing['severity'] = aviso_normalize_severity($item['severity'] ?? ($existing['severity'] ?? 'media'));
+            $existing['meta'] = $item['meta'] ?? ($existing['meta'] ?? array());
+            $existing['auto_resolve'] = !empty($item['auto_resolve']);
+            $existing['updated_at'] = $now;
+            $existing['last_seen_at'] = $now;
+            $existing['last_run_id'] = $runId;
+            $existing['last_eval_action'] = 'updated';
+            if ($oldStatus === 'resolved') {
+                $existing['status'] = 'active';
+                $existing['read_at'] = '';
+                $existing['dismissed_at'] = '';
+                $existing['resolved_at'] = '';
+                $existing['occurrences'] = (int)($existing['occurrences'] ?? 1) + 1;
+                $existing['last_eval_action'] = 'reactivated';
+                $stats['reactivated']++;
+                if ($sendWhatsapp) $toSend[] = $existing;
+            } elseif ($oldStatus === 'dismissed') {
+                $existing['last_eval_action'] = 'still_dismissed';
+                $stats['dismissed_persistent']++;
+            } else {
+                $stats['updated']++;
+                if ($sendWhatsapp && aviso_noise_profile() !== 'agresivo' && aviso_whatsapp_should_retry($existing)) {
+                    $toSend[] = $existing;
+                }
+            }
+            $rows[$foundIndex] = $existing;
+            $changed = true;
         }
-
-        if ($foundIndex === null) {
-            $newRow = array(
-                'id' => generate_id('aviso'),
-                'engine' => $engine,
-                'source_key' => $sourceKey,
-                'title' => $item['title'] ?? 'Aviso',
-                'message' => $item['message'] ?? '',
-                'severity' => aviso_normalize_severity($item['severity'] ?? 'media'),
-                'meta' => $item['meta'] ?? array(),
-                'status' => 'active',
-                'auto_resolve' => !empty($item['auto_resolve']),
-                'created_at' => $now,
-                'updated_at' => $now,
-                'last_seen_at' => $now,
-                'last_run_id' => $runId,
-                'last_eval_action' => 'created',
-                'occurrences' => 1,
-                'read_at' => '',
-                'dismissed_at' => '',
-                'resolved_at' => '',
-                'whatsapp_sent_at' => '',
-                'whatsapp_last_attempt_at' => '',
-                'whatsapp_last_result' => '',
-                'whatsapp_last_error' => '',
-                'whatsapp_last_log' => array(),
-            );
-
-            if ($sendWhatsapp) {
-                try {
-                    $sendResult = aviso_send_whatsapp($newRow);
-                } catch (Throwable $e) {
-                    $sendResult = array(
-                        'ok' => false,
-                        'status' => 'error',
-                        'attempted_at' => $now,
-                        'phones' => array(),
-                        'error' => 'Excepción enviando WhatsApp: ' . $e->getMessage(),
-                    );
-                }
-
-                if (PHP_SAPI === 'cli') {
-                    $waStatus = isset($sendResult['status']) ? $sendResult['status'] : 'unknown';
-                    $waError = isset($sendResult['error']) ? $sendResult['error'] : '';
-                    echo '[' . date('Y-m-d H:i:s') . '] '
-                        . '[whatsapp] '
-                        . 'aviso=' . ($newRow['id'] ?? 'sin_id')
-                        . ' status=' . $waStatus
-                        . ($waError !== '' ? ' error=' . $waError : '')
-                        . PHP_EOL;
-                }
-
-                $newRow = aviso_apply_whatsapp_send_result($newRow, $sendResult, $now);
-
-                if (aviso_whatsapp_count_as_sent($sendResult)) {
-                    $stats['whatsapp_sent']++;
-                } elseif (aviso_whatsapp_count_as_failed($sendResult)) {
-                    $stats['whatsapp_failed']++;
-                }
-            }
-
-            $rows[] = $newRow;
-            $stats['created']++;
-            continue;
+        foreach ($rows as $index => $row) {
+            if (($row['engine'] ?? '') !== $engine) continue;
+            if (!in_array(($row['status'] ?? ''), array('active', 'dismissed'), true)) continue;
+            if (empty($row['auto_resolve'])) continue;
+            $sourceKey = $row['source_key'] ?? '';
+            if ($sourceKey === '' || isset($generatedByKey[$sourceKey])) continue;
+            $rows[$index]['status'] = 'resolved';
+            $rows[$index]['resolved_at'] = $now;
+            $rows[$index]['updated_at'] = $now;
+            $rows[$index]['last_seen_at'] = $now;
+            $rows[$index]['last_run_id'] = $runId;
+            $rows[$index]['last_eval_action'] = 'auto_resolved';
+            $stats['resolved']++;
+            $changed = true;
         }
-
-        $existing = $rows[$foundIndex];
-        $oldStatus = $existing['status'] ?? 'active';
-
-        $existing['title'] = $item['title'] ?? ($existing['title'] ?? 'Aviso');
-        $existing['message'] = $item['message'] ?? ($existing['message'] ?? '');
-        $existing['severity'] = aviso_normalize_severity($item['severity'] ?? ($existing['severity'] ?? 'media'));
-        $existing['meta'] = $item['meta'] ?? ($existing['meta'] ?? array());
-        $existing['auto_resolve'] = !empty($item['auto_resolve']);
-        $existing['updated_at'] = $now;
-        $existing['last_seen_at'] = $now;
-        $existing['last_run_id'] = $runId;
-        $existing['last_eval_action'] = 'updated';
-
-        if ($oldStatus === 'resolved') {
-            $existing['status'] = 'active';
-            $existing['read_at'] = '';
-            $existing['dismissed_at'] = '';
-            $existing['resolved_at'] = '';
-            $existing['occurrences'] = (int)($existing['occurrences'] ?? 1) + 1;
-            $existing['last_eval_action'] = 'reactivated';
-            $stats['reactivated']++;
-
-            if ($sendWhatsapp) {
-                try {
-                    $sendResult = aviso_send_whatsapp($existing);
-                } catch (Throwable $e) {
-                    $sendResult = array(
-                        'ok' => false,
-                        'status' => 'error',
-                        'attempted_at' => $now,
-                        'phones' => array(),
-                        'error' => 'Excepción enviando WhatsApp: ' . $e->getMessage(),
-                    );
-                }
-
-                if (PHP_SAPI === 'cli') {
-                    $waStatus = isset($sendResult['status']) ? $sendResult['status'] : 'unknown';
-                    $waError = isset($sendResult['error']) ? $sendResult['error'] : '';
-                    echo '[' . date('Y-m-d H:i:s') . '] '
-                        . '[whatsapp] '
-                        . 'aviso=' . ($existing['id'] ?? 'sin_id')
-                        . ' status=' . $waStatus
-                        . ($waError !== '' ? ' error=' . $waError : '')
-                        . PHP_EOL;
-                }
-
-                $existing = aviso_apply_whatsapp_send_result($existing, $sendResult, $now);
-
-                if (aviso_whatsapp_count_as_sent($sendResult)) {
-                    $stats['whatsapp_sent']++;
-                } elseif (aviso_whatsapp_count_as_failed($sendResult)) {
-                    $stats['whatsapp_failed']++;
-                }
-            }
-        } elseif ($oldStatus === 'dismissed') {
-            $existing['last_eval_action'] = 'still_dismissed';
-            $stats['dismissed_persistent']++;
-        } else {
-            $stats['updated']++;
-            if ($sendWhatsapp && aviso_noise_profile() !== 'agresivo' && aviso_whatsapp_should_retry($existing)) {
-                try {
-                    $sendResult = aviso_send_whatsapp($existing);
-                } catch (Throwable $e) {
-                    $sendResult = array(
-                        'ok' => false,
-                        'status' => 'error',
-                        'attempted_at' => $now,
-                        'phones' => array(),
-                        'error' => 'Excepción enviando WhatsApp: ' . $e->getMessage(),
-                    );
-                }
-
-                if (PHP_SAPI === 'cli') {
-                    $waStatus = isset($sendResult['status']) ? $sendResult['status'] : 'unknown';
-                    $waError = isset($sendResult['error']) ? $sendResult['error'] : '';
-                    echo '[' . date('Y-m-d H:i:s') . '] '
-                        . '[whatsapp-retry] '
-                        . 'aviso=' . ($existing['id'] ?? 'sin_id')
-                        . ' status=' . $waStatus
-                        . ($waError !== '' ? ' error=' . $waError : '')
-                        . PHP_EOL;
-                }
-
-                $existing = aviso_apply_whatsapp_send_result($existing, $sendResult, $now);
-
-                if (aviso_whatsapp_count_as_sent($sendResult)) {
-                    $stats['whatsapp_sent']++;
-                } elseif (aviso_whatsapp_count_as_failed($sendResult)) {
-                    $stats['whatsapp_failed']++;
-                }
-            }
+        return array('rows' => $rows, 'changed' => $changed, 'result' => true);
+    });
+    if (!empty($persisted['ok'])) {
+        foreach ($toSend as $row) {
+            $sendResult = avisos_send_and_store_result($row, $now);
+            if (aviso_whatsapp_count_as_sent($sendResult)) $stats['whatsapp_sent']++;
+            elseif (aviso_whatsapp_count_as_failed($sendResult)) $stats['whatsapp_failed']++;
         }
-
-        $rows[$foundIndex] = $existing;
     }
-
-    foreach ($rows as &$row) {
-        if (($row['engine'] ?? '') !== $engine) continue;
-        if (!in_array(($row['status'] ?? ''), array('active', 'dismissed'), true)) continue;
-        if (empty($row['auto_resolve'])) continue;
-
-        $sourceKey = $row['source_key'] ?? '';
-        if ($sourceKey === '' || isset($generatedByKey[$sourceKey])) continue;
-
-        $row['status'] = 'resolved';
-        $row['resolved_at'] = $now;
-        $row['updated_at'] = $now;
-        $row['last_seen_at'] = $now;
-        $row['last_run_id'] = $runId;
-        $row['last_eval_action'] = 'auto_resolved';
-        $stats['resolved']++;
-    }
-    unset($row);
-
-    avisos_write_rows($rows);
     aviso_cli_log('[' . $engine . '] ' . aviso_build_run_summary($stats));
 
     return $stats;
 }
 
 function avisos_retry_pending_whatsapp() {
-    $rows = storage_read('avisos.json');
     $now = now_datetime();
     $sent = 0;
     $failed = 0;
     $checked = 0;
-    $changed = false;
-
-    foreach ($rows as $index => $row) {
-        if (!aviso_whatsapp_should_retry($row)) {
-            continue;
-        }
+    $snapshot = avisos_rows_update_atomic(function ($rows) {
+        return array('rows' => $rows, 'changed' => false, 'result' => $rows);
+    });
+    $rows = !empty($snapshot['ok']) && is_array($snapshot['result']) ? $snapshot['result'] : array();
+    foreach ($rows as $row) {
+        if (!aviso_whatsapp_should_retry($row)) continue;
         $checked++;
-
-        try {
-            $sendResult = aviso_send_whatsapp($row);
-        } catch (Throwable $e) {
-            $sendResult = array(
-                'ok' => false,
-                'status' => 'error',
-                'attempted_at' => $now,
-                'phones' => array(),
-                'error' => 'Excepción enviando WhatsApp: ' . $e->getMessage(),
-            );
-        }
-
-        if (PHP_SAPI === 'cli') {
-            $waStatus = isset($sendResult['status']) ? $sendResult['status'] : 'unknown';
-            $waError = isset($sendResult['error']) ? $sendResult['error'] : '';
-            echo '[' . date('Y-m-d H:i:s') . '] '
-                . '[whatsapp-pending-retry] '
-                . 'aviso=' . ($row['id'] ?? 'sin_id')
-                . ' status=' . $waStatus
-                . ($waError !== '' ? ' error=' . $waError : '')
-                . PHP_EOL;
-        }
-
-        $rows[$index] = aviso_apply_whatsapp_send_result($row, $sendResult, $now);
-        if (!empty($sendResult['ok'])) {
-            $sent++;
-        } else {
-            $failed++;
-        }
-        $changed = true;
-    }
-
-    if ($changed) {
-        avisos_write_rows($rows);
+        $sendResult = avisos_send_and_store_result($row, $now);
+        if (!empty($sendResult['ok'])) $sent++;
+        else $failed++;
     }
 
     return array(
