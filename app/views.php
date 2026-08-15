@@ -2575,7 +2575,10 @@ function render_publicista_crear_perfiles_page($embedded = false) {
     if (!$showOnlyJobDetail) {
 
         echo '<section class="panel panel-space">';
-        echo '<div class="section-head"><div><h2>Nuevo producto publicitario</h2><p>Flujo rápido: sube foto, genera pack del producto, revisa y acepta.</p></div></div>';
+        echo '<div class="section-head"><div><h2>Nuevo producto publicitario</h2><p>Flujo rápido: sube foto, genera pack del producto, revisa y acepta.</p></div>';
+        echo '<div class="section-head-actions">';
+        echo '<button type="button" class="btn-secondary-mini" onclick="publicistaJobsOpen()">Productos creados (' . e(count($jobs)) . ')</button>';
+        echo '</div></div>';
         if (empty($clientas)) {
             echo '<div class="empty">No hay clientas todavía. Primero necesitas al menos una clienta en LaMami o Jostal.</div>';
         } else {
@@ -2728,9 +2731,13 @@ function render_publicista_crear_perfiles_page($embedded = false) {
         
         echo '</section>';
 
-        echo '<section class="panel panel-space">';
-
-        echo '<div class="branch-panel-head"><h2>Productos creados</h2><span class="summary-badge">' . e(count($jobs)) . '</span></div>';
+        echo '<div id="publicistaJobsModalOverlay" class="modal-overlay" style="display:none;" onclick="if(event.target===this)publicistaJobsClose()">';
+        echo '<div class="modal-container" style="max-width:1100px;">';
+        echo '<div class="modal-header">';
+        echo '<h2>Productos creados</h2>';
+        echo '<button type="button" class="modal-close" onclick="publicistaJobsClose()">&times;</button>';
+        echo '</div>';
+        echo '<div class="modal-body">';
         if (empty($jobs)) {
             echo '<div class="empty">Todavía no hay trabajos creados en Publicista.</div>';
         } else {
@@ -2771,7 +2778,16 @@ function render_publicista_crear_perfiles_page($embedded = false) {
             }
             echo '</tbody></table></div>';
         }
-        echo '</section>';
+        echo '</div>';
+        echo '<div class="modal-footer">';
+        echo '<button type="button" class="btn-secondary" onclick="publicistaJobsClose()">Cerrar</button>';
+        echo '</div>';
+        echo '</div>';
+        echo '</div>';
+        echo '<script>';
+        echo 'function publicistaJobsOpen(){var o=document.getElementById("publicistaJobsModalOverlay");if(o){o.style.display="flex";document.body.classList.add("modal-open");}}';
+        echo 'function publicistaJobsClose(){var o=document.getElementById("publicistaJobsModalOverlay");if(o){o.style.display="none";document.body.classList.remove("modal-open");}}';
+        echo '</script>';
     }
     if (!$selectedJob) {
         return;
@@ -8566,7 +8582,7 @@ if (!empty($sendtaxsState)) {
                 $wahaPort = trim($row['waha_port'] ?? '');
                 $wahaSession = trim($row['waha'] ?? '');
                 echo '<td class="td-waha-salud">';
-                echo '<span id="waha-salud-' . e($row['id'] ?? '') . '" class="waha-indicator">⚪</span>';
+                echo '<span id="waha-salud-' . e($row['id'] ?? '') . '" class="waha-indicator" aria-label="Estado WAHA: sin comprobar"><span class="waha-status-dot is-unknown" aria-hidden="true"></span>Sin comprobar</span>';
                 if ($wahaPort !== '') {
                     echo '<div class="waha-line-actions" id="waha-actions-' . e($row['id'] ?? '') . '"></div>';
                 }
@@ -8670,15 +8686,28 @@ if (!empty($sendtaxsState)) {
 
             function twaHealthIcon(status) {
                 var s = (status||"").toUpperCase();
-                if (s === "WORKING" || s === "CONNECTED") return "\u{1F7E2}";
-                if (s === "SCAN_QR_CODE") return "\u{1F7E1}";
-                if (s === "STARTING") return "\u{1F7E0}";
-                return "\u{1F534}";
+                if (s === "WORKING" || s === "CONNECTED") return "up";
+                if (s === "SCAN_QR_CODE" || s === "STARTING") return "starting";
+                if (s === "" || s === "UNKNOWN") return "unknown";
+                return "down";
+            }
+
+            function twaRenderHealth(el, status, label, phone, hint) {
+                var kind = twaHealthIcon(status);
+                var text = label || "Desconocido";
+                var phoneText = phone ? (" (" + phone + ")") : "";
+                el.setAttribute("aria-label", "Estado WAHA: " + text + phoneText);
+                el.innerHTML = "<span class=\"waha-status-dot is-" + kind + "\" aria-hidden=\"true\"></span>" + text + phoneText + (hint || "");
+            }
+
+            function twaRestartButton(id, port, waha, danger) {
+                var buttonClass = danger ? "btn-danger-mini" : "btn-secondary-mini";
+                return "<button type=\"button\" onclick=\"twaRestartAndRescan(\'"+id+"\',\'"+port+"\',\'"+waha+"\')\" class=\"" + buttonClass + " waha-restart-button\" title=\"Reiniciar sesión y vincular con un nuevo QR\" aria-label=\"Reiniciar sesión WAHA y vincular con un nuevo QR\">↻</button>";
             }
 
             function checkLineHealth(id, port, waha, elSalud, elActions) {
                 if (!port) {
-                    elSalud.innerHTML = "\u26AA Sin WAHA";
+                    twaRenderHealth(elSalud, "UNKNOWN", "Sin WAHA");
                     if (elActions) elActions.innerHTML = "";
                     return;
                 }
@@ -8694,38 +8723,36 @@ if (!empty($sendtaxsState)) {
                         // API returned an error with diagnostics
                         var errType = d.status || "ERROR";
                         var errLabel = d.status_label || d.error || "Error";
-                        var errIcon = d.status_icon || "\u{1F534}";
                         console.log("[twa] API error for id=" + id, { error: d.error, debug_url: d.debug_url, debug_http: d.debug_http, debug_curl: d.debug_curl });
                         var hint = "";
                         if (d.debug_url) hint = " <small style=\"font-size:10px;color:var(--muted)\">" + d.debug_url + "</small>";
-                        elSalud.innerHTML = errIcon + " " + errLabel + hint;
+                        twaRenderHealth(elSalud, errType, errLabel, "", hint);
                         if (elActions) {
-                            elActions.innerHTML = "<button onclick=\"twaRestartAndRescan(\'"+id+"\',\'"+port+"\',\'"+waha+"\')\" class=\"btn-danger-mini\">\u{1F504} Reiniciar y vincular</button>";
+                            elActions.innerHTML = twaRestartButton(id, port, waha, true);
                         }
                         return;
                     }
                     // Success: WAHA is responding
-                    var icon = d.status_icon || twaHealthIcon(d.status);
                     var label = d.status_label || d.status;
-                    var phone = d.phone ? (" (" + d.phone + ")") : "";
-                    elSalud.innerHTML = icon + " " + label + phone;
+                    var phone = d.phone || "";
+                    twaRenderHealth(elSalud, d.status, label, phone);
                     if (!elActions) return;
                     var st = (d.status||"").toUpperCase();
                     if (st === "SCAN_QR_CODE" || st === "STARTING") {
                         elActions.innerHTML = "<button onclick=\"twaShowQr(\'"+id+"\',\'"+port+"\',\'"+waha+"\')\" class=\"btn-secondary-mini\">\u{1F4F1} Vincular</button>";
                     } else if (st === "FAILED" || st === "STOPPED") {
-                        elActions.innerHTML = "<button onclick=\"twaRestartAndRescan(\'"+id+"\',\'"+port+"\',\'"+waha+"\')\" class=\"btn-danger-mini\">\u{1F504} Reiniciar y vincular</button>";
+                        elActions.innerHTML = twaRestartButton(id, port, waha, true);
                     } else if (d.is_connected) {
-                        elActions.innerHTML = "<span style=\"color:var(--ok);font-size:12px\">\u2705</span>";
+                        elActions.innerHTML = twaRestartButton(id, port, waha, false);
                     } else {
                         elActions.innerHTML = "";
                     }
                 }).catch(function(e){
                     var msg = (e.message === "timeout") ? "Timeout" : (e.message||"Error");
                     console.error("[twa] FAIL for id=" + id + ": " + msg, e);
-                    elSalud.innerHTML = "\u{1F534} " + msg;
+                    twaRenderHealth(elSalud, "FAILED", msg);
                     if (elActions) {
-                        elActions.innerHTML = "<button onclick=\"twaRestartAndRescan(\'"+id+"\',\'"+port+"\',\'"+waha+"\')\" class=\"btn-danger-mini\">\u{1F504} Reiniciar y vincular</button>";
+                        elActions.innerHTML = twaRestartButton(id, port, waha, true);
                     }
                 });
             }
@@ -8817,7 +8844,7 @@ if (!empty($sendtaxsState)) {
                 if (!confirm("Reiniciar sesión WAHA de esta línea? Deberás escanear el QR para vincular de nuevo.")) return;
                 var elSalud = document.getElementById("waha-salud-" + id);
                 var elActions = document.getElementById("waha-actions-" + id);
-                if (elSalud) elSalud.innerHTML = "\u{1F7E0} Reiniciando...";
+                if (elSalud) twaRenderHealth(elSalud, "STARTING", "Reiniciando...");
                 if (elActions) elActions.innerHTML = "<span class=\"muted\" style=\"font-size:12px\">\u23F3 Espera ~15s</span>";
                 console.log("[twa] restartAndRescan id=" + id + " port=" + port + " waha=" + waha);
                 var url = apiBase + "?action=restart&waha_port=" + encodeURIComponent(port) + "&waha=" + encodeURIComponent(waha) + "&_=" + Date.now();
@@ -10760,9 +10787,15 @@ if ($tab === 'clientas') {
         }
         echo '</div>';
 
-        if (!empty($formSource['telefono'])) {
+        $showDeudaBtn = $edit && (($edit['modo'] ?? '') === 'alquiler');
+        if (!empty($formSource['telefono']) || $showDeudaBtn) {
             echo '<div class="section-head-actions">';
-            echo '<a class="btn-wa" href="' . e(whatsapp_url($formSource['telefono'])) . '" target="_blank" rel="noopener noreferrer">Abrir WhatsApp</a>';
+            if (!empty($formSource['telefono'])) {
+                echo '<a class="btn-wa" href="' . e(whatsapp_url($formSource['telefono'])) . '" target="_blank" rel="noopener noreferrer">Abrir WhatsApp</a>';
+            }
+            if ($showDeudaBtn) {
+                echo '<a class="btn-secondary-mini" href="index.php?page=jostal&tab=deudas&clienta_id=' . urlencode((string)$edit['id']) . '">Ver deuda</a>';
+            }
             echo '</div>';
         }
         echo '</div>';
@@ -11240,11 +11273,19 @@ if ($tab === 'informes') {
     if ($tab === 'deudas') {
         $desde = trim(request_get('desde', ''));
         $hasta = trim(request_get('hasta', ''));
+        $clientaIdFilter = trim(request_get('clienta_id', ''));
+        $fuente = trim(request_get('fuente', 'alquiler'));
+        if ($fuente !== 'semana') $fuente = 'alquiler';
+        $esSemana = ($fuente === 'semana');
 
         $clientasDeuda = array();
         foreach ($clientas as $c) {
             if (($c['modo'] ?? '') !== 'alquiler') continue;
-            if (!jostal_clienta_en_casa($c)) continue;
+            if ($clientaIdFilter !== '') {
+                if ((string)($c['id'] ?? '') !== $clientaIdFilter) continue;
+            } else {
+                if (!jostal_clienta_en_casa($c)) continue;
+            }
             $clientasDeuda[] = $c;
         }
         usort($clientasDeuda, function ($a, $b) {
@@ -11255,38 +11296,74 @@ if ($tab === 'informes') {
 
         echo '<div class="section-head">';
         echo '<div>';
-        echo '<h2>Informe de deuda — alquiler en casa</h2>';
+        echo '<h2>' . ($clientaIdFilter !== '' ? 'Informe de deuda — clienta' : 'Informe de deuda — alquiler en casa') . '</h2>';
         echo '<div class="muted">Detalle semanal y deuda acumulada. El total de deuda es histórico completo; el rango de fechas solo recorta el detalle semanal.</div>';
         echo '</div>';
+        if ($clientaIdFilter !== '') {
+            echo '<div class="section-head-actions">';
+            echo '<a class="btn-secondary-mini" href="index.php?page=jostal&tab=deudas' . ($esSemana ? '&fuente=semana' : '') . '">Ver todas</a>';
+            echo '</div>';
+        }
         echo '</div>';
 
         // Filtros de rango
         echo '<form method="get" class="toolbar">';
         echo '<input type="hidden" name="page" value="jostal">';
         echo '<input type="hidden" name="tab" value="deudas">';
+        if ($clientaIdFilter !== '') {
+            echo '<input type="hidden" name="clienta_id" value="' . e($clientaIdFilter) . '">';
+        }
+        if ($esSemana) {
+            echo '<input type="hidden" name="fuente" value="semana">';
+        }
         echo '<div class="field"><label>Desde</label><input type="date" name="desde" value="' . e($desde) . '"></div>';
         echo '<div class="field"><label>Hasta</label><input type="date" name="hasta" value="' . e($hasta) . '"></div>';
         echo '<div class="field field-btn"><label>&nbsp;</label><button class="btn-primary">Filtrar</button></div>';
         if ($desde !== '' || $hasta !== '') {
-            echo '<div class="field field-btn"><label>&nbsp;</label><a class="btn-secondary-mini" href="index.php?page=jostal&tab=deudas">Todo el tiempo</a></div>';
+            echo '<div class="field field-btn"><label>&nbsp;</label><a class="btn-secondary-mini" href="index.php?page=jostal&tab=deudas' . ($clientaIdFilter !== '' ? '&clienta_id=' . urlencode($clientaIdFilter) : '') . ($esSemana ? '&fuente=semana' : '') . '">Todo el tiempo</a></div>';
         }
         echo '</form>';
 
+        // Selector de fuente de datos (qué columna alimenta la deuda).
+        $baseQs = 'index.php?page=jostal&tab=deudas'
+            . ($clientaIdFilter !== '' ? '&clienta_id=' . urlencode($clientaIdFilter) : '')
+            . ($desde !== '' ? '&desde=' . urlencode($desde) : '')
+            . ($hasta !== '' ? '&hasta=' . urlencode($hasta) : '');
+        echo '<div class="toolbar" style="margin-bottom:12px;">';
+        echo '<span class="inline-label">Fuente de datos:</span>';
+        echo '<a class="' . (!$esSemana ? 'btn-primary' : 'btn-secondary-mini') . '" href="' . e($baseQs) . '">Pago alquiler (cubre)</a>';
+        echo '<a class="' . ($esSemana ? 'btn-primary' : 'btn-secondary-mini') . '" href="' . e($baseQs . '&fuente=semana') . '">Pago esta semana</a>';
+        echo '</div>';
+
         echo '<div class="info-strip" style="background:rgba(59,130,246,.10);border-left-color:#3b82f6;margin-bottom:14px;">';
-        echo '<strong>¿Cómo se reparten los pagos?</strong> Cada pago cubre la semana más antigua con deuda pendiente (FIFO). ';
-        echo 'Si paga más de lo que debe esa semana, el sobrante se aplica a la siguiente (adelanto); si paga por delante más allá de todas las semanas, se marca "a favor". ';
-        echo 'Los pagos "no alquiler" (cliente, fianza, taxi…) se muestran aparte y no suman en ningún sitio.';
+        if ($esSemana) {
+            echo '<strong>Fuente activa: Pago esta semana.</strong> Cada semana se evalúa por sí misma (lo que entregó esa semana frente a lo que debía), sin reparto FIFO. ';
+            echo 'La única compensación válida es el sobrante de una semana, que cubre <span style="color:#fbbf24;font-weight:700;">→ la deuda de la semana anterior</span> y, si no la hay, <span style="color:#fb923c;font-weight:700;">→ la semana siguiente (adelanto)</span>; lo que sobre queda a favor. ';
+            echo 'Los pagos "no alquiler" (cliente, fianza, taxi…) se muestran aparte y no suman en ningún sitio.';
+            echo '<br><strong>Lectura de la tabla:</strong> <em>Pagó esta semana</em> es la fuente (lo que entregó por fecha); <em>Pagos alquiler (cubre)</em> queda como referencia FIFO; <em>Deuda semana</em> y <em>Acumulado</em> salen de la fuente activa.';
+        } else {
+            echo '<strong>Fuente activa: Pago alquiler (cubre).</strong> Cada pago cubre la semana más antigua con deuda pendiente (FIFO). ';
+            echo 'Si paga más de lo que debe esa semana, el sobrante se aplica a la siguiente. ';
+            echo 'En "Pagos alquiler", los pagos resaltados en ámbar salen de su fecha: <span style="color:#fbbf24;font-weight:700;">⤴ adelanto</span> = pagó antes de que empezara la semana y cubre una posterior; ';
+            echo '<span style="color:#fb923c;font-weight:700;">↩ compensa sem. X</span> = pago tardío que cubre la deuda de una semana anterior. ';
+            echo 'Los pagos "no alquiler" (cliente, fianza, taxi…) se muestran aparte y no suman en ningún sitio.';
+            echo '<br><strong>Lectura de la tabla:</strong> <em>Pagó esta semana</em> es lo que entregó esa semana (lo que ella recuerda); <em>Deuda semana</em> es lo que suma (o no) esta semana; y <em>Acumulado</em> = deuda acumulada. Así se ve si la deuda es antigua o nueva.';
+        }
         echo '</div>';
 
         if (empty($clientasDeuda)) {
-            echo '<div class="empty">No hay clientas en modo alquiler actualmente en casa.</div>';
+            if ($clientaIdFilter !== '') {
+                echo '<div class="empty">No se encontró la clienta o no está en modo alquiler.</div>';
+            } else {
+                echo '<div class="empty">No hay clientas en modo alquiler actualmente en casa.</div>';
+            }
         } else {
             // Calcular todos los informes y recopilar dudosos.
             $reportes = array();
             $dudosos = array();
 
             foreach ($clientasDeuda as $c) {
-                $data = jostal_compute_deuda($c, $leads);
+                $data = jostal_compute_deuda($c, $leads, array(), $desde, $hasta);
                 $nombre = trim((string)($c['nombre'] ?? ''));
                 $nombreReal = trim((string)($c['nombre_real'] ?? ''));
                 $display = $nombre . ($nombreReal !== '' && mb_strtolower($nombreReal, 'UTF-8') !== mb_strtolower($nombre, 'UTF-8') ? ' (' . $nombreReal . ')' : '');
@@ -11329,6 +11406,8 @@ if ($tab === 'informes') {
                     echo '<input type="hidden" name="return_tab" value="deudas">';
                     echo '<input type="hidden" name="desde" value="' . e($desde) . '">';
                     echo '<input type="hidden" name="hasta" value="' . e($hasta) . '">';
+                    echo '<input type="hidden" name="clienta_id" value="' . e($clientaIdFilter) . '">';
+                    echo '<input type="hidden" name="fuente" value="' . e($fuente) . '">';
                     echo '<button class="btn-ok-mini">Es alquiler</button>';
                     echo '</form>';
                     echo '<form method="post" class="inline-form">';
@@ -11338,6 +11417,8 @@ if ($tab === 'informes') {
                     echo '<input type="hidden" name="return_tab" value="deudas">';
                     echo '<input type="hidden" name="desde" value="' . e($desde) . '">';
                     echo '<input type="hidden" name="hasta" value="' . e($hasta) . '">';
+                    echo '<input type="hidden" name="clienta_id" value="' . e($clientaIdFilter) . '">';
+                    echo '<input type="hidden" name="fuente" value="' . e($fuente) . '">';
                     echo '<button class="btn-secondary-mini">No es alquiler</button>';
                     echo '</form>';
                     echo '</td>';
@@ -11351,15 +11432,15 @@ if ($tab === 'informes') {
                 foreach ($reportes as $r) {
                     if ($r['error'] !== null) { $gConError++; continue; }
                     $gDebe += (float)$r['data']['debe_total'];
-                    $gPagado += (float)$r['data']['pagado_total'];
-                    $gDeuda += (float)($r['data']['deuda_vencida'] ?? $r['data']['deuda_total']);
+                    $gPagado += (float)($esSemana ? ($r['data']['pagado_total_semana'] ?? 0) : ($r['data']['pagado_total'] ?? 0));
+                    $gDeuda += (float)($esSemana ? ($r['data']['deuda_total_semana'] ?? 0) : ($r['data']['deuda_total'] ?? 0));
                     $gCount++;
                 }
                 echo '<div class="cards four">';
                 dashboard_card('Clientas en alquiler', $gCount, false);
                 dashboard_card('Debe total', euro($gDebe), true);
                 dashboard_card('Pagado total', euro($gPagado), true);
-                dashboard_card('Deuda vencida', euro($gDeuda), true);
+                dashboard_card('Deuda total', euro($gDeuda), true);
                 echo '</div>';
 
                 // ── Detalle por clienta ──
@@ -11380,10 +11461,14 @@ if ($tab === 'informes') {
                     $data = $r['data'];
                     $c = $r['clienta'];
                     $nombre = $r['nombre'];
-                    $deuda = (float)($data['deuda_vencida'] ?? $data['deuda_total']);
-                    $saldoFavor = (float)($data['saldo_favor'] ?? 0);
-                    $pendienteActual = (float)($data['pendiente_actual'] ?? 0);
-                    $weeks = jostal_weeks_en_rango((array)$data['weeks'], $desde, $hasta);
+                    $cid = (string)($c['id'] ?? '');
+                    // Deuda real = total (vencida + semana actual). Lo que le interesa al usuario.
+                    $deuda = (float)($esSemana ? ($data['deuda_total_semana'] ?? 0) : ($data['deuda_total'] ?? 0));
+                    $deudaVencida = (float)($esSemana ? ($data['deuda_vencida_semana'] ?? 0) : ($data['deuda_vencida'] ?? 0));
+                    $saldoFavor = (float)($esSemana ? ($data['saldo_favor_semana'] ?? 0) : ($data['saldo_favor'] ?? 0));
+                    $pendienteActual = (float)($esSemana ? ($data['pendiente_actual_semana'] ?? 0) : ($data['pendiente_actual'] ?? 0));
+                    $weeks = (array)($data['weeks'] ?? array());
+                    $perdon = isset($data['perdon']) && is_array($data['perdon']) ? $data['perdon'] : null;
 
                     $precioLabel = count((array)($data['precios'] ?? array())) > 0
                         ? implode('€ → ', array_map(function ($p) { return (int)round((float)$p); }, array_values(array_unique((array)$data['precios'])))) . '€'
@@ -11399,36 +11484,87 @@ if ($tab === 'informes') {
                         $estadoTxt = '✓ Al día';
                         $estadoColor = '#4ade80';
                     }
-                    if ($pendienteActual > 0.005) {
-                        $estadoTxt .= ' · sem. actual pendiente ' . euro($pendienteActual);
-                    }
 
-                    echo '<section class="panel">';
+                    echo '<section class="panel jostal-cli" data-cid="' . e($cid) . '">';
                     echo '<div class="section-head">';
                     echo '<div>';
                     echo '<h2>' . e($nombre) . '</h2>';
-                    echo '<div class="muted">' . e($c['id'] ?? '') . ' · ' . e($precioLabel) . '/sem · vence ' . e($data['due_weekday_label']) . ' · Entrada ' . e(jostal_fecha_corta($data['entry_date'])) . ' · ' . count($weeks) . ' sem. mostradas</div>';
+                    echo '<div class="muted">' . e($cid) . ' · ' . e($precioLabel) . '/sem · vence ' . e($data['due_weekday_label']) . ' · Entrada ' . e(jostal_fecha_corta($data['entry_date'])) . ' · ' . count($weeks) . ' sem. mostradas</div>';
                     echo '</div>';
                     echo '<div class="section-head-actions" style="align-items:center;text-align:right;">';
-                    echo '<strong style="color:' . $estadoColor . ';font-size:15px;">' . $estadoTxt . '</strong>';
+                    echo '<strong class="jostal-deuda" style="color:' . $estadoColor . ';font-size:16px;">' . $estadoTxt . '</strong>';
+                    echo '<div class="jostal-deuda-sub muted" style="font-size:11px;">' . ($deuda > 0.005 && $pendienteActual > 0.005 ? '(' . e(euro($deudaVencida)) . ' vencido + ' . e(euro($pendienteActual)) . ' esta semana)' : '') . '</div>';
                     echo '</div>';
                     echo '</div>';
+
+                    if ($perdon !== null) {
+                        echo '<div class="jostal-perdon-banner" style="margin-bottom:8px;padding:10px 14px;border:1px solid rgba(45,212,191,.40);border-left:4px solid #2dd4bf;border-radius:8px;background:rgba(45,212,191,.10);font-size:13px;">';
+                        echo '<strong style="color:#5eead4;">🧽 Borrón y cuenta nueva</strong> — aplicado el ' . e(jostal_fecha_corta((string)$perdon['desde'])) . ' · se perdonan <strong style="color:#5eead4;">' . e(euro((float)$perdon['deuda_perdonada'])) . '</strong> de deuda anterior';
+                        if (!empty($perdon['ignorar_actual'])) echo ' <span class="muted">(se ignoran los pagos de la semana en curso)</span>';
+                        echo '</div>';
+                    }
 
                     if (!empty($data['no_alq_total']) && $data['no_alq_total'] > 0) {
                         echo '<div class="muted" style="margin-bottom:8px;">(+) ' . e(euro($data['no_alq_total'])) . ' en pagos NO alquiler (clientes, fianza…) — no descuentan deuda.</div>';
                     }
 
-                    echo '<div class="table-wrap"><table><thead><tr>';
-                    echo '<th>Sem</th><th>Periodo</th><th>Pagos alquiler</th><th>Otros ingresos</th><th>Deuda semana</th><th>Acumulado</th>';
-                    echo '</tr></thead><tbody>';
+                    echo '<div class="table-wrap"><table class="jostal-table"><thead><tr>';
+                    $srcFechaLbl = $esSemana ? '<span style="color:#3b82f6;font-size:10px;font-weight:700;">◉ FUENTE</span>' : '';
+                    $srcFifoLbl  = $esSemana ? '' : '<span style="color:#3b82f6;font-size:10px;font-weight:700;">◉ FUENTE</span>';
+                    echo '<th>Sem</th><th>Periodo</th>';
+                    echo '<th' . ($esSemana ? '' : ' style="opacity:.55;"') . '>Pagó esta semana ' . $srcFechaLbl . '</th>';
+                    echo '<th' . ($esSemana ? ' style="opacity:.55;"' : '') . '>Pagos alquiler (cubre) ' . $srcFifoLbl . '</th>';
+                    echo '<th>Otros ingresos</th><th>Deuda semana</th><th>Acumulado</th>';
+                    echo '</tr></thead><tbody class="jostal-tbody">';
                     foreach ($weeks as $w) {
-                        $dif = (float)$w['diff'];
-                        $run = (float)$w['running'];
+                        $dif = (float)($esSemana ? ($w['diff_semana'] ?? 0) : ($w['diff'] ?? 0));
+                        $run = (float)($esSemana ? ($w['running_semana'] ?? 0) : ($w['running'] ?? 0));
                         $esActual = !empty($w['es_actual']);
-                        $rowBg = $esActual
-                            ? 'rgba(245,158,11,.08)'
-                            : ($run > 0.005 ? 'rgba(239,68,68,.08)' : 'rgba(16,185,129,.09)');
+                        $perdonada = !empty($w['perdonada']);
+                        $esPerdon = !empty($w['es_perdon']);
 
+                        // Fila separadora de "Borrón y cuenta nueva".
+                        if ($esPerdon && $perdon !== null) {
+                            echo '<tr class="jostal-perdon-sep" style="background:rgba(45,212,191,.10);">';
+                            echo '<td colspan="7" style="color:#5eead4;font-weight:700;text-align:center;padding:8px 12px;">🧽 BORRÓN Y CUENTA NUEVA — se perdonan ' . e(euro((float)$perdon['deuda_perdonada'])) . ' · desde ' . e(jostal_fecha_corta((string)$perdon['desde'])) . '</td>';
+                            echo '</tr>';
+                        }
+
+                        if ($esSemana) {
+                            // En "pago esta semana", la fila es verde si pagó lo de ESA semana,
+                            // aunque arrastre deuda de semanas anteriores.
+                            $rowBg = $esActual
+                                ? 'rgba(245,158,11,.08)'
+                                : ($dif > 0.005 ? 'rgba(239,68,68,.08)' : 'rgba(16,185,129,.09)');
+                        } else {
+                            $rowBg = $esActual
+                                ? 'rgba(245,158,11,.08)'
+                                : ($run > 0.005 ? 'rgba(239,68,68,.08)' : 'rgba(16,185,129,.09)');
+                        }
+
+                        // Pagó esta semana (por fecha).
+                        $pagosFechaHtml = '';
+                        if (empty($w['pagos_fecha'])) {
+                            $pagosFechaHtml = '<span class="muted">—</span>';
+                        } else {
+                            foreach ($w['pagos_fecha'] as $pf) {
+                                $concepto = trim((string)($pf['desc'] ?? ''));
+                                $line = e(jostal_fecha_corta($pf['date'])) . ' · <strong>' . e(euro($pf['amount'])) . '</strong>';
+                                if ($concepto !== '') $line .= ' <span class="muted">' . e($concepto) . '</span>';
+                                $pagosFechaHtml .= '<div>' . $line . '</div>';
+                            }
+                        }
+                        // Compensaciones del modo "pago esta semana" (fuente activa).
+                        if ($esSemana) {
+                            $compBack = (float)($w['comp_back'] ?? 0);
+                            $compFwd = (float)($w['comp_fwd'] ?? 0);
+                            $compFavor = (float)($w['comp_favor'] ?? 0);
+                            if ($compBack > 0.005) $pagosFechaHtml .= '<div style="color:#fbbf24;font-weight:700;font-size:11px;">→ cubre sem. anterior ' . e(euro($compBack)) . '</div>';
+                            if ($compFwd > 0.005) $pagosFechaHtml .= '<div style="color:#fb923c;font-weight:700;font-size:11px;">→ adelanto sem. siguiente ' . e(euro($compFwd)) . '</div>';
+                            if ($compFavor > 0.005) $pagosFechaHtml .= '<div style="color:#60a5fa;font-weight:700;font-size:11px;">→ a favor ' . e(euro($compFavor)) . '</div>';
+                        }
+
+                        // Pagos alquiler (cubre, FIFO).
                         $pagosHtml = '';
                         if (empty($w['pagos'])) {
                             $pagosHtml = '<span class="muted">—</span>';
@@ -11437,54 +11573,116 @@ if ($tab === 'informes') {
                                 $aplicado = (float)($p['aplicado'] ?? $p['amount']);
                                 $esParte = $aplicado < (float)$p['amount'] - 0.005;
                                 $concepto = trim((string)($p['desc'] ?? ''));
-                                $line = e(jostal_fecha_corta($p['date'])) . ' · <strong>' . e(euro($aplicado)) . '</strong>';
+                                $pdate = (string)($p['date'] ?? '');
+
+                                $fuera = '';
+                                $badge = '';
+                                if ($pdate !== '' && $pdate < (string)$w['ps']) {
+                                    $fuera = ' style="background:rgba(251,191,36,.10);border-left:3px solid #fbbf24;padding:2px 6px;border-radius:4px;margin-bottom:2px;"';
+                                    $badge = ' <span style="color:#fbbf24;font-weight:700;">⤴ adelanto</span>';
+                                } elseif ($pdate !== '' && $pdate >= (string)$w['pe']) {
+                                    $fuera = ' style="background:rgba(251,146,60,.12);border-left:3px solid #fb923c;padding:2px 6px;border-radius:4px;margin-bottom:2px;"';
+                                    $badge = ' <span style="color:#fb923c;font-weight:700;">↩ compensa sem. ' . (int)$w['n'] . '</span>';
+                                }
+
+                                $line = e(jostal_fecha_corta($pdate)) . ' · <strong>' . e(euro($aplicado)) . '</strong>';
                                 if ($esParte) $line .= ' <span class="muted">(parte)</span>';
                                 if ($concepto !== '') $line .= ' <span class="muted">' . e($concepto) . '</span>';
-                                $pagosHtml .= '<div>' . $line . '</div>';
+                                $line .= $badge;
+                                $pagosHtml .= '<div' . $fuera . '>' . $line . '</div>';
                             }
                         }
 
+                        // Otros ingresos (no alquiler, con botón compensar).
                         $otrosHtml = '';
                         if (empty($w['otros'])) {
                             $otrosHtml = '<span class="muted">—</span>';
                         } else {
                             foreach ($w['otros'] as $op) {
                                 $concepto = trim((string)($op['desc'] ?? ''));
+                                $leadId = (string)($op['lead_id'] ?? '');
                                 $line = e(jostal_fecha_corta($op['date'])) . ' · <strong>' . e(euro($op['amount'])) . '</strong>';
-                                if ($concepto !== '') $line .= ' <span class="muted">' . e($concepto) . '</span>';
-                                $otrosHtml .= '<div>' . $line . '</div>';
+                                $sub = ($concepto !== '')
+                                    ? '<div style="font-size:10px;color:#90a4ae;">' . e($concepto) . '</div>'
+                                    : '<div style="font-size:10px;color:#90a4ae;font-style:italic;">sin concepto</div>';
+                                $btn = '';
+                                if ($leadId !== '') {
+                                    $btn = '<button type="button" class="btn-secondary-mini" style="margin-top:2px;font-size:10px;padding:2px 8px;" data-accion="compensar" data-cid="' . e($cid) . '" data-lead-id="' . e($leadId) . '">→ alquiler</button>';
+                                }
+                                $otrosHtml .= '<div style="margin-bottom:3px;padding-bottom:3px;border-bottom:1px dashed #2a3a4f;">' . $line . $sub . $btn . '</div>';
                             }
                         }
 
                         if ($esActual) {
                             $difHtml = '<span style="color:#f59e0b;font-weight:600;">' . ($dif > 0.005 ? 'pend. ' . e(euro($dif)) : 'pagado') . '</span>';
                         } else {
-                            $difHtml = $dif > 0.005 ? '<span style="color:#f87171;font-weight:600;">+' . e(euro($dif)) . '</span>' : '<span class="muted">0,00 €</span>';
+                            if ($esSemana) {
+                                $difHtml = $dif > 0.005
+                                    ? '<span style="color:#f87171;font-weight:600;">+' . e(euro($dif)) . '</span>'
+                                    : '<span style="color:#4ade80;font-weight:600;">✓</span>';
+                            } else {
+                                $difHtml = $dif > 0.005 ? '<span style="color:#f87171;font-weight:600;">+' . e(euro($dif)) . '</span>' : '<span class="muted">0,00 €</span>';
+                            }
                         }
                         $runColor = $run > 0.005 ? '#f87171' : '#4ade80';
                         $runIcon = $run > 0.005 ? '⚠' : '✓';
 
-                        echo '<tr style="background:' . $rowBg . ';">';
+                        // Celda "Acumulado" con marcadores de perdón.
+                        if ($perdonada) {
+                            $runCell = '<span style="text-decoration:line-through;color:#78909c;">' . e(euro($run)) . '</span> <span style="color:#5eead4;font-size:10px;font-weight:700;">🗑 perdonado</span>';
+                        } elseif ($esPerdon) {
+                            $runCell = e(euro($run)) . ' ' . $runIcon . ' <span style="color:#5eead4;font-size:10px;font-weight:700;">↺ desde aquí</span>';
+                        } else {
+                            $runCell = e(euro($run)) . ' ' . $runIcon;
+                        }
+
+                        $rowStyle = 'background:' . $rowBg . ';' . ($perdonada ? 'opacity:.55;' : '');
+                        echo '<tr style="' . $rowStyle . ';">';
                         echo '<td>' . e($w['n']) . '</td>';
                         echo '<td>' . e(jostal_fecha_corta($w['ps']) . ' → ' . jostal_fecha_corta($w['pe'])) . ($esActual ? ' <span style="color:#f59e0b;font-size:11px;font-weight:600;">(en curso)</span>' : '') . '</td>';
-                        echo '<td>' . $pagosHtml . '</td>';
+                        echo '<td' . ($esSemana ? '' : ' style="opacity:.55;"') . '>' . $pagosFechaHtml . '</td>';
+                        echo '<td' . ($esSemana ? ' style="opacity:.55;"' : '') . '>' . $pagosHtml . '</td>';
                         echo '<td>' . $otrosHtml . '</td>';
                         echo '<td>' . $difHtml . '</td>';
-                        echo '<td style="color:' . $runColor . ';font-weight:700;text-align:right;">' . e(euro($run)) . ' ' . $runIcon . '</td>';
+                        echo '<td style="color:' . $runColor . ';font-weight:700;text-align:right;">' . $runCell . '</td>';
                         echo '</tr>';
                     }
-                    echo '</tbody><tfoot><tr>';
-                    echo '<td colspan="2"><strong>TOTAL</strong></td>';
-                    echo '<td colspan="2">Debe ' . e(euro($data['debe_total'])) . ' · Pagado ' . e(euro($data['pagado_total'])) . '</td>';
-                    echo '<td colspan="2" style="color:' . $estadoColor . ';"><strong>' . $estadoTxt . '</strong></td>';
-                    echo '</tr></tfoot></table></div>';
+                    echo '</tbody></table></div>';
+
+                    // ── Total de deuda real (vencida + semana actual) en una sola cifra ──
+                    $debeVencido = 0.0; $pagadoVencido = 0.0;
+                    $debeActual = 0.0; $pagadoActual = 0.0;
+                    foreach ($weeks as $w) {
+                        if ($esSemana) {
+                            $deficit = (float)($w['deficit_semana'] ?? 0);
+                            if (!empty($w['es_actual'])) { $debeActual += (float)$w['debe']; $pagadoActual += (float)$w['debe'] - $deficit; }
+                            else { $debeVencido += (float)$w['debe']; $pagadoVencido += (float)$w['debe'] - $deficit; }
+                        } else {
+                            if (!empty($w['es_actual'])) { $debeActual += (float)$w['debe']; $pagadoActual += (float)$w['pagado']; }
+                            else { $debeVencido += (float)$w['debe']; $pagadoVencido += (float)$w['pagado']; }
+                        }
+                    }
+                    $deudaVencida = $debeVencido - $pagadoVencido;
+                    $pendienteActual = $debeActual - $pagadoActual;
+                    $deudaTotal = $deudaVencida + $pendienteActual;
+
+                    echo '<div class="jostal-totalbox" style="margin-top:10px;padding:14px 16px;border:1px solid var(--line);border-radius:8px;background:rgba(17,28,45,.5);font-size:14px;">';
+                    echo '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">';
+                    echo '<span class="muted">DEUDA TOTAL</span>';
+                    echo '<strong style="font-size:20px;color:' . ($deudaTotal > 0.005 ? '#f87171' : '#4ade80') . ';">' . e(euro($deudaTotal)) . '</strong>';
+                    echo '<span class="muted" style="font-size:12px;">(' . e(euro($deudaVencida)) . ' vencido + ' . e(euro($pendienteActual)) . ' esta semana)</span>';
+                    echo '</div>';
+                    echo '</div>';
+
+                    // ── Compensaciones temporales (pendientes de confirmar) ──
+                    echo '<div class="jostal-compensaciones" data-cid="' . e($cid) . '"></div>';
 
                     // ── Resumen por meses ──
-                    $meses = (array)($data['resumen_meses'] ?? array());
+                    $meses = (array)($esSemana ? ($data['resumen_meses_semana'] ?? array()) : ($data['resumen_meses'] ?? array()));
                     if (!empty($meses)) {
                         echo '<div style="margin-top:12px;">';
-                        echo '<div class="muted" style="margin-bottom:6px;"><strong>Deuda por mes</strong> (histórico completo, no filtrado por rango)</div>';
-                        echo '<div class="table-wrap"><table><thead><tr><th>Mes</th><th>Debe</th><th>Pagado</th><th>Deuda del mes</th><th>Acumulado</th></tr></thead><tbody>';
+                        echo '<div class="muted" style="margin-bottom:6px;"><strong>Deuda por mes</strong> (dentro del rango seleccionado)</div>';
+                        echo '<div class="table-wrap"><table><thead><tr><th>Mes</th><th>Debe</th><th>Pagado</th><th>Deuda del mes</th><th>Acumulado</th></tr></thead><tbody class="jostal-meses-tbody">';
                         foreach ($meses as $mkey => $m) {
                             $mDiff = (float)$m['diff'];
                             $mRun = (float)$m['running'];
@@ -11503,11 +11701,12 @@ if ($tab === 'informes') {
 
                     // Enviar por WhatsApp (desde dulce)
                     echo '<div class="mini-actions-bar" style="margin-top:10px;">';
-                    echo '<form method="post" class="inline-form" style="gap:6px;flex-wrap:wrap;">';
+                    echo '<form method="post" class="inline-form jostal-wasap-form" data-cid="' . e($cid) . '" style="gap:6px;flex-wrap:wrap;">';
                     echo '<input type="hidden" name="action" value="jostal_send_deuda_wasap">';
-                    echo '<input type="hidden" name="clienta_id" value="' . e($c['id'] ?? '') . '">';
+                    echo '<input type="hidden" name="clienta_id" value="' . e($cid) . '">';
                     echo '<input type="hidden" name="desde" value="' . e($desde) . '">';
                     echo '<input type="hidden" name="hasta" value="' . e($hasta) . '">';
+                    echo '<input type="hidden" name="fuente" value="' . e($fuente) . '">';
                     echo '<label class="inline-label">Enviar informe por WhatsApp (desde dulce) a</label>';
                     echo '<select name="destino_tipo">';
                     echo '<option value="clienta">la clienta (' . e($c['telefono'] ?? 'sin teléfono') . ')</option>';
@@ -11519,6 +11718,25 @@ if ($tab === 'informes') {
                     echo '</form>';
                     echo '</div>';
 
+                    // Blob JSON para el recompute exacto en JS.
+                    $blob = array(
+                        'cid' => $cid,
+                        'fuente' => $fuente,
+                        'weeks' => array_map(function ($w) {
+                            return array('ps' => $w['ps'], 'pe' => $w['pe'], 'debe' => round((float)$w['debe'], 2), 'es_actual' => !empty($w['es_actual']));
+                        }, $weeks),
+                        'pagos_raw' => (array)($data['pagos_raw'] ?? array()),
+                    );
+                    if ($perdon !== null) {
+                        $blob['perdon'] = array(
+                            'desde' => (string)$perdon['desde'],
+                            'reset_index' => (int)$perdon['reset_index'],
+                            'ignorar_actual' => !empty($perdon['ignorar_actual']),
+                            'deuda_perdonada' => (float)$perdon['deuda_perdonada'],
+                        );
+                    }
+                    echo '<script type="application/json" class="jostal-data">' . json_encode($blob, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . '</script>';
+
                     echo '</section>';
                 }
 
@@ -11527,6 +11745,362 @@ if ($tab === 'informes') {
                 }
             }
         }
+        ?>
+<script>
+(function () {
+    'use strict';
+    var state = {}; // cid -> { leadId: true }
+    var data = {};  // cid -> { weeks, pagos_raw }
+
+    function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function euro(n) {
+        n = Math.round((+n) * 100) / 100;
+        var neg = n < 0; n = Math.abs(n);
+        var intPart = Math.floor(n);
+        var dec = Math.round((n - intPart) * 100);
+        var decStr = (dec < 10 ? '0' : '') + dec;
+        var intStr = String(intPart).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        return (neg ? '-' : '') + intStr + ',' + decStr + ' \u20AC';
+    }
+    function fcorte(d) { var p = String(d).split('-'); return p.length >= 3 ? p[2] + '/' + p[1] : d; }
+    function mesLabel(k) { var m = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']; var p = String(k).split('-'); return m[+p[1]] + ' ' + p[0]; }
+
+    document.querySelectorAll('script.jostal-data').forEach(function (el) {
+        try { var d = JSON.parse(el.textContent); data[d.cid] = d; } catch (e) {}
+    });
+
+    function compute(cid) {
+        var d = data[cid]; if (!d) return null;
+        var fuente = d.fuente === 'semana' ? 'semana' : 'alquiler';
+        var over = state[cid] || {};
+        var weeks = d.weeks, n = weeks.length;
+        var alq = [], noalq = [];
+        d.pagos_raw.forEach(function (p) {
+            if (p.tipo === 'alquiler' || over[p.lead_id]) alq.push(p); else noalq.push(p);
+        });
+        alq.sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+        noalq.sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+
+        function inWeek(p, w) { var ps = (w === 0) ? weeks[0].ps : weeks[w - 1].pe; return p.date >= ps && p.date < weeks[w].pe; }
+
+        // Pagos por fecha (fuente "pago esta semana").
+        var pagosFecha = weeks.map(function () { return []; });
+        var pagadoReal = weeks.map(function () { return 0; });
+        alq.forEach(function (p) { for (var w = 0; w < n; w++) { if (inWeek(p, w)) { pagosFecha[w].push(p); pagadoReal[w] += +p.amount; break; } } });
+
+        // Otros ingresos (no alquiler).
+        var otros = weeks.map(function () { return []; });
+        noalq.forEach(function (p) { for (var w = 0; w < n; w++) { if (inWeek(p, w)) { otros[w].push(p); break; } } });
+
+        // FIFO (fuente "pago alquiler cubre").
+        var remaining = weeks.map(function (w) { return +w.debe; });
+        var allocated = weeks.map(function () { return 0; });
+        var pagosSemana = weeks.map(function () { return []; });
+        var saldoFavor = 0;
+        alq.forEach(function (p) {
+            var amt = +p.amount;
+            for (var w = 0; w < n; w++) {
+                if (remaining[w] <= 0.0005) continue;
+                var take = Math.min(amt, remaining[w]);
+                allocated[w] += take; remaining[w] -= take; amt -= take;
+                pagosSemana[w].push({ date: p.date, amount: +p.amount, aplicado: take, desc: p.desc, lead_id: p.lead_id, comp_temporal: !!over[p.lead_id] });
+                if (amt <= 0.0005) break;
+            }
+            if (amt > 0.0005) saldoFavor += amt;
+        });
+
+        // Balance directo "pago esta semana" + compensación adyacente.
+        var direct = weeks.map(function (w, idx) { return pagadoReal[idx] - (+w.debe); });
+        var compBack = weeks.map(function () { return 0; });
+        var compFwd = weeks.map(function () { return 0; });
+        var compFavor = weeks.map(function () { return 0; });
+        var saldoFavorSemana = 0;
+        for (var w = 0; w < n; w++) {
+            if (direct[w] <= 0.0005) continue;
+            var s = direct[w];
+            if (w - 1 >= 0 && direct[w - 1] < -0.0005) { var tb = Math.min(s, -direct[w - 1]); direct[w - 1] += tb; direct[w] -= tb; compBack[w] += tb; s -= tb; }
+            if (s > 0.0005 && w + 1 < n && direct[w + 1] < -0.0005) { var tf = Math.min(s, -direct[w + 1]); direct[w + 1] += tf; direct[w] -= tf; compFwd[w] += tf; s -= tf; }
+            if (s > 0.0005) { compFavor[w] += s; saldoFavorSemana += s; direct[w] -= s; }
+        }
+
+        var outWeeks = [], meses = {}, mesesS = {};
+        var debeTotal = 0, pagadoTotal = 0, deudaVencida = 0, pendActual = 0;
+        var deudaVencidaS = 0, pendActualS = 0;
+        var runFifo = 0, runSemana = 0;
+
+        for (var w = 0; w < n; w++) {
+            var ps = (w === 0) ? weeks[0].ps : weeks[w - 1].pe;
+            var pe = weeks[w].pe, debe = +weeks[w].debe;
+            var paidFifo = allocated[w], diffFifo = debe - paidFifo;
+            var deficit = direct[w] < -0.0005 ? -direct[w] : 0;
+            var esActual = !!weeks[w].es_actual;
+
+            runFifo += diffFifo; runSemana += deficit;
+            debeTotal += debe; pagadoTotal += paidFifo;
+            if (esActual) { if (diffFifo > 0) pendActual = diffFifo; if (deficit > 0) pendActualS = deficit; }
+            else { deudaVencida += diffFifo; deudaVencidaS += deficit; }
+
+            var mes = pe.substring(0, 7);
+            if (!meses[mes]) meses[mes] = { debe: 0, pagado: 0, diff: 0, running: 0 };
+            meses[mes].debe += debe; meses[mes].pagado += paidFifo; meses[mes].diff += diffFifo; meses[mes].running = runFifo;
+            if (!mesesS[mes]) mesesS[mes] = { debe: 0, pagado: 0, diff: 0, running: 0 };
+            mesesS[mes].debe += debe; mesesS[mes].pagado += pagadoReal[w]; mesesS[mes].diff -= deficit; mesesS[mes].running = runSemana;
+
+            outWeeks.push({
+                n: w + 1, ps: ps, pe: pe, debe: debe,
+                pagos: pagosSemana[w], pagos_fecha: pagosFecha[w], pagado: paidFifo, pagado_real: pagadoReal[w],
+                diff: diffFifo, running: runFifo, arrastre: runFifo - diffFifo,
+                diff_semana: deficit, running_semana: runSemana, arrastre_semana: runSemana - deficit, deficit_semana: deficit,
+                comp_back: compBack[w], comp_fwd: compFwd[w], comp_favor: compFavor[w],
+                otros: otros[w], es_actual: esActual
+            });
+        }
+
+        // ── Perdón ("Borrón y cuenta nueva"): re-FIFO post-reset + reinicio ──
+        if (d.perdon && d.perdon.reset_index != null) {
+            var ri = d.perdon.reset_index;
+            var pdesde = weeks[ri].ps;
+            var postN = n - ri;
+            var postDebe = []; for (var i = ri; i < n; i++) postDebe.push(+weeks[i].debe);
+            var prem = postDebe.slice();
+            var palloc = []; for (var k = 0; k < postN; k++) palloc.push(0);
+            var ppagos = []; for (var k = 0; k < postN; k++) ppagos.push([]);
+            alq.forEach(function (p) {
+                if (p.date < pdesde) return;
+                var amt = +p.amount;
+                for (var k = 0; k < postN; k++) {
+                    if (prem[k] <= 0.0005) continue;
+                    var take = Math.min(amt, prem[k]);
+                    palloc[k] += take; prem[k] -= take; amt -= take;
+                    ppagos[k].push({ date: p.date, amount: +p.amount, aplicado: take, desc: p.desc, lead_id: p.lead_id, comp_temporal: !!over[p.lead_id] });
+                    if (amt <= 0.0005) break;
+                }
+            });
+            var runF2 = 0, runS2 = 0;
+            var debeT2 = 0, pagT2 = 0, dv2 = 0, pa2 = 0, dvs2 = 0, pas2 = 0;
+            var meses2 = {}, mesesS2 = {};
+            for (var k = 0; k < postN; k++) {
+                var idx = ri + k;
+                var w = outWeeks[idx];
+                var debe = +w.debe;
+                var paid = palloc[k];
+                var diff = debe - paid;
+                var deficit = +w.deficit_semana;
+                var esActual = w.es_actual;
+                if (d.perdon.ignorar_actual && esActual) {
+                    paid = 0; diff = debe; ppagos[k] = [];
+                    deficit = debe;
+                    w.diff_semana = debe; w.deficit_semana = debe; w.comp_back = 0; w.comp_fwd = 0; w.comp_favor = 0;
+                }
+                w.pagado = paid; w.diff = diff; w.pagos = ppagos[k];
+                w.arrastre = runF2; runF2 += diff; w.running = runF2;
+                w.es_perdon = (k === 0);
+                w.arrastre_semana = runS2; runS2 += deficit; w.running_semana = runS2;
+                debeT2 += debe; pagT2 += paid;
+                if (esActual) { if (diff > 0) pa2 = diff; if (deficit > 0) pas2 = deficit; }
+                else { dv2 += diff; dvs2 += deficit; }
+                var mes = w.pe.substring(0, 7);
+                if (!meses2[mes]) meses2[mes] = { debe: 0, pagado: 0, diff: 0, running: 0 };
+                meses2[mes].debe += debe; meses2[mes].pagado += paid; meses2[mes].diff += diff; meses2[mes].running = runF2;
+                if (!mesesS2[mes]) mesesS2[mes] = { debe: 0, pagado: 0, diff: 0, running: 0 };
+                mesesS2[mes].debe += debe; mesesS2[mes].pagado += w.pagado_real; mesesS2[mes].diff -= deficit; mesesS2[mes].running = runS2;
+            }
+            for (var i = 0; i < ri; i++) outWeeks[i].perdonada = true;
+            return {
+                fuente: fuente, weeks: outWeeks,
+                debe_total: debeT2, pagado_total: pagT2, deuda_total: debeT2 - pagT2,
+                deuda_vencida: dv2, pendiente_actual: pa2, saldo_favor: 0,
+                resumen_meses: meses2,
+                deuda_total_semana: runS2, deuda_vencida_semana: dvs2, pendiente_actual_semana: pas2, saldo_favor_semana: 0,
+                resumen_meses_semana: mesesS2,
+                perdon: d.perdon
+            };
+        }
+
+        return {
+            fuente: fuente, weeks: outWeeks,
+            debe_total: debeTotal, pagado_total: pagadoTotal, deuda_total: debeTotal - pagadoTotal,
+            deuda_vencida: deudaVencida, pendiente_actual: pendActual, saldo_favor: saldoFavor,
+            resumen_meses: meses,
+            deuda_total_semana: runSemana, deuda_vencida_semana: deudaVencidaS, pendiente_actual_semana: pendActualS, saldo_favor_semana: saldoFavorSemana,
+            resumen_meses_semana: mesesS
+        };
+    }
+
+    function renderRow(w, cid, fuente) {
+        var esSemana = fuente === 'semana';
+        var esActual = w.es_actual;
+        var dif = esSemana ? (+w.diff_semana || 0) : (+w.diff || 0);
+        var run = esSemana ? (+w.running_semana || 0) : (+w.running || 0);
+        var perdonada = !!w.perdonada;
+        var esPerdon = !!w.es_perdon;
+        var rowBg = esActual ? 'rgba(245,158,11,.08)' : (esSemana ? (dif > 0.005 ? 'rgba(239,68,68,.08)' : 'rgba(16,185,129,.09)') : (run > 0.005 ? 'rgba(239,68,68,.08)' : 'rgba(16,185,129,.09)'));
+
+        var sep = '';
+        if (esPerdon) {
+            var pinfo = (data[cid] && data[cid].perdon) || {};
+            var perdonDeuda = +pinfo.deuda_perdonada || 0;
+            var perdonDesde = pinfo.desde ? fcorte(pinfo.desde) : '';
+            sep = '<tr style="background:rgba(45,212,191,.10);"><td colspan="7" style="color:#5eead4;font-weight:700;text-align:center;padding:8px 12px;">\uD83E\uDDFD BORRÓN Y CUENTA NUEVA — se perdonan ' + esc(euro(perdonDeuda)) + (perdonDesde ? ' · desde ' + esc(perdonDesde) : '') + '</td></tr>';
+        }
+
+        var pagosFecha = '';
+        if (!w.pagos_fecha.length) pagosFecha = '<span class="muted">\u2014</span>';
+        else w.pagos_fecha.forEach(function (p) {
+            pagosFecha += '<div>' + esc(fcorte(p.date)) + ' \u00B7 <strong>' + esc(euro(p.amount)) + '</strong>' + (p.desc ? (' <span class="muted">' + esc(p.desc) + '</span>') : '') + '</div>';
+        });
+        if (esSemana) {
+            var cb = +w.comp_back || 0, cf = +w.comp_fwd || 0, cv = +w.comp_favor || 0;
+            if (cb > 0.005) pagosFecha += '<div style="color:#fbbf24;font-weight:700;font-size:11px;">\u2192 cubre sem. anterior ' + esc(euro(cb)) + '</div>';
+            if (cf > 0.005) pagosFecha += '<div style="color:#fb923c;font-weight:700;font-size:11px;">\u2192 adelanto sem. siguiente ' + esc(euro(cf)) + '</div>';
+            if (cv > 0.005) pagosFecha += '<div style="color:#60a5fa;font-weight:700;font-size:11px;">\u2192 a favor ' + esc(euro(cv)) + '</div>';
+        }
+
+        var pagos = '';
+        if (!w.pagos.length) pagos = '<span class="muted">\u2014</span>';
+        else w.pagos.forEach(function (p) {
+            var esParte = p.aplicado < p.amount - 0.005;
+            var fuera = '', badge = '';
+            if (p.date < w.ps) { fuera = ' style="background:rgba(251,191,36,.10);border-left:3px solid #fbbf24;padding:2px 6px;border-radius:4px;margin-bottom:2px;"'; badge = ' <span style="color:#fbbf24;font-weight:700;">\u2934 adelanto</span>'; }
+            else if (p.date >= w.pe) { fuera = ' style="background:rgba(251,146,60,.12);border-left:3px solid #fb923c;padding:2px 6px;border-radius:4px;margin-bottom:2px;"'; badge = ' <span style="color:#fb923c;font-weight:700;">\u21A9 compensa sem. ' + w.n + '</span>'; }
+            if (p.comp_temporal) badge += ' <span style="color:#fbbf24;font-weight:700;">(comp. temporal)</span>';
+            pagos += '<div' + fuera + '>' + esc(fcorte(p.date)) + ' \u00B7 <strong>' + esc(euro(p.aplicado)) + '</strong>' + (esParte ? ' <span class="muted">(parte)</span>' : '') + (p.desc ? (' <span class="muted">' + esc(p.desc) + '</span>') : '') + badge + '</div>';
+        });
+
+        var otros = '';
+        if (!w.otros.length) otros = '<span class="muted">\u2014</span>';
+        else w.otros.forEach(function (op) {
+            var sub = op.desc ? '<div style="font-size:10px;color:#90a4ae;">' + esc(op.desc) + '</div>' : '<div style="font-size:10px;color:#90a4ae;font-style:italic;">sin concepto</div>';
+            var btn = op.lead_id ? '<button type="button" class="btn-secondary-mini" style="margin-top:2px;font-size:10px;padding:2px 8px;" data-accion="compensar" data-cid="' + esc(cid) + '" data-lead-id="' + esc(op.lead_id) + '">\u2192 alquiler</button>' : '';
+            otros += '<div style="margin-bottom:3px;padding-bottom:3px;border-bottom:1px dashed #2a3a4f;">' + esc(fcorte(op.date)) + ' \u00B7 <strong>' + esc(euro(op.amount)) + '</strong>' + sub + btn + '</div>';
+        });
+
+        var difHtml;
+        if (esActual) difHtml = '<span style="color:#f59e0b;font-weight:600;">' + (dif > 0.005 ? 'pend. ' + esc(euro(dif)) : 'pagado') + '</span>';
+        else if (esSemana) difHtml = dif > 0.005 ? '<span style="color:#f87171;font-weight:600;">+' + esc(euro(dif)) + '</span>' : '<span style="color:#4ade80;font-weight:600;">\u2713</span>';
+        else difHtml = dif > 0.005 ? '<span style="color:#f87171;font-weight:600;">+' + esc(euro(dif)) + '</span>' : '<span class="muted">0,00 \u20AC</span>';
+        var runColor = run > 0.005 ? '#f87171' : '#4ade80';
+        var runIcon = run > 0.005 ? '\u26A0' : '\u2713';
+
+        var runCell;
+        if (perdonada) runCell = '<span style="text-decoration:line-through;color:#78909c;">' + esc(euro(run)) + '</span> <span style="color:#5eead4;font-size:10px;font-weight:700;">\uD83D\uDDD1 perdonado</span>';
+        else if (esPerdon) runCell = esc(euro(run)) + ' ' + runIcon + ' <span style="color:#5eead4;font-size:10px;font-weight:700;">\u21BA desde aquí</span>';
+        else runCell = esc(euro(run)) + ' ' + runIcon;
+
+        var rowStyle = 'background:' + rowBg + ';' + (perdonada ? 'opacity:.55;' : '');
+
+        return sep + '<tr style="' + rowStyle + ';">'
+            + '<td>' + w.n + '</td>'
+            + '<td>' + esc(fcorte(w.ps) + ' \u2192 ' + fcorte(w.pe)) + (esActual ? ' <span style="color:#f59e0b;font-size:11px;font-weight:600;">(en curso)</span>' : '') + '</td>'
+            + '<td' + (esSemana ? '' : ' style="opacity:.55;"') + '>' + pagosFecha + '</td>'
+            + '<td' + (esSemana ? ' style="opacity:.55;"' : '') + '>' + pagos + '</td>'
+            + '<td>' + otros + '</td>'
+            + '<td>' + difHtml + '</td>'
+            + '<td style="color:' + runColor + ';font-weight:700;text-align:right;">' + runCell + '</td>'
+            + '</tr>';
+    }
+
+    function renderCompensaciones(cid, section) {
+        var bar = section.querySelector('.jostal-compensaciones');
+        if (!bar) return;
+        var over = state[cid] || {};
+        var d = data[cid];
+        var html = '';
+        Object.keys(over).forEach(function (leadId) {
+            var p = null;
+            d.pagos_raw.forEach(function (x) { if (x.lead_id === leadId) p = x; });
+            if (!p) return;
+            html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">'
+                + '<span style="color:#fbbf24;font-weight:600;">compensado:</span> '
+                + esc(fcorte(p.date)) + ' \u00B7 ' + esc(euro(p.amount)) + ' ' + esc(p.desc || '')
+                + ' <form method="post" style="display:inline;">'
+                + '<input type="hidden" name="action" value="jostal_compensar_lead">'
+                + '<input type="hidden" name="lead_id" value="' + esc(leadId) + '">'
+                + '<button class="btn-ok-mini" style="font-size:10px;padding:2px 8px;">\u2713 permanente</button></form>'
+                + ' <button type="button" class="btn-danger-mini" style="font-size:10px;padding:2px 8px;" data-accion="quitar" data-cid="' + esc(cid) + '" data-lead-id="' + esc(leadId) + '">\u21A9 quitar</button>'
+                + '</div>';
+        });
+        bar.innerHTML = html ? '<div style="margin-top:8px;padding:10px 12px;border:1px solid rgba(251,191,36,.35);border-radius:8px;background:rgba(251,191,36,.06);"><div class="muted" style="margin-bottom:4px;"><strong>Compensaciones temporales</strong> (se pierden al recargar)</div>' + html + '</div>' : '';
+    }
+
+    function renderReclasificar(cid, section) {
+        var form = section.querySelector('.jostal-wasap-form');
+        if (!form) return;
+        form.querySelectorAll('input[name="reclasificar[]"]').forEach(function (el) { el.remove(); });
+        var over = state[cid] || {};
+        Object.keys(over).forEach(function (leadId) {
+            var inp = document.createElement('input');
+            inp.type = 'hidden'; inp.name = 'reclasificar[]'; inp.value = leadId;
+            form.appendChild(inp);
+        });
+    }
+
+    function render(cid) {
+        var section = document.querySelector('.jostal-cli[data-cid="' + cid + '"]');
+        if (!section) return;
+        var comp = compute(cid);
+        if (!comp) return;
+
+        var tbody = section.querySelector('.jostal-tbody');
+        if (tbody) { var rows = ''; comp.weeks.forEach(function (w) { rows += renderRow(w, cid, comp.fuente); }); tbody.innerHTML = rows; }
+
+        var esSemana = comp.fuente === 'semana';
+        var dTotal = esSemana ? (comp.deuda_total_semana || 0) : (comp.deuda_total || 0);
+        var deudaVencida = esSemana ? (comp.deuda_vencida_semana || 0) : (comp.deuda_vencida || 0);
+        var pendActual = esSemana ? (comp.pendiente_actual_semana || 0) : (comp.pendiente_actual || 0);
+        var saldoFavor = esSemana ? (comp.saldo_favor_semana || 0) : (comp.saldo_favor || 0);
+        var meses = esSemana ? (comp.resumen_meses_semana || {}) : (comp.resumen_meses || {});
+
+        var estadoTxt, estadoColor;
+        if (dTotal > 0.005) { estadoTxt = '\u26A0 Debe ' + euro(dTotal); estadoColor = '#f87171'; }
+        else if (saldoFavor > 0.005) { estadoTxt = '\u2713 A favor ' + euro(saldoFavor); estadoColor = '#60a5fa'; }
+        else { estadoTxt = '\u2713 Al d\u00EDa'; estadoColor = '#4ade80'; }
+        var deudaHead = section.querySelector('.jostal-deuda');
+        if (deudaHead) { deudaHead.style.color = estadoColor; deudaHead.textContent = estadoTxt; }
+        var deudaSub = section.querySelector('.jostal-deuda-sub');
+        if (deudaSub) deudaSub.textContent = (dTotal > 0.005 && pendActual > 0.005) ? '(' + euro(deudaVencida) + ' vencido + ' + euro(pendActual) + ' esta semana)' : '';
+
+        var box = section.querySelector('.jostal-totalbox');
+        if (box) {
+            box.innerHTML = '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;"><span class="muted">DEUDA TOTAL</span>'
+                + '<strong style="font-size:20px;color:' + (dTotal > 0.005 ? '#f87171' : '#4ade80') + ';">' + esc(euro(dTotal)) + '</strong>'
+                + '<span class="muted" style="font-size:12px;">(' + esc(euro(deudaVencida)) + ' vencido + ' + esc(euro(pendActual)) + ' esta semana)</span></div>';
+        }
+
+        var mesesTbody = section.querySelector('.jostal-meses-tbody');
+        if (mesesTbody) {
+            var mHtml = '';
+            Object.keys(meses).forEach(function (k) {
+                var m = meses[k];
+                var mDiff = m.diff > 0.005 ? '<span style="color:#f87171;font-weight:600;">+' + esc(euro(m.diff)) + '</span>' : '<span class="muted">0,00 \u20AC</span>';
+                var mRunColor = m.running > 0.005 ? '#f87171' : '#4ade80';
+                mHtml += '<tr><td>' + esc(mesLabel(k)) + '</td><td>' + esc(euro(m.debe)) + '</td><td>' + esc(euro(m.pagado)) + '</td><td>' + mDiff + '</td><td style="color:' + mRunColor + ';font-weight:700;text-align:right;">' + esc(euro(m.running)) + '</td></tr>';
+            });
+            mesesTbody.innerHTML = mHtml;
+        }
+
+        renderCompensaciones(cid, section);
+        renderReclasificar(cid, section);
+    }
+
+    document.addEventListener('click', function (e) {
+        var el = e.target.closest ? e.target.closest('[data-accion]') : null;
+        if (!el) return;
+        var accion = el.getAttribute('data-accion');
+        var cid = el.getAttribute('data-cid');
+        var leadId = el.getAttribute('data-lead-id');
+        if (accion === 'compensar') {
+            if (!state[cid]) state[cid] = {};
+            state[cid][leadId] = true;
+            render(cid);
+        } else if (accion === 'quitar') {
+            if (state[cid]) { delete state[cid][leadId]; if (Object.keys(state[cid]).length === 0) delete state[cid]; }
+            render(cid);
+        }
+    });
+})();
+</script>
+<?php
     }
 
     echo '</div>';

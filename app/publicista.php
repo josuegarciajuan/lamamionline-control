@@ -11123,78 +11123,64 @@ function publicista_pollo_mark_exhausted($label) {
     if (!isset($status[$label]) || !is_array($status[$label])) {
         $status[$label] = array();
     }
+    if (!empty($status[$label]['credits_exhausted'])) return;
     $status[$label]['credits_exhausted'] = true;
     $status[$label]['exhausted_at'] = gmdate('Y-m-d H:i:s');
+    unset($status[$label]['exhaustion_notified_at']);
+    publicista_pollo_status_write($status);
+}
+
+function publicista_pollo_mark_recovered($label) {
+    $label = trim((string)$label);
+    if ($label === '') return;
+
+    $status = publicista_pollo_status_read();
+    if (empty($status[$label]['credits_exhausted'])) return;
+
+    $status[$label]['credits_exhausted'] = false;
+    $status[$label]['recovered_at'] = gmdate('Y-m-d H:i:s');
+    unset($status[$label]['recovery_notified_at']);
     publicista_pollo_status_write($status);
 }
 
 function publicista_pollo_check_and_alert() {
     $status = publicista_pollo_status_read();
     $accounts = publicista_pollo_accounts();
-
-    // ── Dedup via avisos.json (más fiable que el status file compartido con Python) ──
-    $allAvisos = function_exists('avisos_all') ? avisos_all() : array();
-    $now = time();
-    $cooldown = 24 * 3600; // 24 horas entre avisos repetidos
+    $statusChanged = false;
 
     foreach ($accounts as $acc) {
         $label = trim((string)($acc['label'] ?? ''));
         if ($label === '') continue;
         $creditsExhausted = !empty($status[$label]['credits_exhausted']);
-        if (!$creditsExhausted) continue;
-
-        $alertTitle = 'Pollo.ai: cuenta ' . $label . ' sin créditos';
-
-        // Buscar si ya existe un aviso RECIENTE (< 24h) para esta cuenta
-        // (activo o ya descartado) para no repetir el aviso en la misma ventana.
-        $recentActive = null;
-        $oldActives = array();
-        foreach ($allAvisos as $av) {
-            if (($av['engine'] ?? '') !== 'pollo') continue;
-            if (($av['title'] ?? '') !== $alertTitle) continue;
-
-            $avStatus = (string)($av['status'] ?? '');
-            $createdTs = strtotime((string)($av['created_at'] ?? ''));
-            if ($createdTs && ($now - $createdTs) < $cooldown) {
-                $recentActive = $av;
-                break;
-            } elseif ($avStatus === 'active') {
-                $oldActives[] = $av;
+        if ($creditsExhausted && empty($status[$label]['exhaustion_notified_at'])) {
+            if (function_exists('avisos_create_active')) {
+                avisos_create_active(
+                    'Pollo.ai: cuenta ' . $label . ' sin créditos',
+                    'Se agotaron los créditos de la cuenta ' . e($label) . ' en Pollo.ai. Se usará otra cuenta como fallback si está disponible.',
+                    'alta',
+                    'pollo',
+                    array('account' => $label),
+                    true,
+                    'pollo_exhausted_' . md5((string)$label)
+                );
             }
+            $status[$label]['exhaustion_notified_at'] = gmdate('Y-m-d H:i:s');
+            $statusChanged = true;
         }
 
-        // Descartar avisos viejos/stale para esta cuenta (limpieza siempre)
-        if (function_exists('aviso_dismiss')) {
-            foreach ($oldActives as $oldAv) {
-                @aviso_dismiss($oldAv['id']);
+        if (!$creditsExhausted && !empty($status[$label]['recovered_at']) && empty($status[$label]['recovery_notified_at'])) {
+            if (function_exists('avisos_create_active')) {
+                avisos_create_active(
+                    'Pollo.ai: cuenta ' . $label . ' con créditos de nuevo',
+                    'La cuenta ' . e($label) . ' de Pollo.ai se ha marcado con créditos de nuevo y vuelve a estar disponible.',
+                    'media',
+                    'pollo',
+                    array('account' => $label),
+                    true,
+                    'pollo_recovered_' . md5((string)$label)
+                );
             }
-        }
-
-        if ($recentActive !== null) {
-            // Ya hay un aviso reciente — no repetir
-            continue;
-        }
-
-        // Crear nuevo aviso
-        if (function_exists('avisos_create_active')) {
-            avisos_create_active(
-                $alertTitle,
-                'Se agotaron los créditos de la cuenta ' . e($label) . ' en Pollo.ai. Se usará otra cuenta como fallback si está disponible.',
-                'alta',
-                'pollo',
-                array('account' => $label),
-                true,
-                'pollo_exhausted_' . md5((string)$label)
-            );
-        }
-    }
-
-    // Limpiar flags alerted huérfanos del status file (ya no se usan)
-    $statusChanged = false;
-    foreach ($status as $lbl => $info) {
-        if (isset($info['alerted']) || isset($info['alerted_at'])) {
-            unset($status[$lbl]['alerted']);
-            unset($status[$lbl]['alerted_at']);
+            $status[$label]['recovery_notified_at'] = gmdate('Y-m-d H:i:s');
             $statusChanged = true;
         }
     }

@@ -582,6 +582,9 @@ def _write_exhausted_status(status_file, label):
                 data = json.loads(fh.read() or "{}")
         if label not in data:
             data[label] = {}
+        was_exhausted = bool(data[label].get("credits_exhausted"))
+        if not was_exhausted:
+            data[label].pop("exhaustion_notified_at", None)
         data[label]["credits_exhausted"] = True
         data[label]["exhausted_at"] = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
         with open(status_file, "w") as fh:

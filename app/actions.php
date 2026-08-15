@@ -339,6 +339,9 @@ function handle_post_actions() {
         case 'jostal_clasificar_lead':
             action_jostal_clasificar_lead();
             break;
+        case 'jostal_compensar_lead':
+            action_jostal_compensar_lead();
+            break;
         case 'jostal_send_deuda_wasap':
             action_jostal_send_deuda_wasap();
             break;
@@ -2312,12 +2315,7 @@ function action_save_configm() {
         }
         // Resetear estado de créditos si se pulsó el botón
         if ($resetCredits && $label !== '' && function_exists('publicista_pollo_status_read')) {
-            $status = publicista_pollo_status_read();
-            if (isset($status[$label])) {
-                unset($status[$label]['credits_exhausted']);
-                unset($status[$label]['exhausted_at']);
-                publicista_pollo_status_write($status);
-            }
+            publicista_pollo_mark_recovered($label);
         }
     }
 
@@ -3050,6 +3048,8 @@ function action_jostal_clasificar_lead() {
     $returnTab = trim(request_post('return_tab', 'deudas'));
     $desde = trim(request_post('desde', ''));
     $hasta = trim(request_post('hasta', ''));
+    $clientaId = trim(request_post('clienta_id', ''));
+    $fuente = trim(request_post('fuente', ''));
 
     if (!in_array($tipo, array('alquiler', 'no_alquiler'), true)) {
         set_flash('error', 'Clasificación inválida.');
@@ -3072,11 +3072,51 @@ function action_jostal_clasificar_lead() {
     $qs = 'index.php?page=jostal&tab=' . urlencode($returnTab);
     if ($desde !== '') $qs .= '&desde=' . urlencode($desde);
     if ($hasta !== '') $qs .= '&hasta=' . urlencode($hasta);
+    if ($clientaId !== '') $qs .= '&clienta_id=' . urlencode($clientaId);
+    if ($fuente !== '') $qs .= '&fuente=' . urlencode($fuente);
+    redirect_to($qs);
+}
+
+/**
+ * Compensa un pago de "otros ingresos" convirtiéndolo permanentemente en alquiler.
+ * El concepto pasa a ser "{original} + compensación posterior alquiler".
+ */
+function action_jostal_compensar_lead() {
+    $leadId = trim(request_post('lead_id'));
+    $desde = trim(request_post('desde', ''));
+    $hasta = trim(request_post('hasta', ''));
+
+    $lead = storage_find_by_id('jostal_leads.json', $leadId);
+    if (!$lead) {
+        set_flash('error', 'Lead no encontrado.');
+        redirect_to('index.php?page=jostal&tab=deudas');
+    }
+
+    $original = trim((string)($lead['observacion'] ?? ''));
+    $sufijo = 'compensación posterior alquiler';
+    if (strpos($original, $sufijo) !== false) {
+        $nuevaObs = $original;
+    } else {
+        $nuevaObs = $original !== '' ? $original . ' + ' . $sufijo : $sufijo;
+    }
+
+    $lead['observacion'] = $nuevaObs;
+    $lead['concepto_tipo'] = 'alquiler';
+    $lead['concepto_fuente'] = 'manual';
+    $lead['concepto_confirmado_at'] = now_datetime();
+    $lead['updated_at'] = now_datetime();
+    storage_upsert('jostal_leads.json', $lead);
+
+    set_flash('ok', 'Pago compensado como alquiler.');
+    $qs = 'index.php?page=jostal&tab=deudas';
+    if ($desde !== '') $qs .= '&desde=' . urlencode($desde);
+    if ($hasta !== '') $qs .= '&hasta=' . urlencode($hasta);
     redirect_to($qs);
 }
 
 /**
  * Envía por WhatsApp (desde la línea "jostal dulce") el informe de deuda de una clienta.
+ * Admite compensaciones temporales vía `reclasificar[]` (lead_id tratados como alquiler).
  */
 function action_jostal_send_deuda_wasap() {
     $clientaId = trim(request_post('clienta_id'));
@@ -3084,6 +3124,12 @@ function action_jostal_send_deuda_wasap() {
     $destinoManual = trim(request_post('destino_manual', ''));
     $desde = trim(request_post('desde', ''));
     $hasta = trim(request_post('hasta', ''));
+    $fuente = trim(request_post('fuente', 'alquiler'));
+    if ($fuente !== 'semana') $fuente = 'alquiler';
+
+    $reclasificar = request_post('reclasificar', array());
+    if (!is_array($reclasificar)) $reclasificar = array();
+    $reclasificar = array_values(array_unique(array_filter(array_map('strval', $reclasificar), function ($x) { return $x !== ''; })));
 
     $clienta = storage_find_by_id('jostal_clientas.json', $clientaId);
     if (!$clienta) {
@@ -3091,7 +3137,7 @@ function action_jostal_send_deuda_wasap() {
         redirect_to('index.php?page=jostal&tab=deudas');
     }
 
-    $data = jostal_compute_deuda($clienta);
+    $data = jostal_compute_deuda($clienta, null, $reclasificar, $desde, $hasta);
     if (isset($data['error'])) {
         set_flash('error', 'No se pudo calcular la deuda de esta clienta.');
         redirect_to('index.php?page=jostal&tab=deudas');
@@ -3119,7 +3165,7 @@ function action_jostal_send_deuda_wasap() {
     }
 
     $nombre = trim((string)($clienta['nombre'] ?? ''));
-    $texto = jostal_texto_deuda($nombre, $data, $desde, $hasta);
+    $texto = jostal_texto_deuda($nombre, $data, $desde, $hasta, $fuente);
 
     $result = comercial_send_text_via_line($line, $targetDigits, $texto, array('slug' => 'jostal_deuda'));
 
@@ -3132,6 +3178,7 @@ function action_jostal_send_deuda_wasap() {
     $qs = 'index.php?page=jostal&tab=deudas';
     if ($desde !== '') $qs .= '&desde=' . urlencode($desde);
     if ($hasta !== '') $qs .= '&hasta=' . urlencode($hasta);
+    if ($fuente === 'semana') $qs .= '&fuente=semana';
     redirect_to($qs);
 }
 

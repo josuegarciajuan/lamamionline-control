@@ -6372,6 +6372,19 @@ body.josue-yt-fs .josue-yt-fs-close-float {
   font-size: 13px;
   line-height: 1.6;
 }
+.waha-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 50%;
+  vertical-align: middle;
+  background: var(--muted);
+}
+.waha-status-dot.is-up { background: var(--ok); }
+.waha-status-dot.is-starting { background: #f59e0b; }
+.waha-status-dot.is-down { background: var(--danger); }
+.waha-status-dot.is-unknown { background: var(--muted); }
 .waha-line-actions {
   margin-top: 2px;
 }
@@ -6379,9 +6392,14 @@ body.josue-yt-fs .josue-yt-fs-close-float {
   font-size: 11px;
   padding: 2px 8px;
 }
+.waha-line-actions .waha-restart-button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  line-height: 1;
+}
 
 @media (max-width: 768px) {
   .wasap-sidebar { width: 100%; min-width: 0; }
   .wasap-config { grid-template-columns: 1fr; }
 }
-
