@@ -224,13 +224,170 @@ function storage_runtime_log($event, $context = array()) {
     bootstrap_runtime_log('storage | ' . trim((string)$event) . (empty($parts) ? '' : (' | ' . implode(' | ', $parts))));
 }
 
-function storage_json_write_direct($file, $data) {
+/** Abre el lock lateral sin exigir permiso de escritura sobre locks creados por otro usuario. */
+function storage_json_lock_open($file) {
     $path = storage_json_path($file);
     $dir = dirname($path);
     if (!is_dir($dir)) {
         @mkdir($dir, 0775, true);
     }
-    $pretty = storage_should_pretty_write($file, $data);
+    $lockPath = $path . '.lock';
+    $handle = is_file($lockPath) ? @fopen($lockPath, 'rb') : false;
+    if (!$handle) {
+        $previousUmask = umask(0);
+        $handle = @fopen($lockPath, 'x+b');
+        umask($previousUmask);
+        if ($handle) {
+            if (!@chmod($lockPath, 0666)) {
+                storage_runtime_log('lock_chmod_failed', array('file' => $file, 'lock_path' => $lockPath));
+            }
+        } else {
+            // Otro proceso pudo crear el lock entre is_file() y fopen('x+b').
+            $handle = @fopen($lockPath, 'rb');
+        }
+    }
+    if (!$handle) {
+        storage_runtime_log('lock_open_failed', array('file' => $file, 'lock_path' => $lockPath));
+        return false;
+    }
+    clearstatcache(true, $lockPath);
+    $lockMode = @fileperms($lockPath);
+    $lockOwner = @fileowner($lockPath);
+    $effectiveUid = function_exists('posix_geteuid') ? @posix_geteuid() : null;
+    $canRepairMode = ($effectiveUid === null || $effectiveUid === false || (int)$effectiveUid === 0 || (int)$lockOwner === (int)$effectiveUid);
+    if ($lockMode !== false && (((int)$lockMode & 0777) !== 0666) && $canRepairMode && !@chmod($lockPath, 0666)) {
+        storage_runtime_log('lock_chmod_failed', array('file' => $file, 'lock_path' => $lockPath));
+    }
+    return $handle;
+}
+
+/** Ejecuta una sola sección crítica por archivo; los callbacks deben usar helpers *_locked. */
+function storage_json_with_lock($file, $callback) {
+    if (!is_callable($callback)) return false;
+    $handle = storage_json_lock_open($file);
+    if (!$handle) return false;
+    if (!@flock($handle, LOCK_EX)) {
+        storage_runtime_log('lock_acquire_failed', array('file' => $file));
+        fclose($handle);
+        return false;
+    }
+    try {
+        return call_user_func($callback);
+    } finally {
+        if (!@flock($handle, LOCK_UN)) {
+            storage_runtime_log('lock_release_failed', array('file' => $file));
+        }
+        fclose($handle);
+    }
+}
+
+/** Lee un JSON existente bajo lock sin confundir ausencia con fallo o contenido corrupto. */
+function storage_json_read_locked_strict($file) {
+    $path = storage_json_path($file);
+    if (!file_exists($path)) {
+        return array('ok' => true, 'missing' => true, 'data' => array());
+    }
+    if (!is_file($path)) {
+        storage_runtime_log('json_not_regular_file', array('file' => $file, 'path' => $path));
+        return array('ok' => false, 'missing' => false, 'error' => 'El almacenamiento no es un archivo regular.');
+    }
+    $raw = @file_get_contents($path);
+    if ($raw === false) {
+        storage_runtime_log('json_read_failed', array('file' => $file, 'path' => $path));
+        return array('ok' => false, 'missing' => false, 'error' => 'No se pudo leer el almacenamiento existente.');
+    }
+    $data = json_decode((string)$raw, true);
+    if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
+        storage_runtime_log('json_decode_failed', array('file' => $file, 'path' => $path, 'json_error' => json_last_error_msg()));
+        return array('ok' => false, 'missing' => false, 'error' => 'El almacenamiento contiene JSON no válido.');
+    }
+    if ($file === 'anuncios.json') {
+        $normalized = array();
+        foreach ($data as $row) {
+            $normalized[] = publicista_account_normalize(publicista_account_strip_runtime_fields($row));
+        }
+        $data = $normalized;
+    }
+    return array('ok' => true, 'missing' => false, 'data' => $data);
+}
+
+/** Escribe todo el contenido usando temp único y rename; requiere tener el lock común. */
+function storage_json_atomic_replace_locked($file, $json) {
+    $path = storage_json_path($file);
+    $dir = dirname($path);
+    $existingStat = is_file($path) ? @stat($path) : false;
+    $dirStat = @stat($dir);
+    $mode = $existingStat ? ((int)$existingStat['mode'] & 0777) : 0664;
+    if ($mode === 0) $mode = 0664;
+    $owner = $existingStat ? ($existingStat['uid'] ?? null) : ($dirStat['uid'] ?? null);
+    $group = $existingStat ? ($existingStat['gid'] ?? null) : ($dirStat['gid'] ?? null);
+
+    $tmpPath = '';
+    $tmpHandle = false;
+    for ($attempt = 0; $attempt < 5; $attempt++) {
+        $tmpPath = $path . '.tmp.' . getmypid() . '.' . str_replace('.', '', uniqid('', true));
+        $tmpHandle = @fopen($tmpPath, 'x+b');
+        if ($tmpHandle) break;
+    }
+    if (!$tmpHandle) {
+        storage_runtime_log('tmp_open_failed', array('file' => $file, 'path' => $path));
+        return false;
+    }
+
+    $ok = false;
+    try {
+        $length = strlen((string)$json);
+        $offset = 0;
+        while ($offset < $length) {
+            $written = @fwrite($tmpHandle, substr($json, $offset));
+            if ($written === false || $written === 0) {
+                storage_runtime_log('tmp_write_failed', array('file' => $file, 'tmp_path' => $tmpPath, 'offset' => $offset));
+                return false;
+            }
+            $offset += $written;
+        }
+        if (!@fflush($tmpHandle)) {
+            storage_runtime_log('tmp_flush_failed', array('file' => $file, 'tmp_path' => $tmpPath));
+            return false;
+        }
+        if (function_exists('fsync') && !@fsync($tmpHandle)) {
+            storage_runtime_log('tmp_fsync_failed', array('file' => $file, 'tmp_path' => $tmpPath));
+            return false;
+        }
+        fclose($tmpHandle);
+        $tmpHandle = false;
+
+        if ($owner !== null && function_exists('chown') && !@chown($tmpPath, (int)$owner)) {
+            storage_runtime_log('tmp_chown_failed', array('file' => $file, 'tmp_path' => $tmpPath, 'uid' => $owner));
+        }
+        if ($group !== null && function_exists('chgrp') && !@chgrp($tmpPath, (int)$group)) {
+            storage_runtime_log('tmp_chgrp_failed', array('file' => $file, 'tmp_path' => $tmpPath, 'gid' => $group));
+        }
+        if (!@chmod($tmpPath, $mode)) {
+            storage_runtime_log('tmp_chmod_failed', array('file' => $file, 'tmp_path' => $tmpPath, 'mode' => decoct($mode)));
+            return false;
+        }
+        if (!@rename($tmpPath, $path)) {
+            storage_runtime_log('rename_failed', array('file' => $file, 'tmp_path' => $tmpPath, 'path' => $path));
+            return false;
+        }
+        $tmpPath = '';
+        clearstatcache(true, $path);
+        $ok = true;
+        return true;
+    } finally {
+        if (is_resource($tmpHandle)) fclose($tmpHandle);
+        if (!$ok && $tmpPath !== '' && is_file($tmpPath) && !@unlink($tmpPath)) {
+            storage_runtime_log('tmp_cleanup_failed', array('file' => $file, 'tmp_path' => $tmpPath));
+        }
+    }
+}
+
+function storage_json_write_locked($file, $data) {
+    return storage_json_atomic_replace_locked($file, storage_json_encode($data, storage_should_pretty_write($file, $data)));
+}
+
+function storage_json_write_direct($file, $data) {
     if (function_exists('bootstrap_runtime_log') && is_array($data)) {
         $rows = count($data);
         $mem = function_exists('memory_get_usage') ? memory_get_usage(true) : 0;
@@ -238,117 +395,97 @@ function storage_json_write_direct($file, $data) {
             bootstrap_runtime_log('storage_write_json | file=' . $file . ' | rows=' . $rows . ' | mem=' . $mem);
         }
     }
-    $json = storage_json_encode($data, $pretty);
-    $tmpPath = $path . '.tmp';
-    $ok = false;
-    $written = @file_put_contents($tmpPath, $json, LOCK_EX);
-    if ($written === false) {
-        storage_runtime_log('tmp_write_failed', array('file' => $file, 'tmp_path' => $tmpPath));
-        $fallbackWritten = @file_put_contents($path, $json, LOCK_EX);
-        if ($fallbackWritten !== false) {
-            $ok = true;
-        } else {
-            storage_runtime_log('final_write_failed', array('file' => $file, 'path' => $path));
-        }
-    } else {
-        $renamed = @rename($tmpPath, $path);
-        if ($renamed) {
-            $ok = true;
-        } else {
-            storage_runtime_log('rename_failed', array('file' => $file, 'tmp_path' => $tmpPath, 'path' => $path));
-            $fallbackWritten = @file_put_contents($path, $json, LOCK_EX);
-            if ($fallbackWritten !== false) {
-                $ok = true;
-            } else {
-                storage_runtime_log('final_write_failed', array('file' => $file, 'path' => $path));
-            }
-            @unlink($tmpPath);
-        }
-    }
-    return $ok;
+    $ok = storage_json_with_lock($file, function () use ($file, $data) {
+        $existing = storage_json_read_locked_strict($file);
+        if (empty($existing['ok'])) return false;
+        return storage_json_write_locked($file, $data);
+    });
+    if ($ok) storage_invalidate_cache($file);
+    return (bool)$ok;
 }
 
 function storage_json_upsert_direct($file, $row) {
-    $rows = storage_json_read_direct($file);
-    $updated = false;
-    foreach ($rows as $i => $item) {
-        if (isset($item['id']) && $item['id'] === $row['id']) {
-            $rows[$i] = array_merge($item, $row);
-            $updated = true;
-            break;
-        }
-    }
-    if (!$updated) {
-        $rows[] = $row;
-    }
-    return storage_json_write_direct($file, array_values($rows));
+    return storage_json_upsert_atomic($file, $row);
 }
 
 function storage_json_upsert_atomic($file, $row) {
-    // ── Read-modify-write atómico con flock(LOCK_EX) ──
-    // Evita race conditions entre dos procesos que lean y escriban el mismo archivo.
-    $path = storage_json_path($file);
-    $dir = dirname($path);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
+    if (!is_array($row) || !isset($row['id'])) return false;
+    $result = storage_json_mutate_row_atomic($file, (string)$row['id'], function ($current) use ($row) {
+        return array('ok' => true, 'row' => is_array($current) ? array_merge($current, $row) : $row);
+    }, true);
+    return !empty($result['ok']);
+}
+
+/**
+ * Muta una fila tras releerla bajo un lock compartido por todos los upserts JSON.
+ * El callback devuelve ['ok' => true, 'row' => array] o ['ok' => false, 'error' => string].
+ */
+function storage_json_mutate_row_atomic($file, $id, $mutator, $allowInsert = false) {
+    $id = trim((string)$id);
+    if ($id === '' || !is_callable($mutator)) {
+        return array('ok' => false, 'error' => 'Mutación de storage no válida.');
     }
-    $fh = @fopen($path, 'c+');
-    if (!$fh) {
-        storage_runtime_log('atomic_open_failed', array('file' => $file, 'path' => $path));
-        return false;
-    }
-    if (!flock($fh, LOCK_EX)) {
-        fclose($fh);
-        storage_runtime_log('atomic_lock_failed', array('file' => $file));
-        return false;
-    }
-    // Leer datos actuales
-    $raw = '';
-    while (!feof($fh)) {
-        $chunk = fread($fh, 16384);
-        if ($chunk === false) break;
-        $raw .= $chunk;
-    }
-    $rows = json_decode($raw, true);
-    if (!is_array($rows)) {
-        $rows = array();
-    }
-    // Upsert: buscar por id y actualizar o añadir
-    $updated = false;
-    foreach ($rows as $i => $item) {
-        if (is_array($item) && isset($item['id']) && $item['id'] === $row['id']) {
-            $rows[$i] = array_merge($item, $row);
-            $updated = true;
-            break;
+    try {
+        $result = storage_json_with_lock($file, function () use ($file, $id, $mutator, $allowInsert) {
+            $read = storage_json_read_locked_strict($file);
+            if (empty($read['ok'])) return array('ok' => false, 'error' => (string)($read['error'] ?? 'No se pudo leer el almacenamiento.'));
+            $rows = (array)$read['data'];
+
+            $index = null;
+            $current = null;
+            foreach ($rows as $i => $item) {
+                if (is_array($item) && isset($item['id']) && (string)$item['id'] === $id) {
+                    $index = $i;
+                    $current = $item;
+                    break;
+                }
+            }
+            if ($index === null && !$allowInsert) {
+                return array('ok' => false, 'error' => 'Lead no encontrado.');
+            }
+
+            $mutation = call_user_func($mutator, $current);
+            if (!is_array($mutation) || empty($mutation['ok'])) {
+                return array('ok' => false, 'error' => (string)($mutation['error'] ?? 'No se pudo validar la mutación.'));
+            }
+            $newRow = $mutation['row'] ?? null;
+            if (!is_array($newRow) || (string)($newRow['id'] ?? '') !== $id) {
+                return array('ok' => false, 'error' => 'La mutación produjo una fila no válida.');
+            }
+            if ($index === null) $rows[] = $newRow;
+            else $rows[$index] = $newRow;
+
+            if (!storage_json_write_locked($file, array_values($rows))) {
+                return array('ok' => false, 'error' => 'No se pudo guardar el cambio completo.');
+            }
+            return array('ok' => true, 'row' => $newRow);
+        });
+        if ($result === false) {
+            return array('ok' => false, 'error' => 'No se pudo bloquear el almacenamiento.');
         }
+        if (!empty($result['ok'])) storage_invalidate_cache($file);
+        return $result;
+    } catch (Throwable $e) {
+        storage_runtime_log('atomic_mutation_failed', array('file' => $file, 'error' => $e->getMessage()));
+        return array('ok' => false, 'error' => 'No se pudo completar el cambio.');
     }
-    if (!$updated) {
-        $rows[] = $row;
-    }
-    // Escribir de vuelta
-    $json = storage_json_encode(array_values($rows), storage_should_pretty_write($file, $rows));
-    ftruncate($fh, 0);
-    rewind($fh);
-    $written = fwrite($fh, $json);
-    $ok = ($written !== false);
-    fflush($fh);
-    flock($fh, LOCK_UN);
-    fclose($fh);
-    if (!$ok) {
-        storage_runtime_log('atomic_write_failed', array('file' => $file, 'path' => $path));
-    }
-    return $ok;
 }
 
 function storage_json_delete_direct($file, $id) {
-    $rows = storage_json_read_direct($file);
-    $out = array();
-    foreach ($rows as $row) {
-        if (!isset($row['id']) || $row['id'] !== $id) {
-            $out[] = $row;
+    $ok = storage_json_with_lock($file, function () use ($file, $id) {
+        $read = storage_json_read_locked_strict($file);
+        if (empty($read['ok'])) return false;
+        $rows = (array)$read['data'];
+        $out = array();
+        foreach ($rows as $row) {
+            if (!isset($row['id']) || (string)$row['id'] !== (string)$id) {
+                $out[] = $row;
+            }
         }
-    }
-    storage_json_write_direct($file, array_values($out));
+        return storage_json_write_locked($file, array_values($out));
+    });
+    if ($ok) storage_invalidate_cache($file);
+    return (bool)$ok;
 }
 
 function storage_mysql_file_spec($file) {
@@ -957,6 +1094,109 @@ function storage_mysql_delete($file, $id) {
     }
 }
 
+/** Muta una fila MySQL tras bloquearla con SELECT ... FOR UPDATE. */
+function storage_mysql_mutate_row_atomic($file, $id, $mutator, $allowInsert = false) {
+    if (isset($GLOBALS['storage_mysql_mutation_adapter']) && is_callable($GLOBALS['storage_mysql_mutation_adapter'])) {
+        return call_user_func($GLOBALS['storage_mysql_mutation_adapter'], $file, $id, $mutator, $allowInsert);
+    }
+
+    $spec = storage_mysql_file_spec($file);
+    if (!$spec || trim((string)($spec['kind'] ?? '')) !== 'rows_by_id') {
+        return array('ok' => false, 'error' => 'El archivo no admite mutación por fila en MySQL.', 'code' => 'unsupported');
+    }
+    $pdo = crm_db();
+    if (!$pdo) {
+        return array('ok' => false, 'error' => 'MySQL no está disponible.', 'code' => 'backend_unavailable');
+    }
+    $table = trim((string)($spec['table'] ?? ''));
+    $tableSql = crm_db_quote_identifier($table);
+    $keySql = crm_db_quote_identifier($spec['key_column']);
+    if (!storage_mysql_table_ready($table) || $tableSql === '' || $keySql === '') {
+        return array('ok' => false, 'error' => 'La tabla MySQL no está disponible.', 'code' => 'backend_unavailable');
+    }
+
+    $startedTransaction = false;
+    try {
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+            $startedTransaction = true;
+        }
+        $dbRow = crm_db_query_one(
+            'SELECT * FROM ' . $tableSql . ' WHERE ' . $keySql . ' = ? LIMIT 1 FOR UPDATE',
+            array($id),
+            $pdo
+        );
+        $current = is_array($dbRow) ? storage_mysql_decode_row($spec, $dbRow) : null;
+        if (!is_array($current) && !$allowInsert) {
+            if ($startedTransaction && $pdo->inTransaction()) $pdo->rollBack();
+            return array('ok' => false, 'error' => 'Registro no encontrado.', 'code' => 'not_found');
+        }
+
+        $mutation = call_user_func($mutator, $current);
+        if (!is_array($mutation) || empty($mutation['ok'])) {
+            if ($startedTransaction && $pdo->inTransaction()) $pdo->rollBack();
+            return array(
+                'ok' => false,
+                'error' => (string)($mutation['error'] ?? 'No se pudo validar la mutación.'),
+                'code' => 'validation_failed',
+            );
+        }
+        $newRow = $mutation['row'] ?? null;
+        if (!is_array($newRow) || (string)($newRow['id'] ?? '') !== (string)$id) {
+            if ($startedTransaction && $pdo->inTransaction()) $pdo->rollBack();
+            return array('ok' => false, 'error' => 'La mutación produjo una fila no válida.', 'code' => 'invalid_row');
+        }
+        $record = storage_mysql_prepare_record_from_row($spec, $newRow);
+        if (empty($record) || !storage_mysql_upsert_record($table, $record, $spec['key_column'], $pdo)) {
+            if ($startedTransaction && $pdo->inTransaction()) $pdo->rollBack();
+            return array('ok' => false, 'error' => 'No se pudo guardar la mutación en MySQL.', 'code' => 'write_failed');
+        }
+        if ($startedTransaction && $pdo->inTransaction()) $pdo->commit();
+        storage_invalidate_cache($file);
+        return array('ok' => true, 'row' => $newRow, 'backend' => 'mysql');
+    } catch (Throwable $e) {
+        if ($startedTransaction && $pdo->inTransaction()) $pdo->rollBack();
+        storage_mysql_log_message('atomic mutation fail | file=' . $file . ' | ' . $e->getMessage());
+        return array('ok' => false, 'error' => 'No se pudo completar la mutación MySQL.', 'code' => 'backend_unavailable');
+    }
+}
+
+/**
+ * Dispatcher atómico por backend. En dual, MySQL es primario y JSON recibe la fila
+ * ya validada; si MySQL no está disponible se conserva el fallback JSON histórico.
+ */
+function storage_mutate_row_atomic($file, $id, $mutator, $allowInsert = false) {
+    $mode = storage_backend_mode();
+    if ($mode === 'json') {
+        return storage_json_mutate_row_atomic($file, $id, $mutator, $allowInsert);
+    }
+
+    $mysqlResult = storage_mysql_mutate_row_atomic($file, $id, $mutator, $allowInsert);
+    if (!empty($mysqlResult['ok'])) {
+        if ($mode === 'dual') {
+            $validatedRow = $mysqlResult['row'];
+            $mirror = storage_json_mutate_row_atomic($file, $id, function () use ($validatedRow) {
+                return array('ok' => true, 'row' => $validatedRow);
+            }, true);
+            $mysqlResult['backend'] = 'dual';
+            $mysqlResult['json_mirror_ok'] = !empty($mirror['ok']);
+            if (empty($mirror['ok'])) {
+                storage_runtime_log('dual_json_mirror_failed', array('file' => $file, 'id' => $id, 'error' => $mirror['error'] ?? ''));
+            }
+        }
+        return $mysqlResult;
+    }
+
+    if (($mysqlResult['code'] ?? '') !== 'backend_unavailable') {
+        return $mysqlResult;
+    }
+    $jsonResult = storage_json_mutate_row_atomic($file, $id, $mutator, $allowInsert);
+    if (!empty($jsonResult['ok'])) {
+        $jsonResult['backend'] = $mode === 'dual' ? 'dual_json_fallback' : 'json_fallback';
+    }
+    return $jsonResult;
+}
+
 function storage_read($file) {
     $mode = storage_backend_mode();
     $cacheKey = storage_cache_key($file);
@@ -1314,7 +1554,7 @@ function storage_upsert($file, $row) {
         $mysqlOk = storage_mysql_upsert($file, $row);
     }
     if ($mode !== 'mysql' || !$mysqlOk || $file === 'settings.json') {
-        $jsonOk = storage_json_upsert_direct($file, $row);
+        $jsonOk = storage_json_upsert_atomic($file, $row);
     }
     if ($file === 'settings.json') {
         storage_backend_mode_reset();

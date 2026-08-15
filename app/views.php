@@ -11277,6 +11277,8 @@ if ($tab === 'informes') {
         $fuente = trim(request_get('fuente', 'alquiler'));
         if ($fuente !== 'semana') $fuente = 'alquiler';
         $esSemana = ($fuente === 'semana');
+        $rangoValidado = jostal_validar_rango_fechas($desde, $hasta);
+        $rangeError = empty($rangoValidado['ok']) ? (string)$rangoValidado['error'] : '';
 
         $clientasDeuda = array();
         foreach ($clientas as $c) {
@@ -11297,7 +11299,7 @@ if ($tab === 'informes') {
         echo '<div class="section-head">';
         echo '<div>';
         echo '<h2>' . ($clientaIdFilter !== '' ? 'Informe de deuda — clienta' : 'Informe de deuda — alquiler en casa') . '</h2>';
-        echo '<div class="muted">Detalle semanal y deuda acumulada. El total de deuda es histórico completo; el rango de fechas solo recorta el detalle semanal.</div>';
+        echo '<div class="muted">Detalle semanal y deuda acumulada. El rango recalcula la deuda usando solo las semanas y pagos incluidos entre desde y hasta (ambas fechas inclusive).</div>';
         echo '</div>';
         if ($clientaIdFilter !== '') {
             echo '<div class="section-head-actions">';
@@ -11351,7 +11353,9 @@ if ($tab === 'informes') {
         }
         echo '</div>';
 
-        if (empty($clientasDeuda)) {
+        if ($rangeError !== '') {
+            echo '<div class="info-strip" style="background:rgba(239,68,68,.10);border-left-color:#ef4444;">' . e($rangeError) . '</div>';
+        } elseif (empty($clientasDeuda)) {
             if ($clientaIdFilter !== '') {
                 echo '<div class="empty">No se encontró la clienta o no está en modo alquiler.</div>';
             } else {
@@ -11451,7 +11455,7 @@ if ($tab === 'informes') {
                         $msgs = array(
                             'sin_precio' => 'No tiene precio semanal definido. Añádelo en su ficha (Precio semanal alquiler).',
                             'sin_alquiler_activo' => 'No está en modo alquiler activo.',
-                            'sin_vencimientos' => 'Entró hace menos de una semana, sin vencimientos todavía.',
+                            'sin_vencimientos' => 'No hay vencimientos en el rango seleccionado.',
                         );
                         echo '<div class="empty">' . e($msgs[$r['error']] ?? 'No se pudo calcular.') . '</div>';
                         echo '</section>';
@@ -11639,7 +11643,8 @@ if ($tab === 'informes') {
                         $rowStyle = 'background:' . $rowBg . ';' . ($perdonada ? 'opacity:.55;' : '');
                         echo '<tr style="' . $rowStyle . ';">';
                         echo '<td>' . e($w['n']) . '</td>';
-                        echo '<td>' . e(jostal_fecha_corta($w['ps']) . ' → ' . jostal_fecha_corta($w['pe'])) . ($esActual ? ' <span style="color:#f59e0b;font-size:11px;font-weight:600;">(en curso)</span>' : '') . '</td>';
+                        $periodEndInclusive = jostal_periodo_fin_inclusivo($w['pe']);
+                        echo '<td>' . e(jostal_fecha_corta($w['ps']) . ' → ' . jostal_fecha_corta($periodEndInclusive) . ' (incl.)') . ($esActual ? ' <span style="color:#f59e0b;font-size:11px;font-weight:600;">(en curso)</span>' : '') . '</td>';
                         echo '<td' . ($esSemana ? '' : ' style="opacity:.55;"') . '>' . $pagosFechaHtml . '</td>';
                         echo '<td' . ($esSemana ? ' style="opacity:.55;"' : '') . '>' . $pagosHtml . '</td>';
                         echo '<td>' . $otrosHtml . '</td>';
@@ -11649,27 +11654,10 @@ if ($tab === 'informes') {
                     }
                     echo '</tbody></table></div>';
 
-                    // ── Total de deuda real (vencida + semana actual) en una sola cifra ──
-                    $debeVencido = 0.0; $pagadoVencido = 0.0;
-                    $debeActual = 0.0; $pagadoActual = 0.0;
-                    foreach ($weeks as $w) {
-                        if ($esSemana) {
-                            $deficit = (float)($w['deficit_semana'] ?? 0);
-                            if (!empty($w['es_actual'])) { $debeActual += (float)$w['debe']; $pagadoActual += (float)$w['debe'] - $deficit; }
-                            else { $debeVencido += (float)$w['debe']; $pagadoVencido += (float)$w['debe'] - $deficit; }
-                        } else {
-                            if (!empty($w['es_actual'])) { $debeActual += (float)$w['debe']; $pagadoActual += (float)$w['pagado']; }
-                            else { $debeVencido += (float)$w['debe']; $pagadoVencido += (float)$w['pagado']; }
-                        }
-                    }
-                    $deudaVencida = $debeVencido - $pagadoVencido;
-                    $pendienteActual = $debeActual - $pagadoActual;
-                    $deudaTotal = $deudaVencida + $pendienteActual;
-
                     echo '<div class="jostal-totalbox" style="margin-top:10px;padding:14px 16px;border:1px solid var(--line);border-radius:8px;background:rgba(17,28,45,.5);font-size:14px;">';
                     echo '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">';
                     echo '<span class="muted">DEUDA TOTAL</span>';
-                    echo '<strong style="font-size:20px;color:' . ($deudaTotal > 0.005 ? '#f87171' : '#4ade80') . ';">' . e(euro($deudaTotal)) . '</strong>';
+                    echo '<strong style="font-size:20px;color:' . ($deuda > 0.005 ? '#f87171' : '#4ade80') . ';">' . e(euro($deuda)) . '</strong>';
                     echo '<span class="muted" style="font-size:12px;">(' . e(euro($deudaVencida)) . ' vencido + ' . e(euro($pendienteActual)) . ' esta semana)</span>';
                     echo '</div>';
                     echo '</div>';
@@ -11722,6 +11710,8 @@ if ($tab === 'informes') {
                     $blob = array(
                         'cid' => $cid,
                         'fuente' => $fuente,
+                        'desde' => $desde,
+                        'hasta' => $hasta,
                         'weeks' => array_map(function ($w) {
                             return array('ps' => $w['ps'], 'pe' => $w['pe'], 'debe' => round((float)$w['debe'], 2), 'es_actual' => !empty($w['es_actual']));
                         }, $weeks),
@@ -11751,6 +11741,7 @@ if ($tab === 'informes') {
     'use strict';
     var state = {}; // cid -> { leadId: true }
     var data = {};  // cid -> { weeks, pagos_raw }
+    var csrfToken = <?php echo json_encode(csrf_token()); ?>;
 
     function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     function euro(n) {
@@ -11763,6 +11754,7 @@ if ($tab === 'informes') {
         return (neg ? '-' : '') + intStr + ',' + decStr + ' \u20AC';
     }
     function fcorte(d) { var p = String(d).split('-'); return p.length >= 3 ? p[2] + '/' + p[1] : d; }
+    function periodEnd(pe) { var d = new Date(pe + 'T12:00:00'); d.setDate(d.getDate() - 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
     function mesLabel(k) { var m = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']; var p = String(k).split('-'); return m[+p[1]] + ' ' + p[0]; }
 
     document.querySelectorAll('script.jostal-data').forEach(function (el) {
@@ -11844,7 +11836,7 @@ if ($tab === 'informes') {
             if (!meses[mes]) meses[mes] = { debe: 0, pagado: 0, diff: 0, running: 0 };
             meses[mes].debe += debe; meses[mes].pagado += paidFifo; meses[mes].diff += diffFifo; meses[mes].running = runFifo;
             if (!mesesS[mes]) mesesS[mes] = { debe: 0, pagado: 0, diff: 0, running: 0 };
-            mesesS[mes].debe += debe; mesesS[mes].pagado += pagadoReal[w]; mesesS[mes].diff -= deficit; mesesS[mes].running = runSemana;
+            mesesS[mes].debe += debe; mesesS[mes].pagado += pagadoReal[w]; mesesS[mes].diff += deficit; mesesS[mes].running = runSemana;
 
             outWeeks.push({
                 n: w + 1, ps: ps, pe: pe, debe: debe,
@@ -11859,14 +11851,31 @@ if ($tab === 'informes') {
         // ── Perdón ("Borrón y cuenta nueva"): re-FIFO post-reset + reinicio ──
         if (d.perdon && d.perdon.reset_index != null) {
             var ri = d.perdon.reset_index;
-            var pdesde = weeks[ri].ps;
+            var pdesde = d.perdon.desde;
             var postN = n - ri;
             var postDebe = []; for (var i = ri; i < n; i++) postDebe.push(+weeks[i].debe);
+            var postAlq = alq.filter(function (p) {
+                if (p.date < pdesde) return false;
+                if (!d.perdon.ignorar_actual) return true;
+                for (var i = ri; i < n; i++) {
+                    if (weeks[i].es_actual && p.date >= weeks[i].ps && p.date < weeks[i].pe) return false;
+                }
+                return true;
+            });
+            var postPagadoReal = []; var postPagosFecha = [];
+            for (var k = 0; k < postN; k++) { postPagadoReal.push(0); postPagosFecha.push([]); }
+            postAlq.forEach(function (p) {
+                for (var k = 0; k < postN; k++) {
+                    var idx = ri + k;
+                    if (p.date >= weeks[idx].ps && p.date < weeks[idx].pe) {
+                        postPagadoReal[k] += +p.amount; postPagosFecha[k].push(p); break;
+                    }
+                }
+            });
             var prem = postDebe.slice();
             var palloc = []; for (var k = 0; k < postN; k++) palloc.push(0);
             var ppagos = []; for (var k = 0; k < postN; k++) ppagos.push([]);
-            alq.forEach(function (p) {
-                if (p.date < pdesde) return;
+            postAlq.forEach(function (p) {
                 var amt = +p.amount;
                 for (var k = 0; k < postN; k++) {
                     if (prem[k] <= 0.0005) continue;
@@ -11876,6 +11885,19 @@ if ($tab === 'informes') {
                     if (amt <= 0.0005) break;
                 }
             });
+            var postDirect = [], postCompBack = [], postCompFwd = [], postCompFavor = [];
+            var postSaldoFavorSemana = 0;
+            for (var k = 0; k < postN; k++) {
+                postDirect.push(postPagadoReal[k] - postDebe[k]);
+                postCompBack.push(0); postCompFwd.push(0); postCompFavor.push(0);
+            }
+            for (var k = 0; k < postN; k++) {
+                if (postDirect[k] <= 0.0005) continue;
+                var s = postDirect[k];
+                if (k > 0 && postDirect[k - 1] < -0.0005) { var tb = Math.min(s, -postDirect[k - 1]); postDirect[k - 1] += tb; postDirect[k] -= tb; postCompBack[k] += tb; s -= tb; }
+                if (s > 0.0005 && k + 1 < postN && postDirect[k + 1] < -0.0005) { var tf = Math.min(s, -postDirect[k + 1]); postDirect[k + 1] += tf; postDirect[k] -= tf; postCompFwd[k] += tf; s -= tf; }
+                if (s > 0.0005) { postCompFavor[k] += s; postSaldoFavorSemana += s; postDirect[k] -= s; }
+            }
             var runF2 = 0, runS2 = 0;
             var debeT2 = 0, pagT2 = 0, dv2 = 0, pa2 = 0, dvs2 = 0, pas2 = 0;
             var meses2 = {}, mesesS2 = {};
@@ -11885,17 +11907,13 @@ if ($tab === 'informes') {
                 var debe = +w.debe;
                 var paid = palloc[k];
                 var diff = debe - paid;
-                var deficit = +w.deficit_semana;
+                var deficit = postDirect[k] < -0.0005 ? -postDirect[k] : 0;
                 var esActual = w.es_actual;
-                if (d.perdon.ignorar_actual && esActual) {
-                    paid = 0; diff = debe; ppagos[k] = [];
-                    deficit = debe;
-                    w.diff_semana = debe; w.deficit_semana = debe; w.comp_back = 0; w.comp_fwd = 0; w.comp_favor = 0;
-                }
-                w.pagado = paid; w.diff = diff; w.pagos = ppagos[k];
+                w.pagado = paid; w.diff = diff; w.pagos = ppagos[k]; w.pagado_real = postPagadoReal[k]; w.pagos_fecha = postPagosFecha[k];
                 w.arrastre = runF2; runF2 += diff; w.running = runF2;
                 w.es_perdon = (k === 0);
-                w.arrastre_semana = runS2; runS2 += deficit; w.running_semana = runS2;
+                w.arrastre_semana = runS2; runS2 += deficit; w.diff_semana = deficit; w.deficit_semana = deficit; w.running_semana = runS2;
+                w.comp_back = postCompBack[k]; w.comp_fwd = postCompFwd[k]; w.comp_favor = postCompFavor[k];
                 debeT2 += debe; pagT2 += paid;
                 if (esActual) { if (diff > 0) pa2 = diff; if (deficit > 0) pas2 = deficit; }
                 else { dv2 += diff; dvs2 += deficit; }
@@ -11903,15 +11921,16 @@ if ($tab === 'informes') {
                 if (!meses2[mes]) meses2[mes] = { debe: 0, pagado: 0, diff: 0, running: 0 };
                 meses2[mes].debe += debe; meses2[mes].pagado += paid; meses2[mes].diff += diff; meses2[mes].running = runF2;
                 if (!mesesS2[mes]) mesesS2[mes] = { debe: 0, pagado: 0, diff: 0, running: 0 };
-                mesesS2[mes].debe += debe; mesesS2[mes].pagado += w.pagado_real; mesesS2[mes].diff -= deficit; mesesS2[mes].running = runS2;
+                mesesS2[mes].debe += debe; mesesS2[mes].pagado += w.pagado_real; mesesS2[mes].diff += deficit; mesesS2[mes].running = runS2;
             }
             for (var i = 0; i < ri; i++) outWeeks[i].perdonada = true;
             return {
                 fuente: fuente, weeks: outWeeks,
                 debe_total: debeT2, pagado_total: pagT2, deuda_total: debeT2 - pagT2,
-                deuda_vencida: dv2, pendiente_actual: pa2, saldo_favor: 0,
+                deuda_vencida: dv2, pendiente_actual: pa2,
+                saldo_favor: Math.max(0, postAlq.reduce(function (sum, p) { return sum + (+p.amount); }, 0) - pagT2),
                 resumen_meses: meses2,
-                deuda_total_semana: runS2, deuda_vencida_semana: dvs2, pendiente_actual_semana: pas2, saldo_favor_semana: 0,
+                deuda_total_semana: runS2, deuda_vencida_semana: dvs2, pendiente_actual_semana: pas2, saldo_favor_semana: postSaldoFavorSemana,
                 resumen_meses_semana: mesesS2,
                 perdon: d.perdon
             };
@@ -11991,7 +12010,7 @@ if ($tab === 'informes') {
 
         return sep + '<tr style="' + rowStyle + ';">'
             + '<td>' + w.n + '</td>'
-            + '<td>' + esc(fcorte(w.ps) + ' \u2192 ' + fcorte(w.pe)) + (esActual ? ' <span style="color:#f59e0b;font-size:11px;font-weight:600;">(en curso)</span>' : '') + '</td>'
+            + '<td>' + esc(fcorte(w.ps) + ' \u2192 ' + fcorte(periodEnd(w.pe)) + ' (incl.)') + (esActual ? ' <span style="color:#f59e0b;font-size:11px;font-weight:600;">(en curso)</span>' : '') + '</td>'
             + '<td' + (esSemana ? '' : ' style="opacity:.55;"') + '>' + pagosFecha + '</td>'
             + '<td' + (esSemana ? ' style="opacity:.55;"' : '') + '>' + pagos + '</td>'
             + '<td>' + otros + '</td>'
@@ -12016,6 +12035,12 @@ if ($tab === 'informes') {
                 + ' <form method="post" style="display:inline;">'
                 + '<input type="hidden" name="action" value="jostal_compensar_lead">'
                 + '<input type="hidden" name="lead_id" value="' + esc(leadId) + '">'
+                + '<input type="hidden" name="clienta_id" value="' + esc(cid) + '">'
+                + '<input type="hidden" name="csrf_token" value="' + esc(csrfToken) + '">'
+                + '<input type="hidden" name="desde" value="' + esc(d.desde || '') + '">'
+                + '<input type="hidden" name="hasta" value="' + esc(d.hasta || '') + '">'
+                + '<input type="hidden" name="fuente" value="' + esc(d.fuente || '') + '">'
+                + '<input type="hidden" name="redirect" value="index.php?page=jostal&amp;tab=deudas&amp;clienta_id=' + encodeURIComponent(cid) + '">'
                 + '<button class="btn-ok-mini" style="font-size:10px;padding:2px 8px;">\u2713 permanente</button></form>'
                 + ' <button type="button" class="btn-danger-mini" style="font-size:10px;padding:2px 8px;" data-accion="quitar" data-cid="' + esc(cid) + '" data-lead-id="' + esc(leadId) + '">\u21A9 quitar</button>'
                 + '</div>';

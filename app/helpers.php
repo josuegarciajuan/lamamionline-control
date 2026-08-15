@@ -267,6 +267,22 @@ function redirect_to($url) {
     exit;
 }
 
+/** Devuelve solo redirects internos; evita saltos externos e inyección de cabeceras. */
+function safe_internal_redirect_path($url, $fallback = 'index.php?page=dashboard') {
+    $url = trim((string)$url);
+    $fallback = trim((string)$fallback);
+    if ($fallback === '') $fallback = 'index.php?page=dashboard';
+    if ($url === '' || preg_match('/[\x00-\x1F\x7F]/', $url)) return $fallback;
+    if (strpos($url, '//') === 0 || strpos($url, '\\') === 0) return $fallback;
+
+    $parts = @parse_url($url);
+    if ($parts === false) return $fallback;
+    foreach (array('scheme', 'host', 'user', 'pass') as $externalPart) {
+        if (isset($parts[$externalPart]) && $parts[$externalPart] !== '') return $fallback;
+    }
+    return $url;
+}
+
 function lamami_tab_url($tab = 'interesadas', $params = array()) {
     $query = array_merge(array(
         'page' => 'lamami',
@@ -2209,6 +2225,60 @@ function jostal_perdon_legacy($clienta) {
     return isset($map[$id]) ? $map[$id] : null;
 }
 
+/** Valida fechas opcionales con formato Y-m-d estricto y orden inclusivo. */
+function jostal_validar_rango_fechas($desde, $hasta) {
+    $desde = trim((string)$desde);
+    $hasta = trim((string)$hasta);
+    foreach (array('desde' => $desde, 'hasta' => $hasta) as $campo => $valor) {
+        if ($valor === '') continue;
+        $dt = DateTime::createFromFormat('!Y-m-d', $valor);
+        $errors = DateTime::getLastErrors();
+        if (!$dt || ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0)) || $dt->format('Y-m-d') !== $valor) {
+            return array('ok' => false, 'error' => 'La fecha ' . $campo . ' debe tener formato YYYY-MM-DD y ser válida.');
+        }
+    }
+    if ($desde !== '' && $hasta !== '' && $desde > $hasta) {
+        return array('ok' => false, 'error' => 'La fecha desde no puede ser posterior a la fecha hasta.');
+    }
+    return array('ok' => true, 'desde' => $desde, 'hasta' => $hasta, 'error' => '');
+}
+
+/** Devuelve vacío si un lead puede convertirse permanentemente en alquiler. */
+function jostal_validar_compensacion_permanente($lead, $clientaId) {
+    if (!is_array($lead)) return 'Lead no encontrado.';
+    $clientaId = trim((string)$clientaId);
+    if ($clientaId === '' || (string)($lead['clienta_id'] ?? '') !== $clientaId) {
+        return 'El pago no pertenece a la clienta mostrada.';
+    }
+    if ((float)($lead['precio'] ?? 0) <= 0) return 'El pago debe tener un importe positivo.';
+    $clasif = jostal_concepto_tipo_efectivo($lead);
+    if (($clasif['tipo'] ?? '') !== 'no_alquiler') return 'El pago ya no está clasificado como no alquiler.';
+    return '';
+}
+
+/** Relee, valida y convierte un pago dentro de una única sección crítica. */
+function jostal_compensar_lead_permanente($leadId, $clientaId) {
+    $leadId = trim((string)$leadId);
+    $clientaId = trim((string)$clientaId);
+    if ($leadId === '') return array('ok' => false, 'error' => 'Lead no encontrado.');
+
+    return storage_mutate_row_atomic('jostal_leads.json', $leadId, function ($lead) use ($clientaId) {
+        $validationError = jostal_validar_compensacion_permanente($lead, $clientaId);
+        if ($validationError !== '') return array('ok' => false, 'error' => $validationError);
+
+        $original = trim((string)($lead['observacion'] ?? ''));
+        $sufijo = 'compensación posterior alquiler';
+        if (strpos($original, $sufijo) === false) {
+            $lead['observacion'] = $original !== '' ? $original . ' + ' . $sufijo : $sufijo;
+        }
+        $lead['concepto_tipo'] = 'alquiler';
+        $lead['concepto_fuente'] = 'manual';
+        $lead['concepto_confirmado_at'] = now_datetime();
+        $lead['updated_at'] = now_datetime();
+        return array('ok' => true, 'row' => $lead);
+    });
+}
+
 /**
  * Normaliza un texto para comparación: minúsculas, sin acentos, espacios colapsados.
  */
@@ -2347,9 +2417,10 @@ function jostal_dulce_line() {
  *                           primera semana del rango es la "semana 1" y no se arrastra
  *                           deuda ni pagos anteriores.
  * @param string $hasta      Fecha fin ('' = hasta hoy, incluye semana en curso).
+ * @param string $asOf       Fecha de cálculo controlada (Y-m-d); vacío usa hoy.
  * @return array  Estructura con weeks, totales y dudosos (o ['error' => ...]).
  */
-function jostal_compute_deuda($clienta, $leads = null, $overrides = array(), $desde = '', $hasta = '') {
+function jostal_compute_deuda($clienta, $leads = null, $overrides = array(), $desde = '', $hasta = '', $asOf = '') {
     $clienta = is_array($clienta) ? $clienta : array();
     $cid = (string)($clienta['id'] ?? '');
     $overrides = is_array($overrides) ? array_values(array_unique(array_map('strval', $overrides))) : array();
@@ -2359,7 +2430,15 @@ function jostal_compute_deuda($clienta, $leads = null, $overrides = array(), $de
         return array('error' => 'sin_precio');
     }
 
-    $pi = jostal_alquiler_payment_info($clienta, time());
+    $asOf = trim((string)$asOf);
+    $asOfDate = $asOf !== '' ? $asOf : date('Y-m-d');
+    $asOfDt = DateTime::createFromFormat('!Y-m-d', $asOfDate);
+    if (!$asOfDt || $asOfDt->format('Y-m-d') !== $asOfDate) {
+        return array('error' => 'fecha_control_invalida');
+    }
+    $today_ts = $asOfDt->getTimestamp();
+
+    $pi = jostal_alquiler_payment_info($clienta, $today_ts);
     if (empty($pi['enabled'])) {
         return array('error' => 'sin_alquiler_activo');
     }
@@ -2375,8 +2454,6 @@ function jostal_compute_deuda($clienta, $leads = null, $overrides = array(), $de
     $entry_date = (string)$pi['entry_date'];
     $first_due_date = (string)$pi['first_due_date'];
     $first_due_ts = strtotime($first_due_date . ' 00:00:00');
-    $today_ts = strtotime(date('Y-m-d') . ' 00:00:00');
-
     if (!$first_due_ts || $first_due_ts > $today_ts) {
         return array('error' => 'sin_vencimientos', 'entry_date' => $entry_date);
     }
@@ -2386,29 +2463,36 @@ function jostal_compute_deuda($clienta, $leads = null, $overrides = array(), $de
     // arrastra deuda ni pagos anteriores. "hasta" corta el informe (semanas y pagos posteriores).
     $desde = trim((string)$desde);
     $hasta = trim((string)$hasta);
+    $rango = jostal_validar_rango_fechas($desde, $hasta);
+    if (empty($rango['ok'])) {
+        return array('error' => 'rango_fechas_invalido', 'error_message' => $rango['error']);
+    }
 
     $start_date = $entry_date;
     if ($desde !== '' && $desde > $entry_date) {
         $start_date = $desde;
     }
 
-    $next_due_ts = strtotime((string)$pi['next_due_date'] . ' 00:00:00');
-    $end_ts = ($next_due_ts && $next_due_ts >= $first_due_ts) ? $next_due_ts : $today_ts;
-    if ($hasta !== '') {
-        $hasta_ts = strtotime($hasta . ' 00:00:00');
-        if ($hasta_ts && $hasta_ts < $end_ts) $end_ts = $hasta_ts;
+    // El rango de pagos termina en `hasta` inclusive (sin proyectar deuda futura).
+    // Las semanas son intervalos [ps, pe): se incluye la que contiene end_date.
+    $end_date = date('Y-m-d', $today_ts);
+    if ($hasta !== '' && $hasta < $end_date) $end_date = $hasta;
+    if ($end_date < $start_date) {
+        return array('error' => 'sin_vencimientos', 'entry_date' => $entry_date);
     }
-    $end_date = date('Y-m-d', $end_ts);
 
-    // Vencimientos desde el primero hasta end_date.
+    // Vencimientos hasta el primer límite semanal estrictamente posterior a end_date.
     $due_dates_all = array();
-    for ($ts = $first_due_ts; $ts <= $end_ts; $ts = strtotime('+7 day', $ts)) {
-        $due_dates_all[] = date('Y-m-d', $ts);
+    for ($ts = $first_due_ts; ; $ts = strtotime('+7 day', $ts)) {
+        $due = date('Y-m-d', $ts);
+        $due_dates_all[] = $due;
+        if ($due > $end_date) break;
     }
 
-    // Primer índice con due >= start_date (el resto se descarta → reinicio del arrastre).
+    // Primer periodo [ps, pe) que contiene start_date; si start_date cae justo en
+    // un límite, comienza el periodo nuevo (pe debe ser estrictamente posterior).
     $w0 = 0;
-    while ($w0 < count($due_dates_all) && $due_dates_all[$w0] < $start_date) {
+    while ($w0 < count($due_dates_all) && $due_dates_all[$w0] <= $start_date) {
         $w0++;
     }
     if ($w0 >= count($due_dates_all)) {
@@ -2693,10 +2777,10 @@ function jostal_compute_deuda($clienta, $leads = null, $overrides = array(), $de
         }
         $resumen_meses_semana[$mes]['debe'] += $precio_por_semana[$w];
         $resumen_meses_semana[$mes]['pagado'] += $pagado_real[$w];
-        $resumen_meses_semana[$mes]['diff'] -= $deficit;
+        $resumen_meses_semana[$mes]['diff'] += $deficit;
         $resumen_meses_semana[$mes]['running'] = $running_s;
     }
-    $pagado_total_semana = $debe_total - $deuda_total_semana;
+    $pagado_total_semana = array_sum($pagado_real);
 
     $no_alq_total = 0.0;
     foreach ($no_alq_payments as $p) $no_alq_total += $p['amount'];
@@ -2727,10 +2811,33 @@ function jostal_compute_deuda($clienta, $leads = null, $overrides = array(), $de
 
             for ($i = 0; $i < $reset_w; $i++) $weeks[$i]['perdonada'] = true;
 
-            // Re-FIFO solo sobre las semanas post-reset, con pagos desde $pdesde.
+            // Re-FIFO solo sobre las semanas post-reset, con pagos desde la fecha
+            // exacta configurada. Si procede, los pagos de la semana actual se
+            // excluyen antes tanto de FIFO como de la compensación semanal.
             $pagos_post = array();
+            $post_pagado_real = array_fill(0, $num_weeks - $reset_w, 0.0);
+            $post_pagos_fecha = array_fill(0, $num_weeks - $reset_w, array());
             foreach ($alquiler_payments as $p) {
-                if ($p['date'] >= $pdesde) $pagos_post[] = $p;
+                if ($p['date'] < $pdesde) continue;
+                $ignorado = false;
+                if ($pIgnorarActual) {
+                    for ($i = $reset_w; $i < $num_weeks; $i++) {
+                        if (!empty($weeks[$i]['es_actual']) && $p['date'] >= $weeks[$i]['ps'] && $p['date'] < $weeks[$i]['pe']) {
+                            $ignorado = true;
+                            break;
+                        }
+                    }
+                }
+                if ($ignorado) continue;
+                $pagos_post[] = $p;
+                for ($i = $reset_w; $i < $num_weeks; $i++) {
+                    if ($p['date'] >= $weeks[$i]['ps'] && $p['date'] < $weeks[$i]['pe']) {
+                        $k = $i - $reset_w;
+                        $post_pagado_real[$k] += (float)$p['amount'];
+                        $post_pagos_fecha[$k][] = $p;
+                        break;
+                    }
+                }
             }
             $post_n = $num_weeks - $reset_w;
             $post_debe = array();
@@ -2751,6 +2858,33 @@ function jostal_compute_deuda($clienta, $leads = null, $overrides = array(), $de
                 }
             }
 
+            // Compensación adyacente aislada dentro del tramo post-perdón.
+            $post_direct = array_fill(0, $post_n, 0.0);
+            $post_comp_back = array_fill(0, $post_n, 0.0);
+            $post_comp_fwd = array_fill(0, $post_n, 0.0);
+            $post_comp_favor = array_fill(0, $post_n, 0.0);
+            $post_saldo_favor_semana = 0.0;
+            for ($k = 0; $k < $post_n; $k++) $post_direct[$k] = $post_pagado_real[$k] - $post_debe[$k];
+            for ($k = 0; $k < $post_n; $k++) {
+                if ($post_direct[$k] <= 0.0005) continue;
+                $sobrante = $post_direct[$k];
+                if ($k > 0 && $post_direct[$k - 1] < -0.0005) {
+                    $t = min($sobrante, -$post_direct[$k - 1]);
+                    $post_direct[$k - 1] += $t; $post_direct[$k] -= $t;
+                    $post_comp_back[$k] += $t; $sobrante -= $t;
+                }
+                if ($sobrante > 0.0005 && $k + 1 < $post_n && $post_direct[$k + 1] < -0.0005) {
+                    $t = min($sobrante, -$post_direct[$k + 1]);
+                    $post_direct[$k + 1] += $t; $post_direct[$k] -= $t;
+                    $post_comp_fwd[$k] += $t; $sobrante -= $t;
+                }
+                if ($sobrante > 0.0005) {
+                    $post_comp_favor[$k] += $sobrante;
+                    $post_saldo_favor_semana += $sobrante;
+                    $post_direct[$k] -= $sobrante;
+                }
+            }
+
             $run = 0.0;
             $run_s = 0.0;
             $debe_total = 0.0; $pagado_total = 0.0;
@@ -2767,19 +2901,13 @@ function jostal_compute_deuda($clienta, $leads = null, $overrides = array(), $de
                 $diff = $debe - $paid;
                 $esActual = !empty($w['es_actual']);
 
-                $deficit = (float)$w['deficit_semana'];
-                if ($pIgnorarActual && $esActual) {
-                    $paid = 0.0; $diff = $debe;
-                    $pagos_sem[$k] = array();
-                    $deficit = $debe;
-                    $w['diff_semana'] = $debe;
-                    $w['deficit_semana'] = $debe;
-                    $w['comp_back'] = 0.0; $w['comp_fwd'] = 0.0; $w['comp_favor'] = 0.0;
-                }
+                $deficit = $post_direct[$k] < -0.0005 ? -$post_direct[$k] : 0.0;
 
                 $w['pagado'] = $paid;
                 $w['diff'] = $diff;
                 $w['pagos'] = $pagos_sem[$k];
+                $w['pagado_real'] = $post_pagado_real[$k];
+                $w['pagos_fecha'] = $post_pagos_fecha[$k];
                 $w['arrastre'] = $run;
                 $run += $diff;
                 $w['running'] = $run;
@@ -2787,7 +2915,12 @@ function jostal_compute_deuda($clienta, $leads = null, $overrides = array(), $de
 
                 $w['arrastre_semana'] = $run_s;
                 $run_s += $deficit;
+                $w['diff_semana'] = $deficit;
+                $w['deficit_semana'] = $deficit;
                 $w['running_semana'] = $run_s;
+                $w['comp_back'] = $post_comp_back[$k];
+                $w['comp_fwd'] = $post_comp_fwd[$k];
+                $w['comp_favor'] = $post_comp_favor[$k];
 
                 $debe_total += $debe;
                 $pagado_total += $paid;
@@ -2807,15 +2940,15 @@ function jostal_compute_deuda($clienta, $leads = null, $overrides = array(), $de
                 $resumen_meses[$mes]['running'] = $run;
                 if (!isset($resumen_meses_semana[$mes])) $resumen_meses_semana[$mes] = array('debe' => 0.0, 'pagado' => 0.0, 'diff' => 0.0, 'running' => 0.0);
                 $resumen_meses_semana[$mes]['debe'] += $debe;
-                $resumen_meses_semana[$mes]['pagado'] += (float)$w['pagado_real'];
-                $resumen_meses_semana[$mes]['diff'] -= $deficit;
+                $resumen_meses_semana[$mes]['pagado'] += $post_pagado_real[$k];
+                $resumen_meses_semana[$mes]['diff'] += $deficit;
                 $resumen_meses_semana[$mes]['running'] = $run_s;
             }
 
             $deuda_total_semana = $run_s;
-            $pagado_total_semana = $debe_total - $deuda_total_semana;
-            $saldo_favor = 0.0;
-            $saldo_favor_semana = 0.0;
+            $pagado_total_semana = array_sum($post_pagado_real);
+            $saldo_favor = max(0.0, array_sum(array_map(function ($p) { return (float)$p['amount']; }, $pagos_post)) - $pagado_total);
+            $saldo_favor_semana = $post_saldo_favor_semana;
 
             // Pagos NO alquiler post-reset (el resto se considera perdonado).
             $no_alq_total = 0.0;
@@ -2865,8 +2998,8 @@ function jostal_compute_deuda($clienta, $leads = null, $overrides = array(), $de
 }
 
 /**
- * Filtra las semanas de un informe de deuda por rango de fechas (para visualización).
- * El total de deuda es histórico completo; el rango solo recorta el detalle semanal.
+ * Filtra semanas por su vencimiento. Se conserva para consumidores legacy; los informes
+ * nuevos ya llegan recalculados por jostal_compute_deuda y no deben volver a filtrarse.
  */
 function jostal_weeks_en_rango($weeks, $desde, $hasta) {
     $desde = trim((string)$desde);
@@ -2896,7 +3029,7 @@ function jostal_texto_deuda($nombre, $data, $desde = '', $hasta = '', $fuente = 
     $precioLabel = count($precios) > 0 ? implode('€ → ', array_unique(array_map(function ($p) { return (int)round((float)$p); }, $precios))) . '€' : (string)round((float)($data['precio'] ?? 0));
     $deuda = (float)($esSemana ? ($data['deuda_total_semana'] ?? 0) : ($data['deuda_total'] ?? 0));
     $saldoFavor = (float)($esSemana ? ($data['saldo_favor_semana'] ?? 0) : ($data['saldo_favor'] ?? 0));
-    $weeks = jostal_weeks_en_rango((array)($data['weeks'] ?? array()), $desde, $hasta);
+    $weeks = (array)($data['weeks'] ?? array());
 
     $lineas = array();
     $lineas[] = '🏠 *Informe de alquiler*';
@@ -2913,14 +3046,14 @@ function jostal_texto_deuda($nombre, $data, $desde = '', $hasta = '', $fuente = 
 
         if ($esActual) {
             $estado = $dif > 0.005 ? 'pendiente ' . euro($dif) : 'al día esta semana';
-            $lineas[] = '· S' . $w['n'] . ' (' . jostal_fecha_corta($w['ps']) . '–' . jostal_fecha_corta($w['pe']) . ') *en curso*: pagó ' . euro($pagado) . '/' . euro($debe) . ' → ' . $estado;
+            $lineas[] = '· S' . $w['n'] . ' (' . jostal_fecha_corta($w['ps']) . '–' . jostal_fecha_corta(jostal_periodo_fin_inclusivo($w['pe'])) . ' incl.) *en curso*: pagó ' . euro($pagado) . '/' . euro($debe) . ' → ' . $estado;
         } else {
             if ($dif > 0.005) {
                 $estado = 'debe ' . euro($dif);
             } else {
                 $estado = 'ok';
             }
-            $lineas[] = '· S' . $w['n'] . ' (' . jostal_fecha_corta($w['ps']) . '–' . jostal_fecha_corta($w['pe']) . '): pagó ' . euro($pagado) . '/' . euro($debe) . ' → ' . $estado . ($run > 0.005 ? ' · acum ' . euro($run) : '');
+            $lineas[] = '· S' . $w['n'] . ' (' . jostal_fecha_corta($w['ps']) . '–' . jostal_fecha_corta(jostal_periodo_fin_inclusivo($w['pe'])) . ' incl.): pagó ' . euro($pagado) . '/' . euro($debe) . ' → ' . $estado . ($run > 0.005 ? ' · acum ' . euro($run) : '');
         }
     }
 
@@ -2939,6 +3072,12 @@ function jostal_texto_deuda($nombre, $data, $desde = '', $hasta = '', $fuente = 
 function jostal_fecha_corta($date) {
     $ts = strtotime((string)$date);
     return $ts ? date('d/m', $ts) : (string)$date;
+}
+
+/** Convierte el límite exclusivo de un periodo [ps, pe) en su última fecha incluida. */
+function jostal_periodo_fin_inclusivo($periodEndExclusive) {
+    $ts = strtotime((string)$periodEndExclusive . ' 00:00:00 -1 day');
+    return $ts ? date('Y-m-d', $ts) : (string)$periodEndExclusive;
 }
 
 /** Formatea clave de mes 'Y-m' → 'mes YYYY' (ej. '2026-05' → 'mayo 2026'). */
