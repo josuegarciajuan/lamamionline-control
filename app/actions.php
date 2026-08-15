@@ -4420,8 +4420,31 @@ function action_set_publicista_task_status() {
 }
 
 function action_save_telefono() {
+    if (!auth_is_admin()) {
+        set_flash('error', 'Acceso denegado.');
+        redirect_to(comercial_page_url('lineas'));
+    }
+    if (!csrf_validate((string)request_post('csrf_token'))) {
+        set_flash('error', 'La sesión del formulario ha caducado. Recarga la página e inténtalo de nuevo.');
+        redirect_to(comercial_page_url('lineas'));
+    }
+
     $id = trim(request_post('id'));
     if ($id === '') $id = generate_id('tf');
+
+    $wahaPort = trim((string)request_post('waha_port'));
+    $wahaSession = trim((string)request_post('waha'));
+    if (!telefonos_waha_port_is_allowed($wahaPort, true)) {
+        set_flash('error', 'Puerto WAHA no permitido. Usa 3000-3011, 3031 o déjalo vacío.');
+        redirect_to(comercial_page_url('lineas', array('edit' => $id)));
+    }
+    if ($wahaPort !== '' && $wahaPort !== TELEFONOS_WAHA_PERSONAL_PORT) {
+        $effectiveSession = $wahaSession !== '' ? $wahaSession : 'default';
+        if (!telefonos_waha_session_is_valid($effectiveSession)) {
+            set_flash('error', 'Sesión WAHA no válida.');
+            redirect_to(comercial_page_url('lineas', array('edit' => $id)));
+        }
+    }
 
     $existing = storage_find_by_id('telefonos.json', $id);
 
@@ -4432,8 +4455,8 @@ function action_save_telefono() {
         'uso' => trim(request_post('uso')),
         'pin' => trim(request_post('pin')),
         'compania' => trim(request_post('compania')),
-        'waha_port' => trim(request_post('waha_port')),
-        'waha' => trim(request_post('waha')),
+        'waha_port' => $wahaPort,
+        'waha' => $wahaPort === TELEFONOS_WAHA_PERSONAL_PORT ? 'default' : $wahaSession,
         'notas' => trim(request_post('notas')),
         'destacamos_id' => trim(request_post('destacamos_id')),
         'updated_at' => now_datetime(),
@@ -4446,6 +4469,15 @@ function action_save_telefono() {
 }
 
 function action_delete_telefono() {
+    if (!auth_is_admin()) {
+        set_flash('error', 'Acceso denegado.');
+        redirect_to(comercial_page_url('lineas'));
+    }
+    if (!csrf_validate((string)request_post('csrf_token'))) {
+        set_flash('error', 'La sesión del formulario ha caducado. Recarga la página e inténtalo de nuevo.');
+        redirect_to(comercial_page_url('lineas'));
+    }
+
     $id = trim(request_post('id'));
     if ($id !== '') {
         storage_delete('telefonos.json', $id);
@@ -4837,6 +4869,15 @@ function publicista_normalize_copy_extra_concepts_input($raw) {
 }
 
 function action_save_comercial_settings() {
+    if (!auth_is_admin()) {
+        set_flash('error', 'Acceso denegado.');
+        redirect_to(comercial_page_url('ajustes'));
+    }
+    if (!csrf_validate((string)request_post('csrf_token'))) {
+        set_flash('error', 'La sesión del formulario ha caducado. Recarga la página e inténtalo de nuevo.');
+        redirect_to(comercial_page_url('ajustes'));
+    }
+
     $current = comercial_get_settings();
     $numericFields = array(
         'curl_timeout_sec', 'global_daily_target', 'ban_window_size', 'ban_fail_streak_warning', 'ban_fail_streak_pause',
@@ -4848,9 +4889,19 @@ function action_save_comercial_settings() {
         $current[$field] = request_post($field, $current[$field]);
     }
 
-    $current['waha_host'] = trim((string)request_post('waha_host', $current['waha_host']));
+    $requestedHost = trim((string)request_post('waha_host', $current['waha_host']));
+    if (!telefonos_waha_host_is_allowed($requestedHost)) {
+        set_flash('error', 'Host WAHA no permitido.');
+        redirect_to(comercial_page_url('ajustes'));
+    }
+    $current['waha_host'] = $requestedHost;
     $current['waha_api_key'] = trim((string)request_post('waha_api_key', $current['waha_api_key']));
-    $current['waha_session'] = trim((string)request_post('waha_session', $current['waha_session']));
+    $requestedSession = trim((string)request_post('waha_session', $current['waha_session']));
+    if (!telefonos_waha_session_is_valid($requestedSession)) {
+        set_flash('error', 'Sesión WAHA no válida.');
+        redirect_to(comercial_page_url('ajustes'));
+    }
+    $current['waha_session'] = $requestedSession;
     $current['auto_followup_enabled'] = request_post('auto_followup_enabled') ? 1 : 0;
     $current['auto_pause_enabled'] = request_post('auto_pause_enabled') ? 1 : 0;
     $current['ia_second_turn_enabled'] = request_post('ia_second_turn_enabled') ? 1 : 0;

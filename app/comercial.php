@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/telefonos_waha_service.php';
+
 function comercial_bootstrap_storage() {
     $jsonDefaults = array(
         'comercial_settings.json' => comercial_default_settings(),
@@ -95,10 +97,10 @@ function comercial_default_settings() {
 
 function comercial_normalize_waha_host($host) {
     $host = trim((string)$host);
-    if ($host === '') {
-        $host = (string)(comercial_default_settings()['waha_host'] ?? 'http://100.117.92.74');
+    if (!telefonos_waha_host_is_allowed($host)) {
+        return (string)(comercial_default_settings()['waha_host'] ?? 'http://100.117.92.74');
     }
-    return rtrim($host, '/');
+    return $host;
 }
 
 function comercial_waha_host_options($current = '') {
@@ -107,12 +109,6 @@ function comercial_waha_host_options($current = '') {
         'http://100.113.76.93' => '100.113.76.93 · josue',
         'http://100.76.30.118' => '100.76.30.118 · liveyourdre2',
     );
-
-    $current = comercial_normalize_waha_host($current);
-    if ($current !== '' && !isset($options[$current])) {
-        $label = preg_replace('#^https?://#i', '', $current);
-        $options[$current] = $label . ' · actual';
-    }
 
     return $options;
 }
@@ -5568,6 +5564,11 @@ function comercial_waha_url($settings, $port, $path) {
 }
 
 function comercial_waha_request_json($settings, $port, $method, $path, $payload = null) {
+    $host = trim((string)($settings['waha_host'] ?? ''));
+    $port = trim((string)$port);
+    if (!telefonos_waha_host_is_allowed($host) || !telefonos_waha_port_is_allowed($port, false)) {
+        return array('ok' => false, 'http_code' => 0, 'error' => 'Configuración WAHA no permitida', 'body' => null, 'url' => '');
+    }
     $url = comercial_waha_url($settings, $port, $path);
     $ch = curl_init($url);
     if ($ch === false) {
@@ -5584,6 +5585,9 @@ function comercial_waha_request_json($settings, $port, $method, $path, $payload 
     $options = array(
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => (int)$settings['curl_timeout_sec'],
+        CURLOPT_CONNECTTIMEOUT => min(4, max(1, (int)$settings['curl_timeout_sec'])),
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_MAXREDIRS => 0,
     );
 
     if ($method === 'POST') {
@@ -8028,6 +8032,7 @@ HTML;
         echo '<div class="modal-body">';
         echo '<form method="post" class="form-grid" id="lineaForm">';
         echo '<input type="hidden" name="action" value="save_telefono">';
+        echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
         echo '<input type="hidden" name="id" value="">';
         field_input('nombre', 'Nombre', '', true);
         field_input('tfono', 'Tfono', '', true);
@@ -8054,6 +8059,7 @@ HTML;
         echo '<button type="button" class="btn-primary" id="btnGuardarLinea">Guardar línea</button>';
         echo '<form method="post" id="deleteLineaForm" style="display:inline-block;" onsubmit="return confirm(\'¿Eliminar esta línea?\')">';
         echo '<input type="hidden" name="action" value="delete_telefono">';
+        echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
         echo '<input type="hidden" name="id" value="">';
         echo '<button type="submit" class="btn-danger-mini" id="btnEliminarLinea" style="display:none;">Eliminar</button>';
         echo '</form>';
@@ -8169,6 +8175,7 @@ HTML;
         echo '</div>';
         echo '<form method="post">';
         echo '<input type="hidden" name="action" value="save_comercial_settings">';
+        echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
         echo '<div class="form-grid-2">';
         comercial_field_select('waha_host', 'WAHA host', comercial_waha_host_options($settings['waha_host']), comercial_normalize_waha_host($settings['waha_host']));
         comercial_field_text('waha_api_key', 'WAHA API key', $settings['waha_api_key']);

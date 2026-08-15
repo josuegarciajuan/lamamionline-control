@@ -4,6 +4,10 @@ function is_logged_in() {
     return !empty($_SESSION['logged_in']);
 }
 
+function auth_is_admin() {
+    return is_logged_in() && hash_equals('josue', (string)($_SESSION['username'] ?? ''));
+}
+
 function login_user($username, $password) {
     // Credenciales hardcodeadas
     if ($username === 'josue' && $password === 'prueba1234') {

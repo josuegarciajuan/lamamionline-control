@@ -8042,6 +8042,7 @@ function render_configm_section() {
 
 function render_josue_page() {
     $anunciosUnlocked = !empty($_SESSION['josue_anuncios_unlocked']);
+    $isAdmin = auth_is_admin();
 
     // Modo Lite (coche): auto-desbloquear anuncios — el usuario no puede interactuar con el formulario
     if (($_SESSION['username'] ?? '') === 'lite' && !$anunciosUnlocked) {
@@ -8054,7 +8055,10 @@ function render_josue_page() {
     $wasapUnlocked = !$isLite || !empty($_SESSION['josue_wasap_unlocked']);
 
     $tab = request_get('tab', 'publias');
-    $allowed = array('publias', 'captacion', 'sendtaxs', 'notas', 'autotube', 'reproductor', 'waha', 'telefonos', 'agenda', 'eurekas', 'config', 'configm', 'rutas', 'diario');
+    $allowed = array('publias', 'captacion', 'sendtaxs', 'notas', 'autotube', 'reproductor', 'waha', 'agenda', 'eurekas', 'config', 'configm', 'rutas', 'diario');
+    if ($isAdmin) {
+        $allowed[] = 'telefonos';
+    }
     if ($anunciosUnlocked) {
         $allowed[] = 'anuncios';
     }
@@ -8133,7 +8137,9 @@ function render_josue_page() {
     if ($anunciosUnlocked) {
         echo '<a class="subtab ' . ($tab === 'anuncios' ? 'active' : '') . '" href="index.php?page=josue&tab=anuncios">Anuncios</a>';
     }
-    echo '<a class="subtab ' . ($tab === 'telefonos' ? 'active' : '') . '" href="index.php?page=josue&tab=telefonos">Telefonos</a>';
+    if ($isAdmin) {
+        echo '<a class="subtab ' . ($tab === 'telefonos' ? 'active' : '') . '" href="index.php?page=josue&tab=telefonos">Telefonos</a>';
+    }
     // echo '<a class="subtab ' . ($tab === 'waha' ? 'active' : '') . '" href="index.php?page=josue&tab=waha">WAHA</a>';
     // echo '<a class="subtab ' . ($tab === 'publias' ? 'active' : '') . '" href="index.php?page=josue&tab=publias">PublIas</a>';
     // echo '<a class="subtab ' . ($tab === 'captacion' ? 'active' : '') . '" href="index.php?page=josue&tab=captacion">Captacion</a>';
@@ -8584,7 +8590,10 @@ if (!empty($sendtaxsState)) {
                 echo '<td class="td-waha-salud">';
                 echo '<span id="waha-salud-' . e($row['id'] ?? '') . '" class="waha-indicator" aria-label="Estado WAHA: sin comprobar"><span class="waha-status-dot is-unknown" aria-hidden="true"></span>Sin comprobar</span>';
                 if ($wahaPort !== '') {
-                    echo '<div class="waha-line-actions" id="waha-actions-' . e($row['id'] ?? '') . '"></div>';
+                    echo '<div class="waha-line-actions" id="waha-actions-' . e($row['id'] ?? '') . '" data-telefono-id="' . e($row['id'] ?? '') . '">';
+                    echo '<button type="button" class="btn-secondary-mini twa-action-button" data-action="identify">Identificar</button>';
+                    echo '<span class="twa-action-result muted" aria-live="polite"></span>';
+                    echo '</div>';
                 }
                 echo '</td>';
                 echo '<td>' . e($row['notas'] ?? '') . '</td>';
@@ -8593,6 +8602,7 @@ if (!empty($sendtaxsState)) {
                 echo '<button type="button" class="btn-secondary-mini btn-telefonos-edit">Editar</button> ';
                 echo '<form method="post" class="inline-form" onsubmit="return confirm(\'¿Eliminar este teléfono?\')">';
                 echo '<input type="hidden" name="action" value="delete_telefono">';
+                echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
                 echo '<input type="hidden" name="id" value="' . e($row['id']) . '">';
                 echo '<button class="btn-danger-mini">Eliminar</button>';
                 echo '</form>';
@@ -8612,6 +8622,7 @@ if (!empty($sendtaxsState)) {
         echo '<div class="modal-body">';
         echo '<form method="post" class="form-grid" id="telefonoForm">';
         echo '<input type="hidden" name="action" value="save_telefono">';
+        echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
         echo '<input type="hidden" name="id" value="">';
         field_input('nombre', 'Nombre', '', true);
         field_input('tfono', 'Tfono', '', true);
@@ -8638,6 +8649,7 @@ if (!empty($sendtaxsState)) {
         echo '<button type="button" class="btn-primary" id="btnGuardarTelefono">Guardar teléfono</button>';
         echo '<form method="post" id="deleteTelefonoForm" style="display:inline-block;" onsubmit="return confirm(\'¿Eliminar este teléfono?\')">';
         echo '<input type="hidden" name="action" value="delete_telefono">';
+        echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
         echo '<input type="hidden" name="id" value="">';
         echo '<button type="submit" class="btn-danger-mini" id="btnEliminarTelefono" style="display:none;">Eliminar</button>';
         echo '</form>';
@@ -8648,11 +8660,11 @@ if (!empty($sendtaxsState)) {
 
         // ── QR Modal para vincular líneas WAHA (compartido, oculto) ──
         echo '<div id="twaQrModal" class="wasap-qr-modal" style="display:none">';
-        echo '<div class="wasap-qr-modal-bg" onclick="twaCloseQr()"></div>';
+        echo '<div class="wasap-qr-modal-bg" id="twaQrModalBg"></div>';
         echo '<div class="wasap-qr-modal-box">';
         echo '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
         echo '<h3 style="margin:0">Vincular WhatsApp</h3>';
-        echo '<button onclick="twaCloseQr()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text)">✕</button>';
+        echo '<button type="button" id="twaQrCloseTop" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text)">✕</button>';
         echo '</div>';
         echo '<div id="twaQrLineName" style="font-size:13px;color:var(--muted);margin-bottom:10px"></div>';
         echo '<div id="twaQrImageWrap" style="text-align:center;padding:16px;background:#fff;border-radius:8px;margin-bottom:12px">';
@@ -8660,247 +8672,300 @@ if (!empty($sendtaxsState)) {
         echo '</div>';
         echo '<p id="twaQrStatus" class="muted" style="text-align:center;margin-bottom:10px">Esperando...</p>';
         echo '<div style="display:flex;gap:8px;justify-content:center">';
-        echo '<button onclick="twaRegenerateQr()" class="btn-secondary-mini">🔄 Regenerar QR</button>';
-        echo '<button onclick="twaCloseQr()" class="btn-secondary-mini">Cerrar</button>';
+        echo '<button type="button" id="twaQrRegenerate" class="btn-secondary-mini">🔄 Regenerar QR</button>';
+        echo '<button type="button" id="twaQrCloseBottom" class="btn-secondary-mini">Cerrar</button>';
         echo '</div>';
         echo '</div>';
         echo '</div>';
 
-        // ── JS: health polling + vincular líneas WAHA ──
+        // ── JS: health polling + acciones WAHA por telefono_id ──
         echo '<script>
         (function(){
             var apiBase = "telefonos_waha_api.php";
+            var csrfToken = ' . json_encode(csrf_token()) . ';
+            var qrCurrentId = "";
+            var qrPolling = null;
+            var identifyPending = {};
+            var identifyResult = {};
 
-            function twaFetchWithTimeout(url, timeoutMs) {
+            function fetchTimeout(url, options, timeoutMs) {
                 return new Promise(function(resolve, reject) {
-                    var timer = setTimeout(function(){ reject(new Error("timeout")); }, timeoutMs);
-                    fetch(url).then(function(r){
+                    var done = false;
+                    options = options || {};
+                    var controller = window.AbortController ? new AbortController() : null;
+                    if (controller) options.signal = controller.signal;
+                    var timer = setTimeout(function(){
+                        if (!done) {
+                            done = true;
+                            if (controller) controller.abort();
+                            reject(new Error("Tiempo de espera agotado"));
+                        }
+                    }, timeoutMs);
+                    fetch(url, options).then(function(response){
+                        if (done) return;
+                        done = true;
                         clearTimeout(timer);
-                        resolve(r);
-                    }).catch(function(e){
+                        resolve(response);
+                    }).catch(function(error){
+                        if (done) return;
+                        done = true;
                         clearTimeout(timer);
-                        reject(e);
+                        reject(error);
                     });
                 });
             }
 
-            function twaHealthIcon(status) {
-                var s = (status||"").toUpperCase();
-                if (s === "WORKING" || s === "CONNECTED") return "up";
-                if (s === "SCAN_QR_CODE" || s === "STARTING") return "starting";
-                if (s === "" || s === "UNKNOWN") return "unknown";
+            function jsonRequest(url, options, timeoutMs) {
+                return fetchTimeout(url, options, timeoutMs).then(function(response){
+                    return response.json().catch(function(){
+                        throw new Error("Respuesta inválida del servidor");
+                    }).then(function(data){
+                        if (!response.ok || !data.ok) throw new Error(data.error || ("Error HTTP " + response.status));
+                        return data;
+                    });
+                });
+            }
+
+            function healthKind(status) {
+                status = (status || "").toUpperCase();
+                if (status === "WORKING" || status === "CONNECTED") return "up";
+                if (status === "SCAN_QR_CODE" || status === "STARTING") return "starting";
+                if (!status || status === "UNKNOWN") return "unknown";
                 return "down";
             }
 
-            function twaRenderHealth(el, status, label, phone, hint) {
-                var kind = twaHealthIcon(status);
+            function renderHealth(element, status, label, phone) {
+                if (!element) return;
                 var text = label || "Desconocido";
                 var phoneText = phone ? (" (" + phone + ")") : "";
-                el.setAttribute("aria-label", "Estado WAHA: " + text + phoneText);
-                el.innerHTML = "<span class=\"waha-status-dot is-" + kind + "\" aria-hidden=\"true\"></span>" + text + phoneText + (hint || "");
+                element.setAttribute("aria-label", "Estado WAHA: " + text + phoneText);
+                while (element.firstChild) element.removeChild(element.firstChild);
+                var dot = document.createElement("span");
+                dot.className = "waha-status-dot is-" + healthKind(status);
+                dot.setAttribute("aria-hidden", "true");
+                element.appendChild(dot);
+                element.appendChild(document.createTextNode(text + phoneText));
             }
 
-            function twaRestartButton(id, port, waha, danger) {
-                var buttonClass = danger ? "btn-danger-mini" : "btn-secondary-mini";
-                return "<button type=\"button\" onclick=\"twaRestartAndRescan(\'"+id+"\',\'"+port+"\',\'"+waha+"\')\" class=\"" + buttonClass + " waha-restart-button\" title=\"Reiniciar sesión y vincular con un nuevo QR\" aria-label=\"Reiniciar sesión WAHA y vincular con un nuevo QR\">↻</button>";
+            function actionButton(action, label, className) {
+                var button = document.createElement("button");
+                button.type = "button";
+                button.className = className + " twa-action-button";
+                button.setAttribute("data-action", action);
+                button.textContent = label;
+                return button;
             }
 
-            function checkLineHealth(id, port, waha, elSalud, elActions) {
-                if (!port) {
-                    twaRenderHealth(elSalud, "UNKNOWN", "Sin WAHA");
-                    if (elActions) elActions.innerHTML = "";
-                    return;
+            function renderActions(element, id, status, connected, failed) {
+                if (!element || identifyPending[id]) return;
+                while (element.firstChild) element.removeChild(element.firstChild);
+                status = (status || "").toUpperCase();
+                if (status === "SCAN_QR_CODE" || status === "STARTING") {
+                    element.appendChild(actionButton("qr", "📱 Vincular", "btn-secondary-mini"));
+                } else if (failed || status === "FAILED" || status === "STOPPED") {
+                    element.appendChild(actionButton("restart", "Reescanear", "btn-danger-mini"));
+                } else if (connected) {
+                    element.appendChild(actionButton("restart", "Reescanear", "btn-secondary-mini"));
                 }
-                var url = apiBase + "?action=status&waha_port=" + encodeURIComponent(port) + "&waha=" + encodeURIComponent(waha) + "&_=" + Date.now();
-                console.log("[twa] checkLineHealth url=" + url);
-                twaFetchWithTimeout(url, 12000).then(function(r){
-                    console.log("[twa] HTTP " + r.status + " " + (r.ok ? "OK" : "FAIL") + " for " + id);
-                    if (!r.ok) throw new Error("HTTP " + r.status);
-                    return r.json();
-                }).then(function(d){
-                    console.log("[twa] JSON ok=" + d.ok + " status=" + d.status + " phone=" + (d.phone||""));
-                    if (!d.ok) {
-                        // API returned an error with diagnostics
-                        var errType = d.status || "ERROR";
-                        var errLabel = d.status_label || d.error || "Error";
-                        console.log("[twa] API error for id=" + id, { error: d.error, debug_url: d.debug_url, debug_http: d.debug_http, debug_curl: d.debug_curl });
-                        var hint = "";
-                        if (d.debug_url) hint = " <small style=\"font-size:10px;color:var(--muted)\">" + d.debug_url + "</small>";
-                        twaRenderHealth(elSalud, errType, errLabel, "", hint);
-                        if (elActions) {
-                            elActions.innerHTML = twaRestartButton(id, port, waha, true);
-                        }
-                        return;
-                    }
-                    // Success: WAHA is responding
-                    var label = d.status_label || d.status;
-                    var phone = d.phone || "";
-                    twaRenderHealth(elSalud, d.status, label, phone);
-                    if (!elActions) return;
-                    var st = (d.status||"").toUpperCase();
-                    if (st === "SCAN_QR_CODE" || st === "STARTING") {
-                        elActions.innerHTML = "<button onclick=\"twaShowQr(\'"+id+"\',\'"+port+"\',\'"+waha+"\')\" class=\"btn-secondary-mini\">\u{1F4F1} Vincular</button>";
-                    } else if (st === "FAILED" || st === "STOPPED") {
-                        elActions.innerHTML = twaRestartButton(id, port, waha, true);
-                    } else if (d.is_connected) {
-                        elActions.innerHTML = twaRestartButton(id, port, waha, false);
-                    } else {
-                        elActions.innerHTML = "";
-                    }
-                }).catch(function(e){
-                    var msg = (e.message === "timeout") ? "Timeout" : (e.message||"Error");
-                    console.error("[twa] FAIL for id=" + id + ": " + msg, e);
-                    twaRenderHealth(elSalud, "FAILED", msg);
-                    if (elActions) {
-                        elActions.innerHTML = twaRestartButton(id, port, waha, true);
-                    }
+                element.appendChild(actionButton("identify", "Identificar", "btn-secondary-mini"));
+                var result = document.createElement("span");
+                result.className = "twa-action-result muted";
+                result.setAttribute("aria-live", "polite");
+                result.textContent = identifyResult[id] || "";
+                element.appendChild(result);
+            }
+
+            function checkLine(id) {
+                var health = document.getElementById("waha-salud-" + id);
+                var actions = document.getElementById("waha-actions-" + id);
+                var url = apiBase + "?action=status&telefono_id=" + encodeURIComponent(id) + "&_=" + Date.now();
+                jsonRequest(url, undefined, 12000).then(function(data){
+                    renderHealth(health, data.status, data.status_label || data.status, data.phone || "");
+                    renderActions(actions, id, data.status, !!data.is_connected, false);
+                }).catch(function(error){
+                    renderHealth(health, "FAILED", error.message || "Error WAHA", "");
+                    renderActions(actions, id, "FAILED", false, true);
                 });
             }
 
             function checkAllLines() {
                 var rows = document.getElementById("telefonosRows");
                 if (!rows) return;
-                var trs = rows.querySelectorAll("tr[data-telefono]");
-                trs.forEach(function(tr){
-                    try {
-                        var tel = JSON.parse(tr.getAttribute("data-telefono"));
-                        var id = tel.id || "";
-                        var port = (tel.waha_port || "").trim();
-                        var waha = (tel.waha || "").trim() || "default";
-                        var elSalud = document.getElementById("waha-salud-" + id);
-                        var elActions = document.getElementById("waha-actions-" + id);
-                        if (!elSalud) return;
-                        checkLineHealth(id, port, waha, elSalud, elActions);
-                    } catch(ignored) {}
+                var actionGroups = rows.querySelectorAll(".waha-line-actions[data-telefono-id]");
+                actionGroups.forEach(function(group){
+                    var id = group.getAttribute("data-telefono-id") || "";
+                    if (id) checkLine(id);
                 });
             }
 
-            // ── QR Modal ──
-            var twaQrPolling = null;
-            var twaCurrent = { id: "", port: "", waha: "" };
+            function setQrContent(message, isError) {
+                var wrap = document.getElementById("twaQrImageWrap");
+                if (!wrap) return;
+                while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
+                var text = document.createElement("span");
+                text.className = isError ? "" : "muted";
+                if (isError) text.style.color = "var(--danger)";
+                text.textContent = message;
+                wrap.appendChild(text);
+            }
 
-            function twaShowQr(id, port, waha) {
-                twaCurrent = { id: id, port: port, waha: waha };
-                var modal = document.getElementById("twaQrModal");
-                if (!modal) return;
-                modal.style.display = "flex";
-                document.getElementById("twaQrImageWrap").innerHTML = "<span class=\"muted\">Cargando QR...</span>";
-                document.getElementById("twaQrStatus").textContent = "Obteniendo QR del puerto " + port + "...";
-                var lnEl = document.getElementById("twaQrLineName");
-                if (lnEl) lnEl.textContent = "Línea: " + waha;
-                twaFetchQr();
-                if (twaQrPolling) clearInterval(twaQrPolling);
-                twaQrPolling = setInterval(function(){
-                    var url = apiBase + "?action=status&waha_port=" + encodeURIComponent(port) + "&waha=" + encodeURIComponent(waha) + "&_=" + Date.now();
-                    twaFetchWithTimeout(url, 8000).then(function(r){return r.json()}).then(function(d){
-                        if (d.is_connected) {
-                            twaCloseQr();
+            function stopQrPolling() {
+                if (qrPolling) clearInterval(qrPolling);
+                qrPolling = null;
+            }
+
+            function startQrPolling() {
+                stopQrPolling();
+                qrPolling = setInterval(function(){
+                    var url = apiBase + "?action=status&telefono_id=" + encodeURIComponent(qrCurrentId) + "&_=" + Date.now();
+                    jsonRequest(url, undefined, 8000).then(function(data){
+                        if (data.is_connected) {
+                            closeQr();
                             checkAllLines();
                         }
-                    }).catch(function(){});
+                    }).catch(function(error){
+                        stopQrPolling();
+                        document.getElementById("twaQrStatus").textContent = error.message || "Error comprobando WAHA";
+                    });
                 }, 4000);
             }
 
-            function twaFetchQr() {
+            function fetchQr() {
                 var wrap = document.getElementById("twaQrImageWrap");
-                var st = document.getElementById("twaQrStatus");
-                if (!wrap) return;
-                var url = apiBase + "?action=qr&waha_port=" + encodeURIComponent(twaCurrent.port) + "&waha=" + encodeURIComponent(twaCurrent.waha) + "&_=" + Date.now();
-                console.log("[twa] fetchQr url=" + url);
-                twaFetchWithTimeout(url, 20000).then(function(r){
-                    if (!r.ok) throw new Error("HTTP " + r.status);
-                    return r.json();
-                }).then(function(d){
-                    console.log("[twa] fetchQr result:", d.ok ? ("OK " + (d.qr_base64 ? d.qr_base64.length + "b" : "no data")) : ("FAIL: " + (d.error||"")));
-                    if (d.ok && d.qr_base64) {
-                        wrap.innerHTML = "<img src=\"data:image/png;base64," + d.qr_base64 + "\" style=\"max-width:260px;border-radius:4px\" alt=\"QR\" onerror=\"this.innerHTML=\'<span style=color:var(--danger)>\u274C Error al mostrar QR</span>\'\">";
-                        if (st) st.textContent = "Escanea con WhatsApp \u2192 Vincular dispositivo";
-                    } else {
-                        wrap.innerHTML = "<div style=\"color:var(--danger);margin-bottom:6px\">\u274C " + (d.error||"No se pudo obtener QR") + "</div><div class=\"muted\" style=\"font-size:12px\">" + (d.hint||"\u00BFWAHA ca\u00EDdo? Prueba Reiniciar y vincular.") + "</div>";
-                        if (st) st.textContent = "Error. Prueba reiniciando.";
-                    }
-                }).catch(function(e){
-                    console.error("[twa] fetchQr error:", e.message || e);
-                    var msg = (e.message === "timeout") ? "Tiempo agotado (WAHA no responde)" : (e.message||"Error de red");
-                    wrap.innerHTML = "<div style=\"color:var(--danger);margin-bottom:6px\">\u274C " + msg + "</div>";
-                    if (st) st.textContent = "WAHA no responde.";
+                var status = document.getElementById("twaQrStatus");
+                var url = apiBase + "?action=qr&telefono_id=" + encodeURIComponent(qrCurrentId) + "&_=" + Date.now();
+                return jsonRequest(url, undefined, 20000).then(function(data){
+                    if (!data.qr_base64) throw new Error("WAHA no devolvió un QR");
+                    while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
+                    var image = document.createElement("img");
+                    image.src = "data:image/png;base64," + data.qr_base64;
+                    image.style.maxWidth = "260px";
+                    image.style.borderRadius = "4px";
+                    image.alt = "QR";
+                    image.addEventListener("error", function(){ setQrContent("Error al mostrar QR", true); });
+                    wrap.appendChild(image);
+                    status.textContent = "Escanea con WhatsApp → Vincular dispositivo";
+                    return true;
+                }).catch(function(error){
+                    setQrContent(error.message || "No se pudo obtener el QR", true);
+                    status.textContent = "No se iniciará la comprobación automática.";
+                    return false;
                 });
             }
 
-            function twaRegenerateQr() {
-                document.getElementById("twaQrImageWrap").innerHTML = "<span class=\"muted\">Regenerando QR...</span>";
-                document.getElementById("twaQrStatus").textContent = "Solicitando nuevo QR...";
-                twaFetchQr();
+            function showQr(id) {
+                qrCurrentId = id;
+                stopQrPolling();
+                document.getElementById("twaQrModal").style.display = "flex";
+                document.getElementById("twaQrLineName").textContent = "Línea seleccionada";
+                document.getElementById("twaQrStatus").textContent = "Obteniendo QR...";
+                setQrContent("Cargando QR...", false);
+                fetchQr().then(function(ok){ if (ok) startQrPolling(); });
             }
 
-            function twaCloseQr() {
-                var modal = document.getElementById("twaQrModal");
-                if (modal) modal.style.display = "none";
-                if (twaQrPolling) { clearInterval(twaQrPolling); twaQrPolling = null; }
+            function closeQr() {
+                document.getElementById("twaQrModal").style.display = "none";
+                stopQrPolling();
                 checkAllLines();
             }
 
-            function twaRestartAndRescan(id, port, waha) {
+            function regenerateQr() {
+                stopQrPolling();
+                setQrContent("Regenerando QR...", false);
+                document.getElementById("twaQrStatus").textContent = "Solicitando nuevo QR...";
+                fetchQr().then(function(ok){ if (ok) startQrPolling(); });
+            }
+
+            function postBody(action, idField, id) {
+                var body = new FormData();
+                body.append("action", action);
+                body.append(idField, id);
+                body.append("csrf_token", csrfToken);
+                return body;
+            }
+
+            function restartAndRescan(id) {
                 if (!confirm("Reiniciar sesión WAHA de esta línea? Deberás escanear el QR para vincular de nuevo.")) return;
-                var elSalud = document.getElementById("waha-salud-" + id);
-                var elActions = document.getElementById("waha-actions-" + id);
-                if (elSalud) twaRenderHealth(elSalud, "STARTING", "Reiniciando...");
-                if (elActions) elActions.innerHTML = "<span class=\"muted\" style=\"font-size:12px\">\u23F3 Espera ~15s</span>";
-                console.log("[twa] restartAndRescan id=" + id + " port=" + port + " waha=" + waha);
-                var url = apiBase + "?action=restart&waha_port=" + encodeURIComponent(port) + "&waha=" + encodeURIComponent(waha) + "&_=" + Date.now();
-                twaFetchWithTimeout(url, 30000).then(function(r){return r.json()}).then(function(d){
-                    console.log("[twa] restart response:", d.ok ? "OK" : ("FAIL: " + (d.error||"")));
-                    // Wait 10s for WAHA to restart, then poll for QR
+                var health = document.getElementById("waha-salud-" + id);
+                var actions = document.getElementById("waha-actions-" + id);
+                renderHealth(health, "STARTING", "Reiniciando...", "");
+                while (actions.firstChild) actions.removeChild(actions.firstChild);
+                var waiting = document.createElement("span");
+                waiting.className = "muted";
+                waiting.textContent = "⏳ Reiniciando...";
+                actions.appendChild(waiting);
+                jsonRequest(apiBase, {method:"POST", body:postBody("restart", "telefono_id", id), credentials:"same-origin"}, 30000).then(function(data){
+                    waiting.textContent = data.message || "WAHA reiniciado";
                     setTimeout(function(){
-                        console.log("[twa] restartAndRescan: starting QR poll...");
-                        var pollCount = 0;
-                        var maxPolls = 30; // 30 × 2s = 60s max
-                        var pollForQr = setInterval(function(){
-                            pollCount++;
-                            var statusUrl = apiBase + "?action=status&waha_port=" + encodeURIComponent(port) + "&waha=" + encodeURIComponent(waha) + "&_=" + Date.now();
-                            twaFetchWithTimeout(statusUrl, 8000).then(function(r){return r.json()}).then(function(sd){
-                                console.log("[twa] restartAndRescan: poll #"+pollCount+" status=" + sd.status + " qr=" + (sd.status==="SCAN_QR_CODE"));
-                                if (sd.status === "SCAN_QR_CODE" || sd.status === "STARTING") {
-                                    clearInterval(pollForQr);
-                                    console.log("[twa] restartAndRescan: QR available, opening modal");
-                                    checkAllLines(); // refresh status card
-                                    twaShowQr(id, port, waha);
+                        var polls = 0;
+                        var timer = setInterval(function(){
+                            polls++;
+                            var url = apiBase + "?action=status&telefono_id=" + encodeURIComponent(id) + "&_=" + Date.now();
+                            jsonRequest(url, undefined, 8000).then(function(statusData){
+                                if (statusData.status === "SCAN_QR_CODE" || statusData.status === "STARTING") {
+                                    clearInterval(timer);
+                                    showQr(id);
+                                    return;
                                 }
-                                if (pollCount >= maxPolls) {
-                                    clearInterval(pollForQr);
-                                    checkAllLines();
-                                    if (sd.status !== "SCAN_QR_CODE" && sd.status !== "STARTING" && !sd.is_connected) {
-                                        alert("WAHA no ha generado QR tras 60s. Revisa el estado de conexión.");
-                                    }
+                                if (polls >= 30) {
+                                    clearInterval(timer);
+                                    renderHealth(health, "FAILED", "WAHA no generó QR tras 60s", "");
+                                    renderActions(actions, id, "FAILED", false, true);
                                 }
-                            }).catch(function(){
-                                if (pollCount >= maxPolls) {
-                                    clearInterval(pollForQr);
-                                    checkAllLines();
-                                }
+                            }).catch(function(error){
+                                clearInterval(timer);
+                                renderHealth(health, "FAILED", error.message || "Error comprobando WAHA", "");
+                                renderActions(actions, id, "FAILED", false, true);
+                                var result = actions.querySelector(".twa-action-result");
+                                if (result) result.textContent = error.message || "Error comprobando WAHA";
                             });
                         }, 2000);
-                    }, 10000);
-                }).catch(function(e){
-                    console.error("[twa] restart error:", e);
-                    alert("Error al reiniciar WAHA. Intenta manualmente.");
-                    setTimeout(function(){ checkAllLines(); }, 10000);
+                    }, 3000);
+                }).catch(function(error){
+                    renderHealth(health, "FAILED", error.message || "Error al reiniciar WAHA", "");
+                    renderActions(actions, id, "FAILED", false, true);
+                    var result = actions.querySelector(".twa-action-result");
+                    if (result) result.textContent = error.message || "Error al reiniciar WAHA";
                 });
             }
 
-            // Expose to global scope (needed for inline onclick handlers)
-            window.twaShowQr = twaShowQr;
-            window.twaRegenerateQr = twaRegenerateQr;
-            window.twaCloseQr = twaCloseQr;
-            window.twaRestartAndRescan = twaRestartAndRescan;
-
-            // Init: check all lines immediately, then poll every 15s
-            if (document.readyState === "loading") {
-                document.addEventListener("DOMContentLoaded", function(){ checkAllLines(); });
-            } else {
-                checkAllLines();
+            function identify(id, button, result) {
+                if (identifyPending[id]) return;
+                identifyPending[id] = true;
+                button.disabled = true;
+                result.textContent = "Identificando...";
+                jsonRequest(apiBase, {method:"POST", body:postBody("identify", "target_id", id), credentials:"same-origin"}, 30000).then(function(data){
+                    identifyResult[id] = "Enviado desde " + (data.source_label || "otra línea") + (data.source_phone ? (" (" + data.source_phone + ")") : "");
+                    result.textContent = identifyResult[id];
+                }).catch(function(error){
+                    identifyResult[id] = error.message || "No se pudo identificar la línea";
+                    result.textContent = identifyResult[id];
+                }).then(function(){
+                    identifyPending[id] = false;
+                    button.disabled = false;
+                });
             }
-            setInterval(function(){ checkAllLines(); }, 15000);
+
+            var rows = document.getElementById("telefonosRows");
+            if (rows) rows.addEventListener("click", function(event){
+                var button = event.target.closest ? event.target.closest("button[data-action]") : null;
+                if (!button || !rows.contains(button)) return;
+                var actions = button.parentNode;
+                var id = actions.getAttribute("data-telefono-id") || "";
+                var action = button.getAttribute("data-action");
+                if (!id) return;
+                if (action === "identify") identify(id, button, actions.querySelector(".twa-action-result"));
+                if (action === "restart") restartAndRescan(id);
+                if (action === "qr") showQr(id);
+            });
+            document.getElementById("twaQrModalBg").addEventListener("click", closeQr);
+            document.getElementById("twaQrCloseTop").addEventListener("click", closeQr);
+            document.getElementById("twaQrCloseBottom").addEventListener("click", closeQr);
+            document.getElementById("twaQrRegenerate").addEventListener("click", regenerateQr);
+
+            if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", checkAllLines);
+            else checkAllLines();
+            setInterval(checkAllLines, 15000);
         })();
         </script>';
 
