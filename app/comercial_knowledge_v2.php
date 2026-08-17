@@ -138,9 +138,9 @@ function comercial_knowledge_v2_lamami(): array {
             'pricing' => 'Alta única: 29€ (para siempre). Comisión: 10€ por cada 30min de servicio (1h = 20€). Sin cuotas mensuales. Sin permanencia.',
             'features' => 'Publicación en portales, gestión de mensajes 24/7, filtro de clientes, avisos cuando hay visita.',
             'next_steps' => array(
-                'Te paso los datos que necesito (nombre, ciudad, disponibilidad) y en nada está activo.',
-                'Si me dices tu ciudad y disponibilidad, te lo activo ahora mismo.',
-                'Dame tus datos básicos y hoy mismo empieza a funcionar.',
+                'Si te interesa, te paso los datos que necesito (nombre, ciudad, disponibilidad) y te explico el siguiente paso.',
+                '¿Quieres que te explique algo más? Si te convence, me dices.',
+                'Cuando quieras, te cuento qué datos necesitamos para dejarlo todo listo.',
             ),
         ),
         'MANEJO_OBJECIONES' => array(
@@ -200,9 +200,9 @@ function comercial_knowledge_v2_casawasap(): array {
             'pricing' => '100€/semana. 10 DÍAS GRATIS de prueba (sin tarjeta, sin permanencia). Líneas extra: 25€/sem.',
             'features' => 'Respuestas 24/7, publicación automática de estados, dashboard de estadísticas, avisos Telegram, anti-regateo.',
             'next_steps' => array(
-                'Te activo la prueba de 10 días gratis en tu número. Sin tarjeta, sin permanencia.',
+                '¿Quieres que te explique cómo sería la prueba de 10 días gratis? Sin tarjeta, sin permanencia.',
                 'Entra en demo.casawasap.com y chatea como si fueras cliente. Así ves cómo funciona.',
-                'Dame tu número y en 5 minutos está funcionando. Pruébalo 10 días sin coste.',
+                'Si te convence, me dices y te cuento los pasos para probarlo 10 días sin coste.',
             ),
         ),
         'MANEJO_OBJECIONES' => array(
@@ -321,8 +321,8 @@ function comercial_knowledge_v2_publiscort(): array {
             'pricing' => '50€ por semana. Precio cerrado, sin sorpresas. Sin permanencia.',
             'features' => 'Publicación en 3 portales principales, gestión de anuncios, renovación semanal, estrategia de visibilidad.',
             'next_steps' => array(
-                'Te pido unos datos básicos de tu perfil y en 1-2 días está todo activo.',
-                'Dame los datos de tu perfil y te lo activo. Sin complicaciones.',
+                'Si te interesa, te pido unos datos básicos de tu perfil y en 1-2 días lo dejamos todo listo.',
+                '¿Quieres que te explique el plan con más detalle? Sin compromiso.',
             ),
         ),
         'MANEJO_OBJECIONES' => array(

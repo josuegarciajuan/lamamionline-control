@@ -80,6 +80,7 @@ function comercial_knowledge_plaza(): array {
             "NUNCA te inventes comodidades ni equipamiento de las habitaciones (aire acondicionado, jacuzzi, nevera, etc.). Di SOLO lo que está en la lista real de la casa.",
             "NO hables de otros temas que no sean la casa.",
             "NUNCA ofrezcas visitas a la casa. Ofrece fotos de las habitaciones en su lugar.",
+            "NUNCA presiones el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', 'te lo dejo funcionando hoy' ni urgencia fabricada. Si la chica solo pidió información, respóndele y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?').",
         ),
 
         'faq' => array(
@@ -182,6 +183,7 @@ function comercial_knowledge_lamami(): array {
             "NUNCA uses coletillas infantiles: 'guapa', 'cariño', 'reina'.",
             "NO uses más de 1 emoji por mensaje.",
             "NO hables de otros servicios que no sean La Mami Online.",
+            "NUNCA presiones el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', 'te lo dejo funcionando hoy' ni urgencia fabricada ('hoy mismo', 'ya'). Si pidió solo información, respóndele y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?').",
         ),
 
         'faq' => array(
@@ -189,7 +191,7 @@ function comercial_knowledge_lamami(): array {
             '¿Cuánto cuesta?'         => '29€ una sola vez, para siempre. Luego solo pagas 10€ por cada 30 minutos de cliente que te llevemos. Si no llega cliente, no pagas nada más.',
             '¿Hay permanencia?'       => 'Nada de permanencia. Pagas el alta una vez y solo pagas comisión si llega cliente. Sin compromiso.',
             '¿Cuántos clientes llegan?' => 'Depende de tu zona y disponibilidad. Lo bueno es que es un extra: tú sigues con tus clientes habituales y esto suma sin esfuerzo.',
-            '¿Cómo me doy de alta?'   => 'Te paso los datos que necesito (nombre, ciudad, disponibilidad) y en nada está activo. Responde y te explico paso a paso.',
+            '¿Cómo me doy de alta?'   => 'Te paso los datos que necesito (nombre, ciudad, disponibilidad) y, cuando me los des, te explico el siguiente paso sin prisa. Responde y te lo cuento.',
             '¿Es seguro?'             => 'Totalmente. Llevamos tiempo trabajando con muchas chicas y todo es discreto y profesional.',
             '¿Tengo que hacer algo?'  => 'Casi nada. Tú me dices tu disponibilidad y yo me encargo de todo: publicar, contestar, filtrar. Tú solo confirmas cuando te aviso.',
         ),
@@ -274,6 +276,7 @@ function comercial_knowledge_publicista(): array {
             "NUNCA uses coletillas infantiles: 'guapa', 'cariño', 'reina'.",
             "NO uses más de 1 emoji por mensaje.",
             "Sé directo y profesional. Nada de rodeos.",
+            "NUNCA presiones el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?' ni urgencia fabricada. Si solo pidió información, responde y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?').",
         ),
 
         'faq' => array(
@@ -373,7 +376,8 @@ function comercial_knowledge_casawasap(): array {
             "NO uses más de 1 emoji por mensaje.",
             "Responde PRIMERO a lo que preguntó el cliente, con información concreta.",
             "Menciona siempre el trial de 10 DÍAS GRATIS y la demo si es relevante.",
-            "Si el cliente da señales de compra, cierra directamente.",
+            "Si el cliente da señales claras de compra, cierra sin presión (solo entonces).",
+            "NUNCA presiones el cierre: prohibido '¿Te activo la demo hoy mismo?', '¿Te activo ya?', '¿Empezamos?' ni urgencia fabricada. Si solo pidió información, responde y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?').",
             "NO inventes datos ni funcionalidades que no existan.",
         ),
 
@@ -465,6 +469,7 @@ function comercial_knowledge_publiscort(): array {
             "NO uses más de 1 emoji por mensaje.",
             "Sé breve y directo. No te extiendas demasiado.",
             "NO prometas resultados exactos (número de clientes).",
+            "NUNCA presiones el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?' ni urgencia fabricada. Si solo pidió información, responde y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?').",
         ),
 
         'faq' => array(
@@ -472,7 +477,7 @@ function comercial_knowledge_publiscort(): array {
             '¿Cuánto cuesta?'         => '50€ por semana. Precio cerrado, sin sorpresas.',
             '¿Qué incluye?'           => 'Publicación en los 3 portales principales, gestión de anuncios, renovación semanal y estrategia de visibilidad.',
             '¿Resultados?'            => 'Trabajamos con portales de tráfico real. No te puedo prometer un número exacto, pero la visibilidad que damos genera contactos de calidad.',
-            '¿Cómo empiezo?'          => 'Te pido unos datos básicos de tu perfil y en 1-2 días está todo activo. Sin complicaciones.',
+            '¿Cómo empiezo?'          => 'Te pido unos datos básicos de tu perfil y en 1-2 días lo dejamos todo listo. Sin complicaciones.',
             '¿Hay permanencia?'       => 'No, sin permanencia. Semana a semana.',
         ),
 
@@ -550,6 +555,7 @@ function comercial_knowledge_inbound(): array {
             "Sé breve. Entre 1 y 4 líneas de WhatsApp.",
             "NO mezcles servicios. Sugiere UNO a la vez.",
             "Si la persona muestra interés real, ofrece información concreta y un siguiente paso.",
+            "NUNCA presiones el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?' ni urgencia fabricada. Si solo pidió información, responde y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?').",
         ),
 
         'faq' => array(
