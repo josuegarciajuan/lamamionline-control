@@ -51,6 +51,75 @@ function comercial_agent_critic_get_config(): array {
 }
 
 /**
+ * Detección determinista de cierre agresivo / presión (independiente del LLM).
+ * Fuera de las fases CIERRE y DESCARTADO, mensajes que piden activar/empezar
+ * con urgencia ("¿Te activo hoy mismo?", "¿Te activo ya?", "¿Empezamos?",
+ * "te lo dejo funcionando hoy") se consideran agresivos y deben reescribirse.
+ */
+function comercial_agent_critic_detect_aggressive_close(string $text, string $phase): bool {
+    $text = trim((string)$text);
+    if ($text === '') return false;
+    if (in_array($phase, array('CIERRE', 'DESCARTADO'), true)) return false;
+
+    // CTA de cierre con presión (preguntas o afirmaciones directas de activación)
+    $patterns = array(
+        '/[¿\s]*Te\s+(?:lo\s+)?(?:activo|activamos|activar\w*)\b[^.!?\n]*\??\s*$/iu',
+        '/[¿\s]*(?:Empezamos|Arrancamos|Empiezo|Arranco)\b[^.!?\n]*\??\s*$/iu',
+        '/[¿\s]*Doy\s+(?:yo\s+)?el\s+alta\b[^.!?\n]*\??\s*$/iu',
+        '/te\s+lo\s+dejo\s+(?:funcionando|activado)\b[^.!?\n]*/iu',
+        '/\b(hoy mismo|ya mismo)\b.{0,40}(activ|empez|arranc|funcionando)/iu',
+        '/\b(activ|empez|arranc)\w*\b.{0,40}(hoy mismo|ya mismo)/iu',
+        '/\b(?:no esperes|aprovecha|última oportunidad|solo por hoy|quedan pocas)\b/iu',
+    );
+    foreach ($patterns as $p) {
+        if (preg_match($p, $text)) return true;
+    }
+    return false;
+}
+
+/**
+ * Guard determinista: sustituye el cierre agresivo de un mensaje por un CTA
+ * suave sin presión, conservando el resto del contenido y la información.
+ */
+function comercial_soften_aggressive_close(string $text, string $phase = ''): string {
+    $text = trim((string)$text);
+    if ($text === '') return $text;
+    if (in_array($phase, array('CIERRE', 'DESCARTADO'), true)) return $text;
+    if (!comercial_agent_critic_detect_aggressive_close($text, $phase)) return $text;
+
+    // 1. Quitar la pregunta/afirmación de cierre con presión al final
+    $patterns = array(
+        '/[¿\s]*Te\s+(?:lo\s+)?(?:activo|activamos|activar\w*)\b[^.!?\n]*\??\s*$/iu',
+        '/[¿\s]*(?:Empezamos|Arrancamos|Empiezo|Arranco)\b[^.!?\n]*\??\s*$/iu',
+        '/[¿\s]*Doy\s+(?:yo\s+)?el\s+alta\b[^.!?\n]*\??\s*$/iu',
+        '/te\s+lo\s+dejo\s+(?:funcionando|activado)\b[^.!?\n]*[.!]?\s*$/iu',
+    );
+    foreach ($patterns as $p) {
+        $text = preg_replace($p, '', $text);
+    }
+
+    // 2. Neutralizar urgencia "hoy mismo" solo en contexto de activación/arranque
+    if (preg_match('/\bhoy\s+mismo\b/iu', $text) && preg_match('/(activ|empez|arranc|funcionando|alta)/iu', $text)) {
+        $text = preg_replace('/\bhoy\s+mismo\b/iu', 'cuando quieras', $text);
+    }
+
+    $text = rtrim((string)$text, " \t\n\r.,;¿?¡!");
+    if ($text !== '' && !preg_match('/[.!?;]$/u', $text)) {
+        $text .= '.';
+    }
+
+    // 3. Añadir un CTA suave
+    $soft = array(
+        '¿Te queda alguna duda? Me dices y te ayudo sin problema.',
+        'Si te convence, me dices y lo montamos. ¿Quieres que te explique algo más?',
+        'Sin prisa: si te surge cualquier duda, aquí estoy.',
+        '¿Te gustaría que te lo cuente con más detalle?',
+    );
+    $tail = $soft[array_rand($soft)];
+    return trim($text . ($text !== '' ? ' ' : '') . $tail);
+}
+
+/**
  * Evalúa un mensaje generado contra la checklist de calidad.
  * Devuelve score, checks y texto reescrito si aplica.
  */
@@ -81,12 +150,13 @@ REGLAS:
 - {$questionRule}
 - Responder SOLO a lo que preguntó el prospecto, no añadir info no pedida
 - Sin autoreferencia ("soy", "somos", "nuestro equipo", "nuestro servicio")
+- Prohibido tono agresivo o presión en el cierre: "¿Te activo hoy mismo?", "¿Te activo ya?", "¿Empezamos?", "te lo dejo funcionando hoy", "hoy mismo", urgencia fabricada o pedir activar/empezar sin que el prospecto haya mostrado intención clara. Si el prospecto solo pidió información, termina con un CTA suave ("si te convence, me dices", "¿quieres que te explique algo más?")
 
 Mensaje a evaluar:
 "{$text}"
 
 Devuelve SOLO este JSON (sin ``` ni backticks):
-{"score":0-100,"checks":{"line_count_ok":bool,"single_topic_ok":bool,"no_bot_tells_ok":bool,"no_disclosure_ok":bool,"natural_tone_ok":bool,"emoji_ok":bool,"no_premature_info_ok":bool,"question_end_ok":bool,"answers_question_ok":bool},"rewritten":"texto corregido manteniendo la misma info o null","reason":"breve explicación en español"}
+{"score":0-100,"checks":{"line_count_ok":bool,"single_topic_ok":bool,"no_bot_tells_ok":bool,"no_disclosure_ok":bool,"natural_tone_ok":bool,"emoji_ok":bool,"no_premature_info_ok":bool,"question_end_ok":bool,"answers_question_ok":bool,"no_aggressive_close_ok":bool},"rewritten":"texto corregido manteniendo la misma info o null","reason":"breve explicación en español"}
 PROMPT;
 
     $payload = json_encode(array(
@@ -151,6 +221,17 @@ PROMPT;
     $score = (int)($parsed['score'] ?? 100);
     $rewritten = !empty($parsed['rewritten']) ? trim((string)$parsed['rewritten']) : null;
     $reason = trim((string)($parsed['reason'] ?? ''));
+    $checks = (array)($parsed['checks'] ?? array());
+
+    // ── Guard determinista anti-agresividad ──
+    // Si el mensaje presiona el cierre fuera de fase CIERRE, forzar reescritura
+    // aunque DeepSeek lo hubiera aprobado.
+    $aggressive = comercial_agent_critic_detect_aggressive_close($text, $phase);
+    if ($aggressive) {
+        $score = min($score, 40);
+        $checks['no_aggressive_close_ok'] = false;
+        $reason = ($reason !== '' ? $reason . ' · ' : '') . 'cierre_agresivo_detectado';
+    }
 
     // Si pasa (>89), devolver el original
     if ($score >= 89 && ($rewritten === null || $rewritten === '')) {
@@ -159,19 +240,37 @@ PROMPT;
             'text' => $text,
             'rewritten' => null,
             'reason' => $reason !== '' ? $reason : 'passed',
-            'checks' => $parsed['checks'] ?? array(),
+            'checks' => $checks,
         );
     }
 
     // Si DeepSeek reescribió, usar su versión
     if ($rewritten !== null && $rewritten !== '') {
+        // El rewrite de DeepSeek también debe pasar por el guard anti-agresividad
+        if (comercial_agent_critic_detect_aggressive_close($rewritten, $phase)) {
+            $rewritten = comercial_soften_aggressive_close($rewritten, $phase);
+        }
         return array(
             'score' => $score,
             'text' => $rewritten,
             'rewritten' => $rewritten,
             'reason' => $reason !== '' ? $reason : 'auto_rewritten',
-            'checks' => $parsed['checks'] ?? array(),
+            'checks' => $checks,
         );
+    }
+
+    // Score bajo y sin reescritura — si había agresividad, aplicar guard determinista
+    if ($aggressive && function_exists('comercial_soften_aggressive_close')) {
+        $softened = comercial_soften_aggressive_close($text, $phase);
+        if ($softened !== $text && trim($softened) !== '') {
+            return array(
+                'score' => $score,
+                'text' => $softened,
+                'rewritten' => $softened,
+                'reason' => $reason !== '' ? $reason : 'aggressive_close_softened',
+                'checks' => $checks,
+            );
+        }
     }
 
     // Score bajo y sin reescritura — devolver original con warning
@@ -180,7 +279,7 @@ PROMPT;
         'text' => $text,
         'rewritten' => null,
         'reason' => $reason !== '' ? $reason : 'failed_no_rewrite',
-        'checks' => $parsed['checks'] ?? array(),
+        'checks' => $checks,
     );
 }
 

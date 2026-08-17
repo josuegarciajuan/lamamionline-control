@@ -187,7 +187,7 @@ function comercial_default_process_templates($slug, $field = 'message_templates'
                 );
             case 'lamami':
                 return array(
-                    "Hola 😊 ¡Genial! Te explico un poco como funciona para que te empiecen a entrar citas extra 🚀\nEs súper simple:\n\n✅ Yo pongo la publi\n✅ Yo contesto los mensajes\n✅ A ti solo te llegan citas listas 📅 Te aviso 20 minutos antes de que vaya un cliente, me confirmas si estás disponible y te lo mando de camino a tu localización.\n✅ 29€ una única vez para siempre, en concepto de alta. Luego solo pagas una pequeña comisión por cada cliente extra que te llevamos.\n\nSi quieres arrancar HOY mismo, responde este mensaje y te digo que información has de enviar para empezar ya mismo 👇"
+                    "Hola 😊 ¡Genial! Te explico un poco como funciona para que te empiecen a entrar citas extra 🚀\nEs súper simple:\n\n✅ Yo pongo la publi\n✅ Yo contesto los mensajes\n✅ A ti solo te llegan citas listas 📅 Te aviso 20 minutos antes de que vaya un cliente, me confirmas si estás disponible y te lo mando de camino a tu localización.\n✅ 29€ una única vez para siempre, en concepto de alta. Luego solo pagas una pequeña comisión por cada cliente extra que te llevamos.\n\nSi te convence, me dices y te cuento qué datos necesitamos. ¿Te queda alguna duda?"
                 );
             case 'publicista':
                 return array(
@@ -195,7 +195,7 @@ function comercial_default_process_templates($slug, $field = 'message_templates'
                 );
             case 'casawasap':
                 return array(
-                    "Hola de nuevo 👋\n\nSé que la primera reacción es pensar \"¿de verdad funciona esto?\" o \"¿mis clientes notarán que es un bot?\"\n\nEs la duda más normal. Por eso te digo 2 cosas:\n\n1️⃣ El 94% de los mensajes se responden al instante. Los clientes notan que les contestan RÁPIDO, no que sea IA.\n\n2️⃣ Hay una demo pública donde puedes chatear como si fueras cliente y comprobarlo tú misma, sin registrarte:\n👉 https://demo.casawasap.com\n\nEntra, escribe lo que quieras y juzga por ti misma. 2 minutos.\n\nCuando quieras, te activo los 10 días gratis en tu propio número. Sin tarjeta."
+                    "Hola de nuevo 👋\n\nSé que la primera reacción es pensar \"¿de verdad funciona esto?\" o \"¿mis clientes notarán que es un bot?\"\n\nEs la duda más normal. Por eso te digo 2 cosas:\n\n1️⃣ El 94% de los mensajes se responden al instante. Los clientes notan que les contestan RÁPIDO, no que sea IA.\n\n2️⃣ Hay una demo pública donde puedes chatear como si fueras cliente y comprobarlo tú misma, sin registrarte:\n👉 https://demo.casawasap.com\n\nEntra, escribe lo que quieras y juzga por ti misma. 2 minutos.\n\nCuando quieras, te explico cómo sería la prueba de 10 días gratis en tu número. Sin tarjeta."
                 );
             case 'publiscort':
                 return array(
@@ -2650,6 +2650,20 @@ function comercial_agent_generate_reply_wrapper($thread, $processSlug, $text) {
                     ));
                     $reply = $fallback;
                 }
+            }
+        }
+
+        // 3. Guard determinista anti-agresividad (backstop final: también aplica
+        //    si el crítico está deshabilitado por falta de API key).
+        if (function_exists('comercial_soften_aggressive_close')) {
+            $softened = comercial_soften_aggressive_close($reply, $phase);
+            if ($softened !== $reply) {
+                comercial_event_append('aggressive_close_softened', array(
+                    'thread_id' => (string)$thread['id'],
+                    'phase' => $phase,
+                    'original' => $reply,
+                ));
+                $reply = $softened;
             }
         }
 

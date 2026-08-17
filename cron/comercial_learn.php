@@ -152,6 +152,44 @@ function comercial_learn_sanitize_content(string $slug, string $content): string
 }
 
 /**
+ * Red de seguridad anti-agresividad para el playbook generado:
+ * neutraliza los cierres con presión que el LLM pudiera recomendar a pesar
+ * de las instrucciones del meta-prompt. Complementa comercial_learn_meta_prompt.
+ */
+function comercial_learn_sanitize_aggression(string $content): string {
+    $content = (string)$content;
+
+    // Preguntas/afirmaciones de cierre con presión → recomendación de cierre suave
+    $map = array(
+        '¿Te activo ya?'                             => '¿Quieres que te explique algo más?',
+        '¿Te activo hoy mismo?'                      => '¿Quieres que te explique algo más?',
+        '¿Te activo ahora mismo?'                    => 'Si te convence, me dices',
+        '¿Te activo la demo ahora mismo?'            => '¿Quieres probar la demo cuando te venga bien?',
+        '¿Te activo la prueba?'                      => '¿Quieres que te explique cómo sería la prueba?',
+        '¿Te activo la prueba de 10 días?'           => '¿Te gustaría probarlo 10 días sin compromiso?',
+        '¿Empezamos?'                                => '¿Quieres que te cuente algo más?',
+        '¿Empezamos ya?'                             => 'Si te convence, me dices',
+        'te lo dejo funcionando hoy'                 => 'te explico cómo funciona cuando quieras',
+        'te lo dejo activado y listo'                => 'te lo dejo preparado para cuando decidas',
+        'te lo dejo activado'                        => 'te lo dejo preparado para cuando decidas',
+        'hoy mismo empieza a funcionar'              => 'cuando quieras, lo dejamos listo',
+        'cierre de activación'                       => 'cierre suave sin presión',
+        'Cierra siempre con una microacción clara. Usa frases tipo: "Responde INFO y te lo dejo funcionando hoy" o "¿Te activo la demo ahora mismo?".' => 'Cierra siempre con una microacción clara y SIN presión: "¿Quieres que te lo explique algo más?" o "si te convence, me dices". Evita "¿Te activo ya?" y urgencia fabricada.',
+    );
+    foreach ($map as $from => $to) {
+        $content = str_ireplace($from, $to, $content);
+    }
+
+    // "hoy mismo" / "ya" con urgencia en contexto de activación → "cuando quieras"
+    if (preg_match('/\bhoy\s+mismo\b/iu', $content)) {
+        $content = preg_replace('/\bhoy\s+mismo\b/iu', 'cuando quieras', $content);
+    }
+    $content = preg_replace('/\bactiva(?:r|mos)?\s+(?:el\s+)?servicio\s+ya\b/iu', 'activar el servicio cuando quieras', $content);
+
+    return trim($content);
+}
+
+/**
  * Construye el meta-prompt de análisis para un proceso.
  */
 function comercial_learn_meta_prompt(string $slug, string $fixedBlock = ''): string {
@@ -186,6 +224,11 @@ TU ANÁLISIS DEBE RESPONDER:
 
 5. TÉCNICAS DE CIERRE:
    ¿Qué frases o enfoques llevaron a una cita/lead confirmado? ¿Qué NO hacer en el cierre?
+   IMPORTANTE: prioriza CIERRES SUAVES, sin presión. NUNCA recomiendes frases tipo
+   "¿Te activo ya?", "¿Te activo hoy mismo?", "¿Empezamos?", "te lo dejo funcionando hoy",
+   urgencia fabricada ("hoy mismo", "última oportunidad" falsa) ni pedir activar/empezar
+   cuando el cliente solo pidió información. En ese caso, el bot debe dar la información y
+   cerrar con un CTA suave ("si te convence, me dices", "¿quieres que te explique algo más?").
 
 6. ANÁLISIS DE ESTILO HUMANO:
    En las respuestas del operador humano, analiza:
@@ -225,6 +268,7 @@ IMPORTANTE:
 - Da ejemplos concretos: "el cliente dijo X y se respondió Y...".
 - Si no ves un patrón claro, dilo honestamente.
 - No repitas información genérica; sé específico del negocio "{$nombre}".
+- NUNCA recomiendes presión o urgencia fabricada ("¿Te activo ya?", "hoy mismo", "última oportunidad" falsa). El tono del bot debe ser cercano y SIN presión.
 META;
 
     if ($fixedBlock !== '') {
@@ -433,6 +477,7 @@ foreach ($processSlugs as $slug) {
         . "> Última actualización: " . date('Y-m-d H:i:s T') . "\n"
         . "> Motor: {$dsCfg['model']}\n\n---\n\n";
     $content = comercial_learn_sanitize_content($slug, $content);
+    $content = comercial_learn_sanitize_aggression($content);
 
     $file = $playbooksDir . '/' . $slug . '.md';
     $bytes = @file_put_contents($file, $header . $fixedBlock . $content, LOCK_EX);
