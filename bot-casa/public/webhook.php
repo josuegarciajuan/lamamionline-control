@@ -429,6 +429,36 @@ try {
         exit;
     }
 
+    // ── Subscription enforcement ─────────────────────────────────────
+    // Expired trial/subscription → the bot stops replying for this user.
+    // The incoming message is already persisted above (visible in the chat
+    // UI), but the pipeline (LLM reply, states, leads) is skipped.
+    if ($userId > 1) {
+        try {
+            $subCheck = new \WasapBot\Core\SubscriptionManager(
+                new \WasapBot\Core\UserManager(WASAPBOT_ROOT)
+            );
+            if ($subCheck->isExpired($userId)) {
+                $logger->info('webhook.php — subscription expired, skipping pipeline', [
+                    'user_id'   => $userId,
+                    'thread_id' => $threadId,
+                ]);
+                http_response_code(200);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode([
+                    'status'  => 'ok',
+                    'message' => 'Subscription expired — message saved',
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+        } catch (\Throwable $e) {
+            $logger->error('webhook.php — subscription check failed: ' . $e->getMessage(), [
+                'user_id' => $userId,
+            ]);
+            // Fall through: never block a reply because of a broken check.
+        }
+    }
+
     // Process through pipeline
     $result = $bot->handleWebhook($payload);
 
