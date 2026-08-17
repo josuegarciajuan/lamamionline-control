@@ -9,6 +9,12 @@
 # Se dejaron de trackear (git rm --cached) para que ningún merge los pise.
 /bot-casa/data/
 
+# bot-casa/public/data: runtime del bot (logs, session_memory.ndjson, QR, locks...)
+/bot-casa/public/data/
+
+# Test scratch con token hardcodeado (wasap_personal_2026). No trackear.
+/_wasap_test.html
+
 # Backups de código (nunca en git; se regeneran localmente)
 *.bak
 
