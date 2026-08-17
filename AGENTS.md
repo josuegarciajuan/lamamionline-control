@@ -170,26 +170,21 @@ git diff
 php -l archivo.php
 ```
 
-## 🧵 Sesiones paralelas (anti-clobber)
+## 🧵 Cambios en paralelo (worktree + merge a producción)
 
-Varias sesiones de opencode pueden estar trabajando sobre este MISMO árbol (= producción viva).
-Para no machacarse entre sí:
+El árbol principal (`/root/lamamionline-control` = producción viva vía bind mount) queda
+**fijo en la rama de producción** (`master`) y los datos vivos (`data/`, `bot-casa/data/`)
+viven solo ahí, fuera de git. Cada CAMBIO se trabaja en una copia aislada:
 
-1. **Antes de editar** cualquier archivo: `git status` + `git diff`.
-2. Si `git status` muestra cambios sin commitear de otra sesión/producción: NO pisarlos;
-   commitearlos primero como `sync: preservar cambios de producción (...)`, o coordinar.
-3. **Antes de cada commit**: repetir `git status` para detectar commits nuevos de otras
-   sesiones; si cambió algo, `git diff` y reconciliar antes de commitear.
-4. **Commit atómico + frecuente**, mensaje `tipo: descripción` (tipo ∈ feat, fix, refactor,
-   docs, chore, test, style, sync).
-5. Serializar la transacción add+commit con flock (mismo archivo de lock para todas las sesiones):
-   ```bash
-   flock -x -w 120 .git/.opencode-session.lock -c 'git add -- . ":(exclude)data/" ":(exclude).env" && git commit -m "tipo: descripción"'
-   ```
-6. Usar el comando global `/git-workflow`:
-   - `/git-workflow start` al entrar a trabajar.
-   - `/git-workflow finish` al terminar (commit + verificación + push solo si hay remoto).
-7. **Push**: solo si existe remoto configurado. Sin remoto, dejar commit local y reportar la
-   acción manual exacta. Nunca inventar un remoto.
-8. Este repo no usa `git worktree`: el working tree ES producción (bind mount), una copia
-   aparte sería invisible para producción. El aislamiento se hace por disciplina + lock.
+1. **`/git-workflow start`** crea la copia: `git worktree add -b work/<id> /root/.opencode-worktrees/lamamionline-control/<id>`.
+   Se edita SOLO en la copia, nunca en el árbol principal.
+2. Trabajar con commits atómicos `tipo: descripción` en la copia (el hook bloquea data/ y secretos).
+3. **`/git-workflow finish`**: merge `--no-ff` de `work/<id>` → `master` (bajo flock), resolviendo
+   conflictos con marcadores de git si dos sesiones tocaron el mismo trozo. El merge actualiza
+   producción (bind mount) de inmediato. Si se tocaron css/js, aplicar la convención de caché
+   (fecha en `index.php`). Limpia la copia y push solo si hay remoto.
+4. `data/` y `bot-casa/data/` están fuera de git: NUNCA commitearlas ni dejarlas mergear
+   (el hook las bloquea; se permite solo `git rm --cached` para dejarlas de trackear).
+5. **Push**: solo si existe remoto. Sin remoto, el merge ya publicó en producción; reportar la
+   acción manual exacta para la nube. Nunca inventar un remoto.
+6. Si se pide OTRO cambio en la misma sesión, repetir el ciclo completo (nueva copia).
