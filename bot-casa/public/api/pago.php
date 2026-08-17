@@ -72,7 +72,11 @@ if ($action === 'create-order') {
     $returnUrl = $base . '/pago';
     $cancelUrl = $base . '/pago';
 
-    $result = $paypal->createOrder($amount, $description, $returnUrl, $cancelUrl);
+    // Echo a stable reference (user:<id>) so PayPal webhook events can be
+    // attributed to the correct user server-side, independent of the client.
+    $customId = 'user:' . $userId . ($isExtraLine ? ':extra-line' : ':weekly');
+
+    $result = $paypal->createOrder($amount, $description, $returnUrl, $cancelUrl, $customId);
 
     if ($result['ok']) {
         // Store pending order state in session for later verification
@@ -124,6 +128,29 @@ if ($action === 'capture-order') {
     $amount      = (float) ($_SESSION['paypal_amount'] ?? 100);
     $isExtraLine = !empty($_SESSION['paypal_extra']);
     $txnId       = (string) ($result['transaction_id'] ?? '');
+
+    // ── Verify captured amount matches the expected amount (anti-tampering) ──
+    $capturedAmount = (float) ($result['amount'] ?? 0.0);
+    if ($capturedAmount > 0.0 && abs($capturedAmount - $amount) > 0.01) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'El importe capturado no coincide con el esperado. Contacta con soporte.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // ── Idempotency: if this transaction was already applied, don't re-activate ──
+    if ($txnId !== '') {
+        $userForCheck = $um->getUser($userId);
+        $payments = $userForCheck['payments'] ?? [];
+        if (is_array($payments)) {
+            foreach ($payments as $p) {
+                if (is_array($p) && ($p['transaction_id'] ?? '') === $txnId) {
+                    // Already processed → respond OK without duplicating activation
+                    echo json_encode(['ok' => true, 'message' => 'Pago ya registrado.', 'transaction_id' => $txnId, 'duplicate' => true], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+            }
+        }
+    }
 
     if ($isExtraLine) {
         // Extra-line payment on active plan

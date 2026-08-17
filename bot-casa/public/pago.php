@@ -52,6 +52,13 @@ if (in_array($subStatus['status'], ['unlimited', 'demo'], true)) {
     exit;
 }
 
+// Already-active plan (fresh payment or existing subscription): nothing to pay.
+// Redirect back to the panel so the user sees the green "Plan semanal" banner.
+if ($subStatus['status'] === 'active' && !$isExtraLine) {
+    header('Location: cliente');
+    exit;
+}
+
 // ── Mode selection ──
 $useMock = (($_GET['mock'] ?? '') === '1') && $isAdmin;
 
@@ -499,7 +506,8 @@ if (!$useMock) {
                 .then(function(result) {
                     hideProcessing();
                     if (result.ok) {
-                        window.location.reload();
+                        // Payment captured → back to the panel (green active banner).
+                        window.location.href = 'cliente';
                     } else {
                         var card = document.querySelector('.payment-card');
                         var errDiv = document.createElement('div');

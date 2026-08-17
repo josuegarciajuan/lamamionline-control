@@ -40,24 +40,32 @@ class PayPalClient
      * @param string $description  Order description shown to buyer.
      * @param string $returnUrl   Where to redirect after approval.
      * @param string $cancelUrl   Where to redirect if user cancels.
+     * @param string $customId    Optional opaque reference (e.g. "user:<id>") echoed
+     *                            back in webhook events so the server can attribute
+     *                            the payment without trusting the client.
      * @return array{ok: bool, order_id?: string, error?: string}
      */
-    public function createOrder(float $amount, string $description, string $returnUrl, string $cancelUrl): array
+    public function createOrder(float $amount, string $description, string $returnUrl, string $cancelUrl, string $customId = ''): array
     {
         $token = $this->getAccessToken();
         if ($token === null) {
             return ['ok' => false, 'error' => 'No se pudo autenticar con PayPal.'];
         }
 
+        $purchaseUnit = [
+            'amount' => [
+                'currency_code' => 'EUR',
+                'value' => number_format($amount, 2, '.', ''),
+            ],
+            'description' => $description,
+        ];
+        if ($customId !== '') {
+            $purchaseUnit['custom_id'] = $customId;
+        }
+
         $payload = [
             'intent' => 'CAPTURE',
-            'purchase_units' => [[
-                'amount' => [
-                    'currency_code' => 'EUR',
-                    'value' => number_format($amount, 2, '.', ''),
-                ],
-                'description' => $description,
-            ]],
+            'purchase_units' => [$purchaseUnit],
             'payment_source' => [
                 'paypal' => [
                     'experience_context' => [
@@ -84,7 +92,7 @@ class PayPalClient
     /**
      * Capture (finalize) a PayPal Order after buyer approval.
      *
-     * @return array{ok: bool, transaction_id?: string, error?: string}
+     * @return array{ok: bool, transaction_id?: string, amount?: float, error?: string}
      */
     public function captureOrder(string $orderId): array
     {
@@ -96,13 +104,15 @@ class PayPalClient
         $result = $this->apiCall('POST', "/v2/checkout/orders/{$orderId}/capture");
 
         if (isset($result['status']) && $result['status'] === 'COMPLETED') {
-            // Extract PayPal transaction ID from the capture
+            // Extract PayPal transaction ID and captured amount
             $txnId = '';
+            $amount = 0.0;
             $captures = $result['purchase_units'][0]['payments']['captures'] ?? [];
             if (count($captures) > 0) {
                 $txnId = (string) ($captures[0]['id'] ?? '');
+                $amount = (float) ($captures[0]['amount']['value'] ?? 0);
             }
-            return ['ok' => true, 'transaction_id' => $txnId];
+            return ['ok' => true, 'transaction_id' => $txnId, 'amount' => $amount];
         }
 
         $errorDetail = $result['message'] ?? ($result['error'] ?? 'Error al capturar el pago.');
@@ -136,6 +146,29 @@ class PayPalClient
         $result = $this->apiCall('POST', '/v1/notifications/verify-webhook-signature', $payload);
 
         return ($result['verification_status'] ?? '') === 'SUCCESS';
+    }
+
+    /**
+     * Fetch order details (used by the webhook to resolve custom_id and amounts
+     * when the capture event payload doesn't carry them).
+     *
+     * @return array{ok: bool, order?: array<string, mixed>, error?: string}
+     */
+    public function getOrder(string $orderId): array
+    {
+        $token = $this->getAccessToken();
+        if ($token === null) {
+            return ['ok' => false, 'error' => 'No se pudo autenticar con PayPal.'];
+        }
+
+        $result = $this->apiCall('GET', "/v2/checkout/orders/{$orderId}");
+
+        if (isset($result['id'], $result['status'])) {
+            return ['ok' => true, 'order' => $result];
+        }
+
+        $errorDetail = $result['message'] ?? ($result['error'] ?? 'Error al consultar la orden.');
+        return ['ok' => false, 'error' => $errorDetail];
     }
 
     // ─────────────────────────────────────────────────────────
@@ -210,6 +243,8 @@ class PayPalClient
             if (!empty($data)) {
                 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data, JSON_UNESCAPED_UNICODE));
             }
+        } elseif ($method === 'GET') {
+            curl_setopt($ch, CURLOPT_HTTPGET, true);
         }
 
         $response = curl_exec($ch);
