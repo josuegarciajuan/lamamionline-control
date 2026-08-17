@@ -5,6 +5,13 @@
 /data/*
 !/data/.gitkeep
 
+# bot-casa: datos vivos de producción (conversaciones, imgs, cancel...).
+# Se dejaron de trackear (git rm --cached) para que ningún merge los pise.
+/bot-casa/data/
+
+# Backups de código (nunca en git; se regeneran localmente)
+*.bak
+
 # Directorio template vacío (redundante con data/; DATA_PATH en bootstrap.php apunta a data/)
 /DATA_PATH/*
 
