@@ -168,3 +168,28 @@ pwd
 git status
 git diff
 php -l archivo.php
+```
+
+## 🧵 Sesiones paralelas (anti-clobber)
+
+Varias sesiones de opencode pueden estar trabajando sobre este MISMO árbol (= producción viva).
+Para no machacarse entre sí:
+
+1. **Antes de editar** cualquier archivo: `git status` + `git diff`.
+2. Si `git status` muestra cambios sin commitear de otra sesión/producción: NO pisarlos;
+   commitearlos primero como `sync: preservar cambios de producción (...)`, o coordinar.
+3. **Antes de cada commit**: repetir `git status` para detectar commits nuevos de otras
+   sesiones; si cambió algo, `git diff` y reconciliar antes de commitear.
+4. **Commit atómico + frecuente**, mensaje `tipo: descripción` (tipo ∈ feat, fix, refactor,
+   docs, chore, test, style, sync).
+5. Serializar la transacción add+commit con flock (mismo archivo de lock para todas las sesiones):
+   ```bash
+   flock -x -w 120 .git/.opencode-session.lock -c 'git add -- . ":(exclude)data/" ":(exclude).env" && git commit -m "tipo: descripción"'
+   ```
+6. Usar el comando global `/git-workflow`:
+   - `/git-workflow start` al entrar a trabajar.
+   - `/git-workflow finish` al terminar (commit + verificación + push solo si hay remoto).
+7. **Push**: solo si existe remoto configurado. Sin remoto, dejar commit local y reportar la
+   acción manual exacta. Nunca inventar un remoto.
+8. Este repo no usa `git worktree`: el working tree ES producción (bind mount), una copia
+   aparte sería invisible para producción. El aislamiento se hace por disciplina + lock.
