@@ -8591,7 +8591,7 @@ if (!empty($sendtaxsState)) {
                 echo '<span id="waha-salud-' . e($row['id'] ?? '') . '" class="waha-indicator" aria-label="Estado WAHA: sin comprobar"><span class="waha-status-dot is-unknown" aria-hidden="true"></span>Sin comprobar</span>';
                 if ($wahaPort !== '') {
                     echo '<div class="waha-line-actions" id="waha-actions-' . e($row['id'] ?? '') . '" data-telefono-id="' . e($row['id'] ?? '') . '">';
-                    echo '<button type="button" class="btn-secondary-mini twa-action-button" data-action="identify">Identificar</button>';
+                    echo '<button type="button" class="btn-secondary-mini twa-action-button" data-action="identify" title="Identificar" aria-label="Identificar">?</button>';
                     echo '<span class="twa-action-result muted" aria-live="polite"></span>';
                     echo '</div>';
                 }
@@ -8747,12 +8747,14 @@ if (!empty($sendtaxsState)) {
                 element.appendChild(document.createTextNode(text + phoneText));
             }
 
-            function actionButton(action, label, className) {
+            function actionButton(action, icon, title, className) {
                 var button = document.createElement("button");
                 button.type = "button";
                 button.className = className + " twa-action-button";
                 button.setAttribute("data-action", action);
-                button.textContent = label;
+                button.setAttribute("title", title);
+                button.setAttribute("aria-label", title);
+                button.textContent = icon;
                 return button;
             }
 
@@ -8761,13 +8763,13 @@ if (!empty($sendtaxsState)) {
                 while (element.firstChild) element.removeChild(element.firstChild);
                 status = (status || "").toUpperCase();
                 if (status === "SCAN_QR_CODE" || status === "STARTING") {
-                    element.appendChild(actionButton("qr", "📱 Vincular", "btn-secondary-mini"));
+                    element.appendChild(actionButton("qr", "📱", "Vincular", "btn-secondary-mini"));
                 } else if (failed || status === "FAILED" || status === "STOPPED") {
-                    element.appendChild(actionButton("restart", "Reescanear", "btn-danger-mini"));
+                    element.appendChild(actionButton("restart", "↻", "Reescanear", "btn-danger-mini"));
                 } else if (connected) {
-                    element.appendChild(actionButton("restart", "Reescanear", "btn-secondary-mini"));
+                    element.appendChild(actionButton("restart", "↻", "Reescanear", "btn-secondary-mini"));
                 }
-                element.appendChild(actionButton("identify", "Identificar", "btn-secondary-mini"));
+                element.appendChild(actionButton("identify", "?", "Identificar", "btn-secondary-mini"));
                 var result = document.createElement("span");
                 result.className = "twa-action-result muted";
                 result.setAttribute("aria-live", "polite");

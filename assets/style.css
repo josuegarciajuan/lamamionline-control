@@ -6386,17 +6386,38 @@ body.josue-yt-fs .josue-yt-fs-close-float {
 .waha-status-dot.is-down { background: var(--danger); }
 .waha-status-dot.is-unknown { background: var(--muted); }
 .waha-line-actions {
-  margin-top: 2px;
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 .waha-line-actions button {
-  font-size: 11px;
-  padding: 2px 8px;
-}
-.waha-line-actions .waha-restart-button {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
   line-height: 1;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+}
+.waha-line-actions button:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+.waha-line-actions button[data-action="restart"] {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--muted);
+}
+.twa-action-result {
+  font-size: 10px;
+  color: var(--muted);
 }
 
 @media (max-width: 768px) {
