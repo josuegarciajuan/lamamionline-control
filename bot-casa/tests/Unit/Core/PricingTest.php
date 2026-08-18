@@ -32,6 +32,26 @@ final class PricingTest extends TestCase
         $this->assertSame(2.0, Pricing::resolveOverride($overrides, 'otro_usuario', 17, 100.0));
     }
 
+    public function testResolveOverrideMatchesNationalFormatWithoutCountryPrefix(): void
+    {
+        // Username con prefijo 34 → la clave de override en formato nacional (sin 34) hace match.
+        $overrides = ['654464023' => 1];
+        $this->assertSame(1.0, Pricing::resolveOverride($overrides, '34654464023', 12, 100.0));
+    }
+
+    public function testResolveOverrideNationalKeyDoesNotMatchOther34Users(): void
+    {
+        // 34604829142 sin el 34 → 604829142, que no está en los overrides → sin descuento.
+        $overrides = ['654464023' => 1];
+        $this->assertSame(100.0, Pricing::resolveOverride($overrides, '34604829142', 17, 100.0));
+    }
+
+    public function testResolveOverrideRawUsernameStillMatches(): void
+    {
+        $overrides = ['654464023' => 1];
+        $this->assertSame(1.0, Pricing::resolveOverride($overrides, '654464023', 999, 100.0));
+    }
+
     public function testResolveOverrideUsernameTakesPrecedenceOverUserId(): void
     {
         $overrides = ['34604829142' => 1, '17' => 2];
