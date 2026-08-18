@@ -84,12 +84,22 @@ final class Pricing
     /**
      * Aplica el descuento por usuario: primero por username, luego por id numérico.
      *
+     * Para el username se prueba primero el valor tal cual y después sin el prefijo
+     * de país "34" (formato nacional): así la clave de override "654464023" hace match
+     * con un usuario cuyo username sea "34654464023".
+     *
      * @param array<mixed> $overrides Mapa username|id → importe en euros.
      */
     public static function resolveOverride(array $overrides, string $username, int $userId, float $default): float
     {
-        if ($username !== '' && isset($overrides[$username])) {
-            return (float) $overrides[$username];
+        if ($username !== '') {
+            if (isset($overrides[$username])) {
+                return (float) $overrides[$username];
+            }
+            $national = preg_replace('/^34/', '', $username, 1);
+            if (is_string($national) && $national !== '' && isset($overrides[$national])) {
+                return (float) $overrides[$national];
+            }
         }
         if (isset($overrides[(string) $userId])) {
             return (float) $overrides[(string) $userId];
