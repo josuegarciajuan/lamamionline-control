@@ -149,7 +149,7 @@ final class SubscriptionManager
             'subscription_type' => null,
         ]);
 
-        return $result['ok'] ?? false;
+        return $result['ok'];
     }
 
     // ─────────────────────────────────────────────────────────
@@ -162,6 +162,8 @@ final class SubscriptionManager
      * Si ya está activo, se añaden semanas al final del periodo actual.
      *
      * @param int $weeks Número de semanas a añadir (por defecto 1)
+     *
+     * @return array{ok: bool, error?: string}
      */
     public function activateWeekly(int $userId, int $weeks = 1): array
     {
@@ -214,6 +216,8 @@ final class SubscriptionManager
     /**
      * Registra un pago en el historial del usuario.
      * Llama a updateUser que gestiona su propio locking interno.
+     *
+     * @return array{ok: bool, error?: string}
      */
     public function recordPayment(int $userId, float $amount, string $method = 'card', string $transactionId = ''): array
     {
@@ -257,6 +261,8 @@ final class SubscriptionManager
 
     /**
      * Marca un usuario como "sin restricciones monetarias" (unlimited).
+     *
+     * @return array{ok: bool, error?: string}
      */
     public function setUnlimited(int $userId): array
     {
@@ -272,6 +278,8 @@ final class SubscriptionManager
 
     /**
      * Marca un usuario como expirado (admin override).
+     *
+     * @return array{ok: bool, error?: string}
      */
     public function setExpired(int $userId): array
     {
@@ -286,6 +294,8 @@ final class SubscriptionManager
 
     /**
      * @param array<string, mixed> $user
+     *
+     * @return array{status: string, currentDay: int, totalDays: int, daysLeft: int, isExpired: bool, periodLabel: string, canUseBot: bool, subscriptionEnd: string|null}
      */
     private function computeTrialStatus(array $user, \DateTimeImmutable $now): array
     {
@@ -352,6 +362,8 @@ final class SubscriptionManager
 
     /**
      * @param array<string, mixed> $user
+     *
+     * @return array{status: string, currentDay: int, totalDays: int, daysLeft: int, isExpired: bool, periodLabel: string, canUseBot: bool, subscriptionEnd: string|null}
      */
     private function computeActiveStatus(array $user, \DateTimeImmutable $now): array
     {
@@ -446,6 +458,8 @@ final class SubscriptionManager
 
     /**
      * Notifica un nuevo pago al admin vía Telegram.
+     *
+     * @param array<string, mixed> $user
      */
     private function notifyPaymentTelegram(array $user, float $amount, string $method): void
     {
