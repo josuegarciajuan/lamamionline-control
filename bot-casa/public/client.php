@@ -210,28 +210,11 @@ foreach (readNdjson($memoryPath) as $rec) {
 }
 
 // ── Active lines count ──
-$linesMapPath = WASAPBOT_ROOT . '/data/lines_map.json';
-$linesForUser = 0;
-if (file_exists($linesMapPath)) {
-    $linesMap = @json_decode((string) @file_get_contents($linesMapPath), true);
-    if (is_array($linesMap)) {
-        foreach ($linesMap as $uid) {
-            if ((int) $uid === $clientUserId) $linesForUser++;
-        }
-    }
-}
-// Fallback: count from user's lines.json if lines_map has no entries for this user
-if ($linesForUser <= 0) {
-    $userLinesFile = WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/lines.json';
-    if (file_exists($userLinesFile)) {
-        $userLines = @json_decode((string) @file_get_contents($userLinesFile), true);
-        if (is_array($userLines)) $linesForUser = count($userLines);
-    }
-}
+$linesForUser = \WasapBot\Core\Pricing::userLineCount($clientUserId, WASAPBOT_ROOT);
 
 // ── Renewal price (based on line count) ──
-$extraLineCost = 25; // €/week per extra line
-$basePrice = 100;    // €/week base (1 line included)
+$extraLineCost = \WasapBot\Core\Pricing::extraLine(); // €/week per extra line
+$basePrice = \WasapBot\Core\Pricing::weeklyBase($clientUserId);    // €/week base (1 line included)
 $extraLineCount = max($linesForUser - 1, 0);
 $renewalPrice = $basePrice + ($extraLineCount * $extraLineCost);
 

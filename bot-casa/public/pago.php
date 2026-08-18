@@ -65,35 +65,19 @@ $useMock = (($_GET['mock'] ?? '') === '1') && $isAdmin;
 function h(string $s): string { return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 
 // ── Pricing ──
-$amount = 100; // €/week base (1 line included)
 $lineCount = 0;
 $extraLines = 0;
-$extraCost = 25; // € per extra line/week
+$extraCost = \WasapBot\Core\Pricing::extraLine(); // € per extra line/week
 
 if ($isExtraLine) {
     $amount = $extraCost;
     $lineCount = 1;
     $extraLines = 0;
 } else {
-    $linesMapFile = WASAPBOT_ROOT . '/data/lines_map.json';
-    if (file_exists($linesMapFile)) {
-        $linesMap = @json_decode((string) @file_get_contents($linesMapFile), true);
-        if (is_array($linesMap)) {
-            foreach ($linesMap as $last9 => $uid) {
-                if ((int) $uid === $userId) $lineCount++;
-            }
-        }
-    }
-    if ($lineCount <= 0) {
-        $userLinesFile = WASAPBOT_ROOT . '/data/users/' . $userId . '/lines.json';
-        if (file_exists($userLinesFile)) {
-            $userLines = @json_decode((string) @file_get_contents($userLinesFile), true);
-            if (is_array($userLines)) $lineCount = count($userLines);
-        }
-    }
+    $lineCount = \WasapBot\Core\Pricing::userLineCount($userId, WASAPBOT_ROOT);
     $lineCount = max($lineCount, 1);
     $extraLines = $lineCount - 1;
-    $amount = 100 + ($extraLines * $extraCost);
+    $amount = \WasapBot\Core\Pricing::weeklyTotal($userId, $lineCount);
 }
 
 $error = '';
@@ -370,7 +354,7 @@ if (!$useMock) {
     </div>
     <?php else: ?>
     <h1><?php echo $isExtraLine ? 'Línea extra WhatsApp' : 'Activar CasaWasap'; ?></h1>
-    <p class="subtitle"><?php echo $isExtraLine ? '+25€/semana por línea adicional' : 'Plan semanal — ' . h($userName); ?></p>
+    <p class="subtitle"><?php echo $isExtraLine ? '+' . $extraCost . '€/semana por línea adicional' : 'Plan semanal — ' . h($userName); ?></p>
 
     <div class="amount-box">
         <div class="price"><?php echo $amount; ?>€</div>

@@ -353,5 +353,11 @@
         "secret": "PAYPAL_SECRET",
         "mode": "sandbox",
         "webhook_id": ""
+    },
+    "pricing": {
+        "_comment": "Precios del plan semanal de CasaWasap. user_override: mapa username -> importe (descuento por usuario, p. ej. para pruebas).",
+        "weekly_price": 100,
+        "extra_line_price": 25,
+        "user_override": {}
     }
 }

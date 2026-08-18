@@ -399,7 +399,7 @@ try {
 
                     // Save pending line data to session — will be created after payment
                     $_SESSION['pending_line'] = ['phone' => $phone, 'label' => $label];
-                    echo json_encode(['extra_line_payment' => true, 'price' => 25]);
+                    echo json_encode(['extra_line_payment' => true, 'price' => \WasapBot\Core\Pricing::extraLine()]);
                     break;
                 }
             }

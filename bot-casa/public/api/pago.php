@@ -46,9 +46,18 @@ $subManager = new \WasapBot\Core\SubscriptionManager($um);
 //  PayPal: create order
 // ─────────────────────────────────────────────────────────
 if ($action === 'create-order') {
-    $amount      = (float) ($input['amount'] ?? 100);
     $description = (string) ($input['description'] ?? 'CasaWasap - Plan semanal');
     $isExtraLine = !empty($input['is_extra_line']);
+
+    // ── Importe autoritativo calculado en servidor (anti-manipulación) ──
+    // No se confía en el amount enviado por el cliente: se recalcula según
+    // líneas del usuario y descuentos configurados (pricing.user_override).
+    if ($isExtraLine) {
+        $amount = \WasapBot\Core\Pricing::extraLine();
+    } else {
+        $lineCount = \WasapBot\Core\Pricing::userLineCount($userId, WASAPBOT_ROOT);
+        $amount = \WasapBot\Core\Pricing::weeklyTotal($userId, $lineCount);
+    }
 
     if ($amount <= 0) {
         http_response_code(400);
@@ -246,7 +255,7 @@ if ($weeks < 1) $weeks = 1;
 
 $activateResult = $subManager->activateWeekly($userId, $weeks);
 if ($activateResult['ok']) {
-    $amount = 100.0 * $weeks;
+    $amount = \WasapBot\Core\Pricing::weeklyBase($userId) * $weeks;
     $subManager->recordPayment($userId, $amount, 'card');
 
     $newStatus = $subManager->getStatus($userId);
