@@ -74,6 +74,25 @@ function lamami_prepare_girls_panel($botCode, $clientaLeadCode, $clientaName, $s
     return array(true, $girlsJsonPath);
 }
 
+function lamami_openai_api_key() {
+    $env = trim((string)getenv('OPENAI_API_KEY'));
+    if ($env !== '') {
+        return $env;
+    }
+
+    if (function_exists('storage_read')) {
+        $settings = storage_read('settings.json');
+        if (is_array($settings)) {
+            $stored = trim((string)($settings['voice_ai_api_key'] ?? ''));
+            if ($stored !== '') {
+                return $stored;
+            }
+        }
+    }
+
+    return '';
+}
+
 function lamami_bot_vars($bot, $clienta) {
     $nombreBot = trim((string)($bot['nombre_bot'] ?? ''));
     $nombreClienta = trim((string)($clienta['nombre'] ?? ''));
@@ -94,6 +113,7 @@ function lamami_bot_vars($bot, $clienta) {
         '[LAMAMI_SESSION_MEMORY_FILE]'      => '/data/session_memory_' . $nombreBot . '.ndjson',
         '[LAMAMI_SESSION_MEMORY_FILE_TMP]'  => '/data/session_memory_' . $nombreBot . '.ndjson.tmp',
         '[LAMAMI_SESSION_MEMORY_LOCK]'      => '/data/.session_memory_' . $nombreBot . '.lock',
+        '[LAMAMI_OPENAI_API_KEY]'           => lamami_openai_api_key(),
     );
 }
 
@@ -631,7 +651,7 @@ function lamami_template_texto1() {
           "parameters": [
             {
               "name": "Authorization",
-              "value": "Bearer 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"
+              "value": "Bearer [LAMAMI_OPENAI_API_KEY]"
             },
             {
               "name": "Content-Type",
@@ -865,7 +885,7 @@ function lamami_template_texto1() {
           "parameters": [
             {
               "name": "Authorization",
-              "value": "Bearer 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"
+              "value": "Bearer [LAMAMI_OPENAI_API_KEY]"
             },
             {
               "name": "Content-Type",

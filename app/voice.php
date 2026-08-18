@@ -710,6 +710,18 @@ function voice_ai_detect_defaults_from_bot_template() {
         $cache['source'] = 'bot_template';
     }
 
+    // La clave de OpenAI ya no va hardcodeada en la plantilla (evita que el
+    // secret scanning de GitHub bloquee el push). Se resuelve en runtime desde
+    // config gitignored (settings.json) o variable de entorno OPENAI_API_KEY.
+    if (!$cache['api_key_found'] && function_exists('lamami_openai_api_key')) {
+        $runtimeKey = trim((string)lamami_openai_api_key());
+        if ($runtimeKey !== '') {
+            $cache['api_key'] = $runtimeKey;
+            $cache['api_key_found'] = true;
+            $cache['source'] = 'config_runtime';
+        }
+    }
+
     if (preg_match_all("/model:\\s*['\"]([^'\"]+)['\"]/", $raw, $models)) {
         $flat = array_values(array_unique(array_filter(array_map('trim', (array)$models[1]))));
         if (in_array('gpt-4.1-mini', $flat, true)) {
