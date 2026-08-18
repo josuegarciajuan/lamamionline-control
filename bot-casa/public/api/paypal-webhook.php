@@ -171,13 +171,13 @@ if ($isExtraLine) {
     // Extra line: webhook arrives from PayPal servers (no browser session), so the
     // pending line data is NOT available here. Record the payment as a credit; the
     // user creates the extra line from the panel (paid plan allows multiple lines).
-    $subManager->recordPayment($userId, $amount > 0 ? $amount : 25.0, 'paypal', $txnId);
+    $subManager->recordPayment($userId, $amount > 0 ? $amount : \WasapBot\Core\Pricing::extraLine(), 'paypal', $txnId);
     $activated = true;
     error_log('[paypal-webhook] PAYMENT.CAPTURE.COMPLETED — extra-line payment recorded for user ' . $userId . ' txn: ' . $txnId);
 } else {
     $activateResult = $subManager->activateWeekly($userId, 1);
     if ($activateResult['ok']) {
-        $subManager->recordPayment($userId, $amount > 0 ? $amount : 100.0, 'paypal', $txnId);
+        $subManager->recordPayment($userId, $amount > 0 ? $amount : \WasapBot\Core\Pricing::weeklyBase($userId), 'paypal', $txnId);
         $activated = true;
         error_log('[paypal-webhook] PAYMENT.CAPTURE.COMPLETED — weekly plan activated for user ' . $userId . ' txn: ' . $txnId);
     } else {
