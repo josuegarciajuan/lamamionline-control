@@ -303,6 +303,18 @@ try {
             }
             break;
 
+        // ── POST /api/pago → payment API (create/capture PayPal order) ──
+        case $method === 'POST' && $uri === '/api/pago':
+            $apiPagoPath = WASAPBOT_ROOT . '/public/api/pago.php';
+            if (file_exists($apiPagoPath)) {
+                require $apiPagoPath;
+            } else {
+                http_response_code(503);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => false, 'error' => 'API de pago no disponible.'], JSON_UNESCAPED_UNICODE);
+            }
+            break;
+
         // ── GET|POST /chat → chat operador (open access) ──────
         case ($method === 'GET' || $method === 'POST') && $uri === '/chat':
             $chatPath = WASAPBOT_ROOT . '/public/chat.php';
@@ -347,6 +359,7 @@ try {
                     'GET  /health'              => 'Health check',
                     'GET  /info'                => 'Bot info',
                     'POST /api/paypal-webhook'  => 'PayPal webhook',
+                    'POST /api/pago'            => 'Payment API (create/capture order)',
                 ],
             ], JSON_UNESCAPED_UNICODE);
             break;
