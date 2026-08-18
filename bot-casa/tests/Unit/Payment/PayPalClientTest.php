@@ -30,6 +30,41 @@ final class PayPalClientTest extends TestCase
         ], $cfg));
     }
 
+    /**
+     * PayPalClient con apiCall stubbeado (sin red) para fijar el contrato de
+     * createOrder frente a los estados que devuelve la API v2 real.
+     */
+    private function stubClient(array $cfg = [], array $apiResponse = []): PayPalClient
+    {
+        return new class($cfg, $apiResponse) extends PayPalClient {
+            /** @var array<string, mixed> */
+            private array $stub;
+
+            /**
+             * @param array<string, mixed> $cfg
+             * @param array<string, mixed> $apiResponse
+             */
+            public function __construct(array $cfg, array $apiResponse)
+            {
+                parent::__construct($cfg);
+                $this->stub = $apiResponse;
+            }
+
+            /**
+             * @return array<string, mixed>
+             */
+            protected function apiCall(string $method, string $path, array $data = []): array
+            {
+                return $this->stub;
+            }
+
+            protected function getAccessToken(): ?string
+            {
+                return 'fake-token';
+            }
+        };
+    }
+
     public function testCreateOrderFailsCleanlyWithoutCredentials(): void
     {
         $result = $this->client()->createOrder(100.0, 'Plan semanal', 'https://x/pago', 'https://x/pago', 'user:42:weekly');
@@ -67,6 +102,42 @@ final class PayPalClientTest extends TestCase
     {
         $result = $this->client()->verifyWebhook([], '{}', 'wh-123');
         $this->assertFalse($result);
+    }
+
+    public function testCreateOrderAcceptsPayerActionRequired(): void
+    {
+        // Con payment_source predefinido, la API v2 responde PAYER_ACTION_REQUIRED:
+        // la orden está creada y debe tratarse como éxito.
+        $client = $this->stubClient(['client_id' => 'c', 'secret' => 's'], [
+            'id' => 'ORD-PAR-1',
+            'status' => 'PAYER_ACTION_REQUIRED',
+            'links' => [['rel' => 'payer-action', 'href' => 'https://www.sandbox.paypal.com/checkoutnow?token=ORD-PAR-1']],
+        ]);
+        $result = $client->createOrder(100.0, 'Plan semanal', 'https://x/pago', 'https://x/pago', 'user:42:weekly');
+        $this->assertTrue($result['ok']);
+        $this->assertSame('ORD-PAR-1', $result['order_id']);
+    }
+
+    public function testCreateOrderAcceptsCreated(): void
+    {
+        $client = $this->stubClient(['client_id' => 'c', 'secret' => 's'], [
+            'id' => 'ORD-C-1',
+            'status' => 'CREATED',
+        ]);
+        $result = $client->createOrder(100.0, 'Plan semanal', 'https://x/pago', 'https://x/pago');
+        $this->assertTrue($result['ok']);
+        $this->assertSame('ORD-C-1', $result['order_id']);
+    }
+
+    public function testCreateOrderRejectsUnexpectedStatus(): void
+    {
+        $client = $this->stubClient(['client_id' => 'c', 'secret' => 's'], [
+            'id' => 'ORD-BAD',
+            'status' => 'COMPLETED',
+        ]);
+        $result = $client->createOrder(100.0, 'Plan semanal', 'https://x/pago', 'https://x/pago');
+        $this->assertFalse($result['ok']);
+        $this->assertSame('Error desconocido al crear la orden.', $result['error'] ?? '');
     }
 
     public function testCaptureOrderModesSelectCorrectBaseUrl(): void
