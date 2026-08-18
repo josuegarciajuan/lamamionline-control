@@ -81,7 +81,11 @@ class PayPalClient
 
         $result = $this->apiCall('POST', '/v2/checkout/orders', $payload);
 
-        if (isset($result['id'], $result['status']) && $result['status'] === 'CREATED') {
+        // PayPal v2 devuelve CREATED cuando no se envía payment_source y
+        // PAYER_ACTION_REQUIRED cuando se predefine (como hacemos aquí). En ambos
+        // casos la orden está creada y esperando aprobación del comprador.
+        if (isset($result['id'], $result['status'])
+            && in_array($result['status'], ['CREATED', 'PAYER_ACTION_REQUIRED'], true)) {
             return ['ok' => true, 'order_id' => $result['id']];
         }
 
@@ -175,7 +179,7 @@ class PayPalClient
     //  Internal
     // ─────────────────────────────────────────────────────────
 
-    private function getAccessToken(): ?string
+    protected function getAccessToken(): ?string
     {
         if ($this->accessToken !== null) {
             return $this->accessToken;
@@ -218,7 +222,7 @@ class PayPalClient
      * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
-    private function apiCall(string $method, string $path, array $data = []): array
+    protected function apiCall(string $method, string $path, array $data = []): array
     {
         $url = $this->baseUrl . $path;
         $token = $this->getAccessToken();
