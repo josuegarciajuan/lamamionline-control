@@ -2169,7 +2169,14 @@ function comercial_thread_history($thread, $limit = 1500) {
             continue;
         }
 
-        $dedupeKey = $entry['ts'] . '|' . $entry['direction'] . '|' . $entry['text'];
+        // Los mensajes salientes se registran con DOS eventos (send_ok de transporte
+        // + manual_outbound_sent/thread_message_sent semántico). Como el timestamp es
+        // de segundo y ambos pueden caer en segundos distintos, deduplicamos los 'out'
+        // por texto (ignorando el ts) para que no se muestre el mensaje dos veces.
+        // Los 'in' conservan el ts porque cada entrada del cliente es un mensaje real.
+        $dedupeKey = ($entry['direction'] === 'out')
+            ? 'out|' . $entry['text']
+            : $entry['ts'] . '|' . $entry['direction'] . '|' . $entry['text'];
         $priority = 1;
         if ($type === 'qualified_auto_reply_sent') {
             $priority = 4;
