@@ -18,6 +18,15 @@
     var _fullChatLastJson = '';    // dedup del refresco en tiempo real del fullchat
     var _readTimestamps = {};      // { threadId: Date.now() } — marca cuándo se leyó localmente
 
+    // ── Sidebar lazy-load (muro) ──
+    var _flatThreads = [];         // items cargados (modo normal)
+    var _hasMore = true;
+    var _nextTs = null;            // cursor paginación
+    var _nextId = null;
+    var _searchMode = false;
+    var _loadingMore = false;
+    var _searchDebounce = null;
+
     // ── Init ──
     function init() {
         if (currentView === 'chat') {
@@ -429,112 +438,108 @@
     }
 
     // ── Load lines + threads ──
+    // ── Load lines (primera página del muro) ──
     function loadLines() {
-        fetch(api + '?action=lines&_=' + Date.now(), {credentials:'same-origin'})
+        if (_searchMode) return; // en modo búsqueda no pisamos el muro
+        fetch(api + '?action=lines&limit=50&_=' + Date.now(), {credentials:'same-origin'})
         .then(function(r){return r.json()})
         .then(function(d){
             if (!d.ok) return;
-            var json = JSON.stringify(d.lines || []);
+            var json = JSON.stringify(d.threads || []);
             if (json === lastLinesJson) return;
             lastLinesJson = json;
-            linesData = d.lines || [];
-            renderSidebar(linesData);
+            _flatThreads = d.threads || [];
+            _hasMore = !!d.has_more;
+            _nextTs = d.next_ts || null;
+            _nextId = d.next_id || null;
+            _searchMode = false;
+            renderSidebar(_flatThreads, true);
             if (d.settings) updateGlobalToggles(d.settings);
         }).catch(function(){});
     }
 
-    // ── Sidebar rendering ──
-    function renderSidebar(lines) {
+    // ── Load more (scroll infinito) ──
+    function loadMoreLines() {
+        if (_loadingMore || !_hasMore || _searchMode || !_nextTs) return;
+        _loadingMore = true;
+        var url = api + '?action=lines&limit=50&before_ts=' + encodeURIComponent(_nextTs)
+            + '&before_id=' + encodeURIComponent(_nextId || '') + '&_=' + Date.now();
+        fetch(url, {credentials:'same-origin'})
+        .then(function(r){return r.json()})
+        .then(function(d){
+            if (!d.ok) return;
+            var newItems = d.threads || [];
+            var seen = {};
+            for (var i = 0; i < _flatThreads.length; i++) seen[_flatThreads[i].id] = true;
+            newItems = newItems.filter(function(t){ return !seen[t.id]; });
+            _flatThreads = _flatThreads.concat(newItems);
+            _hasMore = !!d.has_more;
+            _nextTs = d.next_ts || null;
+            _nextId = d.next_id || null;
+            renderSidebar(_flatThreads, false);
+        })
+        .catch(function(){})
+        .finally(function(){ _loadingMore = false; });
+    }
+
+    // ── Sidebar rendering (lista plana tipo muro) ──
+    function renderSidebar(items, resetScroll) {
         var list = document.getElementById('inboxLinesList');
         if (!list) return;
-        if (!lines.length) {
-            list.innerHTML = '<div class="inbox-empty">No hay líneas con conversaciones</div>';
+        if (!items.length) {
+            list.innerHTML = '<div class="inbox-empty">' + (_searchMode ? 'Sin resultados' : 'No hay conversaciones') + '</div>';
             return;
         }
         var now = Date.now();
         var h = '';
-        for (var i = 0; i < lines.length; i++) {
-            var line = lines[i];
-            var lid = line.line_id || '';
-            var lname = esc(line.line_name || 'Línea');
-            var lphone = line.line_phone || '';
-            var threads = line.threads || [];
-            var tcount = threads.length;
-            var lineLastTs = line.line_last_ts || '';
-            var lineUnread = line.line_total_unread || 0;
-            var lineTime = formatLineTime(lineLastTs);
+        for (var i = 0; i < items.length; i++) {
+            var t = items[i];
+            var tid = t.id || '';
+            var tname = t.display_name || t.phone || '?';
+            var tmsg = t.last_message || '';
+            var tstage = t.stage_label || t.stage || '';
+            var tpaused = t.paused || t.human_taken;
+            var tprocess = t.process_slug || '';
+            var tline = t.line_name || '';
+            var tunread = t.unread;
+            var ttime = formatRelativeTime(t.last_ts || '');
 
-            // Race-condition: subtract locally-read threads from server unread count
-            for (var j = 0; j < threads.length; j++) {
-                var tid = threads[j].id;
-                if (threads[j].unread && _readTimestamps[tid] && (now - _readTimestamps[tid]) < 120000) {
-                    threads[j].unread = false;
-                    lineUnread = Math.max(0, (lineUnread || 0) - 1);
-                }
+            // Race-condition: resta hilos leídos localmente
+            if (tunread && _readTimestamps[tid] && (now - _readTimestamps[tid]) < 120000) {
+                tunread = false;
             }
 
-            var dotClass = lineUnread > 0 ? ' line-dot line-dot--unread' : ' line-dot';
+            var active = (selectedThreadId === tid) ? ' active' : '';
+            var pausedClass = tpaused ? ' paused' : '';
+            var unreadClass = tunread ? ' is-unread' : '';
 
-            h += '<div class="inbox-line-group collapsed" data-line-id="' + escAttr(lid) + '">';
-            h += '<div class="inbox-line-header" onclick="InboxChat.toggleLine(\'' + escAttr(lid) + '\')">';
-            h += '<span class="' + dotClass + '"></span>';
-            h += '<span>' + esc(lname) + '</span>';
-            if (lineTime) {
-                h += '<span class="inbox-line-time">' + esc(lineTime) + '</span>';
-            }
-            h += '<span class="inbox-line-meta">' + esc(lphone) + ' · ' + tcount + '</span>';
-            if (lineUnread > 0) {
-                h += '<span class="inbox-line-badge-unread">' + lineUnread + '</span>';
-            }
-            h += '<span class="inbox-line-arrow">▼</span>';
+            h += '<div class="inbox-thread-item' + active + pausedClass + unreadClass + '" data-thread-id="' + escAttr(tid) + '" onclick="InboxChat.selectThread(\'' + escAttr(tid) + '\',\'' + escAttr(tname) + '\')">';
+            h += '<div class="inbox-thread-item-top">';
+            if (tunread) h += '<span class="inbox-thread-dot"></span>';
+            h += '<span class="inbox-thread-name">' + esc(tname) + '</span>';
+            if (ttime) h += '<span class="inbox-thread-time">' + esc(ttime) + '</span>';
             h += '</div>';
-            h += '<div class="inbox-thread-list">';
-            if (!threads.length) {
-                h += '<div class="inbox-loading">Sin conversaciones</div>';
-            } else {
-                for (var j = 0; j < threads.length; j++) {
-                    var t = threads[j];
-                    var tid = t.id || '';
-                    var tname = t.display_name || t.phone || '?';
-                    var tmsg = t.last_message || '';
-                    var tstage = t.stage_label || t.stage || '';
-                    var tpaused = t.paused || t.human_taken;
-                    var tprocess = t.process_slug || '';
-                    var tunread = t.unread;
-                    var ttime = formatRelativeTime(t.last_ts || '');
-                    var active = (selectedThreadId === tid) ? ' active' : '';
-                    var pausedClass = tpaused ? ' paused' : '';
-                    var unreadClass = tunread ? ' is-unread' : '';
-
-                    h += '<div class="inbox-thread-item' + active + pausedClass + unreadClass + '" data-thread-id="' + escAttr(tid) + '" onclick="InboxChat.selectThread(\'' + escAttr(tid) + '\',\'' + escAttr(tname) + '\')">';
-                    h += '<div class="inbox-thread-item-top">';
-                    if (tunread) {
-                        h += '<span class="inbox-thread-dot"></span>';
-                    }
-                    h += '<span class="inbox-thread-name">' + esc(tname) + '</span>';
-                    if (ttime) {
-                        h += '<span class="inbox-thread-time">' + esc(ttime) + '</span>';
-                    }
-                    h += '</div>';
-                    h += '<div class="inbox-thread-item-sub">';
-                    h += '<span class="inbox-thread-stage ' + escAttr(tstage.toLowerCase()) + '">' + esc(tstage) + '</span>';
-                    h += '</div>';
-                    if (tmsg) {
-                        h += '<div class="inbox-thread-msg">';
-                        if (tpaused) h += '<span class="paused-icon" title="Bot parado en esta conversación">⏸</span>';
-                        h += esc(tmsg);
-                        h += '</div>';
-                    }
-                    h += '<div class="inbox-thread-meta">';
-                    if (tprocess) h += '<span>' + esc(tprocess) + '</span>';
-                    h += '<span>R:' + (t.replies_count||0) + ' E:' + (t.sent_count||0) + '</span>';
-                    h += '</div>';
-                    h += '</div>';
-                }
+            h += '<div class="inbox-thread-item-sub">';
+            h += '<span class="inbox-thread-stage ' + escAttr(tstage.toLowerCase()) + '">' + esc(tstage) + '</span>';
+            if (tline) h += '<span class="inbox-thread-line">' + esc(tline) + '</span>';
+            h += '</div>';
+            if (tmsg) {
+                h += '<div class="inbox-thread-msg">';
+                if (tpaused) h += '<span class="paused-icon" title="Bot parado en esta conversación">⏸</span>';
+                h += esc(tmsg);
+                h += '</div>';
             }
-            h += '</div></div>';
+            h += '<div class="inbox-thread-meta">';
+            if (tprocess) h += '<span>' + esc(tprocess) + '</span>';
+            h += '<span>R:' + (t.replies_count||0) + ' E:' + (t.sent_count||0) + '</span>';
+            h += '</div>';
+            h += '</div>';
+        }
+        if (_hasMore && !_searchMode) {
+            h += '<div class="inbox-load-more" id="inboxLoadMore">Cargando más…</div>';
         }
         list.innerHTML = h;
+        if (resetScroll && list.scrollTop) list.scrollTop = 0;
     }
 
     // ── Select thread ──
@@ -739,17 +744,28 @@
 
     // ── Search filter ──
     function filterSidebar() {
-        var q = (document.getElementById('inboxSearch')?.value || '').toLowerCase();
-        var items = document.querySelectorAll('.inbox-thread-item');
-        var groups = document.querySelectorAll('.inbox-line-group');
-        items.forEach(function(item){
-            var text = (item.textContent || '').toLowerCase();
-            item.style.display = (q === '' || text.indexOf(q) !== -1) ? '' : 'none';
-        });
-        groups.forEach(function(group){
-            var vis = group.querySelectorAll('.inbox-thread-item:not([style*="display: none"])');
-            group.style.display = vis.length > 0 ? '' : 'none';
-        });
+        var q = (document.getElementById('inboxSearch')?.value || '').trim();
+        if (_searchDebounce) clearTimeout(_searchDebounce);
+        _searchDebounce = setTimeout(function(){
+            if (q === '') {
+                _searchMode = false;
+                lastLinesJson = '';
+                loadLines();
+                return;
+            }
+            _searchMode = true;
+            fetch(api + '?action=lines&limit=200&search=' + encodeURIComponent(q) + '&_=' + Date.now(), {credentials:'same-origin'})
+            .then(function(r){return r.json()})
+            .then(function(d){
+                if (!d.ok) return;
+                _flatThreads = d.threads || [];
+                _hasMore = false;
+                _nextTs = null;
+                _nextId = null;
+                renderSidebar(_flatThreads, true);
+            })
+            .catch(function(){});
+        }, 300);
     }
 
     // ── Fullscreen chat (desde la tabla de agente) ──
@@ -1754,5 +1770,14 @@
         if (input) { input.addEventListener('keydown', handleInputKey); input.addEventListener('input', autoResize); }
         var search = document.getElementById('inboxSearch');
         if (search) search.addEventListener('input', filterSidebar);
+        var linesList = document.getElementById('inboxLinesList');
+        if (linesList) {
+            linesList.addEventListener('scroll', function(){
+                if (_searchMode) return;
+                if (linesList.scrollTop + linesList.clientHeight >= linesList.scrollHeight - 250) {
+                    loadMoreLines();
+                }
+            });
+        }
     });
 })();

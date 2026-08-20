@@ -101,104 +101,109 @@ function inbox_is_unread(string $threadId, string $updatedAt, array $readStatus)
 }
 
 // ── GET ?action=lines ──
-// Devuelve líneas asignadas a procesos, cada una con sus hilos + info de no leídos
+// Lista plana y paginada de conversaciones de las líneas de procesos (muro).
+// Params: limit (default 50), before_ts + before_id (cursor), search (opcional).
+// Orden: last_ts desc, id desc. `unread` es flag por hilo (dot verde en la UI).
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'lines') {
     $allThreads = comercial_get_threads();
-    $allLines = comercial_list_lines();
     $linesIndexed = comercial_list_lines_indexed();
     $processLineIds = inbox_get_process_line_ids();
     $readStatus = inbox_read_status();
 
-    // Filtrar solo líneas de procesos
-    $filteredLines = [];
-    foreach ($allLines as $line) {
-        if (in_array((string)($line['id'] ?? ''), $processLineIds, true)) {
-            $filteredLines[] = $line;
-        }
-    }
+    $limit = max(1, min(200, (int)($_GET['limit'] ?? 50)));
+    $beforeTs = trim((string)($_GET['before_ts'] ?? ''));
+    $beforeId = trim((string)($_GET['before_id'] ?? ''));
+    $search = trim((string)($_GET['search'] ?? ''));
 
-    // Agrupar hilos por línea
-    $threadsByLine = [];
+    // Construir lista plana de items (solo líneas de procesos)
+    $threadItems = [];
     foreach ($allThreads as $thread) {
         $lid = trim((string)($thread['line_id'] ?? ''));
         if ($lid === '' || !in_array($lid, $processLineIds, true)) continue;
-        if (!isset($threadsByLine[$lid])) $threadsByLine[$lid] = [];
-        $threadsByLine[$lid][] = $thread;
-    }
 
-    $result = [];
-    foreach ($filteredLines as $line) {
-        $lid = (string)($line['id'] ?? '');
-        $threads = $threadsByLine[$lid] ?? [];
+        $phone = comercial_only_digits((string)($thread['target_phone'] ?? ''));
+        $lastMsg = trim((string)($thread['last_inbound_text'] ?? ''));
+        if ($lastMsg === '') $lastMsg = trim((string)($thread['last_outbound_text'] ?? ''));
+        $stage = trim((string)($thread['stage'] ?? ''));
+        $tid = (string)($thread['id'] ?? '');
+        $updatedAt = trim((string)($thread['updated_at'] ?? $thread['created_at'] ?? ''));
+        $unread = inbox_is_unread($tid, $updatedAt, $readStatus);
 
-        $threadItems = [];
-        $lineLastTs = '';
-        $lineUnread = 0;
+        $agendaEntry = comercial_agenda_find_by_phone($phone);
+        $agendaName = $agendaEntry ? (string)($agendaEntry['nombre'] ?? '') : '';
+        $displayName = $agendaName !== '' ? $agendaName : ($phone !== '' ? $phone : 'Sin teléfono');
+        $lineName = isset($linesIndexed[$lid]) ? trim((string)($linesIndexed[$lid]['nombre'] ?? '')) : '';
 
-        foreach ($threads as $thread) {
-            $phone = comercial_only_digits((string)($thread['target_phone'] ?? ''));
-            $lastMsg = trim((string)($thread['last_inbound_text'] ?? ''));
-            if ($lastMsg === '') $lastMsg = trim((string)($thread['last_outbound_text'] ?? ''));
-            $stage = trim((string)($thread['stage'] ?? ''));
-            $tid = (string)($thread['id'] ?? '');
-            $updatedAt = trim((string)($thread['updated_at'] ?? $thread['created_at'] ?? ''));
-            $unread = inbox_is_unread($tid, $updatedAt, $readStatus);
-
-            // Agenda lookup
-            $agendaEntry = comercial_agenda_find_by_phone($phone);
-            $agendaName = $agendaEntry ? (string)($agendaEntry['nombre'] ?? '') : '';
-            $agendaId   = $agendaEntry ? (string)($agendaEntry['id'] ?? '') : '';
-            $displayName = $agendaName !== '' ? $agendaName : ($phone !== '' ? $phone : 'Sin teléfono');
-
-            $threadItems[] = [
-                'id'            => $tid,
-                'phone'         => $phone,
-                'display_name'  => $displayName,
-                'agenda_name'   => $agendaName,
-                'agenda_id'     => $agendaId,
-                'last_message'  => function_exists('mb_substr') ? mb_substr($lastMsg, 0, 80, 'UTF-8') : substr($lastMsg, 0, 80),
-                'last_ts'       => $updatedAt,
-                'stage'         => $stage,
-                'stage_label'   => function_exists('comercial_thread_stage_label') ? comercial_thread_stage_label($stage) : $stage,
-                'paused'        => !empty($thread['inbox_paused']),
-                'human_taken'   => !empty($thread['human_taken']),
-                'replies_count' => (int)($thread['replies_count'] ?? 0),
-                'sent_count'    => (int)($thread['messages_sent_count'] ?? 0),
-                'process_slug'  => trim((string)($thread['process_slug'] ?? '')),
-                'line_phone'    => trim((string)($thread['line_phone'] ?? '')),
-                'unread'        => $unread,
-            ];
-
-            // Track line-level: más reciente + unread count
-            if ($updatedAt !== '' && ($lineLastTs === '' || $updatedAt > $lineLastTs)) {
-                $lineLastTs = $updatedAt;
-            }
-            if ($unread) $lineUnread++;
-        }
-
-        // Ordenar: unread primero, luego por last_ts desc
-        usort($threadItems, function ($a, $b) {
-            $aUnread = $a['unread'] ? 1 : 0;
-            $bUnread = $b['unread'] ? 1 : 0;
-            if ($aUnread !== $bUnread) return $bUnread - $aUnread;
-            return strcmp((string)($b['last_ts'] ?? ''), (string)($a['last_ts'] ?? ''));
-        });
-
-        $result[] = [
-            'line_id'          => $lid,
-            'line_name'        => trim((string)($line['nombre'] ?? '')),
-            'line_phone'       => comercial_only_digits((string)($line['tfono'] ?? '')),
-            'waha_port'        => trim((string)($line['waha_port'] ?? '')),
-            'threads'          => $threadItems,
-            'thread_count'     => count($threadItems),
-            'line_last_ts'     => $lineLastTs,
-            'line_total_unread'=> $lineUnread,
+        $threadItems[] = [
+            'id'            => $tid,
+            'phone'         => $phone,
+            'display_name'  => $displayName,
+            'line_id'       => $lid,
+            'line_name'     => $lineName,
+            'last_message'  => function_exists('mb_substr') ? mb_substr($lastMsg, 0, 40, 'UTF-8') : substr($lastMsg, 0, 40),
+            'last_ts'       => $updatedAt,
+            'stage'         => $stage,
+            'stage_label'   => function_exists('comercial_thread_stage_label') ? comercial_thread_stage_label($stage) : $stage,
+            'paused'        => !empty($thread['inbox_paused']),
+            'human_taken'   => !empty($thread['human_taken']),
+            'replies_count' => (int)($thread['replies_count'] ?? 0),
+            'sent_count'    => (int)($thread['messages_sent_count'] ?? 0),
+            'process_slug'  => trim((string)($thread['process_slug'] ?? '')),
+            'unread'        => $unread,
         ];
     }
 
+    // Orden estable: last_ts desc, id desc
+    usort($threadItems, function ($a, $b) {
+        $c = strcmp((string)($b['last_ts'] ?? ''), (string)($a['last_ts'] ?? ''));
+        if ($c !== 0) return $c;
+        return strcmp((string)($b['id'] ?? ''), (string)($a['id'] ?? ''));
+    });
+
+    // Búsqueda en servidor (filtra sobre toda la lista)
+    if ($search !== '') {
+        $needle = mb_strtolower($search, 'UTF-8');
+        $threadItems = array_values(array_filter($threadItems, function ($it) use ($needle) {
+            $hay = mb_strtolower(implode(' ', array(
+                (string)($it['display_name'] ?? ''),
+                (string)($it['phone'] ?? ''),
+                (string)($it['line_name'] ?? ''),
+            )), 'UTF-8');
+            return $needle === '' || mb_strpos($hay, $needle) !== false;
+        }));
+        $page = array_slice($threadItems, 0, $limit);
+        inbox_api_json_ok([
+            'threads' => $page,
+            'has_more' => count($threadItems) > $limit,
+            'next_ts' => null,
+            'next_id' => null,
+            'search' => $search,
+            'settings' => function_exists('inbox_get_settings') ? inbox_get_settings() : ['replies_enabled' => true, 'opener_enabled' => true],
+        ]);
+    }
+
+    // Paginación por cursor
+    if ($beforeTs !== '' && $beforeId !== '') {
+        $threadItems = array_values(array_filter($threadItems, function ($it) use ($beforeTs, $beforeId) {
+            $c = strcmp((string)($it['last_ts'] ?? ''), $beforeTs);
+            if ($c < 0) return true;    // más antiguo
+            if ($c > 0) return false;   // más reciente
+            return strcmp((string)($it['id'] ?? ''), $beforeId) < 0; // mismo ts, id menor
+        }));
+    }
+
+    $page = array_slice($threadItems, 0, $limit);
+    $hasMore = count($threadItems) > $limit;
+    $lastItem = end($page);
+    $nextTs = ($hasMore && $lastItem !== false) ? (string)($lastItem['last_ts'] ?? '') : null;
+    $nextId = ($hasMore && $lastItem !== false) ? (string)($lastItem['id'] ?? '') : null;
+
     inbox_api_json_ok([
-        'lines' => $result,
+        'threads' => $page,
+        'has_more' => $hasMore,
+        'next_ts' => $nextTs,
+        'next_id' => $nextId,
         'settings' => function_exists('inbox_get_settings') ? inbox_get_settings() : ['replies_enabled' => true, 'opener_enabled' => true],
     ]);
 }

@@ -55,6 +55,8 @@
 .inbox-thread-msg{font-size:13px;color:var(--wa-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px}
 .inbox-thread-msg .paused-icon{font-size:13px;flex-shrink:0;color:#fbbf24}
 .inbox-thread-meta{font-size:11px;color:#667781;display:flex;align-items:center;gap:8px}
+.inbox-thread-line{font-size:10px;color:#8696a0;background:rgba(255,255,255,.05);padding:2px 8px;border-radius:10px;flex-shrink:0}
+.inbox-load-more{padding:16px;text-align:center;color:var(--wa-muted);font-size:13px}
 .inbox-thread-item.paused{opacity:.6}
 .inbox-thread-item.paused .inbox-thread-name{color:var(--wa-muted)}
 .inbox-thread-item.is-unread{background:rgba(37,211,102,.06)}
