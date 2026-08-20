@@ -3460,6 +3460,8 @@ function comercial_handle_webhook_http() {
                 'ip' => (string)($_SERVER['REMOTE_ADDR'] ?? ''),
                 'expected_key' => $expectedKey !== '' ? 'configured' : 'empty',
                 'provided_key' => $providedKey !== '' ? 'present' : 'missing',
+                'has_waha_request_id' => !empty($headers['x-webhook-request-id']) ? 1 : 0,
+                'event' => trim((string)($body['event'] ?? '')),
             );
             if (!comercial_request_looks_like_waha_webhook($body, $headers)) {
                 comercial_event_append('webhook_auth_failed', $payloadLog);
