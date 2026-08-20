@@ -10,7 +10,7 @@ function auth_is_admin() {
 
 function login_user($username, $password) {
     // Credenciales hardcodeadas
-    if ($username === 'josue' && $password === 'prueba1234') {
+    if ($username === 'josue' && $password === 'vsomnos1Q#') {
         $_SESSION['logged_in'] = true;
         $_SESSION['username'] = 'josue';
         $_SESSION['display_name'] = 'Josué';
