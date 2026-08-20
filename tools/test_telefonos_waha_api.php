@@ -91,6 +91,12 @@ $personalConfig = telefonos_waha_line_config($rows[2], $commercialSettings, $per
 twa_test_same('default', $personalConfig['session'], 'puerto 3031 fuerza sesión default');
 twa_test_same('http://100.117.92.74', $personalConfig['settings']['waha_host'], 'puerto 3031 usa host personal permitido');
 
+// Las instancias desplegadas son WAHA Core: solo admiten la sesión 'default'.
+// El campo waha de la fila es una etiqueta, nunca el nombre real de la sesión.
+$commercialConfig = telefonos_waha_line_config($rows[1], $commercialSettings, $personalSettings);
+twa_test_same('default', $commercialConfig['session'], 'línea comercial usa sesión default (WAHA Core)');
+twa_test_same('http://100.113.76.93', $commercialConfig['settings']['waha_host'], 'línea comercial usa host comercial');
+
 // Runtime me.id exclusion and immediate deterministic fallback.
 $events = [];
 $dedup = [];
@@ -192,6 +198,10 @@ $capped = telefonos_waha_identify(
 );
 twa_test_same(4, $capCalls, 'límite de candidatos aplicado');
 twa_test_same(409, $capped['status'], 'sin fuente conectada devuelve conflicto');
+twa_test_assert(
+    strpos($capped['error'] ?? '', 'Líneas comprobadas') !== false && strpos($capped['error'] ?? '', 'STOPPED') !== false,
+    'conflicto detalla líneas comprobadas y su estado'
+);
 
 $budgetCalls = 0;
 $clockValues = [0.0, 0.0, 21.0, 21.0];
@@ -225,8 +235,8 @@ $restart = telefonos_waha_restart(
     static function (): void {}
 );
 twa_test_same(200, $restart['status'], 'DELETE 404 permite recreación');
-twa_test_same('api/sessions/target-session', $restartCalls[0]['path'], 'reinicio usa sesión exacta');
-twa_test_same('target-session', $restartCalls[1]['payload']['name'], 'recreación usa sesión exacta');
+twa_test_same('api/sessions/default', $restartCalls[0]['path'], 'reinicio usa sesión default (WAHA Core)');
+twa_test_same('default', $restartCalls[1]['payload']['name'], 'recreación usa sesión default (WAHA Core)');
 
 $stopped = telefonos_waha_restart(
     $targetConfig,

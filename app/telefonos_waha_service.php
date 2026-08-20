@@ -107,14 +107,15 @@ function telefonos_waha_line_config(?array $row, array $commercialSettings, arra
         throw new InvalidArgumentException('La línea no tiene un puerto WAHA permitido');
     }
 
+    // Todas las instancias WAHA desplegadas son WAHA Core, que solo admite la
+    // sesión 'default'. El campo waha de la fila es solo una etiqueta, no el
+    // nombre real de la sesión (usarlo rompía status/identify/restart con 422).
     if ($port === TELEFONOS_WAHA_PERSONAL_PORT) {
-        $session = 'default';
         $settings = $personalSettings;
     } else {
-        $session = trim((string)($row['waha'] ?? ''));
-        if ($session === '') $session = 'default';
         $settings = $commercialSettings;
     }
+    $session = 'default';
     if (!telefonos_waha_session_is_valid($session)) {
         throw new InvalidArgumentException('La línea no tiene una sesión WAHA válida');
     }
@@ -228,8 +229,13 @@ function telefonos_waha_identify(
     $maxCandidates = max(1, min(TELEFONOS_WAHA_IDENTIFY_MAX_CANDIDATES, (int)($options['max_candidates'] ?? TELEFONOS_WAHA_IDENTIFY_MAX_CANDIDATES)));
     $budgetSeconds = max(1, min(TELEFONOS_WAHA_IDENTIFY_BUDGET_SECONDS, (int)($options['budget_seconds'] ?? TELEFONOS_WAHA_IDENTIFY_BUDGET_SECONDS)));
     $onError = $options['on_error'] ?? static function (string $stage, Throwable $error): void {};
+    $candidateLabel = static function (array $candidate): string {
+        return trim((string)($candidate['row']['nombre'] ?? ''))
+            . ' (puerto ' . (string)($candidate['config']['port'] ?? '') . ')';
+    };
     $startedAt = (float)$clock();
     $hadConnected = false;
+    $diagnostics = [];
 
     foreach (array_slice($candidates, 0, $maxCandidates) as $candidate) {
         if ((float)$clock() - $startedAt >= $budgetSeconds) break;
@@ -237,11 +243,18 @@ function telefonos_waha_identify(
             $response = $statusCallback($candidate['config'], $candidate['row']);
         } catch (Throwable $error) {
             $onError('status', $error);
+            $diagnostics[] = $candidateLabel($candidate) . ': error al consultar estado';
             continue;
         }
         $info = telefonos_waha_status_info(is_array($response) ? $response : []);
-        if (!$info['connected']) continue;
-        if ($info['phone'] !== null && hash_equals($targetPhone, $info['phone'])) continue;
+        if (!$info['connected']) {
+            $diagnostics[] = $candidateLabel($candidate) . ': no conectada (' . ($info['status'] !== '' ? $info['status'] : 'sin respuesta') . ')';
+            continue;
+        }
+        if ($info['phone'] !== null && hash_equals($targetPhone, $info['phone'])) {
+            $diagnostics[] = $candidateLabel($candidate) . ': es la propia línea';
+            continue;
+        }
         if ((float)$clock() - $startedAt >= $budgetSeconds) break;
 
         $hadConnected = true;
@@ -251,9 +264,13 @@ function telefonos_waha_identify(
             $sent = $sendCallback($candidate['config'], $targetPhone, $message, $candidate['row']);
         } catch (Throwable $error) {
             $onError('send', $error);
+            $diagnostics[] = $candidateLabel($candidate) . ': error al enviar';
             continue;
         }
-        if (!telefonos_waha_response_is_success(is_array($sent) ? $sent : [])) continue;
+        if (!telefonos_waha_response_is_success(is_array($sent) ? $sent : [])) {
+            $diagnostics[] = $candidateLabel($candidate) . ': no pudo enviar el mensaje';
+            continue;
+        }
         $result = [
             'ok' => true,
             'status' => 200,
@@ -266,8 +283,9 @@ function telefonos_waha_identify(
         return $result;
     }
 
-    if (!$hadConnected) return ['ok' => false, 'status' => 409, 'error' => 'No hay otra línea WAHA conectada disponible'];
-    return ['ok' => false, 'status' => 502, 'error' => 'Las líneas conectadas no pudieron enviar el mensaje'];
+    $detail = $diagnostics !== [] ? ' Líneas comprobadas: ' . implode('; ', $diagnostics) . '.' : '';
+    if (!$hadConnected) return ['ok' => false, 'status' => 409, 'error' => 'No hay otra línea WAHA conectada disponible.' . $detail];
+    return ['ok' => false, 'status' => 502, 'error' => 'Las líneas conectadas no pudieron enviar el mensaje.' . $detail];
 }
 
 /**
