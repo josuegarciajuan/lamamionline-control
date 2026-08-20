@@ -517,7 +517,7 @@
                     h += '</div>';
                     if (tmsg) {
                         h += '<div class="inbox-thread-msg">';
-                        if (tpaused) h += '<span class="paused-icon">🔇</span>';
+                        if (tpaused) h += '<span class="paused-icon" title="Bot parado en esta conversación">⏸</span>';
                         h += esc(tmsg);
                         h += '</div>';
                     }
@@ -587,6 +587,7 @@
                 }
             }
             renderMessages(d.messages || []);
+            updateTypingIndicator(document.getElementById('inboxMessages'), d.thread);
         }).catch(function(){});
     }
 
@@ -607,6 +608,7 @@
         messages = uniq;
         var wasAtBottom = (area.scrollHeight - area.scrollTop - area.clientHeight) <= 80;
         var lastDate = '';
+        var lastAuthor = '';
         var h = '';
         for (var i = 0; i < messages.length; i++) {
             var m = messages[i];
@@ -618,17 +620,44 @@
             var dir = m.direction === 'out' ? 'out' : 'in';
             var time = formatTime(m.ts || '');
             var botTag = m.is_bot ? '<span class="msg-bot-tag">🤖 bot</span>' : '';
-            h += '<div class="inbox-msg-bubble ' + dir + '">';
+            var cont = (lastAuthor === dir) ? ' cont' : '';
+            lastAuthor = dir;
+            h += '<div class="inbox-msg-bubble ' + dir + cont + '">';
             if (botTag) h += botTag;
-            h += '<div class="msg-text">' + esc(m.text || '') + '</div>';
-            h += '<div class="msg-time">' + esc(time) + '</div>';
+            h += '<div class="msg-text">' + formatMessageBody(m.text || '') + '</div>';
+            h += '<div class="msg-time">' + esc(time);
+            if (dir === 'out') h += '<span class="msg-checks">✓✓</span>';
+            h += '</div>';
             h += '</div>';
         }
         area.innerHTML = h;
         if (wasAtBottom) area.scrollTop = area.scrollHeight;
     }
 
-    // ── Send message ──
+    // ── Typing indicator (burbuja 3 puntos) ──
+    // Se muestra cuando el bot tiene una acción programada en el futuro próximo
+    // (next_bot_action_at) → está "escribiendo"/pensando una respuesta.
+    function updateTypingIndicator(area, thread) {
+        if (!area) return;
+        var existing = area.querySelector('.inbox-typing');
+        var show = false;
+        if (thread && thread.next_bot_action_at && !thread.paused && !thread.human_taken) {
+            var ts = String(thread.next_bot_action_at || '');
+            var d = new Date(ts.replace(' ','T') + (ts.indexOf('+') === -1 && ts.indexOf('Z') === -1 ? 'Z' : ''));
+            if (!isNaN(d.getTime()) && (d.getTime() - Date.now()) < 300000 && (d.getTime() - Date.now()) > -60000) {
+                show = true;
+            }
+        }
+        if (show && !existing) {
+            var el = document.createElement('div');
+            el.className = 'inbox-typing';
+            el.innerHTML = '<span></span><span></span><span></span>';
+            area.appendChild(el);
+            area.scrollTop = area.scrollHeight;
+        } else if (!show && existing) {
+            existing.remove();
+        }
+    }
     function sendMessage() {
         if (!selectedThreadId) return;
         var input = document.getElementById('inboxChatInput');
@@ -767,8 +796,10 @@
                 if (t.process_slug) parts.push(t.process_slug);
                 if (t.line_name) parts.push('via ' + t.line_name);
                 if (subEl) subEl.textContent = parts.join(' · ') || 'Conversación';
+                renderFullChatPause(t);
             }
             renderFullChatMessages(d.messages || []);
+            updateTypingIndicator(document.getElementById('inboxFullChatMessages'), d.thread);
         })
         .catch(function(){
             if (msgEl) msgEl.innerHTML = '<div class="inbox-chat-placeholder"><div>Error al cargar</div></div>';
@@ -792,6 +823,44 @@
         }
         // Forzar refresco del sidebar para quitar indicadores de no leído
         if (currentView === 'chat') loadLines();
+    }
+
+    // ── Pill de pausa del fullscreen chat ──
+    // Muestra si el bot está activo ("🤖 Auto") o parado ("⏸ Parado") en esta
+    // conversación. Parado = inbox_paused o human_taken (intervención humana
+    // desde la app o desde WhatsApp nativo).
+    function renderFullChatPause(thread) {
+        var btn = document.getElementById('inboxFullChatPauseBtn');
+        if (!btn) return;
+        var paused = !!(thread && (thread.paused || thread.human_taken));
+        var label = document.getElementById('inboxFullChatPauseLabel');
+        btn.style.display = '';
+        btn.className = 'inbox-conv-pause' + (paused ? ' paused' : '');
+        if (label) label.textContent = paused ? '⏸ Parado' : '🤖 Auto';
+        btn.title = paused
+            ? 'El bot está parado en esta conversación (intervención humana). Pulsa para reactivarlo.'
+            : 'Parar las respuestas automáticas del bot en esta conversación';
+    }
+
+    function toggleFullChatPause() {
+        if (!fullChatThreadId) return;
+        var btn = document.getElementById('inboxFullChatPauseBtn');
+        if (btn) btn.disabled = true;
+        fetch(api + '?action=toggle_thread&_=' + Date.now(), {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'action=toggle_thread&thread_id=' + encodeURIComponent(fullChatThreadId),
+            credentials: 'same-origin'
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(){
+            if (currentView === 'chat') loadLines();
+            openFullChat(fullChatThreadId); // recarga mensajes + estado de pausa
+        })
+        .catch(function(){
+            showToast('Error al cambiar el estado del bot');
+        })
+        .finally(function(){ if (btn) btn.disabled = false; });
     }
 
     // ── markRead — marca un hilo como leído (patrón SuperWasap) ──
@@ -856,6 +925,7 @@
         messages = uniq;
         var wasAtBottom = (area.scrollHeight - area.scrollTop - area.clientHeight) <= 80;
         var lastDate = '';
+        var lastAuthor = '';
         var h = '';
         for (var i = 0; i < messages.length; i++) {
             var m = messages[i];
@@ -867,10 +937,14 @@
             var dir = m.direction === 'out' ? 'out' : 'in';
             var time = formatTime(m.ts || '');
             var botTag = m.is_bot ? '<span class="msg-bot-tag">🤖 bot</span>' : '';
-            h += '<div class="inbox-msg-bubble ' + dir + '">';
+            var cont = (lastAuthor === dir) ? ' cont' : '';
+            lastAuthor = dir;
+            h += '<div class="inbox-msg-bubble ' + dir + cont + '">';
             if (botTag) h += botTag;
-            h += '<div class="msg-text">' + esc(m.text || '') + '</div>';
-            h += '<div class="msg-time">' + esc(time) + '</div>';
+            h += '<div class="msg-text">' + formatMessageBody(m.text || '') + '</div>';
+            h += '<div class="msg-time">' + esc(time);
+            if (dir === 'out') h += '<span class="msg-checks">✓✓</span>';
+            h += '</div>';
             h += '</div>';
         }
         area.innerHTML = h;
@@ -881,6 +955,35 @@
     function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function escAttr(s) { return String(s).replace(/'/g,'%27').replace(/"/g,'%22').replace(/\\/g,'\\\\'); }
     function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // ── Formatea el cuerpo del mensaje estilo WhatsApp nativo (patrón bot-casa) ──
+    // Detecta URLs de imagen (compartir.site, .jpg/.png/.webp) y las renderiza
+    // inline como <img> clicable; el resto de URLs como <a> clicable.
+    function isImageUrl(url) {
+        return /^https?:\/\//i.test(url)
+            && (/(?:^|\/)compartir\.site\//i.test(url)
+                || /\.(?:jpe?g|png|webp|gif)(?:\?|#|$)/i.test(url));
+    }
+    function extractUrls(text) {
+        var m = String(text).match(/(https?:\/\/[^\s<>"']+)/gi);
+        return m || [];
+    }
+    function formatMessageBody(text) {
+        var s = String(text || '');
+        if (!s) return '';
+        var urls = extractUrls(s);
+        var out = esc(s);
+        if (!urls.length) return out;
+        for (var i = 0; i < urls.length; i++) {
+            var u = urls[i];
+            var e = esc(u);
+            var linkHtml = isImageUrl(u)
+                ? '<a href="' + e + '" target="_blank" rel="noopener" onclick="event.stopPropagation()"><img class="chat-img" src="' + e + '" alt="foto" loading="lazy"></a>'
+                : '<a class="chat-link" href="' + e + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + e + '</a>';
+            out = out.split(e).join(linkHtml);
+        }
+        return out;
+    }
 
     function formatDate(ts) {
         if (!ts) return '';
@@ -1456,6 +1559,111 @@
         return false;
     }
 
+    // ── Photo picker: adjuntar fotos de habitaciones ──
+    var photoPickerThreadId = null;
+    var photoPickerIsFullChat = false;
+    var photoPickerSelected = {};
+
+    function openPhotoPicker(isFullChat) {
+        var threadId = isFullChat ? fullChatThreadId : selectedThreadId;
+        if (!threadId) {
+            showToast('Abre una conversación primero');
+            return;
+        }
+        photoPickerThreadId = threadId;
+        photoPickerIsFullChat = !!isFullChat;
+        photoPickerSelected = {};
+        var overlay = document.getElementById('inboxPhotoPickerOverlay');
+        var grid = document.getElementById('inboxPhotoPickerGrid');
+        var sendBtn = document.getElementById('inboxPhotoPickerSendBtn');
+        if (!overlay || !grid) return;
+        overlay.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        grid.innerHTML = '<div class="inbox-loading">Cargando fotos...</div>';
+        if (sendBtn) { sendBtn.disabled = true; }
+
+        fetch(api + '?action=room_photos&_=' + Date.now(), {credentials:'same-origin'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (!d.ok || !d.photos || !d.photos.length) {
+                grid.innerHTML = '<div class="inbox-empty">No hay fotos de habitaciones disponibles</div>';
+                return;
+            }
+            var h = '';
+            for (var i = 0; i < d.photos.length; i++) {
+                var p = d.photos[i];
+                var url = p.url || '';
+                var img = p.img || url;
+                if (!url) continue;
+                h += '<div class="inbox-photo-picker-thumb" data-url="' + escAttr(url) + '" onclick="InboxChat.photoPickerToggle(this)">'
+                    + '<img src="' + escAttr(img) + '" alt="habitación" loading="lazy">'
+                    + '<span class="inbox-photo-picker-check">✓</span>'
+                    + '</div>';
+            }
+            grid.innerHTML = h || '<div class="inbox-empty">No hay fotos de habitaciones disponibles</div>';
+        })
+        .catch(function(){
+            grid.innerHTML = '<div class="inbox-empty">Error al cargar las fotos</div>';
+        });
+    }
+
+    function photoPickerHide() {
+        var overlay = document.getElementById('inboxPhotoPickerOverlay');
+        if (overlay) overlay.style.display = 'none';
+        document.body.style.overflow = '';
+        photoPickerThreadId = null;
+        photoPickerSelected = {};
+    }
+
+    function photoPickerToggle(el) {
+        var url = el ? el.getAttribute('data-url') : '';
+        if (!url) return;
+        var sendBtn = document.getElementById('inboxPhotoPickerSendBtn');
+        if (photoPickerSelected[url]) {
+            delete photoPickerSelected[url];
+            if (el) el.classList.remove('selected');
+        } else {
+            photoPickerSelected[url] = true;
+            if (el) el.classList.add('selected');
+        }
+        if (sendBtn) sendBtn.disabled = !Object.keys(photoPickerSelected).length;
+    }
+
+    function photoPickerSend() {
+        var urls = Object.keys(photoPickerSelected);
+        var threadId = photoPickerThreadId;
+        if (!urls.length || !threadId) return;
+        photoPickerHide();
+        // Enviar cada foto como mensaje (URL), con pequeño delay entre envíos
+        // (mismo patrón que bot-casa sendImages).
+        var sendOne = function(idx) {
+            if (idx >= urls.length) return;
+            var url = urls[idx];
+            var fd = 'action=send&thread_id=' + encodeURIComponent(threadId) + '&text=' + encodeURIComponent(url);
+            fetch(api + '?action=send&_=' + Date.now(), {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: fd,
+                credentials: 'same-origin'
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+                if (!d.ok) showToast('Error al enviar: ' + (d.error || ''));
+                else {
+                    if (photoPickerIsFullChat && fullChatThreadId) openFullChat(fullChatThreadId);
+                    else loadMessages(true);
+                    loadLines();
+                }
+                setTimeout(function(){ sendOne(idx + 1); }, 2200);
+            })
+            .catch(function(){
+                showToast('Error de red al enviar la foto');
+                setTimeout(function(){ sendOne(idx + 1); }, 2200);
+            });
+        };
+        sendOne(0);
+    }
+
     // ── Expose ──
     window.InboxChat = {
         currentView: currentView,
@@ -1471,6 +1679,7 @@
         closeFullChat: closeFullChat,
         sendFullChatMessage: sendFullChatMessage,
         handleFullChatKey: handleFullChatKey,
+        toggleFullChatPause: toggleFullChatPause,
         markRead: markRead,
         updatePanelBadge: updatePanelBadge,
         copyToClipboard: copyToClipboard,
@@ -1495,6 +1704,11 @@
         panelAddShow: panelAddShow,
         panelAddHide: panelAddHide,
         panelAddSubmit: panelAddSubmit,
+        // Photo picker
+        openPhotoPicker: openPhotoPicker,
+        photoPickerHide: photoPickerHide,
+        photoPickerToggle: photoPickerToggle,
+        photoPickerSend: photoPickerSend,
     };
 
     // ── Attach input handlers ──

@@ -53,7 +53,7 @@
 .inbox-thread-stage.opened,.inbox-thread-stage.responded{background:rgba(251,191,36,.15);color:#fbbf24}
 .inbox-thread-stage.discarded{background:rgba(239,68,68,.1);color:#f87171}
 .inbox-thread-msg{font-size:13px;color:var(--wa-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px}
-.inbox-thread-msg .paused-icon{font-size:13px;flex-shrink:0}
+.inbox-thread-msg .paused-icon{font-size:13px;flex-shrink:0;color:#fbbf24}
 .inbox-thread-meta{font-size:11px;color:#667781;display:flex;align-items:center;gap:8px}
 .inbox-thread-item.paused{opacity:.6}
 .inbox-thread-item.paused .inbox-thread-name{color:var(--wa-muted)}
@@ -85,11 +85,20 @@
 
 .inbox-msg-date-sep{display:flex;align-items:center;justify-content:center;margin:8px 0}
 .inbox-msg-date-sep span{background:rgba(255,255,255,.08);color:var(--wa-muted);font-size:12px;padding:5px 12px;border-radius:8px}
-.inbox-msg-bubble{max-width:65%;padding:7px 10px 4px;border-radius:8px;font-size:14px;line-height:1.45;color:var(--wa-text);word-wrap:break-word;overflow-wrap:break-word;position:relative;box-shadow:0 1px 1px rgba(0,0,0,.08)}
+.inbox-msg-bubble{max-width:85%;padding:7px 10px 4px;border-radius:8px;font-size:14px;line-height:1.45;color:var(--wa-text);word-wrap:break-word;overflow-wrap:break-word;position:relative;box-shadow:0 1px 1px rgba(0,0,0,.08);margin-bottom:2px}
 .inbox-msg-bubble.in{background:var(--wa-bubble-in);align-self:flex-start;border-top-left-radius:2px}
 .inbox-msg-bubble.out{background:var(--wa-bubble-out);align-self:flex-end;border-top-right-radius:2px}
+.inbox-msg-bubble.cont{margin-top:2px}
 .inbox-msg-bubble .msg-time{display:flex;align-items:center;justify-content:flex-end;gap:3px;font-size:11px;color:rgba(255,255,255,.45);margin-top:3px;float:right;margin-left:10px;position:relative;top:4px}
 .inbox-msg-bubble .msg-bot-tag{font-size:10px;color:var(--wa-accent);display:block;margin-bottom:1px;font-weight:600}
+.inbox-msg-bubble .msg-checks{font-size:.7rem;color:rgba(255,255,255,.55);letter-spacing:-1px}
+.inbox-msg-bubble .msg-text{white-space:pre-wrap;word-break:break-word}
+.inbox-msg-bubble .msg-text .chat-img{max-width:240px;max-height:240px;border-radius:6px;display:block;margin:2px 0}
+.inbox-msg-bubble .msg-text .chat-link{color:#53bdeb;text-decoration:underline;word-break:break-all}
+/* Colitas estilo WhatsApp nativo */
+.inbox-msg-bubble.out::after{content:'';position:absolute;bottom:0;right:-6px;width:0;height:0;border-left:7px solid var(--wa-bubble-out);border-bottom:6px solid transparent;border-top:6px solid transparent}
+.inbox-msg-bubble.in::after{content:'';position:absolute;bottom:0;left:-6px;width:0;height:0;border-right:7px solid var(--wa-bubble-in);border-bottom:6px solid transparent;border-top:6px solid transparent}
+.inbox-msg-bubble.cont::after{content:none}
 
 /* ── Input area ── */
 .inbox-chat-input-area{padding:8px 12px;background:#111b2e;border-top:1px solid var(--wa-border);display:flex;gap:8px;align-items:flex-end;flex-shrink:0;min-height:56px;padding-bottom:max(8px, env(safe-area-inset-bottom))}
@@ -101,6 +110,40 @@
 .inbox-chat-send-btn:active{transform:scale(.95)}
 .inbox-chat-send-btn:disabled{opacity:.3;cursor:default;transform:none}
 .inbox-chat-send-btn::after{content:'▶';font-size:16px}
+
+/* Botón adjuntar (📎) — patrón bot-casa chat-attach-btn */
+.inbox-attach-btn{background:none;border:none;color:var(--wa-muted);font-size:1.3rem;cursor:pointer;padding:6px;border-radius:50%;flex-shrink:0;transition:color .15s,background .15s}
+.inbox-attach-btn:hover{color:var(--wa-text);background:rgba(255,255,255,.08)}
+
+/* ── Pill pausa por conversación (patrón bot-casa conv-bot-toggle) ── */
+.inbox-conv-pause{display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:20px;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s}
+.inbox-conv-pause:hover{background:rgba(255,255,255,.18)}
+.inbox-conv-pause.paused{background:rgba(239,68,68,.25)}
+.inbox-conv-pause .pause-pill{width:8px;height:8px;border-radius:50%;background:var(--wa-accent);margin-left:4px;flex-shrink:0}
+.inbox-conv-pause.paused .pause-pill{background:#ef4444}
+
+/* ── Typing indicator (burbuja 3 puntos) ── */
+.inbox-typing{display:flex;align-items:center;gap:4px;align-self:flex-start;background:var(--wa-bubble-in);border-radius:8px;border-top-left-radius:2px;padding:10px 14px;margin-bottom:2px}
+.inbox-typing span{width:7px;height:7px;border-radius:50%;background:var(--wa-muted);animation:inbox-typing-bounce 1.2s infinite ease-in-out}
+.inbox-typing span:nth-child(2){animation-delay:.2s}
+.inbox-typing span:nth-child(3){animation-delay:.4s}
+@keyframes inbox-typing-bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-4px);opacity:1}}
+
+/* ── Photo picker (adjuntar fotos de habitaciones) ── */
+.inbox-photo-picker-overlay{position:fixed;inset:0;z-index:11000;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:20px}
+.inbox-photo-picker-modal{background:#111b2e;border:1px solid var(--wa-border);border-radius:12px;width:min(560px,100%);max-height:85vh;display:flex;flex-direction:column;overflow:hidden}
+.inbox-photo-picker-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#075e54;color:#fff;font-weight:600;flex-shrink:0}
+.inbox-photo-picker-close{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:6px;padding:4px 10px;font-size:13px;cursor:pointer}
+.inbox-photo-picker-grid{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;padding:14px}
+.inbox-photo-picker-thumb{position:relative;border-radius:8px;overflow:hidden;cursor:pointer;border:3px solid transparent;aspect-ratio:4/3;background:#1f2c33}
+.inbox-photo-picker-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.inbox-photo-picker-thumb.selected{border-color:var(--wa-accent)}
+.inbox-photo-picker-check{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:var(--wa-accent);color:#000;font-size:13px;font-weight:700;display:none;align-items:center;justify-content:center}
+.inbox-photo-picker-thumb.selected .inbox-photo-picker-check{display:flex}
+.inbox-photo-picker-actions{display:flex;gap:10px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--wa-border);flex-shrink:0}
+.inbox-photo-picker-send{padding:9px 18px;border-radius:8px;border:none;background:var(--wa-accent);color:#000;font-size:14px;font-weight:700;cursor:pointer}
+.inbox-photo-picker-send:disabled{opacity:.35;cursor:default}
+.inbox-photo-picker-cancel{padding:9px 16px;border-radius:8px;border:1px solid var(--wa-border);background:transparent;color:var(--wa-muted);font-size:14px;cursor:pointer}
 
 /* ── Buttons ── */
 .inbox-btn-toggle{padding:5px 14px;border-radius:14px;border:1px solid var(--wa-border);background:rgba(255,255,255,.04);color:var(--wa-muted);font-size:12px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px;transition:all .15s}
@@ -477,11 +520,19 @@ body.inbox-agent-fs .inbox-agent-fs-close{display:block}
 .inbox-fullchat-messages::-webkit-scrollbar-thumb{background:#32404a;border-radius:3px}
 
 /* Asegurar que los bubbles y date-sep funcionan dentro del fullscreen overlay */
-.inbox-fullchat-overlay .inbox-msg-bubble{max-width:65%;padding:7px 10px 4px;border-radius:8px;font-size:14px;line-height:1.45;color:#e9edef;word-wrap:break-word;overflow-wrap:break-word;position:relative;box-shadow:0 1px 1px rgba(0,0,0,.08)}
+.inbox-fullchat-overlay .inbox-msg-bubble{max-width:85%;padding:7px 10px 4px;border-radius:8px;font-size:14px;line-height:1.45;color:#e9edef;word-wrap:break-word;overflow-wrap:break-word;position:relative;box-shadow:0 1px 1px rgba(0,0,0,.08);margin-bottom:2px}
 .inbox-fullchat-overlay .inbox-msg-bubble.in{background:#1f2c33;align-self:flex-start;border-top-left-radius:2px}
 .inbox-fullchat-overlay .inbox-msg-bubble.out{background:#005c4b;align-self:flex-end;border-top-right-radius:2px}
+.inbox-fullchat-overlay .inbox-msg-bubble.cont{margin-top:2px}
 .inbox-fullchat-overlay .inbox-msg-bubble .msg-time{display:flex;align-items:center;justify-content:flex-end;gap:3px;font-size:12px;color:rgba(255,255,255,.55);margin-top:3px;float:right;margin-left:10px;position:relative;top:4px}
 .inbox-fullchat-overlay .inbox-msg-bubble .msg-bot-tag{font-size:10px;color:#25d366;display:block;margin-bottom:1px;font-weight:600}
+.inbox-fullchat-overlay .inbox-msg-bubble .msg-checks{font-size:.7rem;color:rgba(255,255,255,.55);letter-spacing:-1px}
+.inbox-fullchat-overlay .inbox-msg-bubble .msg-text{white-space:pre-wrap;word-break:break-word}
+.inbox-fullchat-overlay .inbox-msg-bubble .msg-text .chat-img{max-width:240px;max-height:240px;border-radius:6px;display:block;margin:2px 0}
+.inbox-fullchat-overlay .inbox-msg-bubble .msg-text .chat-link{color:#53bdeb;text-decoration:underline;word-break:break-all}
+.inbox-fullchat-overlay .inbox-msg-bubble.out::after{content:'';position:absolute;bottom:0;right:-6px;width:0;height:0;border-left:7px solid #005c4b;border-bottom:6px solid transparent;border-top:6px solid transparent}
+.inbox-fullchat-overlay .inbox-msg-bubble.in::after{content:'';position:absolute;bottom:0;left:-6px;width:0;height:0;border-right:7px solid #1f2c33;border-bottom:6px solid transparent;border-top:6px solid transparent}
+.inbox-fullchat-overlay .inbox-msg-bubble.cont::after{content:none}
 .inbox-fullchat-overlay .inbox-msg-date-sep{display:flex;align-items:center;justify-content:center;margin:8px 0}
 .inbox-fullchat-overlay .inbox-msg-date-sep span{background:rgba(255,255,255,.08);color:#8696a0;font-size:12px;padding:5px 12px;border-radius:8px}
 

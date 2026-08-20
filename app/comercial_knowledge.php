@@ -61,12 +61,12 @@ function comercial_knowledge_plaza(): array {
             "Sábanas, toallas y buen ambiente incluidos.",
             "Dos modalidades:",
             "- PLAZA (60/40): compartida, 15-21 días renovables.",
-            "- ALQUILER: habitación privada, precio económico.",
+            "- ALQUILER: habitación privada, se contrata por SEMANAS (1 semana como mínimo).",
         )),
 
         'pricing' => implode("\n", array(
             "Plaza: 60/40 (la casa se queda el 40% de cada servicio).",
-            "Alquiler: precio económico (consultar disponibilidad exacta).",
+            "ALQUILER habitación privada: 170€ por semana. Mínimo 1 semana.",
             "PRECIOS NO NEGOCIABLES. No ofrezcas descuentos ni rebajas.",
         )),
 
@@ -80,16 +80,17 @@ function comercial_knowledge_plaza(): array {
             "NUNCA te inventes comodidades ni equipamiento de las habitaciones (aire acondicionado, jacuzzi, nevera, etc.). Di SOLO lo que está en la lista real de la casa.",
             "NO hables de otros temas que no sean la casa.",
             "NUNCA ofrezcas visitas a la casa. Ofrece fotos de las habitaciones en su lugar.",
+            "Si pregunta por alquiler o habitación privada, asume 1 semana como base. NUNCA preguntes '¿para qué días?' ni '¿qué días quieres?'. Pregunta cuándo quiere llegar o empezar.",
             "NUNCA presiones el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', 'te lo dejo funcionando hoy' ni urgencia fabricada. Si la chica solo pidió información, respóndele y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?').",
         ),
 
         'faq' => array(
-            '¿Cuánto cuesta?'               => 'Hay dos opciones: plaza compartida al 60/40 o alquiler de habitación privada. Cuéntame qué te interesa más y te detallo.',
+            '¿Cuánto cuesta?'               => 'Hay dos opciones: plaza compartida al 60/40 o alquiler de habitación privada a 170€ la semana. Cuéntame qué te interesa más y te detallo.',
             '¿Dónde está la casa?'           => 'En Burriana, una zona tranquila y bien comunicada. Si quieres, te paso fotos de las habitaciones y lo ves tú misma.',
             '¿Hay disponibilidad?'           => 'Sí, ahora mismo hay hueco. Varias chicas se han ido de vacaciones y hay mucha demanda. Si quieres, te cuento más.',
             '¿Cómo es la casa?'              => 'Grande, limpia y tranquila, con buen rollo. 2 baños completos, ventilador (sin aire acondicionado), wifi y smartTV, sábanas y toallas. Se puede trabajar 24/7 y hay clientela fija.',
             '¿Puedo verla?'                 => 'Claro, te paso fotos de las habitaciones y así lo ves sin compromiso.',
-            '¿Cuánto tiempo puedo quedarme?' => 'Las plazas son de 15 a 21 días renovables. Si vas por alquiler, podemos hablarlo.',
+            '¿Cuánto tiempo puedo quedarme?' => 'Las plazas son de 15 a 21 días renovables. El alquiler de habitación privada es por semanas (mínimo 1 semana, 170€).',
             '¿Hay normas?'                  => 'Las básicas de convivencia y respeto. Nada raro. Si te paso las fotos te cuento todo.',
         ),
 
@@ -127,7 +128,7 @@ function comercial_knowledge_plaza(): array {
             "No inventes cuál habitación está libre ni su estado: la disponibilidad concreta se consulta en el momento.",
         ),
 
-        'tone' => "Cercano y profesional, como hablarías con una compañera de piso. Tono cálido pero directo. Nada de formalismos excesivos. Usa expresiones naturales de WhatsApp. NO uses coletillas infantiles.",
+        'tone' => "Cercano y directo, como una compañera hablando por WhatsApp. Frases cortas y cálidas, tuteo natural. Sin formalismos, sin lenguaje corporativo, sin coletillas infantiles. NO uses coletillas infantiles.",
 
         'opening_styles' => array(
             'Destacar la alta demanda actual ("hay muchísimo curro porque varias se fueron de vacaciones")',
@@ -221,7 +222,7 @@ function comercial_knowledge_lamami(): array {
             'Insulta o es agresiva',
         ),
 
-        'tone' => "Cercano, profesional y entusiasta. Como quien recomienda algo bueno a una amiga. Sin ser empalagosa. Transmite confianza y claridad. NO uses coletillas infantiles.",
+        'tone' => "Cercano, directo y con energía, como quien recomienda algo bueno a una amiga. Frases cortas y cálidas, tuteo natural. Sin formalismos ni lenguaje corporativo. Transmite confianza y claridad. NO uses coletillas infantiles.",
 
         'opening_styles' => array(
             'Presentar el concepto: "nuevo concepto de publicista, a resultados"',
@@ -312,7 +313,7 @@ function comercial_knowledge_publicista(): array {
             'Insulta o es agresivo',
         ),
 
-        'tone' => "Directo, profesional y claro. Sin rodeos. Tono de negocios pero cercano. La frase clave es 'tú solo abres la puerta, nosotros hacemos el resto'. Máximo 1 emoji por mensaje.",
+        'tone' => "Directo, cercano y claro. Sin rodeos. Tono de negocios pero cálido, como hablar con un conocido. La frase clave es 'tú solo abres la puerta, nosotros hacemos el resto'. Máximo 1 emoji por mensaje. Sin lenguaje corporativo ni formalismos.",
 
         'opening_styles' => array(
             'Pregunta retórica sobre ingresos pasivos',
@@ -418,7 +419,7 @@ function comercial_knowledge_casawasap(): array {
             'Insulta o es agresivo',
         ),
 
-        'tone' => "Profesional, cálido y directo. Tono de negocios pero cercano. Transmite confianza en el producto sin ser arrogante. NUNCA coletillas infantiles. Máximo 1 emoji por mensaje. Responde primero a lo que preguntan, luego añade valor.",
+        'tone' => "Cercano, cálido y directo. Tono de conversación de WhatsApp entre personas que se conocen. Transmite confianza en el producto sin ser arrogante. NUNCA coletillas infantiles. Máximo 1 emoji por mensaje. Responde primero a lo que preguntan, luego añade valor. Sin lenguaje corporativo ('estamos para ayudarte', 'cualquier consulta').",
 
         'opening_styles' => array(
             'Pregunta provocativa: "¿Cuántos clientes pierdes mientras duermes?"',
@@ -500,7 +501,7 @@ function comercial_knowledge_publiscort(): array {
             'El precio le parece inasumible y lo dice claramente',
         ),
 
-        'tone' => "Cercano, profesional y breve. Sin extenderse. Directo al grano pero amable. Máximo 1 emoji. Sé conciso.",
+        'tone' => "Cercano, directo y breve. Sin extenderse. Al grano pero amable, como un WhatsApp normal. Sin lenguaje corporativo. Máximo 1 emoji. Sé conciso.",
 
         'opening_styles' => array(
             'Presentación directa del servicio y portales',
@@ -583,7 +584,7 @@ function comercial_knowledge_inbound(): array {
             'Insulta o es agresivo',
         ),
 
-        'tone' => "Natural, cercano y profesional. Como una persona real respondiendo un WhatsApp. Nada de formalismos excesivos. Curiosidad genuina, no interrogatorio.",
+        'tone' => "Natural, cercano y directo. Como una persona real respondiendo un WhatsApp a alguien que acaba de conocer. Frases cortas y cálidas, tuteo natural. Nada de formalismos ni lenguaje corporativo. Curiosidad genuina, no interrogatorio.",
 
         'opening_styles' => array(), // inbound no abre conversaciones
 

@@ -2503,7 +2503,7 @@ function comercial_plaza_wants_photos(string $inboundText, string $replyText): b
     // Normalizar acentos/ñ para matchear con independencia de tildes
     $accents = array('á'=>'a','à'=>'a','ä'=>'a','â'=>'a','é'=>'e','è'=>'e','ë'=>'e','ê'=>'e','í'=>'i','ì'=>'i','ï'=>'i','î'=>'i','ó'=>'o','ò'=>'o','ö'=>'o','ô'=>'o','ú'=>'u','ù'=>'u','ü'=>'u','û'=>'u','ñ'=>'n');
     $haystack = strtr($haystack, $accents);
-    return (bool) preg_match('/(fotos?|ensen|mandam|habitacion|verla|verlo|a ver|como es|como son)/u', $haystack);
+    return (bool) preg_match('/(fotos?|fotitos?|ensen|mandam|habitacion|habitaciones|verla|verlo|verlas|a ver|ver las|quiero ver|como es|como son|mostr|muestr)/u', $haystack);
 }
 
 /**
@@ -3230,6 +3230,60 @@ function comercial_thread_release_inbound_lock($lockHandle) {
     @fclose($lockHandle);
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  Cancelación de respuesta en vuelo (patrón bot-casa .cancel)
+//  Cuando un humano interviene (app o WhatsApp nativo) mientras el
+//  bot está generando/enviando una respuesta automática, se escribe
+//  un marcador .cancel. comercial_send_thread_message lo comprueba
+//  antes de cada envío y aborta si existe.
+// ═══════════════════════════════════════════════════════════════
+
+function comercial_thread_cancel_path($threadId) {
+    $threadId = trim((string)$threadId);
+    $safe = $threadId !== '' ? md5($threadId) : 'unknown';
+    return DATA_PATH . '/comercial_thread_cancel/' . $safe . '.cancel';
+}
+
+function comercial_thread_request_cancel($threadId) {
+    $threadId = trim((string)$threadId);
+    if ($threadId === '') return false;
+    $p = comercial_thread_cancel_path($threadId);
+    $dir = dirname($p);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    return @file_put_contents($p, gmdate('c'), LOCK_EX) !== false;
+}
+
+function comercial_thread_is_cancelled($threadId) {
+    $threadId = trim((string)$threadId);
+    if ($threadId === '') return false;
+    return file_exists(comercial_thread_cancel_path($threadId));
+}
+
+function comercial_thread_clear_cancel($threadId) {
+    $threadId = trim((string)$threadId);
+    if ($threadId === '') return;
+    @unlink(comercial_thread_cancel_path($threadId));
+}
+
+// Limpia marcadores de cancelación huérfanos (más de 1 hora de antigüedad).
+// Se llama de forma probabilística para no añadir coste por request.
+function comercial_thread_cancel_gc() {
+    $dir = DATA_PATH . '/comercial_thread_cancel';
+    if (!is_dir($dir)) return;
+    if (mt_rand(1, 20) !== 1) return;
+    $cutoff = time() - 3600;
+    foreach ((array)@scandir($dir) as $f) {
+        if ($f === '.' || $f === '..') continue;
+        $fp = $dir . '/' . $f;
+        $mtime = @filemtime($fp);
+        if ($mtime !== false && $mtime < $cutoff) {
+            @unlink($fp);
+        }
+    }
+}
+
 function comercial_webhook_extract_payload($request = array()) {
     $request = is_array($request) ? $request : array();
     $body = isset($request['body']) && is_array($request['body']) ? $request['body'] : $request;
@@ -3401,6 +3455,9 @@ function comercial_handle_webhook_http() {
         $payload = comercial_webhook_extract_payload($body);
         $logContext = comercial_webhook_payload_log_context($payload);
 
+        // Limpieza probabilística de marcadores de cancelación huérfanos
+        comercial_thread_cancel_gc();
+
         if (!empty($payload['from_me'])) {
             // ── fromMe=true → un humano respondió desde WhatsApp nativo ──
             // source=api ⇒ lo envió el propio bot vía WAHA API y ya está
@@ -3424,6 +3481,9 @@ function comercial_handle_webhook_http() {
                     $fromMeThread['human_taken'] = 1;
                     $fromMeThread['inbox_paused'] = 1;
                     $fromMeThread['last_human_reply_at'] = now_datetime();
+                    // Cancelar cualquier respuesta automática en vuelo para este hilo:
+                    // el humano ha tomado el control, el bot no debe seguir enviando.
+                    comercial_thread_request_cancel((string)($fromMeThread['id'] ?? ''));
                     // Persistir el texto del mensaje en el thread para que aparezca en el historial
                     if ($msgText !== '') {
                         $fromMeThread['last_outbound_text'] = $msgText;
@@ -5901,6 +5961,16 @@ function comercial_send_thread_message($thread, $text, $options = array()) {
     // ── Split automático: texto primero, luego cada enlace de foto en mensaje individual ──
     // Solo en respuestas automáticas; las manuales (human_taken) se envían tal cual.
     $isAuto = empty($options['human_taken']);
+
+    // ── Inyección centralizada de fotos (rama plaza): se aplica en TODOS los paths
+    // automáticos (greeting, responded, qualified, very_hot, fallback) porque todos
+    // terminan en esta función. Antes solo se inyectaba en el wrapper LLM y el path
+    // very_hot (generador legacy) se quedaba sin enlaces. El guard interno de
+    // comercial_plaza_inject_room_photos evita duplicar si el texto ya lleva URLs.
+    if ($isAuto && trim((string)($thread['process_slug'] ?? '')) === 'plaza') {
+        $text = comercial_plaza_inject_room_photos('plaza', $text, (string)($thread['last_inbound_text'] ?? ''));
+    }
+
     $messages = $isAuto ? comercial_split_image_messages($text) : array($text);
     $messages = array_values(array_filter(array_map(function($m) { return trim((string)$m); }, $messages), function($m) { return $m !== ''; }));
     if (empty($messages)) {
@@ -5910,6 +5980,18 @@ function comercial_send_thread_message($thread, $text, $options = array()) {
     $sentCount = 0;
     $send = null;
     foreach ($messages as $i => $msg) {
+        // ── Cancelación en vuelo: si un humano intervino mientras generábamos
+        // (marcador .cancel), abortar el envío automático sin mandar nada.
+        if ($isAuto && comercial_thread_is_cancelled((string)($thread['id'] ?? ''))) {
+            comercial_thread_clear_cancel((string)($thread['id'] ?? ''));
+            comercial_event_append('auto_reply_cancelled', array(
+                'thread_id' => (string)($thread['id'] ?? ''),
+                'process_slug' => (string)($thread['process_slug'] ?? ''),
+                'target_phone' => (string)($thread['target_phone'] ?? ''),
+                'reason' => 'human_intervened',
+            ));
+            return array('ok' => false, 'error' => 'cancelled', 'cancelled' => true);
+        }
         if ($i > 0) {
             sleep((int)COMERCIAL_PHOTO_LINK_SLEEP_SEC);
         }
@@ -6832,24 +6914,6 @@ function comercial_handle_inbound_message($payload) {
     $thread['last_contact_at'] = now_datetime();
     $thread['updated_at'] = now_datetime();
     $thread['last_inbound_processed_at'] = now_datetime();
-
-    // Auto-reopen: si el hilo fue escalado a humano pero no hubo actividad humana
-    // en los últimos 30 minutos, devolver el control al bot automáticamente.
-    if (!empty($thread['human_taken'])) {
-        $lastHumanAt = trim((string)($thread['last_human_reply_at'] ?? $thread['updated_at'] ?? ''));
-        $lastHumanTs = $lastHumanAt !== '' ? strtotime($lastHumanAt) : 0;
-        $humanInactiveMinutes = 30;
-        if ($lastHumanTs === 0 || (time() - $lastHumanTs) > ($humanInactiveMinutes * 60)) {
-            $thread['human_taken'] = 0;
-            $thread['auto_turn_count'] = 0; // resetear turnos para que el bot pueda volver a responder
-            comercial_event_append('human_reopen_auto', array(
-                'thread_id' => (string)$thread['id'],
-                'process_slug' => (string)($thread['process_slug'] ?? ''),
-                'target_phone' => (string)($thread['target_phone'] ?? ''),
-                'reason' => 'human_inactive_' . $humanInactiveMinutes . 'min',
-            ));
-        }
-    }
 
     // ── AGENT V2: determinar fase de conversación (state machine) ──
     $thread['conversation_phase'] = comercial_state_machine_determine_phase($thread, $process, $text);

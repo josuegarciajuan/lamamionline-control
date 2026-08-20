@@ -51,7 +51,7 @@ $agentHtml = ob_get_clean();
 // ── Versiones para cache busters ──
 $_chatCssV = is_file(__DIR__ . '/assets/inbox-chat.css') ? filemtime(__DIR__ . '/assets/inbox-chat.css') : time();
 $_chatJsV  = is_file(__DIR__ . '/assets/inbox-chat.js')  ? filemtime(__DIR__ . '/assets/inbox-chat.js')  : time();
-$_forceV   = '20260813_01'; // Agenda: responsive cards + chat interno + fix scroll panel agente
+$_forceV   = '20260820_01'; // fotos habitaciones centralizadas + alquiler 170€ + tono humano + UI WhatsApp + pausa por conversación
 
 ?><!doctype html>
 <html lang="es">
@@ -211,6 +211,7 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
         </div>
 
         <div class="inbox-chat-input-area" id="inboxInputArea" style="display:none">
+            <button class="inbox-attach-btn" id="inboxAttachBtn" onclick="InboxChat.openPhotoPicker()" title="Adjuntar fotos de habitaciones">📎</button>
             <textarea id="inboxChatInput" class="inbox-chat-input" placeholder="Escribe un mensaje..." rows="1"></textarea>
             <button class="inbox-chat-send-btn" id="inboxChatSendBtn" onclick="InboxChat.sendMessage()">Enviar</button>
         </div>
@@ -232,6 +233,11 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
             <div class="inbox-fullchat-name" id="inboxFullChatName">Conversación</div>
             <div class="inbox-fullchat-sub" id="inboxFullChatSub"></div>
         </div>
+        <div class="inbox-fullchat-header-actions">
+            <button class="inbox-conv-pause" id="inboxFullChatPauseBtn" style="display:none" onclick="InboxChat.toggleFullChatPause()" title="Parar/reanudar respuestas automáticas del bot en esta conversación">
+                <span class="inbox-conv-pause-label" id="inboxFullChatPauseLabel">🤖 Auto</span><span class="pause-pill"></span>
+            </button>
+        </div>
     </div>
     <div class="inbox-fullchat-messages" id="inboxFullChatMessages">
         <div class="inbox-chat-placeholder">
@@ -240,6 +246,7 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
         </div>
     </div>
     <div class="inbox-fullchat-input-area" id="inboxFullChatInputArea">
+        <button class="inbox-attach-btn" id="inboxFullChatAttachBtn" onclick="InboxChat.openPhotoPicker(true)" title="Adjuntar fotos de habitaciones">📎</button>
         <textarea class="inbox-fullchat-input" id="inboxFullChatInput" placeholder="Escribe un mensaje..." rows="1" onkeydown="InboxChat.handleFullChatKey(event)"></textarea>
         <button class="inbox-fullchat-send-btn" id="inboxFullChatSendBtn" onclick="InboxChat.sendFullChatMessage()">▶</button>
     </div>
@@ -355,6 +362,23 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
                 <button type="button" class="panel-add-btn-cancel" onclick="InboxChat.panelAddHide()">Cancelar</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- ── Modal: Adjuntar fotos de habitaciones ── -->
+<div class="inbox-photo-picker-overlay" id="inboxPhotoPickerOverlay" style="display:none">
+    <div class="inbox-photo-picker-modal">
+        <div class="inbox-photo-picker-header">
+            <span>📎 Fotos de habitaciones</span>
+            <button class="inbox-photo-picker-close" onclick="InboxChat.photoPickerHide()">✕</button>
+        </div>
+        <div class="inbox-photo-picker-grid" id="inboxPhotoPickerGrid">
+            <div class="inbox-loading">Cargando fotos...</div>
+        </div>
+        <div class="inbox-photo-picker-actions">
+            <button type="button" class="inbox-photo-picker-send" id="inboxPhotoPickerSendBtn" onclick="InboxChat.photoPickerSend()" disabled>Enviar seleccionadas</button>
+            <button type="button" class="inbox-photo-picker-cancel" onclick="InboxChat.photoPickerHide()">Cancelar</button>
+        </div>
     </div>
 </div>
 

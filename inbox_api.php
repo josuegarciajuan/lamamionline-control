@@ -275,6 +275,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'thread') {
             'paused'        => !empty($thread['inbox_paused']),
             'human_taken'   => !empty($thread['human_taken']),
             'updated_at'    => trim((string)($thread['updated_at'] ?? '')),
+            'next_bot_action_at' => trim((string)($thread['next_bot_action_at'] ?? '')),
             'agenda_entry'  => $agendaData,
         ],
         'messages' => $messages,
@@ -316,6 +317,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'send') {
     }
     if (!$thread) inbox_api_json_err('Hilo no encontrado', 404);
 
+    // El humano interviene desde la app: cancelar cualquier respuesta automática
+    // en vuelo y marcar la conversación como parada (human_taken + inbox_paused
+    // los aplica comercial_send_thread_message con human_taken=true).
+    if (function_exists('comercial_thread_request_cancel')) {
+        comercial_thread_request_cancel($threadId);
+    }
+
     $send = comercial_send_thread_message($thread, $text, [
         'human_taken' => true,
         'event_type'  => 'manual_outbound_sent',
@@ -349,6 +357,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'toggle_thread') {
             $thread['inbox_paused'] = 0;
             $thread['human_taken']  = 0;
             $newPaused = false;
+            // Al reactivar el bot, limpiar cualquier cancelación pendiente
+            if (function_exists('comercial_thread_clear_cancel')) {
+                comercial_thread_clear_cancel($threadId);
+            }
         } else {
             $thread['inbox_paused'] = 1;
             $newPaused = true;
@@ -591,5 +603,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'manual_panel_add') {
     if (!$found) inbox_api_json_err('Hilo no encontrado', 404);
 }
 
+// ── GET ?action=room_photos ──
+// Devuelve la lista de fotos de habitaciones (rama plaza) para el selector
+// de adjuntar del chat. Vive en data/plaza_room_photos.json (compartir.site).
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'room_photos') {
+    $photos = function_exists('plaza_room_photos_get') ? plaza_room_photos_get() : array();
+    inbox_api_json_ok(['photos' => $photos]);
+}
+
 // ── Sin acción válida ──
-inbox_api_json_err('Acción no válida. Usa: lines, thread, send, toggle_thread, toggle_replies, toggle_opener, mark_read, pending_count, attend, discard, manual_panel_add, find_thread_by_phone');
+inbox_api_json_err('Acción no válida. Usa: lines, thread, send, toggle_thread, toggle_replies, toggle_opener, mark_read, pending_count, attend, discard, manual_panel_add, find_thread_by_phone, room_photos');

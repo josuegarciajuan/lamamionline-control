@@ -164,7 +164,17 @@ function comercial_agent_build_system_prompt(string $processSlug, string $mode, 
 
     // ── Sección 6: Tono ──
     if (!empty($kb['tone'])) {
-        $sections[] = "═══ TONO Y ESTILO ═══\n" . trim($kb['tone']) . "\n- Máximo 1 emoji por mensaje.\n- Sin markdown, sin listas, sin formato especial.\n- Natural, como un WhatsApp real.\n- Entre 1 y 4 líneas.\n- NUNCA coletillas infantiles (guapa, cariño, reina, Holaaa).\n- Varía la estructura de tus mensajes, no uses siempre el mismo patrón.\n- NUNCA presiones ni fuerces el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', 'te lo dejo funcionando hoy', urgencia fabricada ('hoy mismo', 'ya').\n- Si el cliente pidió SOLO información, dásela y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?'). No pidas activar/empezar sin que haya mostrado intención clara.";
+        $sections[] = "═══ TONO Y ESTILO ═══\n" . trim($kb['tone']) . "\n"
+            . "- Habla como una persona real por WhatsApp: frases cortas y cálidas, tuteo natural.\n"
+            . "- PROHIBIDO lenguaje corporativo o de atención al cliente: 'Entiendo que...', 'podemos coordinar', 'Siempre hay rotación', 'es bueno tener el contacto', 'avísame', 'quedamos', 'me alegra que preguntes', 'buena pregunta'.\n"
+            . "- Máximo 1 emoji por mensaje.\n"
+            . "- Sin markdown, sin listas, sin formato especial.\n"
+            . "- Natural, como un WhatsApp real.\n"
+            . "- Entre 1 y 4 líneas.\n"
+            . "- NUNCA coletillas infantiles (guapa, cariño, reina, Holaaa).\n"
+            . "- Varía la estructura de tus mensajes, no uses siempre el mismo patrón.\n"
+            . "- NUNCA presiones ni fuerces el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', 'te lo dejo funcionando hoy', urgencia fabricada ('hoy mismo', 'ya').\n"
+            . "- Si el cliente pidió SOLO información, dásela y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?'). No pidas activar/empezar sin que haya mostrado intención clara.";
     }
 
     // ── Sección 7: Señales de lead ──
