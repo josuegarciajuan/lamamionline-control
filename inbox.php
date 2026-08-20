@@ -112,7 +112,7 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
 .inbox-fullchat-header-info{flex:1;min-width:0}
 .inbox-fullchat-name{font-size:16px;font-weight:600;color:#fff}
 .inbox-fullchat-sub{font-size:12px;color:rgba(255,255,255,.55);margin-top:2px}
-.inbox-fullchat-messages{flex:1;min-height:0;overflow-y:auto;padding:10px 20px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.inbox-fullchat-messages{flex:1;min-height:0;overflow-y:auto;padding:10px 20px;display:flex;flex-direction:column;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .inbox-fullchat-input-area{padding:8px 12px;background:#111b2e;border-top:1px solid #222d34;display:flex;gap:8px;align-items:flex-end;flex-shrink:0;min-height:56px}
 .inbox-fullchat-input{flex:1;resize:none;padding:9px 14px;border-radius:20px;border:none;background:#1f2c33;color:#e9edef;font-size:15px;outline:none;min-height:42px;max-height:120px;font-family:inherit;line-height:1.4}
 .inbox-fullchat-input:focus{background:#2a3942}
