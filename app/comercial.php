@@ -1785,6 +1785,7 @@ function comercial_normalize_thread($row) {
         'manual_panel_reason' => '',
         'manual_panel_negocio' => '',
         'manual_panel_at' => '',
+        'sender_lid' => '',
     );
     $out = array_merge($defaults, $row);
     $out['human_taken'] = !empty($out['human_taken']) ? 1 : 0;
@@ -3376,6 +3377,15 @@ function comercial_webhook_extract_payload($request = array()) {
     ));
     $linePhone = comercial_only_digits((string)($me['id'] ?? ''));
 
+    // LID oculto de WhatsApp (p.ej. 196379527909586@lid). Lo guardamos para poder
+    // consultar el historial de mensajes vía WAHA GET /api/messages?chatId=<lid>.
+    $rawChat = comercial_first_nonempty_value(array(
+        $dataInfo['Chat'] ?? '',
+        $payload['from'] ?? '',
+        $data['from'] ?? '',
+    ));
+    $fromLid = (is_string($rawChat) && stripos($rawChat, '@lid') !== false) ? trim($rawChat) : '';
+
     return array(
         'from' => comercial_only_digits($from),
         'to' => comercial_only_digits($to),
@@ -3385,6 +3395,7 @@ function comercial_webhook_extract_payload($request = array()) {
         'from_me' => $fromMe ? 1 : 0,
         'source' => trim((string)$source),
         'line_phone' => $linePhone,
+        'from_lid' => $fromLid,
         'is_status_broadcast' => $isStatusBroadcast ? 1 : 0,
         'is_group' => $isGroupMessage ? 1 : 0,
         'raw' => $body,
@@ -3664,6 +3675,7 @@ function comercial_register_unmatched_inbound_thread($payload) {
         'line_id' => (string)($line['id'] ?? ''),
         'line_phone' => comercial_only_digits((string)($line['tfono'] ?? ($payload['to'] ?? ''))),
         'target_phone' => $fromPhone,
+        'sender_lid' => trim((string)($payload['from_lid'] ?? '')),
         'source_ref' => 'webhook_unmatched',
         'source_payload' => (array)($payload['raw'] ?? array()),
         'stage' => 'opened',
@@ -6351,6 +6363,112 @@ function comercial_schedule_next_run($process, $lineState = null) {
     return $process;
 }
 
+/**
+ * Sincroniza las respuestas enviadas desde WhatsApp nativo (no desde la app ni
+ * desde la API) para un hilo concreto, consultando el historial de WAHA.
+ *
+ * GOWS no dispara el evento webhook `message.any` para mensajes salientes, así
+ * que detectamos las respuestas nativas leyendo GET /api/messages por chat.
+ * Devuelve el número de respuestas nativas detectadas (y registradas).
+ */
+function comercial_sync_native_replies_for_thread($thread, $shortTimeoutSec = 2) {
+    $thread = comercial_normalize_thread($thread);
+    $lineId = trim((string)($thread['line_id'] ?? ''));
+    $lines = comercial_list_lines_indexed();
+    if ($lineId === '' || !isset($lines[$lineId])) return 0;
+    $port = trim((string)($lines[$lineId]['waha_port'] ?? ''));
+    if ($port === '') return 0;
+
+    // chatId: preferir el LID oculto; si no lo tenemos, usar el teléfono @c.us.
+    $chatId = trim((string)($thread['sender_lid'] ?? ''));
+    if ($chatId === '') {
+        $chatId = comercial_to_chat_id(comercial_normalize_phone_spain((string)($thread['target_phone'] ?? '')));
+    }
+    if ($chatId === '' || $chatId === '@c.us') return 0;
+
+    $settings = comercial_get_settings();
+    // Timeout corto: una caída de WAHA no debe colgar la carga del chat.
+    $settings['curl_timeout_sec'] = (string)max(1, min((int)($settings['curl_timeout_sec'] ?? 8), (int)$shortTimeoutSec));
+    $session = trim((string)($settings['waha_session'] ?? 'default'));
+    if ($session === '') $session = 'default';
+
+    $path = 'api/messages?chatId=' . rawurlencode($chatId) . '&limit=8&session=' . rawurlencode($session);
+    try {
+        $resp = comercial_waha_get_json($settings, $port, $path);
+    } catch (Throwable $e) {
+        return 0;
+    }
+    if (empty($resp['ok'])) return 0;
+
+    $decoded = json_decode((string)($resp['body'] ?? ''), true);
+    if (!is_array($decoded)) return 0;
+
+    $detected = 0;
+    foreach ($decoded as $msg) {
+        if (!is_array($msg)) continue;
+        if (empty($msg['fromMe'])) continue;                 // solo salientes
+        $source = trim((string)($msg['source'] ?? ''));
+        if ($source === 'api') continue;                     // envíos del bot vía API (ya registrados)
+        $msgId = trim((string)($msg['id'] ?? ''));
+        $body = trim((string)($msg['body'] ?? ''));
+        if ($msgId === '' || $body === '') continue;         // sin id/texto no podemos deduplicar/registrar
+        if (!comercial_webhook_claim_message($msgId)) continue; // ya procesado (webhook o poll previo)
+
+        $thread['human_taken'] = 1;
+        $thread['inbox_paused'] = 1;
+        $thread['last_human_reply_at'] = now_datetime();
+        $thread['last_outbound_text'] = $body;
+        $thread['updated_at'] = now_datetime();
+        comercial_thread_request_cancel((string)($thread['id'] ?? ''));
+        comercial_event_append('manual_outbound_sent', array(
+            'thread_id' => (string)($thread['id'] ?? ''),
+            'target_phone' => (string)($thread['target_phone'] ?? ''),
+            'text' => $body,
+            'source' => 'native_wa',
+        ));
+        $detected++;
+    }
+
+    if ($detected > 0) {
+        comercial_upsert_thread($thread);
+    }
+    return $detected;
+}
+
+/**
+ * Backstop de fondo: detecta respuestas nativas en hilos abiertos que no están
+ * siendo vistos en la app, para pausar el bot y marcar no-leído. Se llama desde
+ * comercial_run_tick. La vista en tiempo real la cubre ?action=thread.
+ */
+function comercial_poll_native_replies($maxThreads = 40) {
+    $threads = comercial_get_threads();
+    $candidates = array();
+    $cutoff = time() - (2 * 86400); // solo actividad de los últimos 2 días
+    foreach ($threads as $t) {
+        if (!empty($t['human_taken'])) continue;
+        if (!empty($t['inbox_paused'])) continue;
+        $lastTs = strtotime((string)($t['last_contact_at'] ?? $t['updated_at'] ?? ''));
+        if ($lastTs === false || $lastTs < $cutoff) continue;
+        $candidates[] = $t;
+    }
+    usort($candidates, function ($a, $b) {
+        return strcmp((string)($b['last_contact_at'] ?? ''), (string)($a['last_contact_at'] ?? ''));
+    });
+    $candidates = array_slice($candidates, 0, max(1, (int)$maxThreads));
+
+    $summary = array('polled' => 0, 'detected' => 0, 'errors' => 0);
+    foreach ($candidates as $t) {
+        try {
+            $n = comercial_sync_native_replies_for_thread($t);
+            $summary['polled']++;
+            $summary['detected'] += $n;
+        } catch (Throwable $e) {
+            $summary['errors']++;
+        }
+    }
+    return $summary;
+}
+
 function comercial_run_tick($forceProcessId = '') {
     $results = array();
     comercial_refresh_lines_health(false);
@@ -6508,6 +6626,16 @@ function comercial_run_tick($forceProcessId = '') {
     $aiResult = comercial_auto_qualify_recent_threads();
     if (!empty($aiResult['analyzed']) && (int)$aiResult['analyzed'] > 0) {
         comercial_event_append('ai_auto_qualify', $aiResult);
+    }
+
+    // ── Backstop: detectar respuestas nativas de WhatsApp (no vistas en la app) ──
+    try {
+        $native = comercial_poll_native_replies();
+        if ((int)($native['polled'] ?? 0) > 0 || (int)($native['detected'] ?? 0) > 0) {
+            $results[] = array('process' => '__native_replies__', 'ok' => true, 'reason' => json_encode($native, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        }
+    } catch (Throwable $e) {
+        // No romper el tick por un fallo de polling
     }
 
     return $results;
@@ -6881,6 +7009,12 @@ function comercial_handle_inbound_message($payload) {
             'action' => $classification === 'opened' ? 'thread_opened' : 'thread_created',
             'target_phone' => $fromPhone,
         );
+    }
+
+    // Persistir el LID del remitente si aún no lo tenemos (necesario para el
+    // polling de respuestas nativas vía GET /api/messages?chatId=<lid>).
+    if (trim((string)($thread['sender_lid'] ?? '')) === '' && trim((string)($payload['from_lid'] ?? '')) !== '') {
+        $thread['sender_lid'] = trim((string)$payload['from_lid']);
     }
 
     // ── Fix #6: thread-level inbound lock — previene respuestas duplicadas en ráfagas ──

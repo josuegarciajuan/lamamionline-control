@@ -217,6 +217,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'thread') {
     if (!$thread) inbox_api_json_err('Hilo no encontrado', 404);
 
     $thread = comercial_normalize_thread($thread);
+
+    // ── Respuestas nativas en tiempo real ──
+    // GOWS no dispara el webhook message.any para salientes, así que consultamos
+    // el historial de WAHA para detectar si el humano respondió desde WhatsApp
+    // nativo y reflejarlo (human_taken/paused) sin recargar la app manualmente.
+    if (function_exists('comercial_sync_native_replies_for_thread')) {
+        try {
+            $nativeDetected = comercial_sync_native_replies_for_thread($thread);
+            if ($nativeDetected > 0) {
+                foreach (comercial_get_threads() as $t) {
+                    if ((string)($t['id'] ?? '') === $threadId) { $thread = comercial_normalize_thread($t); break; }
+                }
+            }
+        } catch (Throwable $e) {
+            // No romper la carga del hilo por un fallo de polling WAHA
+        }
+    }
+
     $linesIndexed = comercial_list_lines_indexed();
     $lineName = isset($linesIndexed[(string)($thread['line_id'] ?? '')]) ? trim((string)($linesIndexed[(string)$thread['line_id']]['nombre'] ?? '')) : '';
 

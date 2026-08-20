@@ -15,6 +15,7 @@
     var currentView = 'chat'; // 'chat' | 'agent'
     var fullChatThreadId = null;   // ID del hilo abierto en fullscreen
     var fullChatThreadData = null; // Datos del hilo fullscreen
+    var _fullChatLastJson = '';    // dedup del refresco en tiempo real del fullchat
     var _readTimestamps = {};      // { threadId: Date.now() } — marca cuándo se leyó localmente
 
     // ── Init ──
@@ -23,7 +24,10 @@
             loadLines();
             pollingTimer = setInterval(function(){
                 if (document.hidden) return;
-                if (currentView === 'chat') loadLines();
+                if (currentView === 'chat') {
+                    loadLines();
+                    if (fullChatThreadId) refreshFullChat();
+                }
             }, 5000);
         } else if (currentView === 'agent') {
             // Inicializar tabla de agente tras carga del DOM
@@ -800,10 +804,42 @@
             }
             renderFullChatMessages(d.messages || []);
             updateTypingIndicator(document.getElementById('inboxFullChatMessages'), d.thread);
+            _fullChatLastJson = JSON.stringify(d.messages || []);
         })
         .catch(function(){
             if (msgEl) msgEl.innerHTML = '<div class="inbox-chat-placeholder"><div>Error al cargar</div></div>';
         });
+    }
+
+    // Refresca el fullchat abierto en tiempo real (poll de 5s) SIN tocar el input
+    // ni forzar scroll. La detección de respuestas nativas la hace el backend en
+    // ?action=thread (comercial_sync_native_replies_for_thread).
+    function refreshFullChat() {
+        if (!fullChatThreadId) return;
+        fetch(api + '?action=thread&id=' + encodeURIComponent(fullChatThreadId) + '&_=' + Date.now(), {credentials:'same-origin'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (!d.ok) return;
+            var json = JSON.stringify(d.messages || []);
+            if (json === _fullChatLastJson) return; // nada nuevo, evitar re-render/flicker
+            _fullChatLastJson = json;
+            fullChatThreadData = d;
+            var msgEl = document.getElementById('inboxFullChatMessages');
+            var subEl = document.getElementById('inboxFullChatSub');
+            if (d.thread) {
+                var t = d.thread;
+                if (subEl) {
+                    var parts = [];
+                    if (t.process_slug) parts.push(t.process_slug);
+                    if (t.line_name) parts.push('via ' + t.line_name);
+                    subEl.textContent = parts.join(' · ') || 'Conversación';
+                }
+                renderFullChatPause(t);
+            }
+            renderFullChatMessages(d.messages || []);
+            updateTypingIndicator(msgEl, d.thread);
+        })
+        .catch(function(){});
     }
 
     function closeFullChat() {
@@ -814,6 +850,7 @@
         if (panel) updateCardBadges(panel);
         fullChatThreadId = null;
         fullChatThreadData = null;
+        _fullChatLastJson = '';
         document.body.style.overflow = '';
         // Resetear el highlight de la sidebar
         selectedThreadId = null;
