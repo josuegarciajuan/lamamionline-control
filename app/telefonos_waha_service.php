@@ -157,6 +157,30 @@ function telefonos_waha_status_info(array $response): array
     ];
 }
 
+/**
+ * Valida una respuesta de sendText más allá del código HTTP.
+ * GOWS puede devolver HTTP 2xx mientras el mensaje falló o se envió vacío;
+ * WAHA lo reporta como un campo `error` dentro del body JSON.
+ *
+ * @param array<string,mixed> $response
+ * @return array{ok:bool,reason:string}
+ */
+function telefonos_waha_send_info(array $response): array
+{
+    if (!telefonos_waha_response_is_success($response)) {
+        return ['ok' => false, 'reason' => 'HTTP ' . (int)($response['http_code'] ?? 0)];
+    }
+    $body = json_decode((string)($response['body'] ?? ''), true);
+    if (!is_array($body)) {
+        return ['ok' => true, 'reason' => 'ok'];
+    }
+    $error = trim((string)($body['error'] ?? ''));
+    if ($error !== '') {
+        return ['ok' => false, 'reason' => $error];
+    }
+    return ['ok' => true, 'reason' => 'ok'];
+}
+
 function telefonos_waha_webhook_for_row(array $row): string
 {
     return match (strtolower(trim((string)($row['uso'] ?? '')))) {
@@ -258,8 +282,8 @@ function telefonos_waha_identify(
         if ((float)$clock() - $startedAt >= $budgetSeconds) break;
 
         $hadConnected = true;
-        $message = 'IDENTIFICAR: esta línea es ' . trim((string)($target['nombre'] ?? ''))
-            . ' (' . trim((string)($target['tfono'] ?? '')) . ')';
+        $message = 'Hola ' . trim((string)($target['nombre'] ?? ''))
+            . ' (' . trim((string)($target['tfono'] ?? '')) . '), ya sé quién eres';
         try {
             $sent = $sendCallback($candidate['config'], $targetPhone, $message, $candidate['row']);
         } catch (Throwable $error) {
@@ -267,8 +291,10 @@ function telefonos_waha_identify(
             $diagnostics[] = $candidateLabel($candidate) . ': error al enviar';
             continue;
         }
-        if (!telefonos_waha_response_is_success(is_array($sent) ? $sent : [])) {
-            $diagnostics[] = $candidateLabel($candidate) . ': no pudo enviar el mensaje';
+        $sendInfo = telefonos_waha_send_info(is_array($sent) ? $sent : []);
+        if (!$sendInfo['ok']) {
+            $onError('send', new RuntimeException('sendText falló: ' . $sendInfo['reason']));
+            $diagnostics[] = $candidateLabel($candidate) . ': no pudo enviar el mensaje (' . $sendInfo['reason'] . ')';
             continue;
         }
         $result = [

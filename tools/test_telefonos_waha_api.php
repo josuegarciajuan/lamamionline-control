@@ -127,7 +127,7 @@ twa_test_same('Origen B', $result['source_label'], 'excluye fuente cuyo me.id re
 twa_test_same([
     'status:source-a',
     'status:source-b',
-    'send:source-b:34600111222:IDENTIFICAR: esta línea es Destino (+34 600 111 222)',
+    'send:source-b:34600111222:Hola Destino (+34 600 111 222), ya sé quién eres',
 ], $events, 'health y envío son inmediatos, deterministas y con texto exacto');
 
 $eventCount = count($events);
@@ -162,6 +162,28 @@ $fallback = telefonos_waha_identify(
 );
 twa_test_same(['status:source-a', 'send:source-a', 'status:source-b', 'send:source-b'], $fallbackEvents, 'fallback no comprueba todas antes de enviar');
 twa_test_same('Origen B', $fallback['source_label'], 'fallback informa fuente final');
+
+// HTTP 200 con error en el body se trata como envío fallido y cae al siguiente candidato.
+$errorBodyEvents = [];
+$errorBody = telefonos_waha_identify(
+    'target', $rows, $commercialSettings, $personalSettings,
+    function (array $config, array $row) use (&$errorBodyEvents): array {
+        $errorBodyEvents[] = 'status:' . $row['id'];
+        return twa_test_response('CONNECTED', $row['id'] === 'source-a' ? '34600222333@c.us' : '34600333444@c.us');
+    },
+    function (array $config, string $phone, string $message, array $row) use (&$errorBodyEvents): array {
+        $errorBodyEvents[] = 'send:' . $row['id'];
+        if ($row['id'] === 'source-a') {
+            return ['ok' => true, 'http_code' => 200, 'body' => json_encode(['error' => 'sesión inválida'])];
+        }
+        return ['ok' => true, 'http_code' => 200, 'body' => '{}'];
+    },
+    static fn(): ?array => null,
+    static function (): void {},
+    ['now' => static fn(): int => 2200, 'clock' => static fn(): float => 22.0]
+);
+twa_test_same(['status:source-a', 'send:source-a', 'status:source-b', 'send:source-b'], $errorBodyEvents, 'envío 200 con error en body cae al siguiente candidato');
+twa_test_same('Origen B', $errorBody['source_label'], 'envío 200 con error en body informa fuente final');
 
 $exceptionEvents = [];
 $exceptionFallback = telefonos_waha_identify(
