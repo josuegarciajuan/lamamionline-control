@@ -484,7 +484,7 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
 <link rel="apple-touch-icon" href="https://casawasap.com/img/hero-casawasap.png">
 <?php endif; ?>
 <title>bot-casa — <?php echo $clientName; ?></title>
-<link rel="stylesheet" href="assets/style.css?v=20260614_1">
+<link rel="stylesheet" href="assets/style.css?v=20260825_1">
 <link rel="stylesheet" href="assets/chat.css?v=20260629_1">
 <?php if ($isDirectAccess): ?>
 <script src="assets/pwa.js?v=20260613_1"></script>
@@ -562,6 +562,7 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
     $bannerBody = '';
     $bannerCta = '';
     $bannerCtaUrl = '';
+    $titleWarningClass = '';
 
     $cur = $subStatus['currentDay'];
     $tot = $subStatus['totalDays'];
@@ -580,10 +581,17 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
         $bannerClass = 'sub-active';
         $bannerIcon = '✅';
         $bannerTitle = 'Plan semanal — Día ' . $cur . ' de ' . $tot;
-        $bannerBody = ($left <= 2 && $left > 0)
-            ? '⚠️ Tu plan vence en ' . $left . ' día' . ($left > 1 ? 's' : '') . '. Renueva para no perder el acceso.'
-            : '';
-        $bannerCta = '<a href="pago" class="btn btn-sm" style="background:var(--accent);color:#fff;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:600">Pagar con PayPal — ' . $renewalPrice . '€/sem</a>';
+        // El botón de pago y el aviso solo aparecen cuando queda 1 día o menos
+        // para que la renovación no confunda al cliente recién pagado.
+        if ($left <= 1) {
+            $bannerBody = ($left > 0)
+                ? '⚠️ Tu plan vence en ' . $left . ' día' . ($left > 1 ? 's' : '') . '. Renueva para no perder el acceso.'
+                : '⚠️ Tu plan vence hoy. Renueva para no perder el acceso.';
+            $bannerCta = '<a href="pago" class="btn btn-sm" style="background:var(--accent);color:#fff;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:600">Pagar con PayPal — ' . $renewalPrice . '€/sem</a>';
+            $titleWarningClass = ' sub-title--warning';
+        } else {
+            $bannerBody = '';
+        }
     } elseif ($subStatus['status'] === 'expired') {
         $bannerClass = 'sub-expired';
         $bannerIcon = '🔴';
@@ -597,7 +605,7 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
     <div class="sub-banner-left">
         <span class="sub-icon"><?php echo $bannerIcon; ?></span>
         <div class="sub-info">
-            <span class="sub-title"><?php echo $bannerTitle; ?></span>
+            <span class="sub-title<?php echo $titleWarningClass; ?>"><?php echo $bannerTitle; ?></span>
             <?php if ($bannerBody !== ''): ?>
             <span class="sub-body"><?php echo $bannerBody; ?></span>
             <?php endif; ?>
