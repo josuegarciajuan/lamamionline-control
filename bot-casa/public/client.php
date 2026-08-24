@@ -1437,24 +1437,6 @@ function dismissWizard() {
                 <strong>Playbook:</strong> <span id="playbook-status"></span>
                 <button type="button" class="btn btn-sm btn-info" style="margin-left:12px" onclick="viewPlaybook()" id="btn-view-playbook">📖 Ver playbook</button>
             </div>
-            <?php if ($isDemo): ?>
-            <div class="demo-playbook-banner" style="margin-top:12px;background:linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(245,158,11,0.06) 100%);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:12px 14px;font-size:.82rem;line-height:1.55;color:var(--text-muted)">
-                <div style="display:flex;align-items:flex-start;gap:8px">
-                    <span style="font-size:1.2rem;flex-shrink:0">💡</span>
-                    <div>
-                        <strong style="color:#f59e0b">Esto es una demostración</strong>
-                        <div style="margin-top:4px">Este playbook y las estadísticas de aprendizaje son datos simulados para que puedas ver <strong>lo que el bot sería capaz de aprender por sí solo</strong> analizando tus conversaciones reales:</div>
-                        <ul style="margin:6px 0 0 0;padding-left:18px;color:var(--text-muted)">
-                            <li>Qué chica convierte más leads</li>
-                            <li>Qué patrones detectan mareadores antes de que te hagan perder el tiempo</li>
-                            <li>Qué señales predicen un ghosteo</li>
-                            <li>Cómo optimizar el bot para vender más</li>
-                        </ul>
-                        <div style="margin-top:6px;font-size:.76rem">Con tus conversaciones reales, el playbook se genera automáticamente cada día y se vuelve más preciso con el tiempo.</div>
-                    </div>
-                </div>
-            </div>
-            <?php endif; ?>
         </div>
         <div id="playbook-preview" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;max-height:500px;overflow:auto;font-size:.82rem;line-height:1.6;white-space:pre-wrap;margin-bottom:16px"></div>
 

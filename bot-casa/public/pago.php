@@ -2,11 +2,8 @@
 /**
  * pago.php — Payment page for CasaWasap.
  *
- * Two modes:
- *   1. PayPal (default) — real payment via PayPal REST API Orders v2.
- *   2. Mock (?mock=1, admin only) — fake card form for testing.
- *
- * Mock mode is preserved verbatim from the original implementation.
+ * Pago real vía PayPal REST API Orders v2 (incluye checkout con tarjeta de
+ * débito/crédito gestionado por el propio SDK de PayPal).
  */
 declare(strict_types=1);
 
@@ -59,9 +56,6 @@ if ($subStatus['status'] === 'active' && !$isExtraLine) {
     exit;
 }
 
-// ── Mode selection ──
-$useMock = (($_GET['mock'] ?? '') === '1') && $isAdmin;
-
 function h(string $s): string { return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 
 // ── Pricing ──
@@ -83,137 +77,20 @@ if ($isExtraLine) {
 $error = '';
 $success = false;
 
-// ── Mock mode POST handler (original logic, untouched) ──
-if ($useMock && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $cardNumber  = trim((string) ($_POST['card_number'] ?? ''));
-    $cardExpiry  = trim((string) ($_POST['card_expiry'] ?? ''));
-    $cardCvv     = trim((string) ($_POST['card_cvv'] ?? ''));
-
-    if ($cardNumber === '' || strlen(preg_replace('/\s/', '', $cardNumber)) < 13) {
-        $error = 'Número de tarjeta inválido.';
-    } elseif (!preg_match('/^\d{2}\/\d{2}$/', $cardExpiry)) {
-        $error = 'Fecha de caducidad inválida (formato MM/AA).';
-    } elseif (!preg_match('/^\d{3,4}$/', $cardCvv)) {
-        $error = 'CVV inválido.';
-    } else {
-        if ($isExtraLine) {
-            $phone = (string) ($pendingLine['phone'] ?? '');
-            $label = (string) ($pendingLine['label'] ?? '');
-            if ($phone === '') {
-                $error = 'Error: datos de línea incompletos.';
-            } else {
-                $wahaCfg = [
-                    'waha_server' => '100.117.92.74',
-                    'waha_api_key' => 'local321',
-                    'webhook_url' => 'https://lamami.online/control/bot-casa/public/webhook.php',
-                ];
-                $wmLines = new \WasapBot\Core\WahaManager($wahaCfg);
-                $linesMapFile = WASAPBOT_ROOT . '/data/lines_map.json';
-
-                // wasapbot_create_line_local is defined below only when mock is used
-                $createResult = wasapbot_create_line_local($phone, $label, $userId, $wmLines, $linesMapFile);
-                if ($createResult['ok']) {
-                    $subManager->recordPayment($userId, (float) $amount, 'card');
-                    unset($_SESSION['pending_line']);
-                    $success = true;
-                } else {
-                    $error = 'Error al crear la línea: ' . ($createResult['error'] ?? 'desconocido');
-                }
-            }
-        } else {
-            $activateResult = $subManager->activateWeekly($userId, 1);
-            if ($activateResult['ok']) {
-                $subManager->recordPayment($userId, (float) $amount, 'card');
-                $success = true;
-            } else {
-                $error = 'Error al activar: ' . ($activateResult['error'] ?? 'desconocido');
-            }
-        }
-    }
-}
-
-// ── wasapbot_create_line_local (only needed when mock mode is active) ──
-if ($useMock) {
-    /**
-     * Create a line for a user (WAHA instance + persist + lines_map).
-     */
-    function wasapbot_create_line_local(string $phone, string $label, int $userId, object $wm, string $linesMapFile): array {
-        $last9 = preg_replace('/[^0-9]/', '', $phone);
-        if (strlen($last9) < 9) $last9 = str_pad($last9, 9, '0', STR_PAD_LEFT);
-        $last9 = mb_substr($last9, -9);
-
-        $linesFile = WASAPBOT_ROOT . '/data/users/' . $userId . '/lines.json';
-        $lines = [];
-        if (file_exists($linesFile)) {
-            $data = @json_decode((string)@file_get_contents($linesFile), true);
-            if (is_array($data)) $lines = $data;
-        }
-
-        $status = $wm->getStatus();
-        $port = (int) ($status['next_port'] ?? 3020);
-
-        $result = ['ok' => false, 'error' => 'WAHA no disponible'];
-        try {
-            $result = $wm->createInstance($port);
-        } catch (\Throwable) {
-            $result = ['ok' => false, 'error' => 'WAHA no disponible'];
-        }
-
-        if (!$result['ok']) {
-            return ['ok' => false, 'error' => $result['error'] ?? 'Error al crear instancia WAHA'];
-        }
-
-        $nextId = count($lines) > 0 ? max(array_column($lines, 'id')) + 1 : 1;
-        $line = [
-            'id' => $nextId, 'last9' => $last9, 'phone' => $phone,
-            'label' => $label !== '' ? $label : ('Línea ' . $nextId),
-            'port' => $result['port'] ?? $port, 'container_port' => $port,
-            'created_at' => date('c'), 'health_status' => 'starting', 'error' => '',
-        ];
-        $lines[] = $line;
-
-        $dir = dirname($linesFile);
-        if (!is_dir($dir)) @mkdir($dir, 0700, true);
-        if (file_exists($linesFile) && !is_writable($linesFile)) {
-            @unlink($linesFile);
-            clearstatcache(true, $linesFile);
-        }
-        @file_put_contents($linesFile, json_encode($lines, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)."\n", LOCK_EX);
-
-        $map = [];
-        if (file_exists($linesMapFile)) {
-            $map = @json_decode((string)@file_get_contents($linesMapFile), true);
-            if (!is_array($map)) $map = [];
-        }
-        $map[$last9] = $userId;
-        if (file_exists($linesMapFile) && !is_writable($linesMapFile)) {
-            @unlink($linesMapFile);
-            clearstatcache(true, $linesMapFile);
-        }
-        @file_put_contents($linesMapFile, json_encode($map, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE)."\n", LOCK_EX);
-
-        return ['ok' => true, 'line' => $line];
-    }
-}
-
-// ── PayPal config (only needed in PayPal mode) ──
+// ── PayPal config ──
 $paypalClientId = '';
 $paypalMode = 'sandbox';
-if (!$useMock) {
-    try {
-        $config = new \WasapBot\Core\Config(WASAPBOT_ROOT);
-        $paypalCfg = $config->get('paypal');
-        if (is_array($paypalCfg)) {
-            $paypalClientId = (string) ($paypalCfg['client_id'] ?? '');
-            $paypalMode     = (string) ($paypalCfg['mode'] ?? 'sandbox');
-        }
-    } catch (\Throwable) {
-        // Config not available; fallback handled client-side
+try {
+    $config = new \WasapBot\Core\Config(WASAPBOT_ROOT);
+    $paypalCfg = $config->get('paypal');
+    if (is_array($paypalCfg)) {
+        $paypalClientId = (string) ($paypalCfg['client_id'] ?? '');
+        $paypalMode     = (string) ($paypalCfg['mode'] ?? 'sandbox');
     }
-    $paypalConfigured = ($paypalClientId !== '' && $paypalClientId !== 'PAYPAL_CLIENT_ID');
-} else {
-    $paypalConfigured = false;
+} catch (\Throwable) {
+    // Config not available; fallback handled client-side
 }
+$paypalConfigured = ($paypalClientId !== '' && $paypalClientId !== 'PAYPAL_CLIENT_ID');
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -734,49 +611,6 @@ if (!$useMock) {
     <div class="error-msg" role="alert" aria-live="polite"><?php echo h($error); ?></div>
     <?php endif; ?>
 
-    <?php if ($useMock): ?>
-    <!-- ═══════════ MOCK MODE (admin only) ═══════════ -->
-    <form method="post" action="pago?mock=1" id="payment-form" onsubmit="handleMockSubmit(event)">
-        <div class="form-group">
-            <label for="card_number">Número de tarjeta</label>
-            <input type="text" name="card_number" id="card_number" placeholder="1234 5678 9012 3456"
-                   maxlength="19" inputmode="numeric" autocomplete="off" required>
-        </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label for="card_expiry">Caducidad</label>
-                <input type="text" name="card_expiry" id="card_expiry" placeholder="MM/AA"
-                       maxlength="5" inputmode="numeric" autocomplete="off" required>
-            </div>
-            <div class="form-group">
-                <label for="card_cvv">CVV</label>
-                <input type="text" name="card_cvv" id="card_cvv" placeholder="123"
-                       maxlength="4" inputmode="numeric" autocomplete="off" required>
-            </div>
-        </div>
-        <button type="submit" class="btn-pay" id="btn-pay"><?php echo $isExtraLine ? 'Añadir línea · ' . $amount . '€' : 'Desbloquear ahora · ' . $amount . '€'; ?></button>
-        <p class="cta-microcopy">Pago seguro · Activación en segundos</p>
-    </form>
-
-    <div class="test-note">
-        <strong>Modo pruebas:</strong> no se realiza ningún cobro real.<br>
-        Al aceptar, se activará el plan automáticamente.
-    </div>
-    <script>
-    function handleMockSubmit(e) {
-        e.preventDefault();
-        var btn = document.getElementById('btn-pay');
-        var overlay = document.getElementById('processing-overlay');
-        btn.disabled = true;
-        btn.textContent = 'Activando...';
-        overlay.classList.add('active');
-        setTimeout(function() { e.target.submit(); }, 2000);
-    }
-    </script>
-
-    <?php else: ?>
-    <!-- ═══════════ PAYPAL MODE ═══════════ -->
-
     <?php if (!$paypalConfigured): ?>
     <div class="paypal-unconfigured">
         ⚠️ PayPal no configurado.<br>
@@ -791,20 +625,15 @@ if (!$useMock) {
     <p class="cta-microcopy">Activación inmediata · Sin permanencia</p>
 
     <p class="back-link"><a href="cliente">← Volver al panel</a></p>
-    <?php endif; ?>
 
-    <?php if (!$useMock): ?>
     <div class="trust-badges">
         <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2.5"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Pago cifrado</span>
         <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Sin permanencia</span>
         <span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Soporte humano</span>
     </div>
     <?php endif; ?>
-
-    <?php endif; ?>
 </div>
 
-<?php if (!$useMock): ?>
 <!-- PayPal JS SDK -->
 <script src="https://www.paypal.com/sdk/js?client-id=<?php echo h($paypalClientId); ?>&currency=EUR&intent=capture" data-namespace="paypal_sdk"></script>
 <script>
@@ -893,7 +722,6 @@ if (!$useMock) {
     }
 })();
 </script>
-<?php endif; ?>
 
 </body>
 </html>

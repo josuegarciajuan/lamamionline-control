@@ -2,7 +2,6 @@
 /**
  * api/pago.php — Payment API endpoints.
  *
- * POST /api/pago                      → Mock activation (legacy, for testing)
  * POST /api/pago?action=create-order  → Create PayPal order
  * POST /api/pago?action=capture-order → Capture PayPal order + activate subscription
  */
@@ -248,23 +247,9 @@ if ($action === 'capture-order') {
 }
 
 // ─────────────────────────────────────────────────────────
-//  Legacy mock POST (no action param)
+//  Sin action → operación no válida (se eliminó la activación
+//  mock sin pago: cualquier usuario podía activar gratis)
 // ─────────────────────────────────────────────────────────
-$weeks = (int) ($input['weeks'] ?? 1);
-if ($weeks < 1) $weeks = 1;
-
-$activateResult = $subManager->activateWeekly($userId, $weeks);
-if ($activateResult['ok']) {
-    $amount = \WasapBot\Core\Pricing::weeklyBase($userId) * $weeks;
-    $subManager->recordPayment($userId, $amount, 'card');
-
-    $newStatus = $subManager->getStatus($userId);
-    echo json_encode([
-        'ok' => true,
-        'message' => 'Plan activado correctamente.',
-        'subscription' => $newStatus,
-    ], JSON_UNESCAPED_UNICODE);
-} else {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => $activateResult['error'] ?? 'Error al activar'], JSON_UNESCAPED_UNICODE);
-}
+http_response_code(400);
+echo json_encode(['ok' => false, 'error' => 'Acción de pago no válida. Usa action=create-order o action=capture-order.'], JSON_UNESCAPED_UNICODE);
+exit;
