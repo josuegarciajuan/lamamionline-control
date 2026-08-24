@@ -256,7 +256,10 @@ return array(
     // - <base>/api/oferta-del-dia.json
     // - <base>/admin/  (panel embebido en el iframe)
     'afiliados_api_base_url' => 'https://josue.ink/afiliados',
-    'afiliados_admin_url' => 'https://josue.ink/afiliados',
+    // Base del panel admin (el CRM añade /admin). El token se pasa por ?t=.
+    'afiliados_admin_url' => 'https://josue.ink',
+    // Token del panel admin (secreto; por defecto se fija en runtime, no aquí).
+    'afiliados_admin_token' => '',
 
     // Cadencia de la rama WhatsApp de afiliados (estados + broadcast).
     // 'afiliados_frecuencia_tipo' => 'cada_x_horas' | 'x_veces_al_dia'

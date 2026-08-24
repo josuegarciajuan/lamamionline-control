@@ -13260,6 +13260,7 @@ function publicista_afiliados_config_defaults() {
         'enabled' => 0,
         'api_base_url' => '',
         'admin_url' => '',
+        'admin_token' => '',
         'frecuencia_tipo' => 'cada_x_horas',
         'frecuencia_valor' => 6,
         'hora_inicio' => '08:00',
@@ -13290,6 +13291,9 @@ function publicista_afiliados_config_defaults() {
         }
         if (trim((string)($defaults['admin_url'])) === '') {
             $defaults['admin_url'] = trim((string)($a['afiliados_admin_url'] ?? ''));
+        }
+        if (trim((string)($defaults['admin_token'])) === '') {
+            $defaults['admin_token'] = trim((string)($a['afiliados_admin_token'] ?? ''));
         }
         $usosDefault = trim((string)($a['afiliados_lineas_uso'] ?? ''));
         if ($usosDefault !== '') {
@@ -13349,6 +13353,7 @@ function publicista_afiliados_config_normalize($row) {
 
     $cfg['api_base_url'] = rtrim(trim((string)($cfg['api_base_url'] ?? '')), '/');
     $cfg['admin_url'] = rtrim(trim((string)($cfg['admin_url'] ?? '')), '/');
+    $cfg['admin_token'] = trim((string)($cfg['admin_token'] ?? ''));
 
     $allowedFreq = array_keys(publicista_afiliados_frecuencia_options());
     $cfg['frecuencia_tipo'] = in_array($cfg['frecuencia_tipo'], $allowedFreq, true)

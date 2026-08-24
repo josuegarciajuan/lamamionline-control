@@ -5295,11 +5295,16 @@ function render_bot_casa_page() {
 
 function render_afiliados_page() {
     $adminUrl = '';
+    $adminToken = '';
     $cfg = function_exists('publicista_afiliados_get_config') ? publicista_afiliados_get_config() : array();
     if (!empty($cfg['admin_url'])) {
         $adminUrl = trim((string)$cfg['admin_url']);
     } elseif (function_exists('avisos_config')) {
         $adminUrl = trim((string)(avisos_config()['afiliados_admin_url'] ?? ''));
+    }
+    $adminToken = trim((string)($cfg['admin_token'] ?? ''));
+    if ($adminToken === '' && function_exists('avisos_config')) {
+        $adminToken = trim((string)(avisos_config()['afiliados_admin_token'] ?? ''));
     }
     if ($adminUrl === '') {
         page_header('Afiliados', 'Panel de productos afiliados');
@@ -5314,8 +5319,12 @@ function render_afiliados_page() {
     }
 
     page_header('Afiliados', 'Panel de gestión de productos afiliados');
+    $iframeSrc = $adminUrl . '/';
+    if ($adminToken !== '') {
+        $iframeSrc .= '?t=' . rawurlencode($adminToken);
+    }
     echo '<div class="panel panel-space" style="padding:0;overflow:visible;border-radius:var(--radius-md)">';
-    echo '<iframe id="afiliados-iframe" src="' . e($adminUrl) . '/" style="width:100%;min-height:calc(100vh - 200px);height:auto;border:none;display:block" title="Panel Afiliados"></iframe>';
+    echo '<iframe id="afiliados-iframe" src="' . e($iframeSrc) . '" style="width:100%;min-height:calc(100vh - 200px);height:auto;border:none;display:block" title="Panel Afiliados"></iframe>';
     echo '</div>';
     echo "<script>(function(){\n";
     echo "  var iframe = document.getElementById('afiliados-iframe');\n";
