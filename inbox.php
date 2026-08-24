@@ -51,7 +51,7 @@ $agentHtml = ob_get_clean();
 // ── Versiones para cache busters ──
 $_chatCssV = is_file(__DIR__ . '/assets/inbox-chat.css') ? filemtime(__DIR__ . '/assets/inbox-chat.css') : time();
 $_chatJsV  = is_file(__DIR__ . '/assets/inbox-chat.js')  ? filemtime(__DIR__ . '/assets/inbox-chat.js')  : time();
-$_forceV   = '20260820_01'; // fotos habitaciones centralizadas + alquiler 170€ + tono humano + UI WhatsApp + pausa por conversación
+$_forceV   = '20260821_01'; // sidebar por líneas (lazy-load por línea) + punto verde no-leídas + marcar todas leídas
 
 ?><!doctype html>
 <html lang="es">

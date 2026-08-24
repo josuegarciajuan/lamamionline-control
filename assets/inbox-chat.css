@@ -29,14 +29,17 @@
 .inbox-line-group{}
 .inbox-line-header{padding:10px 14px;font-size:12px;font-weight:600;color:var(--wa-accent);display:flex;align-items:center;gap:8px;cursor:pointer;border-bottom:1px solid var(--wa-border);letter-spacing:.03em;transition:background .1s}
 .inbox-line-header:hover{background:rgba(255,255,255,.03)}
-.inbox-line-header .line-dot{width:10px;height:10px;border-radius:50%;background:var(--wa-accent);flex-shrink:0;box-shadow:0 0 6px rgba(37,211,102,.4)}
+.inbox-line-header .line-dot{width:10px;height:10px;border-radius:50%;background:#667781;flex-shrink:0;box-shadow:0 0 6px rgba(102,119,129,.35)}
 .inbox-line-header .line-dot.off{background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.3)}
-.inbox-line-header .line-dot--unread{background:#f59e0b;box-shadow:0 0 8px rgba(245,158,11,.5);animation:inbox-pulse-dot 2s ease-in-out infinite}
-@keyframes inbox-pulse-dot{0%,100%{box-shadow:0 0 4px rgba(245,158,11,.4)}50%{box-shadow:0 0 12px rgba(245,158,11,.8)}}
+.inbox-line-header .line-dot--unread{background:#25d366;box-shadow:0 0 8px rgba(37,211,102,.5);animation:inbox-pulse-dot 2s ease-in-out infinite}
+@keyframes inbox-pulse-dot{0%,100%{box-shadow:0 0 4px rgba(37,211,102,.4)}50%{box-shadow:0 0 12px rgba(37,211,102,.8)}}
+.inbox-line-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--wa-text)}
 .inbox-line-time{font-size:10px;color:#667781;white-space:nowrap;flex-shrink:0}
-.inbox-line-meta{font-size:10px;color:#64748b;white-space:nowrap}
+.inbox-line-meta{font-size:10px;color:#64748b;white-space:nowrap;flex-shrink:0}
 .inbox-line-badge-unread{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#25d366;color:#000;font-size:11px;font-weight:700;flex-shrink:0;margin-left:2px}
-.inbox-line-arrow{font-size:10px;margin-left:auto;transition:transform .15s;color:var(--wa-muted)}
+.inbox-line-mark-read{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;border:none;background:rgba(37,211,102,.18);color:#25d366;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;transition:background .15s}
+.inbox-line-mark-read:hover{background:rgba(37,211,102,.35)}
+.inbox-line-arrow{font-size:10px;margin-left:auto;transition:transform .15s;color:var(--wa-muted);flex-shrink:0}
 .inbox-line-group.collapsed .inbox-line-arrow{transform:rotate(-90deg)}
 .inbox-line-group.collapsed .inbox-thread-list{display:none}
 

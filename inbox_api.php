@@ -3,11 +3,13 @@
  * inbox_api.php — API JSON para el chat SuperWasap del inbox comercial.
  *
  * Endpoints:
- *   GET  ?action=lines                     → líneas con sus hilos agrupados (incluye unread)
+ *   GET  ?action=lines                     → líneas agrupadas con resumen de no leídos
+ *   GET  ?action=line_threads&line_id=X    → hilos de una línea (paginado por cursor)
  *   GET  ?action=thread&id=THREAD_ID       → timeline completo de un hilo
  *   POST ?action=send                      → enviar mensaje manual
  *   POST ?action=toggle_thread             → pausar/reactivar bot en un hilo
  *   POST ?action=mark_read&thread_id=X     → marcar hilo como leído
+ *   POST ?action=mark_all_read&line_id=X   → marcar todos los hilos de una línea como leídos
  */
 
 declare(strict_types=1);
@@ -100,27 +102,13 @@ function inbox_is_unread(string $threadId, string $updatedAt, array $readStatus)
     return $updatedUnix > $lastReadUnix;
 }
 
-// ── GET ?action=lines ──
-// Lista plana y paginada de conversaciones de las líneas de procesos (muro).
-// Params: limit (default 50), before_ts + before_id (cursor), search (opcional).
-// Orden: last_ts desc, id desc. `unread` es flag por hilo (dot verde en la UI).
+// ── Helpers de construcción de items + paginación por cursor ──
 
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'lines') {
-    $allThreads = comercial_get_threads();
-    $linesIndexed = comercial_list_lines_indexed();
-    $processLineIds = inbox_get_process_line_ids();
-    $readStatus = inbox_read_status();
-
-    $limit = max(1, min(200, (int)($_GET['limit'] ?? 50)));
-    $beforeTs = trim((string)($_GET['before_ts'] ?? ''));
-    $beforeId = trim((string)($_GET['before_id'] ?? ''));
-    $search = trim((string)($_GET['search'] ?? ''));
-
-    // Construir lista plana de items (solo líneas de procesos)
-    $threadItems = [];
-    foreach ($allThreads as $thread) {
+function inbox_build_thread_items(array $threads, array $linesIndexed, array $readStatus, array $allowedLineIds): array {
+    $items = [];
+    foreach ($threads as $thread) {
         $lid = trim((string)($thread['line_id'] ?? ''));
-        if ($lid === '' || !in_array($lid, $processLineIds, true)) continue;
+        if (!empty($allowedLineIds) && !in_array($lid, $allowedLineIds, true)) continue;
 
         $phone = comercial_only_digits((string)($thread['target_phone'] ?? ''));
         $lastMsg = trim((string)($thread['last_inbound_text'] ?? ''));
@@ -135,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'lines') {
         $displayName = $agendaName !== '' ? $agendaName : ($phone !== '' ? $phone : 'Sin teléfono');
         $lineName = isset($linesIndexed[$lid]) ? trim((string)($linesIndexed[$lid]['nombre'] ?? '')) : '';
 
-        $threadItems[] = [
+        $items[] = [
             'id'            => $tid,
             'phone'         => $phone,
             'display_name'  => $displayName,
@@ -155,14 +143,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'lines') {
     }
 
     // Orden estable: last_ts desc, id desc
-    usort($threadItems, function ($a, $b) {
+    usort($items, function ($a, $b) {
         $c = strcmp((string)($b['last_ts'] ?? ''), (string)($a['last_ts'] ?? ''));
         if ($c !== 0) return $c;
         return strcmp((string)($b['id'] ?? ''), (string)($a['id'] ?? ''));
     });
 
-    // Búsqueda en servidor (filtra sobre toda la lista)
+    return $items;
+}
+
+function inbox_paginate_items(array $items, int $limit, string $beforeTs, string $beforeId): array {
+    if ($beforeTs !== '' && $beforeId !== '') {
+        $items = array_values(array_filter($items, function ($it) use ($beforeTs, $beforeId) {
+            $c = strcmp((string)($it['last_ts'] ?? ''), $beforeTs);
+            if ($c < 0) return true;    // más antiguo
+            if ($c > 0) return false;   // más reciente
+            return strcmp((string)($it['id'] ?? ''), $beforeId) < 0; // mismo ts, id menor
+        }));
+    }
+
+    $page = array_slice($items, 0, $limit);
+    $hasMore = count($items) > $limit;
+    $lastItem = end($page);
+
+    return [
+        'threads'  => $page,
+        'has_more' => $hasMore,
+        'next_ts'  => ($hasMore && $lastItem !== false) ? (string)($lastItem['last_ts'] ?? '') : null,
+        'next_id'  => ($hasMore && $lastItem !== false) ? (string)($lastItem['id'] ?? '') : null,
+    ];
+}
+
+// ── GET ?action=lines ──
+// Devuelve líneas de procesos agrupadas con resumen (no leídos, nº de hilos,
+// última actividad). La carga de hilos de cada línea es perezosa y paginada
+// vía ?action=line_threads. Con `search` devuelve lista plana filtrada.
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'lines') {
+    $allThreads = comercial_get_threads();
+    $allLines = comercial_list_lines();
+    $linesIndexed = comercial_list_lines_indexed();
+    $processLineIds = inbox_get_process_line_ids();
+    $readStatus = inbox_read_status();
+
+    $search = trim((string)($_GET['search'] ?? ''));
+
+    // Búsqueda en servidor → lista plana (muro) filtrada sobre toda la lista
     if ($search !== '') {
+        $threadItems = inbox_build_thread_items($allThreads, $linesIndexed, $readStatus, $processLineIds);
         $needle = mb_strtolower($search, 'UTF-8');
         $threadItems = array_values(array_filter($threadItems, function ($it) use ($needle) {
             $hay = mb_strtolower(implode(' ', array(
@@ -172,40 +200,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'lines') {
             )), 'UTF-8');
             return $needle === '' || mb_strpos($hay, $needle) !== false;
         }));
-        $page = array_slice($threadItems, 0, $limit);
         inbox_api_json_ok([
-            'threads' => $page,
-            'has_more' => count($threadItems) > $limit,
-            'next_ts' => null,
-            'next_id' => null,
-            'search' => $search,
+            'threads'  => array_slice($threadItems, 0, 200),
+            'search'   => $search,
             'settings' => function_exists('inbox_get_settings') ? inbox_get_settings() : ['replies_enabled' => true, 'opener_enabled' => true],
         ]);
     }
 
-    // Paginación por cursor
-    if ($beforeTs !== '' && $beforeId !== '') {
-        $threadItems = array_values(array_filter($threadItems, function ($it) use ($beforeTs, $beforeId) {
-            $c = strcmp((string)($it['last_ts'] ?? ''), $beforeTs);
-            if ($c < 0) return true;    // más antiguo
-            if ($c > 0) return false;   // más reciente
-            return strcmp((string)($it['id'] ?? ''), $beforeId) < 0; // mismo ts, id menor
-        }));
+    // Filtrar solo líneas de procesos
+    $filteredLines = [];
+    foreach ($allLines as $line) {
+        if (in_array((string)($line['id'] ?? ''), $processLineIds, true)) {
+            $filteredLines[] = $line;
+        }
     }
 
-    $page = array_slice($threadItems, 0, $limit);
-    $hasMore = count($threadItems) > $limit;
-    $lastItem = end($page);
-    $nextTs = ($hasMore && $lastItem !== false) ? (string)($lastItem['last_ts'] ?? '') : null;
-    $nextId = ($hasMore && $lastItem !== false) ? (string)($lastItem['id'] ?? '') : null;
+    // Agrupar hilos por línea (solo líneas de procesos)
+    $threadsByLine = [];
+    foreach ($allThreads as $thread) {
+        $lid = trim((string)($thread['line_id'] ?? ''));
+        if ($lid === '' || !in_array($lid, $processLineIds, true)) continue;
+        $threadsByLine[$lid][] = $thread;
+    }
+
+    $result = [];
+    foreach ($filteredLines as $line) {
+        $lid = (string)($line['id'] ?? '');
+        $threads = $threadsByLine[$lid] ?? [];
+
+        $lineLastTs = '';
+        $lineUnread = 0;
+        foreach ($threads as $thread) {
+            $updatedAt = trim((string)($thread['updated_at'] ?? $thread['created_at'] ?? ''));
+            if ($updatedAt !== '' && ($lineLastTs === '' || $updatedAt > $lineLastTs)) {
+                $lineLastTs = $updatedAt;
+            }
+            if (inbox_is_unread((string)($thread['id'] ?? ''), $updatedAt, $readStatus)) {
+                $lineUnread++;
+            }
+        }
+
+        $result[] = [
+            'line_id'           => $lid,
+            'line_name'         => trim((string)($line['nombre'] ?? '')),
+            'line_phone'        => comercial_only_digits((string)($line['tfono'] ?? '')),
+            'waha_port'         => trim((string)($line['waha_port'] ?? '')),
+            'thread_count'      => count($threads),
+            'line_last_ts'      => $lineLastTs,
+            'line_total_unread' => $lineUnread,
+        ];
+    }
+
+    // Líneas con no leídos primero, luego por actividad reciente
+    usort($result, function ($a, $b) {
+        $aU = ($a['line_total_unread'] > 0) ? 1 : 0;
+        $bU = ($b['line_total_unread'] > 0) ? 1 : 0;
+        if ($aU !== $bU) return $bU - $aU;
+        return strcmp((string)($b['line_last_ts'] ?? ''), (string)($a['line_last_ts'] ?? ''));
+    });
 
     inbox_api_json_ok([
-        'threads' => $page,
-        'has_more' => $hasMore,
-        'next_ts' => $nextTs,
-        'next_id' => $nextId,
+        'lines'    => $result,
         'settings' => function_exists('inbox_get_settings') ? inbox_get_settings() : ['replies_enabled' => true, 'opener_enabled' => true],
     ]);
+}
+
+// ── GET ?action=line_threads&line_id=X ──
+// Hilos de una línea concreta, paginados por cursor (last_ts desc, id desc).
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'line_threads') {
+    $lineId = trim((string)($_GET['line_id'] ?? ''));
+    if ($lineId === '') inbox_api_json_err('Falta line_id');
+
+    $linesIndexed = comercial_list_lines_indexed();
+    $readStatus = inbox_read_status();
+    $limit = max(1, min(200, (int)($_GET['limit'] ?? 50)));
+    $beforeTs = trim((string)($_GET['before_ts'] ?? ''));
+    $beforeId = trim((string)($_GET['before_id'] ?? ''));
+
+    $items = inbox_build_thread_items(comercial_get_threads(), $linesIndexed, $readStatus, array($lineId));
+    inbox_api_json_ok(inbox_paginate_items($items, $limit, $beforeTs, $beforeId));
 }
 
 // ── GET ?action=thread&id=X ──
@@ -323,6 +397,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'mark_read') {
     }
 
     inbox_api_json_ok(['thread_id' => $threadId, 'last_read_ts' => $lastTs]);
+}
+
+// ── POST action=mark_all_read ──
+// Marca todos los hilos de una línea como leídos (patrón SuperWasap).
+// `line_id` obligatorio → solo esa línea; usa el mismo buffer que mark_read.
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'mark_all_read') {
+    $lineId = trim((string)($_POST['line_id'] ?? ''));
+    if ($lineId === '') inbox_api_json_err('Falta line_id');
+
+    // Mismo buffer que mark_read: mensajes hasta "ahora" cuentan como leídos.
+    $lastTs = gmdate('Y-m-d\TH:i:s\Z', time() + 10);
+
+    $readStatus = inbox_read_status();
+    $marked = 0;
+    foreach (comercial_get_threads() as $thread) {
+        if (trim((string)($thread['line_id'] ?? '')) !== $lineId) continue;
+        $tid = (string)($thread['id'] ?? '');
+        if ($tid === '') continue;
+        $readStatus[$tid] = $lastTs;
+        $marked++;
+    }
+
+    if (!inbox_save_read_status($readStatus)) {
+        inbox_api_json_err('Error al guardar estado de lectura', 500);
+    }
+
+    inbox_api_json_ok(['line_id' => $lineId, 'marked' => $marked]);
 }
 
 // ── POST action=send ──
@@ -636,4 +738,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'room_photos') {
 }
 
 // ── Sin acción válida ──
-inbox_api_json_err('Acción no válida. Usa: lines, thread, send, toggle_thread, toggle_replies, toggle_opener, mark_read, pending_count, attend, discard, manual_panel_add, find_thread_by_phone, room_photos');
+inbox_api_json_err('Acción no válida. Usa: lines, line_threads, thread, send, toggle_thread, toggle_replies, toggle_opener, mark_read, mark_all_read, pending_count, attend, discard, manual_panel_add, find_thread_by_phone, room_photos');
