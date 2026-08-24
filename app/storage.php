@@ -5625,9 +5625,27 @@ function publicista_free_bump_logs_path() {
     return $dir . '/free_bump_logs.ndjson';
 }
 
+function publicista_free_bump_compact_attempt($attempt) {
+    $attempt = is_array($attempt) ? $attempt : array();
+    // Quitar payloads pesados (HTML/parseo de Destacamos) que la UI del log nunca
+    // muestra. Cada intento llegaba a ~50 KB; sin esto el log crece sin límite y
+    // cargarlo entero agota la memoria (fatal 512 MB en subir_anuncios).
+    unset($attempt['result'], $attempt['debug_log'], $attempt['humanTrace'], $attempt['before'], $attempt['after']);
+    if (is_array($attempt['attempts'] ?? null)) {
+        $attempt['attempts'] = array_map('publicista_free_bump_compact_attempt', $attempt['attempts']);
+    }
+    return $attempt;
+}
+
 function publicista_free_bump_log_append($row) {
     $row = is_array($row) ? $row : array();
     $row['created_at'] = trim((string)($row['created_at'] ?? now_datetime()));
+    if (is_array($row['attempts'] ?? null)) {
+        $row['attempts'] = array_map('publicista_free_bump_compact_attempt', $row['attempts']);
+    }
+    if (is_array($row['primary_attempt'] ?? null)) {
+        $row['primary_attempt'] = publicista_free_bump_compact_attempt($row['primary_attempt']);
+    }
     $json = storage_json_encode($row, false);
     return @file_put_contents(publicista_free_bump_logs_path(), $json . "\n", FILE_APPEND | LOCK_EX) !== false;
 }
@@ -5881,36 +5899,59 @@ function publicista_free_bump_logs_get($limit = 80) {
     $limit = max(1, (int)$limit);
     $path = publicista_free_bump_logs_path();
     if (!is_file($path)) return array();
-    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if (!is_array($lines) || empty($lines)) return array();
-    $lines = array_slice($lines, -1 * $limit);
     $out = array();
-    foreach ($lines as $line) {
+    $handle = @fopen($path, 'rb');
+    if ($handle === false) return array();
+    // Lectura en streaming: nunca cargar el archivo entero en memoria
+    // (file() explotaba la memoria con un log de 150 MB).
+    while (($line = fgets($handle)) !== false) {
         $decoded = json_decode((string)$line, true);
-        if (is_array($decoded)) $out[] = $decoded;
+        if (!is_array($decoded)) continue;
+        $out[] = $decoded;
+        if (count($out) > $limit) array_shift($out);
     }
+    fclose($handle);
     return array_reverse($out);
 }
 
-function publicista_free_bump_logs_all() {
+function publicista_free_bump_logs_all($sinceTs = null) {
     $path = publicista_free_bump_logs_path();
     if (!is_file($path)) return array();
-    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if (!is_array($lines) || empty($lines)) return array();
     $out = array();
-    foreach ($lines as $line) {
+    $handle = @fopen($path, 'rb');
+    if ($handle === false) return array();
+    while (($line = fgets($handle)) !== false) {
         $decoded = json_decode((string)$line, true);
-        if (is_array($decoded)) $out[] = $decoded;
+        if (!is_array($decoded)) continue;
+        if ($sinceTs !== null) {
+            $ts = strtotime((string)($decoded['created_at'] ?? ''));
+            if ($ts === false || $ts < (int)$sinceTs) continue;
+        }
+        $out[] = $decoded;
     }
+    fclose($handle);
     return $out;
 }
 
 function publicista_free_bump_find_log_by_request_id($requestId) {
     $requestId = trim((string)$requestId);
     if ($requestId === '') return null;
-    $logs = publicista_free_bump_logs_all();
-    for ($i = count($logs) - 1; $i >= 0; $i--) {
-        $row = is_array($logs[$i] ?? null) ? $logs[$i] : array();
+    $path = publicista_free_bump_logs_path();
+    if (!is_file($path)) return null;
+    // Solo hace falta mirar la cola reciente del log (el request se busca justo
+    // después de ejecutarse); buffer acotado para no cargar el archivo entero.
+    $tail = array();
+    $handle = @fopen($path, 'rb');
+    if ($handle === false) return null;
+    while (($line = fgets($handle)) !== false) {
+        $decoded = json_decode((string)$line, true);
+        if (!is_array($decoded)) continue;
+        $tail[] = $decoded;
+        if (count($tail) > 200) array_shift($tail);
+    }
+    fclose($handle);
+    for ($i = count($tail) - 1; $i >= 0; $i--) {
+        $row = $tail[$i];
         if (trim((string)($row['request_id'] ?? '')) === $requestId) {
             return $row;
         }
@@ -6181,7 +6222,9 @@ function publicista_free_bump_plan_snapshot($cfg = null, $state = null, $nowTs =
 
     $groups = $cfg['groups'];
     $selectedAccounts = publicista_free_bump_selected_accounts($cfg, true);
-    $logs = publicista_free_bump_logs_all();
+    // Solo hace falta el historial reciente: el cooldown es de 12 h y los conteos
+    // de ventana son diarios. Cargar el log entero agotaba la memoria (150 MB+).
+    $logs = publicista_free_bump_logs_all(strtotime('-3 days'));
     $lastSuccessMap = publicista_free_bump_last_success_map($logs);
 
     // Group selected accounts by group name
