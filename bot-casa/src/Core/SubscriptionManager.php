@@ -236,7 +236,7 @@ final class SubscriptionManager
             'id' => $paymentId,
             'amount' => $amount,
             'method' => $method,
-            'gateway' => ($method === 'paypal') ? 'paypal' : 'mock',
+            'gateway' => 'paypal',
             'date' => (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Madrid')))->format('c'),
             'weeks' => 1,
         ];
