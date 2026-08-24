@@ -285,6 +285,10 @@ $_swV       = filemtime(__DIR__ . '/sw.js');
                         render_bot_casa_page();
                         break;
 
+                    case 'afiliados':
+                        render_afiliados_page();
+                        break;
+
                     default:
                         render_dashboard_page();
                         break;

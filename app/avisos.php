@@ -3737,6 +3737,16 @@ function avisos_run_all_generators($sendWhatsapp = true) {
         aviso_cli_log('[publicista_estados_wasap] published=' . ($estadosWasapRun['published'] ? 'yes' : 'no') . ' reason=' . ($estadosWasapRun['reason'] ?? 'published'));
     }
 
+    if (function_exists('publicista_afiliados_run_due')) {
+        $afiliadosRun = publicista_afiliados_run_due();
+        aviso_cli_log('[publicista_afiliados] published=' . ($afiliadosRun['published'] ? 'yes' : 'no') . ' reason=' . ($afiliadosRun['reason'] ?? 'published') . ' next=' . trim((string)($afiliadosRun['next_check'] ?? '')));
+    }
+
+    if (function_exists('publicista_afiliados_destacamos_run_due')) {
+        $afiliadosDestacamosRun = publicista_afiliados_destacamos_run_due();
+        aviso_cli_log('[publicista_afiliados_destacamos] published=' . ($afiliadosDestacamosRun['published'] ? 'yes' : 'no') . ' reason=' . trim((string)($afiliadosDestacamosRun['reason'] ?? 'published')));
+    }
+
     if (function_exists('publicista_campaign_auto_rotation_run_due')) {
         $campaignAutoRotationRun = publicista_campaign_auto_rotation_run_due();
         aviso_cli_log('[publicista_campaign_auto_rotation] status=' . trim((string)($campaignAutoRotationRun['status'] ?? 'unknown')) . ' campaign_id=' . trim((string)($campaignAutoRotationRun['campaign_id'] ?? '')) . ' next=' . trim((string)($campaignAutoRotationRun['next_run_at'] ?? '')));

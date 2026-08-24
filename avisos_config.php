@@ -240,4 +240,44 @@ return array(
     // attention=12
     // recurring:destacamos_publish=631454098
     'whatsapp_sender_overrides' => "",
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | AFILIADOS (promoción de productos afiliados — rama WhatsApp + Destacamos)
+    |--------------------------------------------------------------------------
+    | Este módulo arranca DESACTIVADO (enabled=0). Se activa desde
+    | Publicista → Afiliados cuando la API del repo de afiliados responda.
+    | Se puede sobreescribir en settings.json → avisos_config.
+    */
+
+    // URL base del repo de afiliados. De ella se cuelgan:
+    // - <base>/api/productos.json
+    // - <base>/api/oferta-del-dia.json
+    // - <base>/admin/  (panel embebido en el iframe)
+    'afiliados_api_base_url' => 'https://josue.ink/afiliados',
+    'afiliados_admin_url' => 'https://josue.ink/afiliados',
+
+    // Cadencia de la rama WhatsApp de afiliados (estados + broadcast).
+    // 'afiliados_frecuencia_tipo' => 'cada_x_horas' | 'x_veces_al_dia'
+    'afiliados_frecuencia_tipo' => 'cada_x_horas',
+    'afiliados_frecuencia_valor' => 6,
+
+    // Ventana horaria de publicación.
+    'afiliados_hora_inicio' => '08:00',
+    'afiliados_hora_fin' => '23:00',
+
+    // Valores de "uso" de telefonos.json cuyas líneas publicarán estados
+    // (bot-casa + bot-comercial). Un valor por línea o separados por comas.
+    'afiliados_lineas_uso' => "bot casa\nenvio publi",
+
+    // Destinos de broadcast (un teléfono por línea o separados por comas).
+    'afiliados_destinos_whatsapp' => "",
+
+    // Campaña UTM para los enlaces afiliados.
+    'afiliados_utm_campaign' => 'crm',
+
+    // Anuncios Destacamos de producto: cadencia en días y hora.
+    'afiliados_destacamos_interval_days' => 1,
+    'afiliados_destacamos_hora' => '12:00',
 );

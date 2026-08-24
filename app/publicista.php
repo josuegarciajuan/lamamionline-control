@@ -13244,3 +13244,868 @@ function publicista_estados_wasap_run_due() {
         $result
     );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MÓDULO AFILIADOS — promoción de productos afiliados
+// - Rama WhatsApp: estados en líneas bot-casa/bot-comercial + broadcasts a
+//   destinos del sector (reutiliza WAHA y listas existentes).
+// - Anuncios Destacamos de producto: job contenido (copy DeepSeek + imagen
+//   OpenAI) que se sube reutilizando el sistema subir_anuncios/free-bump.
+// Patrón espejo de publicista_estados_wasap_*. Por defecto DESCONECTADO:
+// se activa desde Publicista → Afiliados cuando la API de afiliados responda.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function publicista_afiliados_config_defaults() {
+    $defaults = array(
+        'enabled' => 0,
+        'api_base_url' => '',
+        'admin_url' => '',
+        'frecuencia_tipo' => 'cada_x_horas',
+        'frecuencia_valor' => 6,
+        'hora_inicio' => '08:00',
+        'hora_fin' => '23:00',
+        'formato' => 'producto_del_dia',
+        'usos' => array('bot casa', 'envio publi'),
+        'lineas' => array(),
+        'broadcast_enabled' => 0,
+        'destinos' => array(),
+        'usar_contactos_casawasap' => 0,
+        'utm_campaign' => 'crm',
+        'destacamos' => array(
+            'enabled' => 0,
+            'account_id' => '',
+            'portal' => 'destacamos',
+            'interval_days' => 1,
+            'hora' => '12:00',
+            'include_link' => 0,
+        ),
+        'updated_at' => '',
+    );
+
+    // Defaults estáticos desde settings/avisos_config (URLs, cadencia, listas)
+    if (function_exists('avisos_config')) {
+        $a = avisos_config();
+        if (trim((string)($defaults['api_base_url'])) === '') {
+            $defaults['api_base_url'] = trim((string)($a['afiliados_api_base_url'] ?? ''));
+        }
+        if (trim((string)($defaults['admin_url'])) === '') {
+            $defaults['admin_url'] = trim((string)($a['afiliados_admin_url'] ?? ''));
+        }
+        $usosDefault = trim((string)($a['afiliados_lineas_uso'] ?? ''));
+        if ($usosDefault !== '') {
+            $usos = array();
+            foreach (preg_split('/[\r\n,]+/', $usosDefault) as $u) {
+                $u = trim($u);
+                if ($u !== '') $usos[] = $u;
+            }
+            if (!empty($usos)) $defaults['usos'] = $usos;
+        }
+        $destinosDefault = trim((string)($a['afiliados_destinos_whatsapp'] ?? ''));
+        if ($destinosDefault !== '') {
+            $destinos = array();
+            foreach (preg_split('/[\r\n,]+/', $destinosDefault) as $d) {
+                $d = preg_replace('/\D+/', '', trim($d));
+                if ($d !== '') $destinos[] = $d;
+            }
+            if (!empty($destinos)) $defaults['destinos'] = $destinos;
+        }
+        if (trim((string)($defaults['utm_campaign'])) === '') {
+            $defaults['utm_campaign'] = trim((string)($a['afiliados_utm_campaign'] ?? 'crm'));
+        }
+    }
+
+    return $defaults;
+}
+
+function publicista_afiliados_format_options() {
+    return array(
+        'producto_del_dia' => 'Producto del día (oferta)',
+        'destacado_random' => 'Destacado aleatorio (1 producto)',
+        'mini_catalogo' => 'Mini catálogo (hasta 3 productos)',
+        'mix_aleatorio' => 'Mix aleatorio (alterna formatos)',
+    );
+}
+
+function publicista_afiliados_frecuencia_options() {
+    return array(
+        'cada_x_horas' => 'Cada X horas',
+        'x_veces_al_dia' => 'X veces al día',
+    );
+}
+
+function publicista_afiliados_normalize_hhmm($value, $default) {
+    $value = trim((string)$value);
+    if (preg_match('/^([01]\d|2[0-3]):([0-5]\d)$/', $value)) {
+        return $value;
+    }
+    return $default;
+}
+
+function publicista_afiliados_config_normalize($row) {
+    $row = is_array($row) ? $row : array();
+    $cfg = array_merge(publicista_afiliados_config_defaults(), $row);
+
+    $cfg['enabled'] = !empty($cfg['enabled']) ? 1 : 0;
+
+    $cfg['api_base_url'] = rtrim(trim((string)($cfg['api_base_url'] ?? '')), '/');
+    $cfg['admin_url'] = rtrim(trim((string)($cfg['admin_url'] ?? '')), '/');
+
+    $allowedFreq = array_keys(publicista_afiliados_frecuencia_options());
+    $cfg['frecuencia_tipo'] = in_array($cfg['frecuencia_tipo'], $allowedFreq, true)
+        ? $cfg['frecuencia_tipo'] : 'cada_x_horas';
+    $cfg['frecuencia_valor'] = max(1, min(24, (int)($cfg['frecuencia_valor'] ?? 6)));
+
+    $cfg['hora_inicio'] = publicista_afiliados_normalize_hhmm((string)($cfg['hora_inicio'] ?? '08:00'), '08:00');
+    $cfg['hora_fin'] = publicista_afiliados_normalize_hhmm((string)($cfg['hora_fin'] ?? '23:00'), '23:00');
+
+    $allowedFormats = array_keys(publicista_afiliados_format_options());
+    $cfg['formato'] = in_array($cfg['formato'], $allowedFormats, true)
+        ? $cfg['formato'] : 'producto_del_dia';
+
+    $cfg['usos'] = array_values(array_unique(array_filter(array_map('trim', (array)($cfg['usos'] ?? array())), function ($u) {
+        return $u !== '';
+    })));
+    if (empty($cfg['usos'])) {
+        $cfg['usos'] = array('bot casa', 'envio publi');
+    }
+
+    $cfg['lineas'] = array_values(array_unique(array_filter(array_map('trim', (array)($cfg['lineas'] ?? array())), function ($id) {
+        return $id !== '';
+    })));
+
+    $cfg['broadcast_enabled'] = !empty($cfg['broadcast_enabled']) ? 1 : 0;
+    $cfg['destinos'] = array_values(array_unique(array_filter(array_map(function ($d) {
+        return preg_replace('/\D+/', '', trim((string)$d));
+    }, (array)($cfg['destinos'] ?? array())), function ($d) {
+        return $d !== '';
+    })));
+    $cfg['usar_contactos_casawasap'] = !empty($cfg['usar_contactos_casawasap']) ? 1 : 0;
+    $cfg['utm_campaign'] = trim((string)($cfg['utm_campaign'] ?? 'crm'));
+    if ($cfg['utm_campaign'] === '') $cfg['utm_campaign'] = 'crm';
+
+    $dc = is_array($cfg['destacamos'] ?? null) ? $cfg['destacamos'] : array();
+    $dcDefaults = publicista_afiliados_config_defaults()['destacamos'];
+    $dc = array_merge($dcDefaults, $dc);
+    $dc['enabled'] = !empty($dc['enabled']) ? 1 : 0;
+    $dc['account_id'] = trim((string)($dc['account_id'] ?? ''));
+    $dc['portal'] = trim((string)($dc['portal'] ?? 'destacamos'));
+    if ($dc['portal'] === '') $dc['portal'] = 'destacamos';
+    $dc['interval_days'] = max(1, min(30, (int)($dc['interval_days'] ?? 1)));
+    $dc['hora'] = publicista_afiliados_normalize_hhmm((string)($dc['hora'] ?? '12:00'), '12:00');
+    $dc['include_link'] = !empty($dc['include_link']) ? 1 : 0;
+    $cfg['destacamos'] = $dc;
+
+    $cfg['updated_at'] = trim((string)($cfg['updated_at'] ?? ''));
+    return $cfg;
+}
+
+function publicista_afiliados_get_config() {
+    $data = storage_read('publicista_afiliados.json');
+    $raw = is_array($data) && isset($data['config']) ? $data['config'] : array();
+    return publicista_afiliados_config_normalize($raw);
+}
+
+function publicista_afiliados_save_config($row) {
+    $data = storage_read('publicista_afiliados.json');
+    if (!is_array($data)) $data = array();
+    $cfg = publicista_afiliados_config_normalize($row);
+    $cfg['updated_at'] = now_datetime();
+    $data['config'] = $cfg;
+    if (!isset($data['log']) || !is_array($data['log'])) $data['log'] = array();
+    storage_write('publicista_afiliados.json', $data);
+    return $cfg;
+}
+
+function publicista_afiliados_get_log() {
+    $data = storage_read('publicista_afiliados.json');
+    if (!is_array($data) || !isset($data['log'])) return array();
+    return $data['log'];
+}
+
+function publicista_afiliados_add_log_entry($entry) {
+    $data = storage_read('publicista_afiliados.json');
+    if (!is_array($data)) $data = array();
+    if (!isset($data['log']) || !is_array($data['log'])) $data['log'] = array();
+    if (!isset($data['config']) || !is_array($data['config'])) {
+        $data['config'] = publicista_afiliados_config_defaults();
+    }
+    while (count($data['log']) >= 200) {
+        array_shift($data['log']);
+    }
+    $data['log'][] = $entry;
+    storage_write('publicista_afiliados.json', $data);
+}
+
+/**
+ * Líneas objetivo para ESTADOS: telefonos.json con uso dentro de la lista
+ * configurada (por defecto bot-casa + bot-comercial) y WAHA configurado.
+ */
+function publicista_afiliados_get_lines() {
+    $cfg = publicista_afiliados_get_config();
+    $usos = $cfg['usos'];
+    $telefonos = storage_read('telefonos.json');
+    $lines = array();
+    foreach ((array)$telefonos as $t) {
+        $uso = trim((string)($t['uso'] ?? ''));
+        $wahaPort = trim((string)($t['waha_port'] ?? ''));
+        if ($wahaPort === '') continue;
+        if (!in_array($uso, $usos, true)) continue;
+        $lines[] = array(
+            'id' => trim((string)($t['id'] ?? '')),
+            'nombre' => trim((string)($t['nombre'] ?? '')),
+            'tfono' => trim((string)($t['tfono'] ?? '')),
+            'waha_port' => $wahaPort,
+            'waha' => trim((string)($t['waha'] ?? '')),
+            'uso' => $uso,
+        );
+    }
+    return $lines;
+}
+
+/**
+ * Destinos objetivo para BROADCAST: teléfonos manuales de config + (opcional)
+ * contactos del sector (casawasap_contactos.json).
+ */
+function publicista_afiliados_get_destinos() {
+    $cfg = publicista_afiliados_get_config();
+    $destinos = $cfg['destinos'];
+    if (!empty($cfg['usar_contactos_casawasap'])) {
+        foreach ((array)storage_read('casawasap_contactos.json') as $c) {
+            $t = preg_replace('/\D+/', '', trim((string)($c['telefono'] ?? '')));
+            if ($t !== '') $destinos[] = $t;
+        }
+    }
+    return array_values(array_unique(array_filter($destinos, function ($d) {
+        return $d !== '';
+    })));
+}
+
+// ─── Fetch de la API de afiliados (con caché de seguridad) ────────────────
+
+function publicista_afiliados_api_base_url() {
+    $cfg = publicista_afiliados_get_config();
+    $url = trim((string)($cfg['api_base_url'] ?? ''));
+    if ($url === '') {
+        if (function_exists('avisos_config')) {
+            $url = trim((string)(avisos_config()['afiliados_api_base_url'] ?? ''));
+        }
+    }
+    return rtrim($url, '/');
+}
+
+function publicista_afiliados_curl_json($url, $cacheFile, $timeout = 15) {
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    $body = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+
+    if ($err !== '' || $code !== 200 || empty($body)) {
+        $cached = storage_read($cacheFile);
+        return is_array($cached) ? $cached : array();
+    }
+
+    $decoded = json_decode($body, true);
+    if (!is_array($decoded)) return array();
+
+    // Contrato: { ok: true, data: [...] } — tolera también array plano
+    $items = isset($decoded['data']) && is_array($decoded['data']) ? $decoded['data'] : $decoded;
+
+    $result = array(
+        'fetched_at' => now_datetime(),
+        'items' => array_values($items),
+    );
+    storage_write($cacheFile, $result);
+    return $result;
+}
+
+function publicista_afiliados_fetch_productos($forceRefresh = false) {
+    $cacheFile = 'publicista_afiliados_productos_cache.json';
+    if (!$forceRefresh) {
+        $cached = storage_read($cacheFile);
+        if (is_array($cached) && isset($cached['items'])) {
+            return $cached['items'];
+        }
+    }
+    $base = publicista_afiliados_api_base_url();
+    if ($base === '') return array();
+    $result = publicista_afiliados_curl_json($base . '/api/productos.json', $cacheFile);
+    return isset($result['items']) ? $result['items'] : array();
+}
+
+function publicista_afiliados_fetch_oferta_del_dia($forceRefresh = false) {
+    $cacheFile = 'publicista_afiliados_oferta_cache.json';
+    if (!$forceRefresh) {
+        $cached = storage_read($cacheFile);
+        if (is_array($cached) && isset($cached['items']) && !empty($cached['items'])) {
+            return $cached['items'][0];
+        }
+    }
+    $base = publicista_afiliados_api_base_url();
+    if ($base === '') return array();
+    $result = publicista_afiliados_curl_json($base . '/api/oferta-del-dia.json', $cacheFile);
+    $items = isset($result['items']) ? $result['items'] : array();
+    return !empty($items) ? $items[0] : array();
+}
+
+/**
+ * Mapeo tolerante de campos del producto afiliado: preparado para casar con
+ * los campos reales de /api/productos.json cuando existan (spec afiliados).
+ */
+function publicista_afiliados_normalize_producto($p) {
+    $p = is_array($p) ? $p : array();
+    return array(
+        'id' => trim((string)($p['id'] ?? ($p['slug'] ?? ''))),
+        'slug' => trim((string)($p['slug'] ?? '')),
+        'titulo' => trim((string)($p['titulo'] ?? ($p['title'] ?? ($p['nombre'] ?? 'Producto afiliado')))),
+        'url_afiliado' => trim((string)($p['url_afiliado'] ?? ($p['enlace'] ?? ($p['url'] ?? ($p['link'] ?? ''))))),
+        'precio' => trim((string)($p['precio'] ?? ($p['price'] ?? ''))),
+        'precio_original' => trim((string)($p['precio_original'] ?? ($p['precio_antes'] ?? ''))),
+        'imagen' => trim((string)($p['imagen'] ?? ($p['image'] ?? ($p['foto'] ?? '')))),
+        'categoria' => trim((string)($p['categoria'] ?? ($p['categoria_id'] ?? ''))),
+        'descripcion' => trim((string)($p['descripcion'] ?? ($p['description'] ?? ''))),
+    );
+}
+
+function publicista_afiliados_pick_producto() {
+    // Prioridad: oferta del día → producto aleatorio del catálogo
+    $oferta = publicista_afiliados_normalize_producto(publicista_afiliados_fetch_oferta_del_dia());
+    if (trim((string)($oferta['titulo'] ?? '')) !== '' && $oferta['titulo'] !== 'Producto afiliado') {
+        return $oferta;
+    }
+    $productos = publicista_afiliados_fetch_productos();
+    if (empty($productos)) return $oferta;
+    $productos = array_map('publicista_afiliados_normalize_producto', $productos);
+    $productos = array_values(array_filter($productos, function ($p) {
+        return trim((string)($p['titulo'] ?? '')) !== '' && $p['titulo'] !== 'Producto afiliado';
+    }));
+    if (empty($productos)) return $oferta;
+    return $productos[array_rand($productos)];
+}
+
+function publicista_afiliados_enlace_afiliado($producto) {
+    $url = trim((string)($producto['url_afiliado'] ?? ''));
+    if ($url === '') return '';
+    $cfg = publicista_afiliados_get_config();
+    $campaign = trim((string)($cfg['utm_campaign'] ?? 'crm'));
+    if ($campaign === '') $campaign = 'crm';
+    $utm = array(
+        'utm_source' => 'whatsapp',
+        'utm_medium' => 'social',
+        'utm_campaign' => $campaign,
+    );
+    $sep = (strpos($url, '?') !== false) ? '&' : '?';
+    return $url . $sep . http_build_query($utm);
+}
+
+// ─── Compositores de texto ────────────────────────────────────────────────
+
+function publicista_afiliados_producto_linea($producto) {
+    $titulo = trim((string)($producto['titulo'] ?? ''));
+    $precio = trim((string)($producto['precio'] ?? ''));
+    $enlace = publicista_afiliados_enlace_afiliado($producto);
+    $linea = $titulo;
+    if ($precio !== '') $linea .= ' — ' . $precio;
+    if ($enlace !== '') $linea .= "\n" . $enlace;
+    return $linea;
+}
+
+function publicista_afiliados_build_status_text($productos, $formato) {
+    $productos = array_values(array_filter((array)$productos, function ($p) {
+        return is_array($p) && trim((string)($p['titulo'] ?? '')) !== '';
+    }));
+    if (empty($productos)) return '';
+
+    if ($formato === 'mix_aleatorio') {
+        $noMix = array_values(array_filter(array_keys(publicista_afiliados_format_options()), function ($f) {
+            return $f !== 'mix_aleatorio';
+        }));
+        $formato = $noMix[array_rand($noMix)];
+    }
+
+    if ($formato === 'destacado_random') {
+        $p = $productos[array_rand($productos)];
+        return "🔥 Destacado hoy 🔥\n\n" . publicista_afiliados_producto_linea($p) . "\n\nNo te lo pierdas 😉";
+    }
+
+    if ($formato === 'mini_catalogo') {
+        shuffle($productos);
+        $pick = array_slice($productos, 0, min(3, count($productos)));
+        $lines = array('🛒 Mini catálogo 🛒', '');
+        foreach ($pick as $p) $lines[] = publicista_afiliados_producto_linea($p);
+        $lines[] = '';
+        $lines[] = 'Elige y pide info 😉';
+        return implode("\n", $lines);
+    }
+
+    // producto_del_dia (default)
+    $p = $productos[array_rand($productos)];
+    return "⭐ Producto del día ⭐\n\n" . publicista_afiliados_producto_linea($p) . "\n\nPrecio y disponibilidad, consulta aquí 😉";
+}
+
+function publicista_afiliados_build_broadcast_text($producto) {
+    $titulo = trim((string)($producto['titulo'] ?? 'Producto'));
+    $precio = trim((string)($producto['precio'] ?? ''));
+    $enlace = publicista_afiliados_enlace_afiliado($producto);
+    $lines = array("🔥 Oferta especial 🔥", '', $titulo);
+    if ($precio !== '') $lines[] = '💰 ' . $precio;
+    if ($enlace !== '') {
+        $lines[] = '';
+        $lines[] = '👉 ' . $enlace;
+    }
+    $lines[] = '';
+    $lines[] = 'Pide más información si te interesa 😉';
+    return implode("\n", $lines);
+}
+
+// ─── Envío WAHA ───────────────────────────────────────────────────────────
+
+function publicista_afiliados_publish_status_to_line($line, $text) {
+    $settings = publicista_estados_wasap_get_waha_settings();
+    $payload = array(
+        'text' => $text,
+        'backgroundColor' => '#25D366',
+        'font' => 0,
+    );
+    return comercial_waha_post_json($settings, $line['waha_port'], 'api/default/status/text', $payload);
+}
+
+function publicista_afiliados_send_broadcast($destino, $text, $port = '') {
+    $settings = publicista_estados_wasap_get_waha_settings();
+    $port = trim((string)$port);
+    if ($port === '') {
+        $stored = storage_read('settings.json');
+        $port = trim((string)($stored['waha_default_port'] ?? '3000'));
+    }
+    $payload = array(
+        'chatId' => $destino . '@c.us',
+        'text' => $text,
+    );
+    return comercial_waha_post_json($settings, $port, 'api/sendText', $payload);
+}
+
+// ─── Publicación manual / ciclo ───────────────────────────────────────────
+
+function publicista_afiliados_publicar_ahora() {
+    $config = publicista_afiliados_get_config();
+    if (empty($config['enabled'])) {
+        return array('ok' => false, 'error' => 'Afiliados WhatsApp está desactivado.', 'results' => array());
+    }
+
+    $productos = publicista_afiliados_fetch_productos(true);
+    $oferta = publicista_afiliados_fetch_oferta_del_dia(true);
+    if (empty($productos) && empty($oferta)) {
+        return array('ok' => false, 'error' => 'La API de afiliados no devuelve productos todavía (o la URL no está configurada).', 'results' => array());
+    }
+
+    $pool = array();
+    if (!empty($oferta)) $pool[] = publicista_afiliados_normalize_producto($oferta);
+    foreach ($productos as $p) $pool[] = publicista_afiliados_normalize_producto($p);
+
+    $results = array();
+    $allOk = true;
+
+    // 1) Estados en las líneas seleccionadas
+    $allLines = publicista_afiliados_get_lines();
+    $enabledIds = $config['lineas'];
+    $lines = array();
+    foreach ($allLines as $l) {
+        if (in_array($l['id'], $enabledIds, true)) $lines[] = $l;
+    }
+
+    if (empty($lines)) {
+        $allOk = false;
+        $results[] = array('tipo' => 'estado', 'ok' => false, 'error' => 'No hay líneas habilitadas para estados (bot-casa / bot-comercial).');
+    } else {
+        $formato = $config['formato'];
+        foreach ($lines as $idx => $line) {
+            $text = publicista_afiliados_build_status_text($pool, $formato);
+            if ($text === '') {
+                $results[] = array('tipo' => 'estado', 'linea' => $line['nombre'], 'ok' => false, 'error' => 'No se pudo componer el texto.');
+                $allOk = false;
+                continue;
+            }
+            $pubResult = publicista_afiliados_publish_status_to_line($line, $text);
+            $ok = !empty($pubResult['ok']) && ($pubResult['http_code'] >= 200 && $pubResult['http_code'] < 300);
+            $results[] = array(
+                'tipo' => 'estado',
+                'linea' => $line['nombre'],
+                'ok' => $ok,
+                'http_code' => (int)($pubResult['http_code'] ?? 0),
+                'error' => $ok ? '' : trim((string)($pubResult['error'] ?? 'Error desconocido')),
+            );
+            if (!$ok) $allOk = false;
+        }
+    }
+
+    // 2) Broadcast a destinos
+    if (!empty($config['broadcast_enabled'])) {
+        $destinos = publicista_afiliados_get_destinos();
+        if (empty($destinos)) {
+            $results[] = array('tipo' => 'broadcast', 'ok' => false, 'error' => 'Broadcast activado pero sin destinos configurados.');
+            $allOk = false;
+        } else {
+            $broadcastPort = !empty($lines) ? $lines[0]['waha_port'] : '';
+            $prod = $pool[array_rand($pool)];
+            $text = publicista_afiliados_build_broadcast_text($prod);
+            foreach ($destinos as $destino) {
+                $pubResult = publicista_afiliados_send_broadcast($destino, $text, $broadcastPort);
+                $ok = !empty($pubResult['ok']) && ($pubResult['http_code'] >= 200 && $pubResult['http_code'] < 300);
+                $results[] = array(
+                    'tipo' => 'broadcast',
+                    'destino' => $destino,
+                    'ok' => $ok,
+                    'http_code' => (int)($pubResult['http_code'] ?? 0),
+                    'error' => $ok ? '' : trim((string)($pubResult['error'] ?? 'Error desconocido')),
+                );
+                if (!$ok) $allOk = false;
+            }
+        }
+    }
+
+    publicista_afiliados_add_log_entry(array(
+        'published_at' => now_datetime(),
+        'tipo' => 'ciclo',
+        'resultado' => $allOk ? 'ok' : 'parcial',
+        'productos_count' => count($pool),
+        'estados_count' => count(array_filter($results, function ($r) { return ($r['tipo'] ?? '') === 'estado'; })),
+        'broadcasts_count' => count(array_filter($results, function ($r) { return ($r['tipo'] ?? '') === 'broadcast'; })),
+        'results' => $results,
+    ));
+
+    $oks = count(array_filter($results, function ($r) { return !empty($r['ok']); }));
+    return array(
+        'ok' => $allOk,
+        'message' => "Completado: $oks/" . count($results) . " envíos OK.",
+        'error' => $allOk ? '' : 'Algunos envíos fallaron (revisa el log).',
+        'results' => $results,
+    );
+}
+
+// ─── Programación (cron) ──────────────────────────────────────────────────
+
+function publicista_afiliados_get_last_scheduled_run_at() {
+    $data = storage_read('publicista_afiliados.json');
+    if (!is_array($data) || !isset($data['config']) || !is_array($data['config'])) return null;
+    return isset($data['config']['last_scheduled_run_at']) ? $data['config']['last_scheduled_run_at'] : null;
+}
+
+function publicista_afiliados_set_last_scheduled_run_at($timestamp = null) {
+    if ($timestamp === null) $timestamp = now_datetime();
+    $data = storage_read('publicista_afiliados.json');
+    if (!is_array($data)) $data = array();
+    if (!isset($data['config']) || !is_array($data['config'])) {
+        $data['config'] = publicista_afiliados_config_defaults();
+    }
+    $data['config']['last_scheduled_run_at'] = $timestamp;
+    storage_write('publicista_afiliados.json', $data);
+}
+
+function publicista_afiliados_is_within_time_window($config) {
+    $nowMinutes = (int)date('H') * 60 + (int)date('i');
+    list($hStart, $mStart) = array_map('intval', explode(':', $config['hora_inicio']));
+    list($hEnd, $mEnd) = array_map('intval', explode(':', $config['hora_fin']));
+    $startMinutes = $hStart * 60 + $mStart;
+    $endMinutes = $hEnd * 60 + $mEnd;
+    if ($endMinutes < $startMinutes) {
+        return ($nowMinutes >= $startMinutes) || ($nowMinutes <= $endMinutes);
+    }
+    return ($nowMinutes >= $startMinutes) && ($nowMinutes <= $endMinutes);
+}
+
+function publicista_afiliados_calculate_interval_seconds($config) {
+    if ($config['frecuencia_tipo'] === 'cada_x_horas') {
+        return (int)$config['frecuencia_valor'] * 3600;
+    }
+    $today = date('Y-m-d');
+    $startTs = strtotime($today . ' ' . $config['hora_inicio'] . ':00');
+    $endTs = strtotime($today . ' ' . $config['hora_fin'] . ':00');
+    if ($startTs === false || $endTs === false) return 3600;
+    if ($endTs <= $startTs) $endTs = strtotime($today . ' ' . $config['hora_fin'] . ':00 +1 day');
+    $windowDuration = $endTs - $startTs;
+    if ($windowDuration <= 0) return 900;
+    return max(900, (int)($windowDuration / (int)$config['frecuencia_valor']));
+}
+
+function publicista_afiliados_is_scheduled_due($config) {
+    if (empty($config['enabled'])) return false;
+    if (!publicista_afiliados_is_within_time_window($config)) return false;
+    $lastRunAt = publicista_afiliados_get_last_scheduled_run_at();
+    if ($lastRunAt === null || $lastRunAt === '') return true;
+    $interval = publicista_afiliados_calculate_interval_seconds($config);
+    if ($interval <= 0) return true;
+    $lastRunTs = strtotime($lastRunAt);
+    if ($lastRunTs === false) return true;
+    return (time() - $lastRunTs) >= $interval;
+}
+
+function publicista_afiliados_run_due() {
+    $config = publicista_afiliados_get_config();
+    $interval = publicista_afiliados_calculate_interval_seconds($config);
+
+    if (!publicista_afiliados_is_scheduled_due($config)) {
+        $lastRunAt = publicista_afiliados_get_last_scheduled_run_at();
+        $lastTs = $lastRunAt !== null && $lastRunAt !== '' ? strtotime($lastRunAt) : false;
+        $nextCheck = ($lastTs !== false)
+            ? date('Y-m-d H:i:s', $lastTs + $interval)
+            : date('Y-m-d H:i:s', time() + $interval);
+        return array(
+            'action' => 'afiliados_wasap_scheduled',
+            'published' => false,
+            'reason' => 'not_due',
+            'next_check' => $nextCheck,
+        );
+    }
+
+    $nowStr = now_datetime();
+    publicista_afiliados_set_last_scheduled_run_at($nowStr);
+
+    $result = publicista_afiliados_publicar_ahora();
+
+    return array_merge(
+        array(
+            'action' => 'afiliados_wasap_scheduled',
+            'published' => !empty($result['ok']),
+            'message' => $result['message'] ?? '',
+            'reason' => '',
+            'next_check' => date('Y-m-d H:i:s', strtotime($nowStr) + $interval),
+        ),
+        $result
+    );
+}
+
+// ─── Anuncios Destacamos de producto (job contenido) ──────────────────────
+
+function publicista_afiliados_destacamos_last_run_at() {
+    $data = storage_read('publicista_afiliados.json');
+    if (!is_array($data) || !isset($data['config']) || !is_array($data['config'])) return '';
+    return trim((string)($data['config']['destacamos_last_run_at'] ?? ''));
+}
+
+function publicista_afiliados_destacamos_set_last_run_at($timestamp = null) {
+    if ($timestamp === null) $timestamp = now_datetime();
+    $data = storage_read('publicista_afiliados.json');
+    if (!is_array($data)) $data = array();
+    if (!isset($data['config']) || !is_array($data['config'])) {
+        $data['config'] = publicista_afiliados_config_defaults();
+    }
+    $data['config']['destacamos_last_run_at'] = $timestamp;
+    storage_write('publicista_afiliados.json', $data);
+}
+
+function publicista_afiliados_destacamos_generate_copy($producto) {
+    $titulo = trim((string)($producto['titulo'] ?? 'Producto'));
+    $descripcion = trim((string)($producto['descripcion'] ?? ''));
+    $prompt = "Eres un copywriter experto en e-commerce para un catálogo de productos de bienestar íntimo en España.\n"
+        . "Genera el copy para un anuncio breve del siguiente producto.\n"
+        . "Responde ÚNICAMENTE con JSON válido: {\"title\": \"...\", \"description\": \"...\"}\n"
+        . "Reglas: title de 15-45 caracteres, impactante, sin clics falsos; description de 80-300 caracteres, beneficios, discreción y envío, tono cercano, sin mentiras.\n"
+        . "PRODUCTO: " . $titulo
+        . ($descripcion !== '' ? "\nDESCRIPCIÓN PROVEEDOR: " . $descripcion : '');
+
+    $payload = array(
+        'input' => array(
+            array('role' => 'system', 'content' => 'Eres un copywriter profesional de e-commerce en español.'),
+            array('role' => 'user', 'content' => $prompt),
+        ),
+        'temperature' => 0.8,
+    );
+    $response = publicista_copy_api_request($payload, 90);
+    if (!$response['ok']) {
+        return array(false, 'Copy IA falló: ' . trim((string)($response['error'] ?? 'sin detalle')));
+    }
+    $raw = publicista_response_output_text($response['decoded']);
+    $raw = trim((string)$raw);
+    if (preg_match('/```(?:json)?\s*\n?(.*?)\n?\s*```/s', $raw, $m)) $raw = trim($m[1]);
+    if (preg_match('/\{.*/s', $raw, $m2)) $raw = $m2[0];
+    $data = json_decode($raw, true);
+    if (!is_array($data)) {
+        return array(false, 'Copy IA no devolvió JSON válido.');
+    }
+    return array(true, array(
+        'title' => trim((string)($data['title'] ?? '')),
+        'description' => trim((string)($data['description'] ?? '')),
+    ));
+}
+
+function publicista_afiliados_destacamos_generate_image($producto) {
+    $titulo = trim((string)($producto['titulo'] ?? 'Producto'));
+    $prompt = "E-commerce product photography of: " . $titulo
+        . ". Clean studio background, soft appetizing lighting, product centered, high quality, no people, no text, no watermark.";
+
+    $response = publicista_openai_image_generate($prompt, array(
+        'quality' => 'medium',
+        'size' => '1024x1024',
+        'n' => 1,
+        'output_format' => 'png',
+    ));
+    if (!$response['ok']) {
+        return array(false, 'Imagen IA falló: ' . trim((string)($response['error'] ?? 'sin detalle')));
+    }
+    list($okBytes, $bytesOrError) = publicista_decode_generated_image_bytes($response['decoded']);
+    if (!$okBytes) {
+        return array(false, $bytesOrError);
+    }
+    $dir = BASE_PATH . '/data/afiliados_destacamos';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    $fs = $dir . '/ad_' . date('Ymd_His') . '_' . substr((string)generate_id(''), 0, 6) . '.png';
+    list($okWrite, $webPathOrError) = publicista_write_binary_file($fs, $bytesOrError);
+    if (!$okWrite) {
+        return array(false, $webPathOrError);
+    }
+    return array(true, array(
+        'fs_path' => $fs,
+        'web_path' => $webPathOrError,
+        'model' => (string)($response['model'] ?? ''),
+    ));
+}
+
+function publicista_afiliados_destacamos_publicar($options = array()) {
+    $cfg = publicista_afiliados_get_config();
+    $dc = $cfg['destacamos'];
+    if (empty($dc['enabled'])) {
+        return array('ok' => false, 'error' => 'Anuncios Destacamos de producto desactivado.');
+    }
+    if (!publicista_require_automation_adapter('destacamos', 'publish')) {
+        return array('ok' => false, 'error' => 'No hay adaptador de Destacamos disponible.');
+    }
+
+    $producto = publicista_afiliados_pick_producto();
+    if (trim((string)($producto['titulo'] ?? '')) === '' || $producto['titulo'] === 'Producto afiliado') {
+        return array('ok' => false, 'error' => 'La API de afiliados no devuelve productos todavía.');
+    }
+
+    // Copy + imagen IA
+    list($okCopy, $copyOrError) = publicista_afiliados_destacamos_generate_copy($producto);
+    if (!$okCopy) return array('ok' => false, 'error' => $copyOrError);
+    list($okImg, $imgOrError) = publicista_afiliados_destacamos_generate_image($producto);
+    if (!$okImg) return array('ok' => false, 'error' => $imgOrError);
+
+    // Cuenta Destacamos objetivo (config o primera con listings)
+    $accountId = trim((string)($dc['account_id'] ?? ''));
+    $account = null;
+    if ($accountId !== '') {
+        $account = publicista_account_get($accountId, true);
+    }
+    if (!$account) {
+        foreach (publicista_accounts_get(true) as $candidate) {
+            if (!empty(publicista_account_listing_ids($candidate))) {
+                $account = $candidate;
+                break;
+            }
+        }
+    }
+    if (!$account) {
+        return array('ok' => false, 'error' => 'No hay cuentas Destacamos con listings configurados.');
+    }
+
+    $listingIds = publicista_account_listing_ids($account);
+    $listingId = trim((string)($listingIds[array_rand($listingIds)] ?? ''));
+    if ($listingId === '') {
+        return array('ok' => false, 'error' => 'La cuenta no tiene listings válidos.');
+    }
+
+    // Item mínimo de campaña reutilizando el pipeline de subida existente
+    $item = array(
+        'id' => generate_id('afitem'),
+        'campaign_id' => '',
+        'estado' => 'ready',
+        'portal_code' => 'destacamos',
+        'product_job_id' => '',
+        'product_snapshot' => publicista_entity_snapshot_defaults(),
+        'account_id' => trim((string)($account['id'] ?? '')),
+        'account_snapshot' => publicista_entity_snapshot_defaults(),
+        'copy_variant_id' => '',
+        'copy_snapshot' => array(
+            'title_neutral' => $copyOrError['title'],
+            'body_neutral' => $copyOrError['description'],
+            'short_hook' => $copyOrError['title'],
+        ),
+        'image_ids' => array(),
+        'image_snapshot' => array(array(
+            'id' => 'afiliado_01',
+            'filename' => basename($imgOrError['web_path']),
+            'path_rel' => $imgOrError['web_path'],
+            'final_path' => $imgOrError['web_path'],
+        )),
+        'publish_mode' => 'auto',
+        'planning_profile_snapshot' => array(),
+        'phone_id' => '',
+        'external_ad_id' => $listingId,
+        'publish_result' => array(),
+        'created_at' => now_datetime(),
+        'updated_at' => now_datetime(),
+    );
+    $campaign = publicista_campaign_normalize(array(
+        'id' => generate_id('afcamp'),
+        'nombre' => 'Afiliado: ' . trim((string)($producto['titulo'] ?? '')),
+        'estado' => 'active',
+        'planning_snapshot' => array('data' => array()),
+    ));
+
+    list($canRun, $errors, $accountResolved, $phone) = publicista_campaign_item_ready_for_execution($item);
+    if (!$canRun) {
+        return array('ok' => false, 'error' => 'Preflight: ' . implode(' | ', $errors));
+    }
+
+    $result = publicista_campaign_execute_item($campaign, $item, array(
+        'timeoutMs' => 90000,
+        'debug_log' => true,
+    ));
+
+    publicista_afiliados_add_log_entry(array(
+        'published_at' => now_datetime(),
+        'tipo' => 'destacamos',
+        'resultado' => !empty($result['ok']) ? 'ok' : 'error',
+        'producto' => trim((string)($producto['titulo'] ?? '')),
+        'listing_id' => $listingId,
+        'error' => empty($result['ok']) ? trim((string)($result['error'] ?? 'Error')) : '',
+    ));
+
+    if (!empty($result['ok'])) {
+        publicista_afiliados_destacamos_set_last_run_at();
+    }
+
+    return array_merge(array('ok' => !empty($result['ok'])), $result);
+}
+
+function publicista_afiliados_destacamos_run_due($force = false) {
+    $cfg = publicista_afiliados_get_config();
+    $dc = $cfg['destacamos'];
+
+    if (empty($dc['enabled'])) {
+        return array('action' => 'afiliados_destacamos', 'published' => false, 'reason' => 'disabled');
+    }
+
+    if (!$force) {
+        $lastRunAt = publicista_afiliados_destacamos_last_run_at();
+        $hora = trim((string)($dc['hora'] ?? '12:00'));
+        $nextTs = strtotime(date('Y-m-d', strtotime('+' . (int)$dc['interval_days'] . ' days')) . ' ' . $hora . ':00');
+        $lastTs = $lastRunAt !== '' ? strtotime($lastRunAt) : 0;
+        // Primer run: no publicar hasta la hora configurada de hoy
+        if ($lastTs === false) $lastTs = 0;
+        $todayTarget = strtotime(date('Y-m-d') . ' ' . $hora . ':00');
+        if ($lastTs > 0 && $lastTs >= $todayTarget) {
+            return array('action' => 'afiliados_destacamos', 'published' => false, 'reason' => 'not_due', 'next_check' => date('Y-m-d H:i:s', $nextTs));
+        }
+        if (time() < $todayTarget) {
+            return array('action' => 'afiliados_destacamos', 'published' => false, 'reason' => 'not_due', 'next_check' => date('Y-m-d H:i:s', $todayTarget));
+        }
+    }
+
+    $result = publicista_afiliados_destacamos_publicar();
+    return array_merge(
+        array(
+            'action' => 'afiliados_destacamos',
+            'published' => !empty($result['ok']),
+            'message' => $result['message'] ?? '',
+            'reason' => !empty($result['ok']) ? 'published' : trim((string)($result['error'] ?? 'error')),
+        ),
+        $result
+    );
+}
