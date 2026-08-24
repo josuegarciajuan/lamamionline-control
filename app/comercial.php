@@ -1125,6 +1125,7 @@ function comercial_get_sent_phones() {
             'id' => trim((string)($row['id'] ?? '')),
             'phone' => $phone,
             'process_slug' => trim((string)($row['process_slug'] ?? '')),
+            'line_id' => trim((string)($row['line_id'] ?? '')),
             'sent_at' => trim((string)($row['sent_at'] ?? '')),
         );
     }
@@ -1142,29 +1143,101 @@ function comercial_phone_was_contacted($phone) {
     return false;
 }
 
-function comercial_register_sent_phone($phone, $processSlug = '') {
+// ─── Dedup por (rama, línea de origen) ───
+// Regla: un teléfono solo puede recibir 1 mensaje por rama y 1 por línea de origen.
+// Para reenviar, tanto la rama como la línea deben ser nuevas para ese teléfono.
+
+/**
+ * ¿Esta rama ya ha escrito a este teléfono? (1 contacto por rama)
+ * Fuente de verdad: archivo por rama comercial_sent_phones_<slug>.json
+ */
+function comercial_phone_contacted_by_branch($phone, $processSlug) {
+    $processSlug = trim((string)$processSlug);
+    $phone = comercial_only_digits($phone);
+    if ($processSlug === '' || $phone === '') return false;
+    foreach (comercial_get_sent_phones_by_branch($processSlug) as $entry) {
+        if (comercial_phone_matches($phone, $entry['phone'])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Líneas de origen ya usadas para este teléfono (1 contacto por línea, en GLOBAL:
+ * una línea agotada para un teléfono lo está para cualquier rama).
+ */
+function comercial_phone_used_lines($phone) {
+    $phone = comercial_only_digits($phone);
+    if ($phone === '') return array();
+    $used = array();
+    foreach (comercial_get_sent_phones() as $entry) {
+        if (!comercial_phone_matches($phone, $entry['phone'])) continue;
+        $lineId = trim((string)($entry['line_id'] ?? ''));
+        if ($lineId === '') continue;
+        $used[$lineId] = true;
+    }
+    return array_keys($used);
+}
+
+/**
+ * ¿Queda alguna línea asignada y disponible (viva) desde la que este teléfono
+ * aún NO haya recibido? (dimensión "1 por línea")
+ */
+function comercial_phone_has_unused_line($phone, $process) {
+    $process = is_array($process) ? $process : array();
+    $used = array_flip(comercial_phone_used_lines($phone));
+    $lines = comercial_list_lines_indexed();
+    foreach ((array)($process['assigned_line_ids'] ?? array()) as $lineId) {
+        if (!isset($lines[$lineId])) continue;
+        if (!comercial_line_is_available($lines[$lineId])) continue;
+        if (!isset($used[$lineId])) return true;
+    }
+    return false;
+}
+
+/**
+ * Gate de pick: el teléfono puede recibir una publicidad nueva si
+ *  - esta rama aún no le ha escrito, y
+ *  - queda al menos una línea asignada viva sin usar para ese teléfono.
+ */
+function comercial_phone_contactable($phone, $process) {
+    $process = is_array($process) ? $process : array();
+    $slug = trim((string)($process['slug'] ?? ''));
+    if ($slug === '') return false;
+    if (comercial_phone_contacted_by_branch($phone, $slug)) return false;
+    if (!comercial_phone_has_unused_line($phone, $process)) return false;
+    return true;
+}
+
+function comercial_register_sent_phone($phone, $processSlug = '', $lineId = '') {
     $phoneDigits = comercial_only_digits($phone);
     if ($phoneDigits === '') return null;
+    $processSlug = trim((string)$processSlug);
+    $lineId = trim((string)$lineId);
 
     // ── Fix #5: deduplicación atómica con flock ──
     // El read-check-write sobre el archivo global no era atómico.
     // Dos procesos concurrentes podían leer, no encontrar el teléfono, y ambos registrarlo.
     // Ahora usamos un archivo de lock dedicado para serializar el acceso al global.
 
+    $entry = array(
+        'id' => generate_id('cmsent'),
+        'phone' => $phoneDigits,
+        'process_slug' => $processSlug,
+        'line_id' => $lineId,
+        'sent_at' => now_datetime(),
+    );
+
     $lockFile = DATA_PATH . '/comercial_sent_phones.lock';
     $lockFh = @fopen($lockFile, 'c+');
     if (!$lockFh) {
         // Si no podemos crear el lock, hacer el check sin lock (best-effort)
-        if (comercial_phone_was_contacted($phoneDigits)) return null;
-        $entry = array(
-            'id' => generate_id('cmsent'),
-            'phone' => $phoneDigits,
-            'process_slug' => trim((string)$processSlug),
-            'sent_at' => now_datetime(),
-        );
+        if (comercial_phone_contacted_by_branch($phoneDigits, $processSlug)) return null;
+        if ($lineId !== '' && in_array($lineId, comercial_phone_used_lines($phoneDigits), true)) return null;
         storage_upsert('comercial_sent_phones.json', $entry);
-        if (trim((string)$processSlug) !== '') {
-            $branchFile = 'comercial_sent_phones_' . preg_replace('/[^a-z0-9_\-]/i', '_', trim((string)$processSlug)) . '.json';
+        if ($processSlug !== '') {
+            $branchFile = 'comercial_sent_phones_' . preg_replace('/[^a-z0-9_\-]/i', '_', $processSlug) . '.json';
             $branchEntry = $entry;
             $branchEntry['branch_file'] = $branchFile;
             storage_upsert($branchFile, $branchEntry);
@@ -1175,16 +1248,11 @@ function comercial_register_sent_phone($phone, $processSlug = '') {
     // Bloquear acceso exclusivo al global
     if (!flock($lockFh, LOCK_EX)) {
         fclose($lockFh);
-        if (comercial_phone_was_contacted($phoneDigits)) return null;
-        $entry = array(
-            'id' => generate_id('cmsent'),
-            'phone' => $phoneDigits,
-            'process_slug' => trim((string)$processSlug),
-            'sent_at' => now_datetime(),
-        );
+        if (comercial_phone_contacted_by_branch($phoneDigits, $processSlug)) return null;
+        if ($lineId !== '' && in_array($lineId, comercial_phone_used_lines($phoneDigits), true)) return null;
         storage_upsert('comercial_sent_phones.json', $entry);
-        if (trim((string)$processSlug) !== '') {
-            $branchFile = 'comercial_sent_phones_' . preg_replace('/[^a-z0-9_\-]/i', '_', trim((string)$processSlug)) . '.json';
+        if ($processSlug !== '') {
+            $branchFile = 'comercial_sent_phones_' . preg_replace('/[^a-z0-9_\-]/i', '_', $processSlug) . '.json';
             $branchEntry = $entry;
             $branchEntry['branch_file'] = $branchFile;
             storage_upsert($branchFile, $branchEntry);
@@ -1194,28 +1262,33 @@ function comercial_register_sent_phone($phone, $processSlug = '') {
 
     // Bajo lock: re-leer y re-chequear (doble verificación)
     try {
-        if (comercial_phone_was_contacted($phoneDigits)) {
+        if (comercial_phone_contacted_by_branch($phoneDigits, $processSlug)) {
             flock($lockFh, LOCK_UN);
             fclose($lockFh);
             comercial_event_append('duplicate_blocked', array(
                 'phone' => $phoneDigits,
-                'process_slug' => trim((string)$processSlug),
-                'reason' => 'already_contacted_under_lock',
+                'process_slug' => $processSlug,
+                'line_id' => $lineId,
+                'reason' => 'already_contacted_by_branch_under_lock',
+            ));
+            return null;
+        }
+        if ($lineId !== '' && in_array($lineId, comercial_phone_used_lines($phoneDigits), true)) {
+            flock($lockFh, LOCK_UN);
+            fclose($lockFh);
+            comercial_event_append('duplicate_blocked', array(
+                'phone' => $phoneDigits,
+                'process_slug' => $processSlug,
+                'line_id' => $lineId,
+                'reason' => 'line_already_used_for_phone_under_lock',
             ));
             return null;
         }
 
-        $entry = array(
-            'id' => generate_id('cmsent'),
-            'phone' => $phoneDigits,
-            'process_slug' => trim((string)$processSlug),
-            'sent_at' => now_datetime(),
-        );
-
         storage_upsert('comercial_sent_phones.json', $entry);
 
-        if (trim((string)$processSlug) !== '') {
-            $branchFile = 'comercial_sent_phones_' . preg_replace('/[^a-z0-9_\-]/i', '_', trim((string)$processSlug)) . '.json';
+        if ($processSlug !== '') {
+            $branchFile = 'comercial_sent_phones_' . preg_replace('/[^a-z0-9_\-]/i', '_', $processSlug) . '.json';
             $branchEntry = $entry;
             $branchEntry['branch_file'] = $branchFile;
             storage_upsert($branchFile, $branchEntry);
@@ -1241,6 +1314,7 @@ function comercial_get_sent_phones_by_branch($processSlug) {
             'id' => trim((string)($row['id'] ?? '')),
             'phone' => $phone,
             'process_slug' => $processSlug,
+            'line_id' => trim((string)($row['line_id'] ?? '')),
             'sent_at' => trim((string)($row['sent_at'] ?? '')),
         );
     }
@@ -1252,7 +1326,9 @@ function comercial_get_sent_phones_by_branch_count($processSlug) {
 }
 
 function comercial_rebuild_global_sent_phones() {
-    // Reconstruye el archivo global desde todos los archivos por rama
+    // Reconstruye el archivo global desde todos los archivos por rama.
+    // Clave de dedup: (phone, process_slug, line_id) — un teléfono puede estar varias
+    // veces (una por rama y por línea de origen), nunca repetido con la misma pareja.
     $allPhones = array();
     $seen = array();
     $branchFiles = glob(DATA_PATH . '/comercial_sent_phones_*.json');
@@ -1264,27 +1340,40 @@ function comercial_rebuild_global_sent_phones() {
         $rows = storage_read($basename);
         foreach ((array)$rows as $row) {
             $phone = comercial_only_digits((string)($row['phone'] ?? ''));
-            if ($phone === '' || isset($seen[$phone])) continue;
-            $seen[$phone] = true;
+            if ($phone === '') continue;
+            $slug = trim((string)($row['process_slug'] ?? ''));
+            $lineId = trim((string)($row['line_id'] ?? ''));
+            $key = $phone . '|' . $slug . '|' . $lineId;
+            if (isset($seen[$key])) continue;
+            $seen[$key] = true;
             $allPhones[] = array(
                 'id' => trim((string)($row['id'] ?? generate_id('cmsent'))),
                 'phone' => $phone,
-                'process_slug' => trim((string)($row['process_slug'] ?? '')),
+                'process_slug' => $slug,
+                'line_id' => $lineId,
                 'sent_at' => trim((string)($row['sent_at'] ?? now_datetime())),
             );
         }
     }
 
-    // También incluir entradas que ya estén en el global pero no en branch files
+    // También incluir entradas que ya estén en el global pero no en branch files.
+    // Solo si tienen line_id: una entrada sin línea no participa en ninguna dimensión
+    // de la dedup (rama→branch files, línea→line_id) y solo es basura del modelo antiguo.
     $globalRows = storage_read('comercial_sent_phones.json');
     foreach ((array)$globalRows as $row) {
         $phone = comercial_only_digits((string)($row['phone'] ?? ''));
-        if ($phone === '' || isset($seen[$phone])) continue;
-        $seen[$phone] = true;
+        if ($phone === '') continue;
+        $slug = trim((string)($row['process_slug'] ?? ''));
+        $lineId = trim((string)($row['line_id'] ?? ''));
+        if ($lineId === '') continue;
+        $key = $phone . '|' . $slug . '|' . $lineId;
+        if (isset($seen[$key])) continue;
+        $seen[$key] = true;
         $allPhones[] = array(
             'id' => trim((string)($row['id'] ?? generate_id('cmsent'))),
             'phone' => $phone,
-            'process_slug' => trim((string)($row['process_slug'] ?? '')),
+            'process_slug' => $slug,
+            'line_id' => $lineId,
             'sent_at' => trim((string)($row['sent_at'] ?? now_datetime())),
         );
     }
@@ -4662,8 +4751,22 @@ function comercial_send_process_message_with_fallback($process, $targetPhone, $t
         return array('ok' => false, 'error' => 'No hay líneas asignadas o disponibles', 'attempts' => array());
     }
 
-    $attempts = array();
+    // ── Dedup por línea de origen: excluir líneas ya usadas para este teléfono ──
+    // Regla "1 por línea": una línea que ya escribió a este teléfono (desde cualquier
+    // rama) no puede volver a hacerlo. Estricto: si no queda línea sin repetir, fallar.
+    $usedLines = array_flip(comercial_phone_used_lines($targetPhone));
+    $eligibleLines = array();
     foreach ($orderedLines as $line) {
+        $lineId = (string)($line['id'] ?? '');
+        if (isset($usedLines[$lineId])) continue;
+        $eligibleLines[] = $line;
+    }
+    if (empty($eligibleLines)) {
+        return array('ok' => false, 'error' => 'Sin línea de origen sin repetir para este teléfono', 'attempts' => array());
+    }
+
+    $attempts = array();
+    foreach ($eligibleLines as $line) {
         $send = comercial_send_text_via_line($line, $targetPhone, $text, $process);
         $attempts[] = array(
             'line_id' => (string)($line['id'] ?? ''),
@@ -6199,8 +6302,9 @@ function comercial_jsonl_dequeue_first_valid($path, $phoneField, $excludePhone =
                 continue;
             }
 
-            // Deduplicación global: evitar enviar a teléfonos ya contactados por cualquier proceso
-            if (comercial_phone_was_contacted($phone)) {
+            // Dedup por (rama, línea): solo descartar si el teléfono ya recibió de esta
+            // rama o ya no le queda ninguna línea asignada viva sin usar.
+            if (!comercial_phone_contactable($phone, $process)) {
                 $skipIndexes[$index] = true;
                 continue;
             }
@@ -6290,8 +6394,9 @@ function comercial_pick_candidate_from_mysql($process) {
                 $blacklistHits++;
                 continue;
             }
-            // Deduplicación global: evitar enviar a teléfonos ya contactados por cualquier proceso
-            if (comercial_phone_was_contacted($phone)) {
+            // Dedup por (rama, línea): solo descartar si el teléfono ya recibió de esta
+            // rama o ya no le queda ninguna línea asignada viva sin usar.
+            if (!comercial_phone_contactable($phone, $process)) {
                 continue;
             }
             $existing = comercial_find_thread_by_process_phone((string)$process['id'], $phone);
@@ -6617,7 +6722,7 @@ function comercial_run_tick($forceProcessId = '') {
                 'created_at' => now_datetime(),
             ));
             comercial_upsert_thread($thread);
-            comercial_register_sent_phone($targetPhone, (string)$process['slug']);
+            comercial_register_sent_phone($targetPhone, (string)$process['slug'], (string)($line['id'] ?? ''));
             $results[] = array('process' => $process['nombre'], 'ok' => true, 'target_phone' => $targetPhone, 'line' => (string)($line['nombre'] ?? ''));
         } else {
             $results[] = array('process' => $process['nombre'], 'ok' => false, 'target_phone' => $targetPhone, 'reason' => (string)$send['error']);
