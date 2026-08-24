@@ -1081,18 +1081,21 @@ function dismissWizard() {
         <?php if ($subStatus['status'] === 'trial'): ?>
         <div class="trial-limit-notice">
             <span>🔒</span>
-            <span><strong>Modo prueba gratuita:</strong> 1 línea incluida. Para añadir más líneas, <a href="pago" style="color:var(--accent);font-weight:600">activa el plan de pago →</a></span>
+            <span><strong>Modo prueba gratuita:</strong> tienes 1 línea incluida y lista para configurar. Para añadir más líneas, <a href="pago" style="color:var(--accent);font-weight:600">activa el plan de pago →</a></span>
         </div>
         <?php elseif ($subStatus['status'] === 'active'): ?>
         <div class="trial-limit-notice" style="background:linear-gradient(135deg, rgba(5,150,105,0.08), rgba(5,150,105,0.04));border-color:rgba(5,150,105,0.2)">
             <span>💡</span>
-            <span>Cada línea extra: <strong>+<?php echo $extraLineCost; ?>€/semana</strong>. 
-            <?php if ($extraLineCount > 0): ?>
-            Tienes <?php echo $linesForUser; ?> línea<?php echo $linesForUser > 1 ? 's' : ''; ?> → tu renovación: <strong><?php echo $renewalPrice; ?>€/sem</strong>.
-            <?php else: ?>
-            Tu renovación: <strong><?php echo $renewalPrice; ?>€/sem</strong>.
-            <?php endif; ?>
-            ¿Muchas líneas? <a href="pago" style="color:var(--accent);font-weight:600">Borra las que no uses antes de pagar →</a></span>
+            <span>
+                <strong>Tu plan incluye 1 línea de WhatsApp, lista para configurar.</strong>
+                <span style="display:block;margin-top:4px">La primera línea no tiene coste adicional. Cada línea adicional cuesta <strong>+<?php echo $extraLineCost; ?>€/semana</strong>.</span>
+                <?php if ($extraLineCount > 0): ?>
+                <span style="display:block;margin-top:4px">Tienes <?php echo $linesForUser; ?> línea<?php echo $linesForUser > 1 ? 's' : ''; ?> → tu renovación: <strong><?php echo $renewalPrice; ?>€/sem</strong>.</span>
+                <?php else: ?>
+                <span style="display:block;margin-top:4px">Tu renovación: <strong><?php echo $renewalPrice; ?>€/sem</strong>.</span>
+                <?php endif; ?>
+                <span style="display:block;margin-top:4px">¿Muchas líneas? <a href="pago" style="color:var(--accent);font-weight:600">Borra las que no uses antes de pagar →</a></span>
+            </span>
         </div>
         <?php endif; ?>
 
