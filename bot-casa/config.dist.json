@@ -359,5 +359,13 @@
         "weekly_price": 100,
         "extra_line_price": 25,
         "user_override": {}
+    },
+    "payment_confirmation_whatsapp": {
+        "_comment": "WhatsApp de confirmación de pago (best-effort). Se envía tras cada pago correcto desde la línea configurada (from_port, p. ej. la línea 'jostal dulce') al teléfono del usuario (to_phone_override o su username). Plantilla con {name}, {amount}, {days}.",
+        "enabled": false,
+        "from_port": 3001,
+        "from_phone": "",
+        "to_phone_override": "",
+        "message": "✅ {name}, hemos recibido tu pago de {amount}€. Tu plan de CasaWasap queda activo {days} días. ¡Gracias!"
     }
 }

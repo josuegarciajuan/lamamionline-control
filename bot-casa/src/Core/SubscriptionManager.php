@@ -250,9 +250,25 @@ final class SubscriptionManager
         // Notificar a Telegram
         if ($result['ok']) {
             $this->notifyPaymentTelegram($user, $amount, $method);
+            $this->notifyPaymentWhatsApp((int) ($user['id'] ?? 0), $amount);
         }
 
         return $result;
+    }
+
+    /**
+     * Envía (best-effort) el WhatsApp de confirmación del pago al usuario.
+     * Cualquier fallo se registra y nunca rompe el flujo de pago.
+     */
+    private function notifyPaymentWhatsApp(int $userId, float $amount): void
+    {
+        try {
+            $config = new Config(dirname(__DIR__, 2));
+            $notifier = new \WasapBot\Payment\PaymentConfirmationNotifier($config, $this->userManager);
+            $notifier->notify($userId, $amount);
+        } catch (\Throwable $e) {
+            error_log('[SubscriptionManager] notifyPaymentWhatsApp error: ' . $e->getMessage());
+        }
     }
 
     // ─────────────────────────────────────────────────────────
