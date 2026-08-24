@@ -1625,6 +1625,9 @@ body.theme-dark .demo-banner-text strong {
     color: var(--text);
     font-size: .84rem;
 }
+.sub-title--warning {
+    color: var(--danger);
+}
 .sub-body {
     color: var(--text-muted);
     font-size: .76rem;
