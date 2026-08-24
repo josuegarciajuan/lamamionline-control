@@ -637,7 +637,7 @@ function render_lamami_page() {
 function render_publicista_page() {
     $tab = request_get('tab', 'crear_perfiles');
     if ($tab === 'calculo_publicidad') $tab = 'estrategias';
-    $allowed = array('crear_perfiles', 'estrategias', 'cuentas', 'campanas', 'subir_anuncios', 'run_log', 'estados_wasap');
+    $allowed = array('crear_perfiles', 'estrategias', 'cuentas', 'campanas', 'subir_anuncios', 'run_log', 'estados_wasap', 'afiliados');
 
     if (!in_array($tab, $allowed, true)) {
         $tab = 'crear_perfiles';
@@ -654,6 +654,7 @@ function render_publicista_page() {
     echo '<a class="subtab ' . ($tab === 'campanas' ? 'active' : '') . '" href="' . e(publicista_page_url('campanas')) . '">Campañas</a>';
     echo '<a class="subtab ' . ($tab === 'subir_anuncios' ? 'active' : '') . '" href="' . e(publicista_page_url('subir_anuncios')) . '">Subir anuncios</a>';
     echo '<a class="subtab ' . ($tab === 'estados_wasap' ? 'active' : '') . '" href="' . e(publicista_page_url('estados_wasap')) . '">📱 Estados</a>';
+    echo '<a class="subtab ' . ($tab === 'afiliados' ? 'active' : '') . '" href="' . e(publicista_page_url('afiliados')) . '">🤝 Afiliados</a>';
     echo '</div>';
     echo '</section>';
 
@@ -700,6 +701,11 @@ function render_publicista_page() {
 
     if ($tab === 'estados_wasap') {
         render_publicista_estados_wasap_page();
+        return;
+    }
+
+    if ($tab === 'afiliados') {
+        render_publicista_afiliados_page();
         return;
     }
 
@@ -887,6 +893,243 @@ function render_publicista_estados_wasap_page() {
             echo '<td>' . $badge . $errorMsg . '</td>';
             echo '<td>' . e((string)($entry['http_code'] ?? '—')) . '</td>';
             echo '<td style="max-width:300px;white-space:pre-wrap;word-break:break-word;">' . e($preview) . '</td>';
+            echo '</tr>';
+        }
+        echo '</tbody></table></div>';
+    }
+    echo '</section>';
+}
+
+function render_publicista_afiliados_page() {
+    $config = publicista_afiliados_get_config();
+    $log = publicista_afiliados_get_log();
+    $allLines = publicista_afiliados_get_lines();
+    $enabledIds = $config['lineas'];
+    $enabledLines = array();
+    foreach ($allLines as $l) {
+        if (in_array($l['id'], $enabledIds, true)) $enabledLines[] = $l;
+    }
+    $dc = $config['destacamos'];
+
+    // ── Status cards ───────────────────────────────────────────────
+    echo '<section class="panel panel-space">';
+    echo '<div class="branch-panel-head"><h2>🤝 Afiliados WhatsApp</h2><span class="summary-badge">' . ($config['enabled'] ? 'Activo' : 'Pausado') . '</span></div>';
+    echo '<div class="cards four" style="margin-top:14px;">';
+    echo '<div class="info-strip"><strong>Estado</strong><br>' . ($config['enabled'] ? '✅ Publicación automática activa' : '⏸️ Pausado (por defecto)') . '</div>';
+    echo '<div class="info-strip"><strong>Líneas estados</strong><br>' . count($enabledLines) . ' de ' . count($allLines) . ' (bot-casa + bot-comercial)</div>';
+    $freqLabel = publicista_afiliados_frecuencia_options()[$config['frecuencia_tipo']] ?? $config['frecuencia_tipo'];
+    $freqDetail = $config['frecuencia_tipo'] === 'cada_x_horas' ? "Cada {$config['frecuencia_valor']}h" : "{$config['frecuencia_valor']} veces/día";
+    echo '<div class="info-strip"><strong>Frecuencia</strong><br>' . e($freqLabel . ' — ' . $freqDetail) . ' (' . e($config['hora_inicio']) . '–' . e($config['hora_fin']) . ')</div>';
+    echo '<div class="info-strip"><strong>Broadcast</strong><br>' . ($config['broadcast_enabled'] ? '✅ Activo (' . count(publicista_afiliados_get_destinos()) . ' destinos)' : '⏸️ Desactivado') . '</div>';
+    echo '</div>';
+    echo '<div class="cards four" style="margin-top:12px;">';
+    echo '<div class="info-strip"><strong>API afiliados</strong><br>' . e($config['api_base_url'] !== '' ? $config['api_base_url'] : '— no configurada —') . '</div>';
+    echo '<div class="info-strip"><strong>Panel admin</strong><br>' . e($config['admin_url'] !== '' ? $config['admin_url'] : '— no configurado —') . '</div>';
+    echo '<div class="info-strip"><strong>Destacamos producto</strong><br>' . ($dc['enabled'] ? '✅ Activo (cada ' . (int)$dc['interval_days'] . 'd a las ' . e($dc['hora']) . ')' : '⏸️ Desactivado') . '</div>';
+    echo '<div class="info-strip"><strong>Último ciclo</strong><br>' . e(!empty($log) ? trim((string)(end($log)['published_at'] ?? '—')) : '—') . '</div>';
+    echo '</div>';
+    echo '</section>';
+
+    // ── Config form ────────────────────────────────────────────────
+    echo '<section class="panel panel-space">';
+    echo '<div class="section-head"><div><h2>Configuración</h2><p>Promoción de productos afiliados: estados en líneas bot-casa/bot-comercial, broadcasts a destinos del sector y anuncios Destacamos de producto.</p></div></div>';
+    echo '<form method="post" class="form-grid">';
+    echo '<input type="hidden" name="action" value="save_afiliados_config">';
+
+    echo '<div class="field">';
+    echo '<label>Activado (rama WhatsApp)</label>';
+    echo '<label style="display:flex;gap:8px;align-items:center;margin-top:10px;">';
+    echo '<input type="checkbox" name="enabled" value="1"' . ($config['enabled'] ? ' checked' : '') . '>';
+    echo 'Publicar estados/broadcasts de afiliados automáticamente';
+    echo '</label>';
+    echo '<div class="field-help">Empieza desactivado. Actívalo cuando la API de afiliados responda.</div>';
+    echo '</div>';
+
+    echo '<div class="field">';
+    echo '<label>URL API afiliados</label>';
+    echo '<input type="text" name="api_base_url" value="' . e($config['api_base_url']) . '" placeholder="https://josue.ink/afiliados" style="margin-top:8px;width:100%;">';
+    echo '<div class="field-help">Base del repo de afiliados. Consume /api/productos.json y /api/oferta-del-dia.json.</div>';
+    echo '</div>';
+
+    echo '<div class="field">';
+    echo '<label>URL panel admin (iframe)</label>';
+    echo '<input type="text" name="admin_url" value="' . e($config['admin_url']) . '" placeholder="https://josue.ink/afiliados" style="margin-top:8px;width:100%;">';
+    echo '<div class="field-help">Se le añade /admin automáticamente si no lo lleva.</div>';
+    echo '</div>';
+
+    echo '<div class="field">';
+    echo '<label>Frecuencia</label>';
+    echo '<select name="frecuencia_tipo" style="margin-top:8px;">';
+    foreach (publicista_afiliados_frecuencia_options() as $val => $label) {
+        $sel = $config['frecuencia_tipo'] === $val ? ' selected' : '';
+        echo '<option value="' . e($val) . '"' . $sel . '>' . e($label) . '</option>';
+    }
+    echo '</select>';
+    echo '</div>';
+
+    echo '<div class="field">';
+    echo '<label>Valor</label>';
+    echo '<input type="number" name="frecuencia_valor" value="' . e((string)$config['frecuencia_valor']) . '" min="1" max="24" style="margin-top:8px;width:100%;">';
+    echo '<div class="field-help">Horas entre publicaciones (si "Cada X horas") o veces al día.</div>';
+    echo '</div>';
+
+    echo '<div class="field"><label>Hora inicio</label><input type="time" name="hora_inicio" value="' . e($config['hora_inicio']) . '" style="margin-top:8px;width:100%;"></div>';
+    echo '<div class="field"><label>Hora fin</label><input type="time" name="hora_fin" value="' . e($config['hora_fin']) . '" style="margin-top:8px;width:100%;"></div>';
+
+    echo '<div class="field full">';
+    echo '<label>Formato de estado</label>';
+    echo '<select name="formato" style="margin-top:8px;width:100%;max-width:420px;">';
+    foreach (publicista_afiliados_format_options() as $val => $label) {
+        $sel = $config['formato'] === $val ? ' selected' : '';
+        echo '<option value="' . e($val) . '"' . $sel . '>' . e($label) . '</option>';
+    }
+    echo '</select>';
+    echo '<div class="field-help">El estado se compone con el producto + enlace afiliado (con UTM).</div>';
+    echo '</div>';
+
+    // Líneas estados
+    echo '<div class="field full">';
+    echo '<label>Líneas para estados (bot-casa + bot-comercial)</label>';
+    if (empty($allLines)) {
+        echo '<div class="empty" style="margin-top:8px;">No hay líneas con uso "bot casa" / "envio publi" y WAHA configurado. Añádelas o ajusta "Usos permitidos" en Josué → Teléfonos.</div>';
+    } else {
+        echo '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-top:8px;">';
+        foreach ($allLines as $line) {
+            $checked = in_array($line['id'], $enabledIds, true) ? ' checked' : '';
+            echo '<label class="info-strip" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 12px;">';
+            echo '<input type="checkbox" name="lineas[]" value="' . e($line['id']) . '"' . $checked . '>';
+            echo '<span><strong>' . e($line['nombre']) . '</strong><br><span class="muted">' . e($line['tfono']) . ' · puerto ' . e($line['waha_port']) . ' · ' . e($line['uso']) . '</span></span>';
+            echo '</label>';
+        }
+        echo '</div>';
+    }
+    echo '</div>';
+
+    // Usos permitidos
+    echo '<div class="field full">';
+    echo '<label>Usos de línea permitidos (estados)</label>';
+    echo '<input type="text" name="usos" value="' . e(implode(', ', $config['usos'])) . '" placeholder="bot casa, envio publi" style="margin-top:8px;width:100%;max-width:420px;">';
+    echo '<div class="field-help">Separados por comas. Valores de "uso" en telefonos.json que publicarán estados.</div>';
+    echo '</div>';
+
+    // Broadcast
+    echo '<div class="field full">';
+    echo '<label style="display:flex;gap:8px;align-items:center;">';
+    echo '<input type="checkbox" name="broadcast_enabled" value="1"' . ($config['broadcast_enabled'] ? ' checked' : '') . '>';
+    echo 'Enviar broadcast a destinos del sector';
+    echo '</label>';
+    echo '</div>';
+
+    echo '<div class="field full">';
+    echo '<label>Destinos broadcast (un teléfono por línea)</label>';
+    echo '<textarea name="destinos" rows="4" style="margin-top:8px;width:100%;max-width:420px;" placeholder="654464023&#10;641993776">' . e(implode("\n", $config['destinos'])) . '</textarea>';
+    echo '</div>';
+
+    echo '<div class="field full">';
+    echo '<label style="display:flex;gap:8px;align-items:center;">';
+    echo '<input type="checkbox" name="usar_contactos_casawasap" value="1"' . ($config['usar_contactos_casawasap'] ? ' checked' : '') . '>';
+    echo 'Añadir también los contactos de Casawasap (casawasap_contactos.json)';
+    echo '</label>';
+    echo '</div>';
+
+    echo '<div class="field">';
+    echo '<label>Campaña UTM</label>';
+    echo '<input type="text" name="utm_campaign" value="' . e($config['utm_campaign']) . '" placeholder="crm" style="margin-top:8px;width:100%;">';
+    echo '<div class="field-help">Se añade a los enlaces afiliados: ?utm_source=whatsapp&amp;utm_medium=social&amp;utm_campaign=...</div>';
+    echo '</div>';
+
+    // ── Destacamos producto ────────────────────────────────────────
+    echo '<div class="full" style="border-top:1px solid rgba(245,158,11,.18);margin-top:18px;padding-top:14px;">';
+    echo '<div class="section-head"><div><h2>Anuncios Destacamos de producto</h2><p>Genera copy (DeepSeek) + imagen (OpenAI) de un producto afiliado y lo sube reutilizando el sistema de subida existente.</p></div></div>';
+    echo '</div>';
+
+    echo '<div class="field">';
+    echo '<label style="display:flex;gap:8px;align-items:center;">';
+    echo '<input type="checkbox" name="destacamos_enabled" value="1"' . ($dc['enabled'] ? ' checked' : '') . '>';
+    echo 'Publicar anuncio de producto en Destacamos';
+    echo '</label>';
+    echo '</div>';
+
+    $accounts = function_exists('publicista_accounts_get') ? publicista_accounts_get(true) : array();
+    echo '<div class="field">';
+    echo '<label>Cuenta Destacamos</label>';
+    echo '<select name="destacamos_account_id" style="margin-top:8px;width:100%;max-width:420px;">';
+    echo '<option value="">Auto (primera cuenta con listings)</option>';
+    foreach ($accounts as $acc) {
+        $accId = trim((string)($acc['id'] ?? ''));
+        $accLabel = trim((string)($acc['display_name'] ?? ($acc['login_user'] ?? $accId)));
+        $sel = $dc['account_id'] === $accId ? ' selected' : '';
+        echo '<option value="' . e($accId) . '"' . $sel . '>' . e($accLabel) . '</option>';
+    }
+    echo '</select>';
+    echo '<div class="field-help">La cuenta debe tener credenciales y listings. El anuncio edita un listing existente (patrón free-bump).</div>';
+    echo '</div>';
+
+    echo '<div class="field">';
+    echo '<label>Intervalo (días)</label>';
+    echo '<input type="number" name="destacamos_interval_days" value="' . e((string)$dc['interval_days']) . '" min="1" max="30" style="margin-top:8px;width:100%;">';
+    echo '</div>';
+
+    echo '<div class="field">';
+    echo '<label>Hora de publicación</label>';
+    echo '<input type="time" name="destacamos_hora" value="' . e($dc['hora']) . '" style="margin-top:8px;width:100%;">';
+    echo '</div>';
+
+    echo '<div class="field">';
+    echo '<label style="display:flex;gap:8px;align-items:center;">';
+    echo '<input type="checkbox" name="destacamos_include_link" value="1"' . ($dc['include_link'] ? ' checked' : '') . '>';
+    echo 'Incluir enlace afiliado en la descripción';
+    echo '</label>';
+    echo '</div>';
+
+    echo '<div class="full" style="display:flex;gap:10px;flex-wrap:wrap;">';
+    echo '<button class="btn-primary">💾 Guardar configuración</button>';
+    echo '</div>';
+    echo '</form>';
+    echo '</section>';
+
+    // ── Publicación manual ─────────────────────────────────────────
+    echo '<section class="panel panel-space">';
+    echo '<div class="branch-panel-head"><h2>Publicar ahora</h2><span class="summary-badge">Manual</span></div>';
+    echo '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">';
+    echo '<form method="post" class="inline-form"><input type="hidden" name="action" value="publicar_afiliado_ahora"><button class="btn-secondary-mini">📱 Publicar estados/broadcast ahora</button></form>';
+    echo '<form method="post" class="inline-form"><input type="hidden" name="action" value="publicar_afiliado_destacamos"><button class="btn-secondary-mini">🪧 Publicar anuncio Destacamos de producto</button></form>';
+    echo '</div>';
+    echo '<div class="field-help" style="margin-top:8px;">La publicación manual respeta el flag "Activado". Si la API de afiliados no responde todavía, se reporta el motivo.</div>';
+    echo '</section>';
+
+    // ── Log ────────────────────────────────────────────────────────
+    echo '<section class="panel panel-space">';
+    echo '<div class="branch-panel-head"><h2>Log de afiliados</h2><span class="summary-badge">' . count($log) . ' entradas</span></div>';
+    if (empty($log)) {
+        echo '<div class="empty" style="margin-top:12px;">Sin actividad todavía.</div>';
+    } else {
+        $logReversed = array_reverse($log);
+        $logReversed = array_slice($logReversed, 0, 20);
+        echo '<div class="table-wrap" style="margin-top:12px;"><table class="table">';
+        echo '<thead><tr><th>Fecha</th><th>Tipo</th><th>Resultado</th><th>Detalle</th></tr></thead><tbody>';
+        foreach ($logReversed as $entry) {
+            $tipo = trim((string)($entry['tipo'] ?? 'ciclo'));
+            $resultado = trim((string)($entry['resultado'] ?? ''));
+            $ok = ($resultado === 'ok');
+            $badge = $ok
+                ? '<span class="summary-badge" style="background:rgba(34,197,94,.15);color:#4ade80;">OK</span>'
+                : '<span class="summary-badge" style="background:rgba(239,68,68,.15);color:#f87171;">' . e($resultado !== '' ? $resultado : 'ERROR') . '</span>';
+            $date = !empty($entry['published_at']) ? date('d/m H:i', strtotime($entry['published_at'])) : '—';
+            $detalle = '';
+            if ($tipo === 'destacamos') {
+                $detalle = trim((string)($entry['producto'] ?? '')) . ' · listing ' . trim((string)($entry['listing_id'] ?? ''));
+            } elseif ($tipo === 'ciclo') {
+                $detalle = (int)($entry['estados_count'] ?? 0) . ' estados · ' . (int)($entry['broadcasts_count'] ?? 0) . ' broadcasts';
+            }
+            if (trim((string)($entry['error'] ?? '')) !== '') {
+                $detalle .= '<br><span class="muted" style="color:var(--danger,#c0392b);">' . e($entry['error']) . '</span>';
+            }
+            echo '<tr>';
+            echo '<td style="white-space:nowrap;">' . e($date) . '</td>';
+            echo '<td>' . e($tipo) . '</td>';
+            echo '<td>' . $badge . '</td>';
+            echo '<td style="max-width:360px;">' . ($detalle !== '' ? $detalle : '—') . '</td>';
             echo '</tr>';
         }
         echo '</tbody></table></div>';
@@ -4953,6 +5196,7 @@ function render_sidebar($page) {
         'bots' => 'Bots',
         'publicista' => 'Publicista',
         'comercial' => 'Comercial',
+        'afiliados' => 'Afiliados',
         'logout' => 'Salir'
     );
 
@@ -5045,6 +5289,61 @@ function render_bot_casa_page() {
     echo "      // CSRF token expired beyond recovery — reload iframe content\n";
     echo "      iframe.src = iframe.src;\n";
     echo "    }\n";
+    echo "  });\n";
+    echo "})();</script>";
+}
+
+function render_afiliados_page() {
+    $adminUrl = '';
+    $cfg = function_exists('publicista_afiliados_get_config') ? publicista_afiliados_get_config() : array();
+    if (!empty($cfg['admin_url'])) {
+        $adminUrl = trim((string)$cfg['admin_url']);
+    } elseif (function_exists('avisos_config')) {
+        $adminUrl = trim((string)(avisos_config()['afiliados_admin_url'] ?? ''));
+    }
+    if ($adminUrl === '') {
+        page_header('Afiliados', 'Panel de productos afiliados');
+        echo '<section class="panel panel-space">';
+        echo '<div class="branch-panel-head"><h2>URL no configurada</h2><span class="summary-badge">Aviso</span></div>';
+        echo '<div class="info-strip" style="margin-top:12px;">La URL del panel de afiliados no está configurada. Añádela en <strong>Publicista → Afiliados → Configuración</strong> (campo "URL panel admin") o en <code>settings.json → avisos_config.afiliados_admin_url</code>.</div>';
+        echo '</section>';
+        return;
+    }
+    if (substr($adminUrl, -6) !== '/admin' && substr($adminUrl, -7) !== '/admin/') {
+        $adminUrl = rtrim($adminUrl, '/') . '/admin';
+    }
+
+    page_header('Afiliados', 'Panel de gestión de productos afiliados');
+    echo '<div class="panel panel-space" style="padding:0;overflow:visible;border-radius:var(--radius-md)">';
+    echo '<iframe id="afiliados-iframe" src="' . e($adminUrl) . '/" style="width:100%;min-height:calc(100vh - 200px);height:auto;border:none;display:block" title="Panel Afiliados"></iframe>';
+    echo '</div>';
+    echo "<script>(function(){\n";
+    echo "  var iframe = document.getElementById('afiliados-iframe');\n";
+    echo "  if (!iframe) return;\n";
+    echo "  var minHeight = Math.max(window.innerHeight - 200, 560);\n";
+    echo "  function resizeIframe(){\n";
+    echo "    try {\n";
+    echo "      var doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);\n";
+    echo "      if (!doc) return;\n";
+    echo "      var body = doc.body;\n";
+    echo "      var html = doc.documentElement;\n";
+    echo "      var contentHeight = Math.max(\n";
+    echo "        body ? body.scrollHeight : 0,\n";
+    echo "        html ? html.scrollHeight : 0,\n";
+    echo "        body ? body.offsetHeight : 0,\n";
+    echo "        html ? html.offsetHeight : 0\n";
+    echo "      );\n";
+    echo "      iframe.style.height = Math.max(contentHeight, minHeight) + 'px';\n";
+    echo "    } catch (e) {}\n";
+    echo "  }\n";
+    echo "  iframe.addEventListener('load', function(){\n";
+    echo "    resizeIframe();\n";
+    echo "    setTimeout(resizeIframe, 250);\n";
+    echo "    setTimeout(resizeIframe, 1000);\n";
+    echo "  });\n";
+    echo "  window.addEventListener('resize', function(){\n";
+    echo "    minHeight = Math.max(window.innerHeight - 200, 560);\n";
+    echo "    resizeIframe();\n";
     echo "  });\n";
     echo "})();</script>";
 }

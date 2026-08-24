@@ -527,6 +527,15 @@ function handle_post_actions() {
         case 'publicar_estado_manual':
             action_publicar_estado_manual();
             break;
+        case 'save_afiliados_config':
+            action_save_afiliados_config();
+            break;
+        case 'publicar_afiliado_ahora':
+            action_publicar_afiliado_ahora();
+            break;
+        case 'publicar_afiliado_destacamos':
+            action_publicar_afiliado_destacamos();
+            break;
         case 'dismiss_aviso':
             action_dismiss_aviso();
             break;
@@ -5565,6 +5574,32 @@ function action_publicar_estado_manual() {
         set_flash('error', $result['error']);
     }
     redirect_to('index.php?page=publicista&tab=estados_wasap');
+}
+
+function action_save_afiliados_config() {
+    $config = publicista_afiliados_save_config($_POST);
+    set_flash('ok', 'Configuración de Afiliados guardada.');
+    redirect_to(publicista_page_url('afiliados'));
+}
+
+function action_publicar_afiliado_ahora() {
+    $result = publicista_afiliados_publicar_ahora();
+    if (!empty($result['ok'])) {
+        set_flash('ok', $result['message']);
+    } else {
+        set_flash('error', $result['error']);
+    }
+    redirect_to(publicista_page_url('afiliados'));
+}
+
+function action_publicar_afiliado_destacamos() {
+    $result = publicista_afiliados_destacamos_publicar();
+    if (!empty($result['ok'])) {
+        set_flash('ok', 'Anuncio Destacamos de producto publicado.');
+    } else {
+        set_flash('error', trim((string)($result['error'] ?? 'Error publicando el anuncio.')));
+    }
+    redirect_to(publicista_page_url('afiliados'));
 }
 
 // ─── Jostal Contratos ─────────────────────────────────────────────────────
