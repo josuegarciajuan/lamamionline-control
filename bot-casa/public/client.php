@@ -484,7 +484,7 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
 <link rel="apple-touch-icon" href="https://casawasap.com/img/hero-casawasap.png">
 <?php endif; ?>
 <title>bot-casa — <?php echo $clientName; ?></title>
-<link rel="stylesheet" href="assets/style.css?v=20260825_1">
+<link rel="stylesheet" href="assets/style.css?v=20260825_2">
 <link rel="stylesheet" href="assets/chat.css?v=20260629_1">
 <?php if ($isDirectAccess): ?>
 <script src="assets/pwa.js?v=20260613_1"></script>

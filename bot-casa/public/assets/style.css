@@ -22,6 +22,11 @@
     --accent-dark:     #e02170;
     --accent2:         #7c5cff;
 
+    /* Corporate light-pink surfaces */
+    --pink-surface:    #fff7fa;
+    --pink-surface-soft: #fffafd;
+    --pink-border:     #f2d5e0;
+
     /* Semantic */
     --danger:          #dc2626;
     --danger-bg:       rgba(220,38,38,0.08);
@@ -79,6 +84,10 @@ body.theme-dark {
 
     --tab-active:      rgba(255,59,141,0.12);
     --accent-glow:     rgba(255,59,141,0.18);
+
+    --pink-surface:    #21151d;
+    --pink-surface-soft: #1c141a;
+    --pink-border:     rgba(255,167,197,0.2);
 
     --danger-bg:       rgba(220,38,38,0.15);
     --ok-bg:           rgba(5,150,105,0.12);
@@ -350,6 +359,8 @@ a:hover { text-decoration: underline; }
 .bot-status-bar {
     display: flex; align-items: center; gap: 14px;
     padding: 14px 20px;
+    background: var(--pink-surface-soft);
+    border-color: var(--pink-border);
 }
 
 .bot-status-bar .bot-emoji {
@@ -396,8 +407,8 @@ a:hover { text-decoration: underline; }
 }
 
 .setup-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
+    background: var(--pink-surface);
+    border: 1px solid var(--pink-border);
     border-radius: var(--radius-md);
     padding: 20px 18px;
     text-align: center;
@@ -518,8 +529,8 @@ a:hover { text-decoration: underline; }
     gap: 8px;
     padding: 10px 14px;
     margin-top: 12px;
-    background: var(--panel);
-    border: 1px solid var(--border);
+    background: var(--pink-surface-soft);
+    border: 1px solid var(--pink-border);
     border-radius: var(--radius-sm);
     font-size: .76rem;
     color: var(--text-muted);
@@ -545,8 +556,8 @@ a:hover { text-decoration: underline; }
 }
 
 .stat-card {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
+    background: var(--pink-surface-soft);
+    border: 1px solid var(--pink-border);
     border-radius: var(--radius-md);
     padding: 18px 20px;
     text-align: center;
@@ -581,8 +592,8 @@ a:hover { text-decoration: underline; }
    ═══════════════════════════════════════════════════════════════════════ */
 .section-guide {
     display: flex; align-items: center; gap: 16px;
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
+    background: var(--pink-surface);
+    border: 1px solid var(--pink-border);
     border-radius: var(--radius-md);
     padding: 16px 20px;
     margin-bottom: 16px;
@@ -593,7 +604,7 @@ a:hover { text-decoration: underline; }
     font-size: 2.2rem; flex-shrink: 0; line-height: 1;
 }
 .section-guide-body { flex: 1; }
-.section-guide-body strong { color: var(--accent); }
+.section-guide-body strong { color: var(--accent-dark); }
 .section-guide-body span {
     display: block; color: var(--text-muted); font-size: .78rem; margin-top: 2px;
 }
