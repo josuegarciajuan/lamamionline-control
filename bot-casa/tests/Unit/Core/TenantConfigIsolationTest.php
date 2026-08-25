@@ -89,8 +89,8 @@ final class TenantConfigIsolationTest extends TestCase
         $tenantDir = Bot::resolveUserConfigDir($this->rootDir, 42);
         file_put_contents($tenantDir . '/config.local.json', json_encode([
             'openai' => ['api_key' => 'copied-key'],
-            'telegram' => ['chat_ids' => ['copied-chat']],
-            'routing' => ['lines' => [['last9' => 'copied-line']]],
+            'telegram' => ['chat_ids' => ['root-chat-id'], 'whatsapp_phones' => ['tenant-phone']],
+            'routing' => ['lines' => [['last9' => 'root-line']], 'sender_blacklist' => ['tenant-blacklist']],
             'files' => ['session_memory' => '/root/copied.ndjson'],
             'urls' => ['google_maps_location' => 'https://copied.example/maps'],
             'prompt' => [
@@ -107,11 +107,22 @@ final class TenantConfigIsolationTest extends TestCase
 
         self::assertArrayNotHasKey('openai', $saved);
         self::assertSame([], $saved['routing']['lines']);
+        self::assertSame(['tenant-blacklist'], $saved['routing']['sender_blacklist']);
         self::assertArrayNotHasKey('files', $saved);
         self::assertSame([], $saved['telegram']['chat_ids'] ?? null);
+        self::assertSame(['tenant-phone'], $saved['telegram']['whatsapp_phones'] ?? null);
         self::assertSame('', $saved['urls']['google_maps_location'] ?? null);
         self::assertSame($dist['prompt']['sections']['tarifas'], $saved['prompt']['sections']['tarifas']);
         self::assertSame('TENANT CUSTOM SERVICES', $saved['prompt']['sections']['servicios']);
+
+        $tenantDirCustom = Bot::resolveUserConfigDir($this->rootDir, 43);
+        file_put_contents($tenantDirCustom . '/config.local.json', json_encode([
+            'openai' => ['api_key' => 'copied-key'],
+            'urls' => ['google_maps_location' => 'https://tenant.example/maps'],
+        ], JSON_THROW_ON_ERROR));
+        new Config($tenantDirCustom, $this->rootDir);
+        $customSaved = json_decode((string) file_get_contents($tenantDirCustom . '/config.local.json'), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('https://tenant.example/maps', $customSaved['urls']['google_maps_location']);
     }
 
     private function removeTree(string $dir): void

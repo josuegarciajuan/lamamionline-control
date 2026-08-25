@@ -274,11 +274,16 @@ final class Config implements ConfigInterface
             );
         }
 
-        // These are never inherited from root, even when a legacy file cloned
-        // them. New tenant defaults remain empty/disabled from config.dist.
+        // Apply the same evidence-based scrub to tenant-owned routing,
+        // notification destinations and maps. Root-equal values reset to
+        // dist defaults; distinguishable tenant edits remain intact.
         foreach (['routing', 'telegram', 'urls'] as $namespace) {
-            if (array_key_exists($namespace, $defaultTenant)) $tenant[$namespace] = $defaultTenant[$namespace];
-            else unset($tenant[$namespace]);
+            if (!isset($tenant[$namespace]) || !is_array($tenant[$namespace])) continue;
+            $tenant[$namespace] = $this->replaceInheritedValues(
+                $tenant[$namespace],
+                $central[$namespace] ?? null,
+                $defaultTenant[$namespace] ?? []
+            );
         }
 
         return $tenant;
