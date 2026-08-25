@@ -60,6 +60,25 @@ final class SubscriptionManagerTest extends TestCase
         $this->assertSame(10, $status['totalDays']);
     }
 
+    public function testNewUserHasNoHistoricalPayment(): void
+    {
+        $res = $this->um->createUser('34600000006', 'pass123', 'user', 'Never Paid');
+        $userId = (int) ($res['user']['id'] ?? 0);
+
+        $this->assertFalse($this->subs->hasHistoricalPayment($userId));
+    }
+
+    public function testHistoricalPaymentRemainsTrueAfterSubscriptionExpires(): void
+    {
+        $res = $this->um->createUser('34600000007', 'pass123', 'user', 'Former Payer');
+        $userId = (int) ($res['user']['id'] ?? 0);
+
+        $this->assertTrue($this->subs->recordPayment($userId, 100.0, 'paypal', 'TXN-HISTORICAL')['ok'] ?? false);
+        $this->um->updateUser($userId, ['subscription_status' => 'expired']);
+
+        $this->assertTrue($this->subs->hasHistoricalPayment($userId));
+    }
+
     public function testExpiredTrialBlocksBot(): void
     {
         $res = $this->um->createUser('34600000001', 'pass123', 'user', 'Old User');
