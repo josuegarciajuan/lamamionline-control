@@ -58,6 +58,9 @@ $subManager = new \WasapBot\Core\SubscriptionManager($um);
 $subStatus = $subManager->getStatus($clientUserId);
 $subExpired = $subStatus['isExpired'];
 $subShowBanner = !in_array($subStatus['status'], ['unlimited', 'demo'], true);
+$hasHistoricalPayment = $subManager->hasHistoricalPayment($clientUserId);
+$subscriptionCtaLabel = $hasHistoricalPayment ? 'Renovar mi plan' : 'Activar mi plan';
+$subscriptionActionVerb = $hasHistoricalPayment ? 'renueva' : 'activa';
 
 $clientName = h((string) ($clientUser['name'] ?? $clientUser['username'] ?? 'Usuario'));
 
@@ -416,7 +419,7 @@ if ($method === 'POST' && $action === 'toggle_bot') {
         $errors = [];
 
         // ── Subscription check ──
-        if ($subExpired) $errors[] = 'Tu acceso ha expirado. <a href="pago" style="color:var(--accent);font-weight:600">Activa tu plan →</a>';
+        if ($subExpired) $errors[] = 'Tu acceso ha expirado. <a href="pago" style="color:var(--accent);font-weight:600">' . ucfirst($subscriptionActionVerb) . ' tu plan →</a>';
 
         if ($linesForUser <= 0) $errors[] = 'No tienes ninguna línea WhatsApp vinculada. Ve a 📱 Líneas.';
         if (!$promptConfigured) $errors[] = 'No has configurado tus tarifas. Ve a 🎭 Personalidad.';
@@ -537,7 +540,7 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
         </button>
         <form method="post" action="cliente?action=toggle_bot" style="display:inline"<?php echo $isDemo ? ' onsubmit="showDemoToast(event)"' : ''; ?>>
             <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
-            <button type="submit" class="btn <?php echo $botMode === 'start' ? 'btn-danger' : 'btn-success'; ?> btn-sm"<?php echo ($isDemo || ($subExpired && $botMode !== 'start')) ? ' disabled' : ''; ?> title="<?php echo $subExpired ? 'Acceso expirado — activa tu plan para usar el bot' : ''; ?>">
+            <button type="submit" class="btn <?php echo $botMode === 'start' ? 'btn-danger' : 'btn-success'; ?> btn-sm"<?php echo ($isDemo || ($subExpired && $botMode !== 'start')) ? ' disabled' : ''; ?> title="<?php echo $subExpired ? 'Acceso expirado — ' . $subscriptionActionVerb . ' tu plan para usar el bot' : ''; ?>">
                 <?php echo $botMode === 'start' ? '⏹ APAGAR' : '▶ ENCENDER'; ?>
             </button>
         </form>
@@ -574,9 +577,9 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
         $bannerIcon = '🎁';
         $bannerTitle = 'Prueba gratuita — Día ' . $cur . ' de ' . $tot;
         $bannerBody = ($left <= 2 && $left > 0)
-            ? '⚠️ Tu prueba termina en ' . $left . ' día' . ($left > 1 ? 's' : '') . '. Activa tu plan para seguir usando el bot.'
+            ? '⚠️ Tu prueba termina en ' . $left . ' día' . ($left > 1 ? 's' : '') . '. ' . ucfirst($subscriptionActionVerb) . ' tu plan para seguir usando el bot.'
             : '';
-        $bannerCta = '<a href="pago" class="btn btn-sm" style="background:var(--accent);color:#fff;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:600">Pagar con PayPal — ' . $renewalPrice . '€/sem</a>';
+        $bannerCta = '<a href="pago" class="btn btn-sm" style="background:var(--accent);color:#fff;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:600">' . $subscriptionCtaLabel . '</a>';
     } elseif ($subStatus['status'] === 'active') {
         $bannerClass = 'sub-active';
         $bannerIcon = '✅';
@@ -587,7 +590,7 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
             $bannerBody = ($left > 0)
                 ? '⚠️ Tu plan vence en ' . $left . ' día' . ($left > 1 ? 's' : '') . '. Renueva para no perder el acceso.'
                 : '⚠️ Tu plan vence hoy. Renueva para no perder el acceso.';
-            $bannerCta = '<a href="pago" class="btn btn-sm" style="background:var(--accent);color:#fff;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:600">Pagar con PayPal — ' . $renewalPrice . '€/sem</a>';
+            $bannerCta = '<a href="pago" class="btn btn-sm" style="background:var(--accent);color:#fff;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:600">' . $subscriptionCtaLabel . '</a>';
             $titleWarningClass = ' sub-title--warning';
         } else {
             $bannerBody = '';
@@ -596,8 +599,8 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
         $bannerClass = 'sub-expired';
         $bannerIcon = '🔴';
         $bannerTitle = 'Acceso expirado';
-        $bannerBody = 'Tu periodo de acceso ha finalizado. Activa tu plan para seguir usando el bot.';
-        $bannerCta = '<a href="pago" class="btn btn-sm" style="background:var(--danger);color:#fff;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:600">Pagar con PayPal — ' . $renewalPrice . '€/sem</a>';
+        $bannerBody = 'Tu periodo de acceso ha finalizado. ' . ucfirst($subscriptionActionVerb) . ' tu plan para seguir usando el bot.';
+        $bannerCta = '<a href="pago" class="btn btn-sm" style="background:var(--danger);color:#fff;text-decoration:none;padding:6px 14px;border-radius:6px;font-weight:600">' . $subscriptionCtaLabel . '</a>';
         $barPct = 100; // full bar but red
     }
 ?>
@@ -1081,7 +1084,7 @@ function dismissWizard() {
         <?php if ($subStatus['status'] === 'trial'): ?>
         <div class="trial-limit-notice">
             <span>🔒</span>
-            <span><strong>Modo prueba gratuita:</strong> tienes 1 línea incluida y lista para configurar. Para añadir más líneas, <a href="pago" style="color:var(--accent);font-weight:600">activa el plan de pago →</a></span>
+            <span><strong>Modo prueba gratuita:</strong> tienes 1 línea incluida y lista para configurar. Para añadir más líneas, <a href="pago" style="color:var(--accent);font-weight:600"><?php echo $subscriptionActionVerb; ?> tu plan de pago →</a></span>
         </div>
         <?php elseif ($subStatus['status'] === 'active'): ?>
         <div class="trial-limit-notice" style="background:linear-gradient(135deg, rgba(5,150,105,0.08), rgba(5,150,105,0.04));border-color:rgba(5,150,105,0.2)">
