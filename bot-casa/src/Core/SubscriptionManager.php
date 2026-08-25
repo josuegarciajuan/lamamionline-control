@@ -128,6 +128,18 @@ final class SubscriptionManager
         return $status['isExpired'];
     }
 
+    /**
+     * Indica si el usuario tiene al menos un pago persistido en su historial.
+     * Este criterio no depende del estado actual de la suscripción.
+     */
+    public function hasHistoricalPayment(int $userId): bool
+    {
+        $user = $this->userManager->getUser($userId);
+        $payments = $user['payments'] ?? null;
+
+        return is_array($payments) && $payments !== [];
+    }
+
     // ─────────────────────────────────────────────────────────
     //  Trial
     // ─────────────────────────────────────────────────────────

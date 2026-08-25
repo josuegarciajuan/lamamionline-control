@@ -58,7 +58,7 @@ describe('guided tutorial', () => {
 
     it('renders all eleven approved stages and resumes the persisted step', async () => {
         const { dom, calls } = load({ ok: true, state: {
-            status: 'running', current_step: 4, version: 1,
+            status: 'pending', current_step: 4, version: 1,
             timestamps: { started_at: null, updated_at: null, paused_at: null, completed_at: null, restarted_at: null }
         } });
         await new Promise(resolve => setTimeout(resolve, 10));
@@ -67,6 +67,7 @@ describe('guided tutorial', () => {
         assert.equal(dom.window.document.querySelector('[data-tutorial-title]').textContent, 'Servicios y ubicación');
         assert.equal(dom.window.document.querySelectorAll('.cw-tutorial__blocker').length, 4);
         assert.equal(dom.window.document.querySelector('.cw-tutorial__spotlight').style.pointerEvents, 'none');
+        assert.ok(dom.window.document.querySelector('[data-tutorial-exit]'));
         assert.ok(calls.some(call => call.url.includes('action=start')));
         dom.window.document.querySelector('[data-tutorial-next]').click();
         await new Promise(resolve => setTimeout(resolve, 10));

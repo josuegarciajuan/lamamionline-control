@@ -3,8 +3,12 @@
 
     var state = { step: 0, steps: [], overlay: null, previousFocus: null };
     var active = false;
+    function tutorialEnabled() { return typeof TUTORIAL_ENABLED === 'undefined' || TUTORIAL_ENABLED === true; }
 
     function token() { return typeof _csrf !== 'undefined' ? _csrf : ''; }
+    function nextFrame(callback) {
+        (window.requestAnimationFrame || function (fn) { return window.setTimeout(fn, 16); })(callback);
+    }
     function post(action, step) {
         var data = new FormData();
         data.append('csrf_token', token());
@@ -17,13 +21,24 @@
         });
     }
     function targetFor(step) { return document.querySelector(step.target); }
-    function switchTo(step) {
+    function waitForTarget(step, attempts, callback) {
+        var target = targetFor(step);
+        if (target) {
+            callback(target);
+            return;
+        }
+        if (attempts <= 0) { callback(target); return; }
+        nextFrame(function () { waitForTarget(step, attempts - 1, callback); });
+    }
+    function switchTo(step, callback) {
         if (step.tab && typeof switchTab === 'function') switchTab(step.tab);
         if (step.open) {
             var disclosure = document.querySelector(step.open);
             if (disclosure) disclosure.open = true;
         }
         if (step.chat && window.ChatApp && typeof window.ChatApp.open === 'function') window.ChatApp.open();
+        // Tabs and ChatApp can render asynchronously; measure after two frames.
+        nextFrame(function () { nextFrame(function () { waitForTarget(step, 12, callback); }); });
     }
     function placeBlockers(rect) {
         var blockers = state.overlay.querySelectorAll('.cw-tutorial__blocker');
@@ -38,8 +53,7 @@
             blockers[i].style.width = Math.max(0, boxes[i][2]) + 'px'; blockers[i].style.height = Math.max(0, boxes[i][3]) + 'px';
         }
     }
-    function position() {
-        var target = targetFor(state.steps[state.step]);
+    function position(target) {
         var card = state.overlay.querySelector('.cw-tutorial__card');
         var spotlight = state.overlay.querySelector('.cw-tutorial__spotlight');
         if (!target) {
@@ -59,12 +73,16 @@
     }
     function render() {
         var step = state.steps[state.step];
-        switchTo(step);
         state.overlay.querySelector('[data-tutorial-title]').textContent = step.title;
         state.overlay.querySelector('[data-tutorial-text]').textContent = step.text;
         state.overlay.querySelector('[data-tutorial-count]').textContent = (state.step + 1) + ' / ' + state.steps.length;
         state.overlay.querySelector('[data-tutorial-next]').textContent = state.step === state.steps.length - 1 ? 'Terminar' : 'Siguiente';
-        position();
+        switchTo(step, function (target) {
+            if (target && target.scrollIntoView) {
+                target.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+            }
+            nextFrame(function () { position(target); });
+        });
     }
     function close(action) {
         if (!active) return;
@@ -101,9 +119,10 @@
         state.overlay = document.createElement('div');
         state.overlay.className = 'cw-tutorial'; state.overlay.setAttribute('role', 'dialog'); state.overlay.setAttribute('aria-modal', 'true');
         state.overlay.setAttribute('aria-labelledby', 'cw-tutorial-title'); state.overlay.setAttribute('aria-describedby', 'cw-tutorial-text');
-        state.overlay.innerHTML = '<div class="cw-tutorial__veil" aria-hidden="true"></div><div class="cw-tutorial__blocker" aria-hidden="true"></div><div class="cw-tutorial__blocker" aria-hidden="true"></div><div class="cw-tutorial__blocker" aria-hidden="true"></div><div class="cw-tutorial__blocker" aria-hidden="true"></div><div class="cw-tutorial__spotlight" aria-hidden="true"></div><section class="cw-tutorial__card"><h2 id="cw-tutorial-title" data-tutorial-title></h2><p id="cw-tutorial-text" data-tutorial-text></p><div class="cw-tutorial__meta"><span data-tutorial-count aria-live="polite"></span><div class="cw-tutorial__actions"><button type="button" class="cw-tutorial__skip" data-tutorial-skip>Omitir</button><button type="button" class="cw-tutorial__next" data-tutorial-next></button></div></div></section>';
+        state.overlay.innerHTML = '<div class="cw-tutorial__veil" aria-hidden="true"></div><div class="cw-tutorial__blocker" aria-hidden="true"></div><div class="cw-tutorial__blocker" aria-hidden="true"></div><div class="cw-tutorial__blocker" aria-hidden="true"></div><div class="cw-tutorial__blocker" aria-hidden="true"></div><div class="cw-tutorial__spotlight" aria-hidden="true"></div><section class="cw-tutorial__card"><h2 id="cw-tutorial-title" data-tutorial-title></h2><p id="cw-tutorial-text" data-tutorial-text></p><div class="cw-tutorial__meta"><span data-tutorial-count aria-live="polite"></span><div class="cw-tutorial__actions"><button type="button" class="cw-tutorial__exit" data-tutorial-exit>Salir</button><button type="button" class="cw-tutorial__skip" data-tutorial-skip>Omitir</button><button type="button" class="cw-tutorial__next" data-tutorial-next></button></div></div></section>';
         document.body.appendChild(state.overlay);
         state.overlay.querySelector('[data-tutorial-next]').addEventListener('click', next);
+        state.overlay.querySelector('[data-tutorial-exit]').addEventListener('click', function () { close('pause'); });
         state.overlay.querySelector('[data-tutorial-skip]').addEventListener('click', function () { close('skip'); });
         state.overlay.addEventListener('keydown', function (event) { if (event.key === 'Escape') close('skip'); });
         active = true; window.CasaWasapTutorialActive = true;
@@ -114,10 +133,14 @@
         fetch('api/tutorial.php?action=status', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
             .then(function (response) { return response.json(); })
             .then(function (data) {
-                if (data.ok && data.state.status !== 'completed' && data.state.status !== 'skipped' && !data.state.completed && !data.state.skipped) show(data.state);
+                if (data.ok && tutorialEnabled()) {
+                    // Only a brand-new client is auto-started. Paused or skipped
+                    // tutorials require an explicit manual start.
+                    if ((data.state.status === 'pending' || (!data.state.status && !data.state.completed && !data.state.skipped)) && !data.state.completed && !data.state.skipped) show(data.state);
+                }
             }).catch(function () {});
-        window.addEventListener('resize', function () { if (active) position(); });
+        window.addEventListener('resize', function () { if (active) position(targetFor(state.steps[state.step])); });
     }
-    window.CasaWasapTutorial = { start: function () { show({ current_step: 0 }); }, pause: function () { return post('pause'); }, restart: function () { return post('restart'); } };
+    window.CasaWasapTutorial = { start: function () { if (tutorialEnabled()) show({ current_step: 0 }); }, pause: function () { return post('pause'); }, restart: function () { return post('restart'); } };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 }());

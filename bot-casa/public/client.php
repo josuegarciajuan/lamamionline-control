@@ -486,7 +486,7 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
 <title>bot-casa — <?php echo $clientName; ?></title>
 <link rel="stylesheet" href="assets/style.css?v=20260825_2">
 <link rel="stylesheet" href="assets/chat.css?v=20260629_1">
-<link rel="stylesheet" href="assets/tutorial.css?v=20260825_2">
+<link rel="stylesheet" href="assets/tutorial.css?v=20260825_3">
 <?php if ($isDirectAccess): ?>
 <script src="assets/pwa.js?v=20260825_1"></script>
 <?php endif; ?>
@@ -1613,6 +1613,7 @@ function dismissWizard() {
 <script>
 // ── Demo mode guard ──
 var IS_DEMO = <?php echo $isDemo ? 'true' : 'false'; ?>;
+var TUTORIAL_ENABLED = <?php echo (!$isDemo && !((($_SESSION['role'] ?? '') === 'admin') && ((int) ($_SESSION['suplantar_user_id'] ?? 0) > 0))) ? 'true' : 'false'; ?>;
 function showDemoToast(e) {
     if (e && e.preventDefault) e.preventDefault();
     var existing = document.querySelector('.demo-toast');
@@ -1656,7 +1657,7 @@ function updateAllCsrfInputs(token) {
 })();
 </script>
 <script src="assets/chat.js?v=20260629_1"></script>
-<script src="assets/tutorial.js?v=20260825_2"></script>
+<script src="assets/tutorial.js?v=20260825_3"></script>
 <script>
 var _csrf = <?php echo json_encode(generateCsrfToken()); ?>;
 // ── Keepalive de sesión + CSRF refresh: ping cada 5 min ──
