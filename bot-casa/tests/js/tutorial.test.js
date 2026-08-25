@@ -27,8 +27,25 @@ function load(status) {
         </nav>
     </body>`, { url: 'http://localhost/cliente', runScripts: 'dangerously', pretendToBeVisual: true });
     dom.window._csrf = 'csrf-test';
-        dom.window.switchTab = function (tab) { dom.window.__switchedTab = tab; };
-        dom.window.ChatApp = { open: function () { dom.window.__chatOpened = true; } };
+        dom.window.switchTab = function (tab) {
+            dom.window.__switchedTab = tab;
+            dom.window.__events.push('tab:' + tab);
+        };
+        dom.window.__events = [];
+        dom.window.ChatApp = {
+            open: function () {
+                dom.window.__chatOpened = true;
+                const overlay = dom.window.document.createElement('div');
+                overlay.className = 'chat-overlay';
+                dom.window.document.body.appendChild(overlay);
+            },
+            close: function () {
+                dom.window.__chatClosed = true;
+                dom.window.__events.push('chat:close');
+                const overlay = dom.window.document.querySelector('.chat-overlay');
+                if (overlay) overlay.remove();
+            }
+        };
     dom.window.fetch = function (url, init) {
         calls.push({ url, init });
         if (url.includes('action=status')) return Promise.resolve({ json: () => Promise.resolve(status) });
@@ -105,6 +122,25 @@ describe('guided tutorial', () => {
 
         assert.equal(dom.window.document.querySelector('[data-tutorial-text]').textContent,
             'Cuando quieras, empieza la configuración básica para comprobar cuánto trabajo puedes ahorrar y cómo responde tu bot.');
+        dom.window.close();
+    });
+
+    it('opens ChatApp on Chat and closes it before switching to dashboard Summary', async () => {
+        const { dom } = load({ ok: true, state: { status: 'pending', current_step: 9 } });
+        await new Promise(resolve => setTimeout(resolve, 30));
+
+        assert.equal(dom.window.document.querySelector('[data-tutorial-title]').textContent, 'Chat');
+        assert.equal(dom.window.__chatOpened, true);
+        assert.ok(dom.window.document.querySelector('.chat-overlay'));
+
+        dom.window.document.querySelector('[data-tutorial-next]').click();
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        assert.equal(dom.window.__chatClosed, true);
+        assert.equal(dom.window.__switchedTab, 'tab-dashboard');
+        assert.ok(dom.window.__events.indexOf('chat:close') < dom.window.__events.indexOf('tab:tab-dashboard'));
+        assert.equal(dom.window.document.querySelector('.chat-overlay'), null);
+        assert.equal(dom.window.document.querySelector('[data-tutorial-title]').textContent, 'Resumen');
         dom.window.close();
     });
 });

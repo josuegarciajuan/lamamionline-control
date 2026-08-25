@@ -44,15 +44,31 @@
         if (attempts <= 0) { callback(target); return; }
         nextFrame(function () { waitForTarget(step, attempts - 1, callback); });
     }
-    function switchTo(step, callback) {
-        if (step.tab && typeof switchTab === 'function') switchTab(step.tab);
-        if (step.open) {
-            var disclosure = document.querySelector(step.open);
-            if (disclosure) disclosure.open = true;
+    function waitForChatClose(attempts, callback) {
+        if (!document.querySelector('.chat-overlay') || attempts <= 0) {
+            callback();
+            return;
         }
-        if (step.chat && window.ChatApp && typeof window.ChatApp.open === 'function') window.ChatApp.open();
-        // Tabs and ChatApp can render asynchronously; measure after two frames.
-        nextFrame(function () { nextFrame(function () { waitForTarget(step, 12, callback); }); });
+        nextFrame(function () { waitForChatClose(attempts - 1, callback); });
+    }
+    function switchTo(step, callback) {
+        function activateStep() {
+            if (step.tab && typeof switchTab === 'function') switchTab(step.tab);
+            if (step.open) {
+                var disclosure = document.querySelector(step.open);
+                if (disclosure) disclosure.open = true;
+            }
+            if (step.chat && window.ChatApp && typeof window.ChatApp.open === 'function') window.ChatApp.open();
+            // Tabs and ChatApp can render asynchronously; measure after two frames.
+            nextFrame(function () { nextFrame(function () { waitForTarget(step, 12, callback); }); });
+        }
+        if (!step.chat && window.ChatApp && typeof window.ChatApp.close === 'function') {
+            window.ChatApp.close();
+            // ChatApp keeps its closing overlay for the transition duration.
+            waitForChatClose(24, activateStep);
+            return;
+        }
+        activateStep();
     }
     function placeBlockers(rect) {
         var blockers = state.overlay.querySelectorAll('.cw-tutorial__blocker');
