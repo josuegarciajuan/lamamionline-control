@@ -42,7 +42,7 @@ final class OnboardingStateTest extends TestCase
         $userState->markCompleted();
 
         self::assertSame('completed', $userState->read()['status']);
-        self::assertSame(10, $userState->read()['current_step']);
+        self::assertSame(11, $userState->read()['current_step']);
         self::assertNotNull($userState->read()['timestamps']['completed_at']);
         self::assertSame('pending', $otherState->read()['status']);
     }
@@ -63,7 +63,7 @@ final class OnboardingStateTest extends TestCase
         $state = new OnboardingState($this->rootDir, 42);
 
         $state->start();
-        $state->step(10);
+        $state->step(11);
         $state->markCompleted();
         $state->restart();
 

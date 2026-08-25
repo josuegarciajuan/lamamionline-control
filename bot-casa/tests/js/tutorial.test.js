@@ -21,6 +21,9 @@ function load(status) {
             <button id="tutorial-anchor-bot-toggle" data-tab="tab-dashboard">Bot</button>
             <button id="tutorial-anchor-chat" data-tab="tab-mensajes">Chat</button>
             <button id="tutorial-anchor-summary" data-tab="tab-dashboard">Resumen</button>
+            <div id="tutorial-target-subscription-banner" data-tutorial-next-tab="tab-lineas"
+                data-tutorial-subscription-status="trial" data-tutorial-current-day="3"
+                data-tutorial-days-left="7" data-tutorial-total-days="10">Banner</div>
         </nav>
     </body>`, { url: 'http://localhost/cliente', runScripts: 'dangerously', pretendToBeVisual: true });
     dom.window._csrf = 'csrf-test';
@@ -56,22 +59,52 @@ describe('guided tutorial', () => {
         dom.window.close();
     });
 
-    it('renders all eleven approved stages and resumes the persisted step', async () => {
+    it('renders all twelve approved stages and resumes the persisted step', async () => {
         const { dom, calls } = load({ ok: true, state: {
             status: 'pending', current_step: 4, version: 1,
             timestamps: { started_at: null, updated_at: null, paused_at: null, completed_at: null, restarted_at: null }
         } });
         await new Promise(resolve => setTimeout(resolve, 10));
 
-        assert.equal(dom.window.document.querySelector('[data-tutorial-count]').textContent, '5 / 11');
+        assert.equal(dom.window.document.querySelector('[data-tutorial-count]').textContent, '5 / 12');
         assert.equal(dom.window.document.querySelector('[data-tutorial-title]').textContent, 'Servicios y ubicación');
         assert.equal(dom.window.document.querySelectorAll('.cw-tutorial__blocker').length, 4);
-        assert.equal(dom.window.document.querySelector('.cw-tutorial__spotlight').style.pointerEvents, 'none');
+        assert.ok(dom.window.document.querySelector('.cw-tutorial__spotlight'));
         assert.ok(dom.window.document.querySelector('[data-tutorial-exit]'));
         assert.ok(calls.some(call => call.url.includes('action=start')));
         dom.window.document.querySelector('[data-tutorial-next]').click();
         await new Promise(resolve => setTimeout(resolve, 10));
         assert.ok(calls.some(call => call.url.includes('action=step')));
+        dom.window.close();
+    });
+
+    it('shows trial motivation with dynamic days and routes without activating the bot', async () => {
+        const { dom, calls } = load({ ok: true, state: { status: 'pending', current_step: 11 } });
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        assert.equal(dom.window.document.querySelector('[data-tutorial-title]').textContent, 'Tu prueba gratuita');
+        assert.match(dom.window.document.querySelector('[data-tutorial-text]').textContent, /Día 3 de 10/);
+        assert.match(dom.window.document.querySelector('[data-tutorial-text]').textContent, /quedan 7 días/);
+        assert.equal(dom.window.document.querySelector('[data-tutorial-next]').textContent, 'Empezar configuración');
+        assert.equal(dom.window.document.querySelector('[data-tutorial-exit]').textContent, 'Terminar por ahora');
+        assert.equal(dom.window.document.querySelector('.cw-tutorial__spotlight').hidden, false);
+
+        dom.window.document.querySelector('[data-tutorial-next]').click();
+        await new Promise(resolve => setTimeout(resolve, 10));
+        assert.equal(dom.window.__switchedTab, 'tab-lineas');
+        assert.ok(calls.some(call => call.url.includes('action=complete')));
+        assert.notEqual(dom.window.__switchedTab, 'tab-dashboard');
+        dom.window.close();
+    });
+
+    it('uses neutral fallback copy when the trial banner is unavailable', async () => {
+        const { dom } = load({ ok: true, state: { status: 'pending', current_step: 11 } });
+        const banner = dom.window.document.querySelector('#tutorial-target-subscription-banner');
+        banner.remove();
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        assert.equal(dom.window.document.querySelector('[data-tutorial-text]').textContent,
+            'Cuando quieras, empieza la configuración básica para comprobar cuánto trabajo puedes ahorrar y cómo responde tu bot.');
         dom.window.close();
     });
 });
