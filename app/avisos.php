@@ -217,6 +217,14 @@ function aviso_sender_line_candidates_for_aviso($aviso, $lines) {
 }
 
 function aviso_whatsapp_allowed_for_aviso($aviso) {
+    // Los avisos manuales creados por el usuario (panel o planificados) son
+    // intencionales: deben enviarse siempre por WhatsApp, sin depender del
+    // perfil de ruido, que solo aplica a los avisos automáticos del motor.
+    $aviso = is_array($aviso) ? $aviso : array();
+    if (trim((string)($aviso['engine'] ?? '')) === 'manual') {
+        return true;
+    }
+
     $severity = aviso_normalize_severity($aviso['severity'] ?? 'media');
     $profile = aviso_noise_profile();
     if ($profile === 'agresivo') {
