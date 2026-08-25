@@ -9,17 +9,27 @@ const path = require('path');
 function load(status) {
     const calls = [];
     const dom = new JSDOM(`<!doctype html><body>
-        <button id="tutorial-anchor-dashboard">Inicio</button>
-        <button id="tutorial-anchor-personality">Personalidad</button>
-        <button id="tutorial-anchor-lines">Líneas</button>
-        <button id="tutorial-anchor-chat">Chat</button>
+        <nav id="tabNav">
+            <button id="tutorial-anchor-dashboard" data-tab="tab-dashboard">Inicio</button>
+            <button id="tutorial-anchor-personality" data-tab="tab-personalidad">Personalidad</button>
+            <button id="tutorial-anchor-bot-style" data-tab="tab-personalidad">Estilo</button>
+            <button id="tutorial-anchor-rates" data-tab="tab-personalidad">Tarifas</button>
+            <button id="tutorial-anchor-services-location" data-tab="tab-personalidad">Servicios</button>
+            <button id="tutorial-anchor-girls" data-tab="tab-chicas">Chicas</button>
+            <button id="tutorial-anchor-notifications" data-tab="tab-clientes">Avisos</button>
+            <button id="tutorial-anchor-lines" data-tab="tab-lineas">Líneas</button>
+            <button id="tutorial-anchor-bot-toggle" data-tab="tab-dashboard">Bot</button>
+            <button id="tutorial-anchor-chat" data-tab="tab-mensajes">Chat</button>
+            <button id="tutorial-anchor-summary" data-tab="tab-dashboard">Resumen</button>
+        </nav>
     </body>`, { url: 'http://localhost/cliente', runScripts: 'dangerously', pretendToBeVisual: true });
     dom.window._csrf = 'csrf-test';
-    dom.window.switchTab = function () {};
+        dom.window.switchTab = function (tab) { dom.window.__switchedTab = tab; };
+        dom.window.ChatApp = { open: function () { dom.window.__chatOpened = true; } };
     dom.window.fetch = function (url, init) {
         calls.push({ url, init });
         if (url.includes('action=status')) return Promise.resolve({ json: () => Promise.resolve(status) });
-        return Promise.resolve({ json: () => Promise.resolve({ ok: true }) });
+        return Promise.resolve({ json: () => Promise.resolve({ ok: true, state: status.state }) });
     };
     dom.window.eval(fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'assets', 'tutorial.js'), 'utf8'));
     return { dom, calls };
@@ -43,6 +53,25 @@ describe('guided tutorial', () => {
         const { dom } = load({ ok: true, state: { completed: true, skipped: false } });
         await new Promise(resolve => setTimeout(resolve, 10));
         assert.equal(dom.window.document.querySelector('[role="dialog"]'), null);
+        dom.window.close();
+    });
+
+    it('renders all eleven approved stages and resumes the persisted step', async () => {
+        const { dom, calls } = load({ ok: true, state: {
+            status: 'pending', current_step: 4, version: 1,
+            timestamps: { started_at: null, updated_at: null, paused_at: null, completed_at: null, restarted_at: null }
+        } });
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        assert.equal(dom.window.document.querySelector('[data-tutorial-count]').textContent, '5 / 11');
+        assert.equal(dom.window.document.querySelector('[data-tutorial-title]').textContent, 'Servicios y ubicación');
+        assert.equal(dom.window.document.querySelectorAll('.cw-tutorial__blocker').length, 4);
+        assert.equal(dom.window.document.querySelector('.cw-tutorial__spotlight').style.pointerEvents, 'none');
+        assert.ok(dom.window.document.querySelector('[data-tutorial-exit]'));
+        assert.ok(calls.some(call => call.url.includes('action=start')));
+        dom.window.document.querySelector('[data-tutorial-next]').click();
+        await new Promise(resolve => setTimeout(resolve, 10));
+        assert.ok(calls.some(call => call.url.includes('action=step')));
         dom.window.close();
     });
 });

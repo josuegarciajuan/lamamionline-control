@@ -4,18 +4,27 @@
     inset: 0;
     z-index: 21000;
     color: #f7f7ff;
+    pointer-events: none;
 }
 .cw-tutorial__veil {
     position: absolute;
     inset: 0;
     background: rgba(5, 5, 16, .68);
+    pointer-events: none;
+}
+.cw-tutorial__blocker {
+    position: fixed;
+    pointer-events: auto;
+    background: transparent;
+    z-index: 1;
 }
 .cw-tutorial__spotlight {
     position: fixed;
-    pointer-events: none;
     border: 2px solid var(--accent, #ff3b8d);
     border-radius: 12px;
     box-shadow: 0 0 0 9999px rgba(5, 5, 16, .68), 0 0 24px rgba(255, 59, 141, .5);
+    pointer-events: none;
+    z-index: 2;
     transition: top .2s ease, left .2s ease, width .2s ease, height .2s ease;
 }
 .cw-tutorial__card {
@@ -26,15 +35,17 @@
     border: 1px solid rgba(255, 59, 141, .3);
     border-radius: 18px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, .55);
+    pointer-events: auto;
+    z-index: 3;
 }
 .cw-tutorial__card h2 { margin: 0 0 8px; font-size: 1.2rem; }
 .cw-tutorial__card p { margin: 0 0 18px; color: #c7c7d8; line-height: 1.5; font-size: .9rem; }
 .cw-tutorial__meta { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .cw-tutorial__actions { display: flex; gap: 8px; margin-left: auto; }
 .cw-tutorial__actions button { font: inherit; cursor: pointer; }
-.cw-tutorial__skip { border: 0; background: transparent; color: #aaaabd; padding: 8px 0; }
+.cw-tutorial__exit, .cw-tutorial__skip { border: 0; background: transparent; color: #aaaabd; padding: 8px 0; }
 .cw-tutorial__next { border: 0; border-radius: 999px; padding: 9px 16px; background: var(--accent, #ff3b8d); color: #fff; font-weight: 700; }
-.cw-tutorial__next:focus-visible, .cw-tutorial__skip:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.cw-tutorial__next:focus-visible, .cw-tutorial__exit:focus-visible, .cw-tutorial__skip:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 @media (max-width: 600px) {
     .cw-tutorial__card { left: 16px !important; right: 16px; bottom: 20px; width: auto; }
 }
