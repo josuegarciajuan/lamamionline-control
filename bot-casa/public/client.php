@@ -486,8 +486,9 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
 <title>bot-casa — <?php echo $clientName; ?></title>
 <link rel="stylesheet" href="assets/style.css?v=20260825_2">
 <link rel="stylesheet" href="assets/chat.css?v=20260629_1">
+<link rel="stylesheet" href="assets/tutorial.css?v=20260825_1">
 <?php if ($isDirectAccess): ?>
-<script src="assets/pwa.js?v=20260613_1"></script>
+<script src="assets/pwa.js?v=20260825_1"></script>
 <?php endif; ?>
 <script>
 // ── Theme toggle ──
@@ -656,7 +657,7 @@ $progressPct = $progressDone > 0 ? round($progressDone / $progressTotal * 100) :
 
 <?php
 // ── Onboarding wizard (shown if progress < 25%) ──
-$showWizard = $progressPct < 25 && !isset($_COOKIE['botcasa_wizard_done']);
+$showWizard = false; // Replaced by the server-persisted guided tutorial below.
 if ($showWizard):
 ?>
 <div id="wizard-overlay" class="wizard-overlay">
@@ -698,12 +699,12 @@ function dismissWizard() {
 <?php endif; ?>
 
 <div class="tab-nav" id="tabNav">
-    <button type="button" class="active" data-tab="tab-dashboard">📊 Inicio</button>
-    <button type="button" data-tab="tab-personalidad">🎭 Personalidad</button>
-    <button type="button" data-tab="tab-lineas">📱 Líneas</button>
+    <button type="button" class="active" data-tab="tab-dashboard" id="tutorial-anchor-dashboard">📊 Inicio</button>
+    <button type="button" data-tab="tab-personalidad" id="tutorial-anchor-personality">🎭 Personalidad</button>
+    <button type="button" data-tab="tab-lineas" id="tutorial-anchor-lines">📱 Líneas</button>
     <button type="button" data-tab="tab-chicas">👩 Chicas</button>
     <button type="button" data-tab="tab-clientes">🔔 Notificaciones</button>
-    <button type="button" data-tab="tab-mensajes">💬 Chat</button>
+    <button type="button" data-tab="tab-mensajes" id="tutorial-anchor-chat">💬 Chat</button>
     <button type="button" data-tab="tab-estados">📢 Estados</button>
     <button type="button" data-tab="tab-seguimiento">📨 Seguimiento</button>
     <button type="button" data-tab="tab-learning">🧠 Aprendizaje</button>
@@ -1655,6 +1656,7 @@ function updateAllCsrfInputs(token) {
 })();
 </script>
 <script src="assets/chat.js?v=20260629_1"></script>
+<script src="assets/tutorial.js?v=20260825_1"></script>
 <script>
 var _csrf = <?php echo json_encode(generateCsrfToken()); ?>;
 // ── Keepalive de sesión + CSRF refresh: ping cada 5 min ──

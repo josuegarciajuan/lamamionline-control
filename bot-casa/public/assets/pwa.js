@@ -20,6 +20,15 @@
   // ── PWA Install Prompt ──
   var deferredPrompt = null;
   var installPromptShown = false;
+  var installPromptBlocked = false;
+
+  window.addEventListener('casawasap:tutorial-started', function () {
+    installPromptBlocked = true;
+  });
+  window.addEventListener('casawasap:tutorial-finished', function () {
+    installPromptBlocked = false;
+    setTimeout(checkInstallPrompt, 300);
+  });
 
   window.addEventListener('beforeinstallprompt', function (e) {
     e.preventDefault();
@@ -140,6 +149,7 @@
 
   // ── Run post-login check (called after page load) ──
   function checkInstallPrompt() {
+    if (installPromptBlocked || window.CasaWasapTutorialActive) return;
     if (isStandalone()) return;        // Already installed
     if (!deferredPrompt) return;        // Browser doesn't support install prompt
     if (wasPromptedRecently()) return;  // Already shown recently
