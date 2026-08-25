@@ -43,6 +43,7 @@ final class TenantConfigIsolationTest extends TestCase
     public function test_first_tenant_request_initializes_without_copying_root_local_config(): void
     {
         $tenantDir = Bot::resolveUserConfigDir($this->rootDir, 42);
+        new Config($tenantDir, $this->rootDir);
 
         self::assertDirectoryExists($tenantDir);
         self::assertFileExists($tenantDir . '/config.local.json');
@@ -92,16 +93,25 @@ final class TenantConfigIsolationTest extends TestCase
             'routing' => ['lines' => [['last9' => 'copied-line']]],
             'files' => ['session_memory' => '/root/copied.ndjson'],
             'urls' => ['google_maps_location' => 'https://copied.example/maps'],
+            'prompt' => [
+                'sections' => [
+                    'tarifas' => 'ROOT PRIVATE TARIFFS',
+                    'servicios' => 'TENANT CUSTOM SERVICES',
+                ],
+            ],
         ], JSON_THROW_ON_ERROR));
 
         new Config($tenantDir, $this->rootDir);
         $saved = json_decode((string) file_get_contents($tenantDir . '/config.local.json'), true, 512, JSON_THROW_ON_ERROR);
+        $dist = json_decode((string) file_get_contents($this->rootDir . '/config.dist.json'), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertArrayNotHasKey('openai', $saved);
         self::assertSame([], $saved['routing']['lines']);
         self::assertArrayNotHasKey('files', $saved);
         self::assertSame([], $saved['telegram']['chat_ids'] ?? null);
         self::assertSame('', $saved['urls']['google_maps_location'] ?? null);
+        self::assertSame($dist['prompt']['sections']['tarifas'], $saved['prompt']['sections']['tarifas']);
+        self::assertSame('TENANT CUSTOM SERVICES', $saved['prompt']['sections']['servicios']);
     }
 
     private function removeTree(string $dir): void

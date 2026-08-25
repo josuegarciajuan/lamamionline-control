@@ -123,6 +123,9 @@ final class Config implements ConfigInterface
         $distBaseDir = $this->centralConfigDir ?? $this->configDir;
         $distPath  = $distBaseDir . '/config.dist.json';
         $localPath = $this->configDir . '/config.local.json';
+        $central = $this->centralConfigDir !== null
+            ? $this->readJsonFile($this->centralConfigDir . '/config.local.json')
+            : [];
 
         // Start with dist
         $this->data = [];
@@ -134,7 +137,7 @@ final class Config implements ConfigInterface
         if ($this->centralConfigDir !== null) {
             $originalLocal = $local;
             $local = $this->isLegacyTenantClone($local)
-                ? $this->tenantLocalData($this->data)
+                ? $this->scrubLegacyTenantData($local, $central, $this->data)
                 : $this->tenantLocalData($local);
             if ($local !== $originalLocal) {
                 $this->writeTenantLocal($local);
@@ -147,7 +150,6 @@ final class Config implements ConfigInterface
         }
 
         if ($this->centralConfigDir !== null) {
-            $central = $this->readJsonFile($this->centralConfigDir . '/config.local.json');
             $this->data = $this->mergeExplicitCentralRuntime($this->data, $central);
         }
     }
@@ -245,6 +247,57 @@ final class Config implements ConfigInterface
             if (array_key_exists($namespace, $data)) return true;
         }
         return false;
+    }
+
+    /**
+     * Scrub a previously cloned root config without destroying distinguishable
+     * tenant edits. A tenant value equal to root local is inherited evidence;
+     * replace it with the corresponding dist default. Values that differ from
+     * root local are retained as tenant-owned edits.
+     *
+     * @param array<string, mixed> $local
+     * @param array<string, mixed> $central
+     * @param array<string, mixed> $defaults
+     * @return array<string, mixed>
+     */
+    private function scrubLegacyTenantData(array $local, array $central, array $defaults): array
+    {
+        $tenant = $this->tenantLocalData($local);
+        $defaultTenant = $this->tenantLocalData($defaults);
+
+        foreach (['prompt', 'message_variants', 'personality', 'human_delays', 'cron'] as $namespace) {
+            if (!isset($tenant[$namespace]) || !is_array($tenant[$namespace])) continue;
+            $tenant[$namespace] = $this->replaceInheritedValues(
+                $tenant[$namespace],
+                $central[$namespace] ?? null,
+                $defaultTenant[$namespace] ?? []
+            );
+        }
+
+        // These are never inherited from root, even when a legacy file cloned
+        // them. New tenant defaults remain empty/disabled from config.dist.
+        foreach (['routing', 'telegram', 'urls'] as $namespace) {
+            if (array_key_exists($namespace, $defaultTenant)) $tenant[$namespace] = $defaultTenant[$namespace];
+            else unset($tenant[$namespace]);
+        }
+
+        return $tenant;
+    }
+
+    private function replaceInheritedValues(mixed $value, mixed $central, mixed $default): mixed
+    {
+        if ($central !== null && $value === $central) return $default;
+        if (!is_array($value)) return $value;
+
+        $result = $value;
+        foreach ($value as $key => $item) {
+            $result[$key] = $this->replaceInheritedValues(
+                $item,
+                is_array($central) && array_key_exists($key, $central) ? $central[$key] : null,
+                is_array($default) && array_key_exists($key, $default) ? $default[$key] : null
+            );
+        }
+        return $result;
     }
 
     /** @return list<string> */
