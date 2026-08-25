@@ -62,6 +62,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 //  Main handler
 // ─────────────────────────────────────────────────────────────────────
 
+function webhookPausedThreadsPath(int $userId): string
+{
+    return $userId > 1
+        ? \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'paused_threads.ndjson')
+        : WASAPBOT_ROOT . '/data/paused_threads.ndjson';
+}
+
 try {
     // ── Resolve user_id from the incoming payload (last9 → user_id) ──
     $rawBody = file_get_contents('php://input');
@@ -308,7 +315,7 @@ try {
     if ($isWritePending) {
         // Check if this specific thread is paused
         $threadPaused = false;
-        $pausedFile = WASAPBOT_ROOT . '/data/paused_threads.ndjson';
+        $pausedFile = webhookPausedThreadsPath($userId);
         if ($threadId !== '' && file_exists($pausedFile)) {
             $pausedLines = @file($pausedFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             if ($pausedLines) {
@@ -390,7 +397,9 @@ try {
     if ($fromMe && $senderPhone !== '') {
         // Auto-pause: human replied from native WA → stop bot for this conversation
         if (!$threadPaused && $threadId !== '') {
-            $pausedFile = WASAPBOT_ROOT . '/data/paused_threads.ndjson';
+            $pausedFile = webhookPausedThreadsPath($userId);
+            $pausedDir = dirname($pausedFile);
+            if (!is_dir($pausedDir)) @mkdir($pausedDir, 0700, true);
             $rec = json_encode(['thread_id' => $threadId, 'paused_at' => gmdate('c')], JSON_UNESCAPED_UNICODE);
             @file_put_contents($pausedFile, $rec . "\n", FILE_APPEND | LOCK_EX);
             $logger->info('webhook.php — auto-paused thread after native WA reply', ['thread_id' => $threadId]);

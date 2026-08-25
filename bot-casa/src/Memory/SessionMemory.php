@@ -389,7 +389,7 @@ final class SessionMemory implements SessionMemoryInterface
     ): array {
         return [
             '_seq'               => $seq,
-            'ts'                 => $this->nowIso8601(),
+            'ts'                 => !empty($meta['ts']) ? (string) $meta['ts'] : $this->nowIso8601(),
             'thread_id'          => $threadId,
             'phone'              => $phone,
             'user_msg'           => $userMessage,
@@ -404,6 +404,8 @@ final class SessionMemory implements SessionMemoryInterface
             'wants_more_girls'   => !empty($meta['wants_more_girls']),
             'ya_enviado'         => $meta['ya_enviado'] ?? [],
             'sender_lid'         => (string) ($meta['sender_lid'] ?? ''),
+            'from_me'            => !empty($meta['from_me']),
+            'waha_message_id'    => (string) ($meta['waha_message_id'] ?? ''),
         ];
     }
 

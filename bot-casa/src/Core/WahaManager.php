@@ -11,7 +11,7 @@ namespace WasapBot\Core;
  *   1. WAHA Manager API (http://waha-server/wahaapi/) — CRUD de contenedores docker
  *   2. WAHA HTTP API (http://waha-server:{port}/api/...) — gestión de sesiones
  */
-final class WahaManager
+final class WahaManager implements LineProvisioningWahaInterface
 {
     private string $wahaServer;
     private string $wahaApiKey;
