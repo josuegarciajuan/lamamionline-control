@@ -31,6 +31,7 @@ final class TenantConfigIsolationTest extends TestCase
             'urls' => ['google_maps_location' => 'https://root.example/maps'],
             'files' => ['session_memory' => '/root/production/memory.ndjson'],
             'prompt' => ['sections' => ['tarifas' => 'ROOT PRIVATE TARIFFS']],
+            'message_variants' => ['audio_auto_reply' => ['ROOT PRIVATE VARIANT']],
         ], JSON_THROW_ON_ERROR));
     }
 
@@ -44,7 +45,7 @@ final class TenantConfigIsolationTest extends TestCase
         $tenantDir = Bot::resolveUserConfigDir($this->rootDir, 42);
 
         self::assertDirectoryExists($tenantDir);
-        self::assertFileDoesNotExist($tenantDir . '/config.local.json');
+        self::assertFileExists($tenantDir . '/config.local.json');
         self::assertFileExists($this->rootDir . '/config.local.json');
     }
 
@@ -56,6 +57,7 @@ final class TenantConfigIsolationTest extends TestCase
         self::assertSame('shared-openai-key', $config->get('openai.api_key'));
         self::assertSame('shared-waha-key', $config->get('waha.api_key'));
         self::assertNotSame('ROOT PRIVATE TARIFFS', $config->get('prompt.sections.tarifas'));
+        self::assertNotSame(['ROOT PRIVATE VARIANT'], $config->get('message_variants.audio_auto_reply'));
         self::assertSame([], $config->get('telegram.chat_ids'));
         self::assertFalse((bool) $config->get('telegram.alert_enabled'));
         self::assertSame([], $config->get('routing.lines'));
@@ -73,7 +75,8 @@ final class TenantConfigIsolationTest extends TestCase
         self::assertArrayNotHasKey('openai', $saved);
         self::assertArrayNotHasKey('waha', $saved);
         self::assertArrayNotHasKey('files', $saved);
-        self::assertArrayNotHasKey('routing', $saved);
+        self::assertSame([], $saved['routing']['lines']);
+        self::assertSame([], $saved['routing']['sender_blacklist']);
 
         $root = json_decode((string) file_get_contents($this->rootDir . '/config.local.json'), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame(['root-chat-id'], $root['telegram']['chat_ids']);
@@ -95,10 +98,10 @@ final class TenantConfigIsolationTest extends TestCase
         $saved = json_decode((string) file_get_contents($tenantDir . '/config.local.json'), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertArrayNotHasKey('openai', $saved);
-        self::assertArrayNotHasKey('routing', $saved);
+        self::assertSame([], $saved['routing']['lines']);
         self::assertArrayNotHasKey('files', $saved);
-        self::assertSame([], $saved['telegram'] ?? []);
-        self::assertArrayNotHasKey('google_maps_location', $saved['urls'] ?? []);
+        self::assertSame([], $saved['telegram']['chat_ids'] ?? null);
+        self::assertSame('', $saved['urls']['google_maps_location'] ?? null);
     }
 
     private function removeTree(string $dir): void
