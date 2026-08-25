@@ -289,6 +289,10 @@ $_swV       = filemtime(__DIR__ . '/sw.js');
                         render_afiliados_page();
                         break;
 
+                    case 'autotube':
+                        render_autotube_page();
+                        break;
+
                     default:
                         render_dashboard_page();
                         break;
