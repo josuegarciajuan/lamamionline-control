@@ -64,7 +64,7 @@ echo "[cron_runner] Done\n";
 function runCron(string $rootDir, int $userId, string $type): void
 {
     $configDir = \WasapBot\Bot::resolveUserConfigDir($rootDir, $userId);
-    $config = new \WasapBot\Core\Config($configDir);
+    $config = new \WasapBot\Core\Config($configDir, $rootDir);
 
     // Override data paths for this user if multi-user mode
     if ($userId > 0) {

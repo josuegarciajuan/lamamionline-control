@@ -66,7 +66,7 @@ $isDemo = (($_SESSION['username'] ?? '') === 'demo');
 
 // ── Load user config ──
 $configDir = \WasapBot\Bot::resolveUserConfigDir(WASAPBOT_ROOT, $clientUserId);
-$config = new \WasapBot\Core\Config($configDir);
+$config = new \WasapBot\Core\Config($configDir, WASAPBOT_ROOT);
 
 // ── Override data paths for non-admin users (data isolation) ──
 if ($clientUserId > 1) {

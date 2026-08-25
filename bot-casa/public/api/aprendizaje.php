@@ -99,7 +99,7 @@ function updateOutcomeInFile(string $outcomesFile, string $threadId, string $new
     // Update client profile for this user
     try {
         $userConfigDir = \WasapBot\Bot::resolveUserConfigDir(WASAPBOT_ROOT, $userId);
-        $config = new \WasapBot\Core\Config($userConfigDir);
+        $config = new \WasapBot\Core\Config($userConfigDir, WASAPBOT_ROOT);
         require_once WASAPBOT_ROOT . '/src/Services/ClientProfileService.php';
         $profileSvc = new \WasapBot\Services\ClientProfileService($config);
         $profileSvc->updateProfile(

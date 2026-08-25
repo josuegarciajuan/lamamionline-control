@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace WasapBot\Core;
 
 /**
- * Configuration manager — reads config.dist.json first, then overlays
- * config.local.json (gitignored) via array_replace_recursive.
+ * Configuration manager — reads config.dist.json first, then overlays the
+ * local config. Tenant configs may additionally read a small, explicit set of
+ * platform settings from the central config at runtime.
  *
  * Strategy:
  *   config.dist.json  → committed to git, all secrets = "CHANGEME_*"
@@ -21,10 +22,12 @@ final class Config implements ConfigInterface
     private array $data = [];
 
     /**
-     * @param string $configDir Base directory containing config.dist.json and config.local.json.
+     * @param string      $configDir          Directory containing tenant config.local.json.
+     * @param string|null $centralConfigDir   Root directory for shared runtime settings.
      */
     public function __construct(
         private readonly string $configDir,
+        private readonly ?string $centralConfigDir = null,
     ) {
         $this->load();
     }
@@ -68,9 +71,13 @@ final class Config implements ConfigInterface
     public function save(): void
     {
         $localPath = $this->configDir . '/config.local.json';
+        $data = $this->data;
+        if ($this->centralConfigDir !== null) {
+            $data = $this->tenantLocalData($data);
+        }
 
         $json = json_encode(
-            $this->data,
+            $data,
             JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
         );
 
@@ -119,7 +126,8 @@ final class Config implements ConfigInterface
      */
     private function load(): void
     {
-        $distPath  = $this->configDir . '/config.dist.json';
+        $distBaseDir = $this->centralConfigDir ?? $this->configDir;
+        $distPath  = $distBaseDir . '/config.dist.json';
         $localPath = $this->configDir . '/config.local.json';
 
         // Start with dist
@@ -128,9 +136,94 @@ final class Config implements ConfigInterface
 
         // Overlay local
         $local = $this->readJsonFile($localPath);
+        if ($this->centralConfigDir !== null) {
+            $local = $this->removeLegacyTenantInheritance($local);
+        }
         if ($local !== []) {
             $this->data = array_replace_recursive($this->data, $local);
         }
+
+        if ($this->centralConfigDir !== null) {
+            $central = $this->readJsonFile($this->centralConfigDir . '/config.local.json');
+            $this->data = array_replace_recursive($this->data, $this->centralRuntimeData($central));
+        }
+    }
+
+    /**
+     * Only these root-level sections are shared with tenants at runtime.
+     * Tenant-local routing, notifications, prompts, URLs and file paths must
+     * never be populated from the central local config.
+     *
+     * @param array<string, mixed> $central
+     * @return array<string, mixed>
+     */
+    private function centralRuntimeData(array $central): array
+    {
+        $shared = [];
+        foreach (['openai', 'deepseek', 'waha', 'global_providers', 'ai_retry', 'catalog', 'log', 'dedup_coalesce', 'paypal', 'payment_confirmation_whatsapp'] as $key) {
+            if (array_key_exists($key, $central)) {
+                $shared[$key] = $central[$key];
+            }
+        }
+
+        // The bot token is platform-wide; tenant notification recipients are not.
+        if (isset($central['telegram']) && is_array($central['telegram']) && array_key_exists('bot_token', $central['telegram'])) {
+            $shared['telegram'] = ['bot_token' => $central['telegram']['bot_token']];
+        }
+        if (isset($central['telegram']) && is_array($central['telegram']) && array_key_exists('alert_dedup_window_sec', $central['telegram'])) {
+            $shared['telegram']['alert_dedup_window_sec'] = $central['telegram']['alert_dedup_window_sec'];
+        }
+        if (isset($central['urls']) && is_array($central['urls']) && array_key_exists('blacklist_ws', $central['urls'])) {
+            $shared['urls'] = ['blacklist_ws' => $central['urls']['blacklist_ws']];
+        }
+
+        return $shared;
+    }
+
+    /**
+     * Remove runtime/platform and server-derived values before persisting a
+     * tenant config. They remain available through centralRuntimeData().
+     *
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private function tenantLocalData(array $data): array
+    {
+        foreach (['openai', 'deepseek', 'waha', 'files', 'bot', 'routing', 'paypal', 'payment_confirmation_whatsapp', 'global_providers', 'ai_retry', 'catalog', 'log', 'dedup_coalesce'] as $key) {
+            unset($data[$key]);
+        }
+
+        if (isset($data['telegram']) && is_array($data['telegram'])) {
+            unset($data['telegram']['bot_token']);
+            if ($data['telegram'] === []) unset($data['telegram']);
+        }
+
+        if (isset($data['urls']) && is_array($data['urls'])) {
+            unset($data['urls']['blacklist_ws']);
+            if ($data['urls'] === []) unset($data['urls']);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Older tenant files were cloned from the root local config. Presence of
+     * platform credentials identifies that format; discard its copied
+     * tenant-specific and server-derived sections before they are read.
+     *
+     * @param array<string, mixed> $local
+     * @return array<string, mixed>
+     */
+    private function removeLegacyTenantInheritance(array $local): array
+    {
+        $isLegacyClone = isset($local['openai']) || isset($local['deepseek']) || isset($local['waha']) || isset($local['paypal']);
+        if (!$isLegacyClone) return $local;
+
+        foreach (['telegram', 'routing', 'files', 'bot'] as $key) unset($local[$key]);
+        if (isset($local['urls']) && is_array($local['urls'])) {
+            unset($local['urls']['google_maps_location'], $local['urls']['blacklist_ws']);
+        }
+        return $local;
     }
 
     /**

@@ -229,7 +229,8 @@ function resolveLast9FromPort(int $userId, string $port): string
             }
         }
     }
-    // Fallback: root config routing.lines (admin or legacy)
+    // Only the admin/legacy context may consult root routing.
+    if ($userId > 1) return '';
     $cfg = new \WasapBot\Core\Config(WASAPBOT_ROOT);
     $routingLines = (array) $cfg->get('routing.lines', []);
     foreach ($routingLines as $rl) {
@@ -256,7 +257,7 @@ try {
     // This ensures chat reads from the EXACT same file the webhook writes to.
     if ($userId > 1) {
         $userConfigDir = \WasapBot\Bot::resolveUserConfigDir(WASAPBOT_ROOT, $userId);
-        $userCfg = new \WasapBot\Core\Config($userConfigDir);
+        $userCfg = new \WasapBot\Core\Config($userConfigDir, WASAPBOT_ROOT);
         $memoryFile = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, (string) $userCfg->get('files.session_memory', 'data/session_memory.ndjson'));
         $leadsFile  = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, (string) $userCfg->get('files.leads', 'data/leads.ndjson'));
     } else {
@@ -491,7 +492,8 @@ try {
             }
 
             // Build WAHA URL from config
-            $cfg = new \WasapBot\Core\Config(WASAPBOT_ROOT, $userId);
+            $cfgDir = \WasapBot\Bot::resolveUserConfigDir(WASAPBOT_ROOT, $userId);
+            $cfg = new \WasapBot\Core\Config($cfgDir, WASAPBOT_ROOT);
             $wahaServer = (string) $cfg->get('waha.base_ip', '100.117.92.74');
             $apiKey     = (string) $cfg->get('waha.api_key', '');
             $session    = (string) $cfg->get('waha.session', 'default');
@@ -584,7 +586,8 @@ try {
             }
 
             // Build WAHA config
-            $cfgS = new \WasapBot\Core\Config(WASAPBOT_ROOT, $userId);
+            $cfgDirS = \WasapBot\Bot::resolveUserConfigDir(WASAPBOT_ROOT, $userId);
+            $cfgS = new \WasapBot\Core\Config($cfgDirS, WASAPBOT_ROOT);
             $wahaServer = (string) $cfgS->get('waha.base_ip', '100.117.92.74');
             $apiKey     = (string) $cfgS->get('waha.api_key', '');
             $session    = (string) $cfgS->get('waha.session', 'default');

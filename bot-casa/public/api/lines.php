@@ -53,7 +53,7 @@ function saveLines(array $lines): void {
     if ($userId > 1) {
         try {
             $cfgDir = \WasapBot\Bot::resolveUserConfigDir(WASAPBOT_ROOT, $userId);
-            $cfg = new \WasapBot\Core\Config($cfgDir);
+            $cfg = new \WasapBot\Core\Config($cfgDir, WASAPBOT_ROOT);
             $routingLines = [];
             foreach ($lines as $line) {
                 if (!is_array($line)) continue;
