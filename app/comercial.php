@@ -650,6 +650,7 @@ function comercial_guess_line_ids($names) {
 function comercial_page_tabs() {
     return array(
         'resumen' => 'Resumen',
+        'chat' => 'Chat comercial',
         'procesos' => 'Procesos',
         'lineas' => 'Líneas',
         'conversaciones' => 'Conversaciones',
@@ -7908,6 +7909,13 @@ function render_comercial_page() {
             echo '</tr>';
         }
         echo '</tbody></table></div>';
+        echo '</section>';
+        return;
+    }
+
+    if ($tab === 'chat') {
+        echo '<section class="panel comercial-chat-embed" style="padding:0;overflow:hidden;">';
+        echo '<iframe id="comercial-chat-iframe" src="/control/inbox.php?tab=inbox" title="Chat comercial" loading="eager" style="display:block;width:100%;height:max(560px, calc(100vh - 190px));min-height:560px;border:0;overflow:hidden;"></iframe>';
         echo '</section>';
         return;
     }
