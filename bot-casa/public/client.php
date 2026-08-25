@@ -489,7 +489,7 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
 <title>bot-casa — <?php echo $clientName; ?></title>
 <link rel="stylesheet" href="assets/style.css?v=20260825_2">
 <link rel="stylesheet" href="assets/chat.css?v=20260629_1">
-<link rel="stylesheet" href="assets/tutorial.css?v=20260825_3">
+<link rel="stylesheet" href="assets/tutorial.css?v=20260825_4">
 <?php if ($isDirectAccess): ?>
 <script src="assets/pwa.js?v=20260825_1"></script>
 <?php endif; ?>
@@ -572,6 +572,9 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
     $tot = $subStatus['totalDays'];
     $left = $subStatus['daysLeft'];
     $barPct = ($tot > 0) ? round($cur / $tot * 100) : 0;
+    $tutorialNextTab = $linesForUser <= 0 ? 'tab-lineas'
+        : (!$promptConfigured ? 'tab-personalidad'
+            : ($girlsActiveCount <= 0 ? 'tab-chicas' : (!$hasNotifications ? 'tab-clientes' : 'tab-personalidad')));
 
     if ($subStatus['status'] === 'trial') {
         $bannerClass = 'sub-trial';
@@ -605,7 +608,12 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
         $barPct = 100; // full bar but red
     }
 ?>
-<div class="subscription-banner <?php echo $bannerClass; ?>">
+<div id="tutorial-target-subscription-banner" class="subscription-banner <?php echo $bannerClass; ?>"
+    data-tutorial-next-tab="<?php echo h($tutorialNextTab); ?>"
+    data-tutorial-subscription-status="<?php echo h((string) $subStatus['status']); ?>"
+    data-tutorial-current-day="<?php echo h((string) $cur); ?>"
+    data-tutorial-days-left="<?php echo h((string) $left); ?>"
+    data-tutorial-total-days="<?php echo h((string) $tot); ?>">
     <div class="sub-banner-left">
         <span class="sub-icon"><?php echo $bannerIcon; ?></span>
         <div class="sub-info">
@@ -1660,7 +1668,7 @@ function updateAllCsrfInputs(token) {
 })();
 </script>
 <script src="assets/chat.js?v=20260629_1"></script>
-<script src="assets/tutorial.js?v=20260825_3"></script>
+<script src="assets/tutorial.js?v=20260825_4"></script>
 <script>
 var _csrf = <?php echo json_encode(generateCsrfToken()); ?>;
 // ── Keepalive de sesión + CSRF refresh: ping cada 5 min ──

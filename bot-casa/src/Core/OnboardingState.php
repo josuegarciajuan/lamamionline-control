@@ -7,7 +7,7 @@ namespace WasapBot\Core;
 final class OnboardingState
 {
     public const VERSION = 1;
-    public const STEP_COUNT = 11;
+    public const STEP_COUNT = 12;
 
     private string $path;
 

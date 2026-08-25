@@ -21,6 +21,20 @@
         });
     }
     function targetFor(step) { return document.querySelector(step.target); }
+    function subscriptionBanner() { return document.querySelector('#tutorial-target-subscription-banner'); }
+    function trialMotivationText() {
+        var banner = subscriptionBanner();
+        if (!banner || banner.dataset.tutorialSubscriptionStatus !== 'trial') {
+            return 'Cuando quieras, empieza la configuración básica para comprobar cuánto trabajo puedes ahorrar y cómo responde tu bot.';
+        }
+        var day = banner.dataset.tutorialCurrentDay;
+        var left = banner.dataset.tutorialDaysLeft;
+        var total = banner.dataset.tutorialTotalDays;
+        if (!day || !left || !total) {
+            return 'Tienes una prueba gratuita de 10 días. Empieza la configuración básica para comprobar cuánto trabajo puedes ahorrar y cómo responde tu bot.';
+        }
+        return 'Tienes una prueba gratuita de 10 días: vas por el Día ' + day + ' de ' + total + ' y quedan ' + left + ' días. Empieza la configuración básica para comprobar cuánto trabajo puedes ahorrar y cómo responde tu bot.';
+    }
     function waitForTarget(step, attempts, callback) {
         var target = targetFor(step);
         if (target) {
@@ -76,7 +90,10 @@
         state.overlay.querySelector('[data-tutorial-title]').textContent = step.title;
         state.overlay.querySelector('[data-tutorial-text]').textContent = step.text;
         state.overlay.querySelector('[data-tutorial-count]').textContent = (state.step + 1) + ' / ' + state.steps.length;
-        state.overlay.querySelector('[data-tutorial-next]').textContent = state.step === state.steps.length - 1 ? 'Terminar' : 'Siguiente';
+        var finalStep = state.step === state.steps.length - 1;
+        state.overlay.querySelector('[data-tutorial-next]').textContent = finalStep ? 'Empezar configuración' : 'Siguiente';
+        state.overlay.querySelector('[data-tutorial-exit]').textContent = finalStep ? 'Terminar por ahora' : 'Salir';
+        state.overlay.querySelector('.cw-tutorial__card').classList.toggle('cw-tutorial__card--motivation', finalStep);
         switchTo(step, function (target) {
             if (target && target.scrollIntoView) {
                 target.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
@@ -94,7 +111,13 @@
         window.dispatchEvent(new CustomEvent('casawasap:tutorial-finished'));
     }
     function next() {
-        if (state.step >= state.steps.length - 1) { close('complete'); return; }
+        if (state.step >= state.steps.length - 1) {
+            var banner = subscriptionBanner();
+            var nextTab = banner && banner.dataset.tutorialNextTab ? banner.dataset.tutorialNextTab : 'tab-personalidad';
+            close('complete');
+            if (typeof switchTab === 'function') switchTab(nextTab);
+            return;
+        }
         state.step += 1;
         post('step', state.step).catch(function () {});
         render();
@@ -113,7 +136,8 @@
             { title: 'Líneas', text: 'Vincula las líneas de WhatsApp que atenderá el bot.', target: '#tutorial-anchor-lines', tab: 'tab-lineas' },
             { title: 'Encender el bot', text: 'Cuando todo esté configurado, enciende el bot desde aquí.', target: '#tutorial-anchor-bot-toggle', tab: 'tab-dashboard' },
             { title: 'Chat', text: 'Consulta conversaciones y responde manualmente si lo necesitas.', target: '#tutorial-anchor-chat', tab: 'tab-mensajes', chat: true },
-            { title: 'Resumen', text: 'Revisa el progreso y vuelve a cualquier sección cuando quieras.', target: '#dashboard-progress', tab: 'tab-dashboard' }
+            { title: 'Resumen', text: 'Revisa el progreso y vuelve a cualquier sección cuando quieras.', target: '#dashboard-progress', tab: 'tab-dashboard' },
+            { title: 'Tu prueba gratuita', text: trialMotivationText(), target: '#tutorial-target-subscription-banner', tab: 'tab-dashboard' }
         ];
         state.step = Math.max(0, Math.min(state.steps.length - 1, Number(serverState && serverState.current_step) || 0));
         state.overlay = document.createElement('div');
