@@ -97,7 +97,7 @@ if ($eventType !== 'PAYMENT.CAPTURE.COMPLETED') {
 // Extract transaction data
 $resource = $payload['resource'] ?? [];
 $txnId    = (string) ($resource['id'] ?? '');
-$amount   = (float) ($resource['amount']['value'] ?? 0);
+$amount   = (string) ($resource['amount']['value'] ?? '0.00');
 $customId = (string) ($resource['custom_id'] ?? '');
 $status   = (string) ($resource['status'] ?? '');
 
@@ -126,8 +126,8 @@ if ($userId <= 0 && $orderId !== '') {
             $userId = (int) $m[1];
             $isExtraLine = (($m[2] ?? '') === 'extra-line');
         }
-        if ($amount <= 0) {
-            $amount = (float) ($pu['amount']['value'] ?? 0);
+        if ($amount === '0.00') {
+            $amount = (string) ($pu['amount']['value'] ?? '0.00');
         }
     }
 }
@@ -147,6 +147,22 @@ if ($user === null) {
     http_response_code(200);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['ok' => true, 'message' => 'Payment captured but user not found.']);
+    exit;
+}
+
+// The amount is always recomputed from server-side product pricing. A captured
+// amount that does not match is acknowledged but never grants access/credit.
+$expectedAmount = $isExtraLine
+    ? \WasapBot\Core\Pricing::extraLineInitialPrice($userId)
+    : \WasapBot\Core\Pricing::weeklyTotal(
+        $userId,
+        max(1, \WasapBot\Core\Pricing::userLineCount($userId, WASAPBOT_ROOT))
+    );
+if ((int) round((float) $amount * 100) !== (int) round($expectedAmount * 100)) {
+    error_log('[paypal-webhook] Amount mismatch for txn ' . $txnId . ': received ' . $amount . ', expected ' . number_format($expectedAmount, 2, '.', ''));
+    http_response_code(200);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => true, 'message' => 'Amount mismatch — logged for manual review.']);
     exit;
 }
 
@@ -171,13 +187,13 @@ if ($isExtraLine) {
     // Extra line: webhook arrives from PayPal servers (no browser session), so the
     // pending line data is NOT available here. Record the payment as a credit; the
     // user creates the extra line from the panel (paid plan allows multiple lines).
-    $subManager->recordPayment($userId, $amount > 0 ? $amount : \WasapBot\Core\Pricing::extraLine(), 'paypal', $txnId);
+    $subManager->recordPayment($userId, $expectedAmount, 'paypal', $txnId);
     $activated = true;
     error_log('[paypal-webhook] PAYMENT.CAPTURE.COMPLETED — extra-line payment recorded for user ' . $userId . ' txn: ' . $txnId);
 } else {
     $activateResult = $subManager->activateWeekly($userId, 1);
     if ($activateResult['ok']) {
-        $subManager->recordPayment($userId, $amount > 0 ? $amount : \WasapBot\Core\Pricing::weeklyBase($userId), 'paypal', $txnId);
+        $subManager->recordPayment($userId, $expectedAmount, 'paypal', $txnId);
         $activated = true;
         error_log('[paypal-webhook] PAYMENT.CAPTURE.COMPLETED — weekly plan activated for user ' . $userId . ' txn: ' . $txnId);
     } else {

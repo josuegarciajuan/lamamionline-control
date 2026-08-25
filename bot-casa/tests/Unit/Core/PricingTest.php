@@ -7,72 +7,37 @@ namespace WasapBot\Tests\Unit\Core;
 use PHPUnit\Framework\TestCase;
 use WasapBot\Core\Pricing;
 
-/**
- * Unit tests for Pricing — descuentos por usuario y cálculo del total semanal.
- *
- * Solo se prueba la lógica pura (resolveOverride / weeklyTotal) para no depender
- * de config.local.json ni de data/users.json (que no existen en un checkout limpio).
- */
 final class PricingTest extends TestCase
 {
-    public function testResolveOverrideReturnsDefaultWhenNoOverrides(): void
+    public function testSharedProductPricingUsesApprovedWeeklyAmounts(): void
     {
-        $this->assertSame(100.0, Pricing::resolveOverride([], '34604829142', 17, 100.0));
+        self::assertSame(50.0, Pricing::weeklyBase(0));
+        self::assertSame(10.0, Pricing::extraLine());
     }
 
-    public function testResolveOverrideByUsername(): void
+    public function testExtraLineProrationUsesWholeCalendarDaysAndRoundsToCents(): void
     {
-        $overrides = ['34604829142' => 1];
-        $this->assertSame(1.0, Pricing::resolveOverride($overrides, '34604829142', 17, 100.0));
+        self::assertSame(10.0, Pricing::proratedExtraLine(7));
+        self::assertSame(8.57, Pricing::proratedExtraLine(6));
+        self::assertSame(1.43, Pricing::proratedExtraLine(1));
+        self::assertSame(0.0, Pricing::proratedExtraLine(0));
     }
 
-    public function testResolveOverrideByUserId(): void
+    public function testWholeDaysRemainingIgnoresTimeOfDay(): void
     {
-        $overrides = ['17' => 2];
-        $this->assertSame(2.0, Pricing::resolveOverride($overrides, 'otro_usuario', 17, 100.0));
-    }
+        $end = '2026-09-01T15:30:00+02:00';
 
-    public function testResolveOverrideMatchesNationalFormatWithoutCountryPrefix(): void
-    {
-        // Username con prefijo 34 → la clave de override en formato nacional (sin 34) hace match.
-        $overrides = ['654464023' => 1];
-        $this->assertSame(1.0, Pricing::resolveOverride($overrides, '34654464023', 12, 100.0));
-    }
-
-    public function testResolveOverrideNationalKeyDoesNotMatchOther34Users(): void
-    {
-        // 34604829142 sin el 34 → 604829142, que no está en los overrides → sin descuento.
-        $overrides = ['654464023' => 1];
-        $this->assertSame(100.0, Pricing::resolveOverride($overrides, '34604829142', 17, 100.0));
-    }
-
-    public function testResolveOverrideRawUsernameStillMatches(): void
-    {
-        $overrides = ['654464023' => 1];
-        $this->assertSame(1.0, Pricing::resolveOverride($overrides, '654464023', 999, 100.0));
-    }
-
-    public function testResolveOverrideUsernameTakesPrecedenceOverUserId(): void
-    {
-        $overrides = ['34604829142' => 1, '17' => 2];
-        $this->assertSame(1.0, Pricing::resolveOverride($overrides, '34604829142', 17, 100.0));
-    }
-
-    public function testResolveOverrideIgnoresOtherUsers(): void
-    {
-        $overrides = ['34604829142' => 1];
-        $this->assertSame(100.0, Pricing::resolveOverride($overrides, 'otro_usuario', 99, 100.0));
-    }
-
-    public function testWeeklyTotalWithZeroOrOneLineIsBasePrice(): void
-    {
-        $this->assertSame(100.0, Pricing::weeklyTotal(99999, 0));
-        $this->assertSame(100.0, Pricing::weeklyTotal(99999, 1));
-    }
-
-    public function testWeeklyTotalAddsExtraLines(): void
-    {
-        // 1 incluida + 2 extra × 25 = 150
-        $this->assertSame(150.0, Pricing::weeklyTotal(99999, 3));
+        self::assertSame(7, Pricing::wholeDaysRemaining(
+            new \DateTimeImmutable('2026-08-25T00:01:00+02:00'),
+            $end
+        ));
+        self::assertSame(7, Pricing::wholeDaysRemaining(
+            new \DateTimeImmutable('2026-08-25T23:59:59+02:00'),
+            $end
+        ));
+        self::assertSame(0, Pricing::wholeDaysRemaining(
+            new \DateTimeImmutable('2026-09-01T00:01:00+02:00'),
+            $end
+        ));
     }
 }

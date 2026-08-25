@@ -64,9 +64,9 @@ $extraLines = 0;
 $extraCost = \WasapBot\Core\Pricing::extraLine(); // € per extra line/week
 
 if ($isExtraLine) {
-    $amount = $extraCost;
-    $lineCount = 1;
-    $extraLines = 0;
+    $amount = \WasapBot\Core\Pricing::extraLineInitialPrice($userId);
+    $lineCount = max(1, \WasapBot\Core\Pricing::userLineCount($userId, WASAPBOT_ROOT));
+    $extraLines = max(0, $lineCount - 1);
 } else {
     $lineCount = \WasapBot\Core\Pricing::userLineCount($userId, WASAPBOT_ROOT);
     $lineCount = max($lineCount, 1);
@@ -76,6 +76,10 @@ if ($isExtraLine) {
 
 $error = '';
 $success = false;
+$subscriptionEnd = (string) ($subStatus['subscriptionEnd'] ?? '');
+$prorationDays = $isExtraLine && $subscriptionEnd !== ''
+    ? \WasapBot\Core\Pricing::wholeDaysRemaining(new \DateTimeImmutable('now', new \DateTimeZone('Europe/Madrid')), $subscriptionEnd)
+    : 0;
 
 // ── PayPal config ──
 $paypalClientId = '';
@@ -579,13 +583,15 @@ $paypalConfigured = ($paypalClientId !== '' && $paypalClientId !== 'PAYPAL_CLIEN
     <?php endif; ?>
 
     <div class="amount-block">
-        <div class="amount-label">Inversión semanal</div>
-        <div class="price"><?php echo $amount; ?>€</div>
-        <div class="period">por semana</div>
+        <div class="amount-label"><?php echo $isExtraLine ? 'Pago inicial prorrateado' : 'Inversión semanal'; ?></div>
+        <div class="price"><?php echo number_format($amount, 2, ',', '.'); ?>€</div>
+        <div class="period"><?php echo $isExtraLine ? 'por los días restantes del periodo actual' : 'por semana'; ?></div>
         <div class="reassurance">Sin permanencia · cancela cuando quieras</div>
         <div class="line-breakdown">
             <?php if ($isExtraLine): ?>
             Línea extra: <?php echo h($pendingLine['label'] ?? $pendingLine['phone'] ?? ''); ?>
+            <br><?php echo $prorationDays; ?> días restantes × <?php echo number_format($extraCost / 7, 2, ',', '.'); ?>€/día.
+            <br>La próxima renovación incluirá esta línea: <?php echo number_format(\WasapBot\Core\Pricing::weeklyTotal($userId, max(1, $lineCount + 1)), 2, ',', '.'); ?>€/semana.
             <?php else: ?>
             <?php echo $lineCount; ?> línea<?php echo $lineCount > 1 ? 's' : ''; ?>
             <?php if ($extraLines > 0): ?>
@@ -638,7 +644,7 @@ $paypalConfigured = ($paypalClientId !== '' && $paypalClientId !== 'PAYPAL_CLIEN
 <script src="https://www.paypal.com/sdk/js?client-id=<?php echo h($paypalClientId); ?>&currency=EUR&intent=capture" data-namespace="paypal_sdk"></script>
 <script>
 (function() {
-    var amount = <?php echo (int) $amount; ?>;
+    var amount = <?php echo json_encode(number_format($amount, 2, '.', ''), JSON_THROW_ON_ERROR); ?>;
     var isExtraLine = <?php echo $isExtraLine ? 'true' : 'false'; ?>;
     var overlay = document.getElementById('processing-overlay');
     var procText = document.getElementById('processing-text');

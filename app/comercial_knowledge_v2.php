@@ -11,6 +11,16 @@
 
 declare(strict_types=1);
 
+if (!function_exists('comercial_casawasap_pricing')) {
+    function comercial_casawasap_pricing(): array {
+        static $pricing;
+        if (!is_array($pricing)) {
+            $pricing = require dirname(__DIR__) . '/config/casawasap_pricing.php';
+        }
+        return $pricing;
+    }
+}
+
 function comercial_knowledge_v2_get(string $slug, string $phase): array {
     $slug = trim($slug);
     $phase = trim($phase);
@@ -162,6 +172,9 @@ function comercial_knowledge_v2_lamami(): array {
 // ═══════════════════════════════════════════════════════════════
 
 function comercial_knowledge_v2_casawasap(): array {
+    $pricing = comercial_casawasap_pricing();
+    $weekly = number_format($pricing['weekly_price'], 0, ',', '.') . '€';
+    $extra = number_format($pricing['extra_line_price'], 0, ',', '.') . '€';
     return array(
         'product_line' => 'CasaWasap',
         'common' => array(
@@ -170,7 +183,7 @@ function comercial_knowledge_v2_casawasap(): array {
                 'Máximo 1 emoji por mensaje.',
                 'Nunca revelar que eres IA.',
                 'Nunca mencionar otros negocios (Plaza, LaMami, Publiscort, Publicista).',
-                'Nunca negociar precios. 100€/semana es fijo.',
+                "Nunca negociar precios. {$weekly}/semana es fijo.",
                 'Nunca inventar funcionalidades que no existen.',
                 'Mencionar siempre los 10 días gratis y la demo si es relevante.',
                 'Nunca autoreferencia: no digas "soy del equipo", "somos X".',
@@ -184,7 +197,7 @@ function comercial_knowledge_v2_casawasap(): array {
                 'Imagina despertarte y tener 5 visitas confirmadas sin haber respondido un solo mensaje 🔥 CasaWasap contesta 24/7 con tono natural. 10 días gratis sin tarjeta. ¿Te interesa?',
                 '94% de mensajes contestados al instante 📊 Así funciona CasaWasap: contesta WhatsApp, publica estados, filtra clientes. Tú solo ves las visitas confirmadas. ¿Quieres probarlo 10 días gratis?',
                 'CasaWasap: el asistente que contesta WhatsApp por ti 24/7. Tono natural, el cliente no nota que es IA. 10 días gratis, sin tarjeta. ¿Te lo explico?',
-                '¿Te han escrito 15 tíos mientras dormías y no has contestado a ninguno? Con CasaWasap los tienes a todos respondidos al despertar. 100€/sem, 10 días gratis. ¿Hablamos?',
+                "¿Te han escrito 15 tíos mientras dormías y no has contestado a ninguno? Con CasaWasap los tienes a todos respondidos al despertar. {$weekly}/sem, 10 días gratis. ¿Hablamos?",
             ),
         ),
         'DESCUBRIMIENTO' => array(
@@ -197,7 +210,7 @@ function comercial_knowledge_v2_casawasap(): array {
             ),
         ),
         'PRESENTACION' => array(
-            'pricing' => '100€/semana. 10 DÍAS GRATIS de prueba (sin tarjeta, sin permanencia). Líneas extra: 25€/sem.',
+            'pricing' => "{$weekly}/semana. 10 DÍAS GRATIS de prueba (sin tarjeta, sin permanencia). Líneas extra: {$extra}/sem.",
             'features' => 'Respuestas 24/7, publicación automática de estados, dashboard de estadísticas, avisos Telegram, anti-regateo.',
             'next_steps' => array(
                 '¿Quieres que te explique cómo sería la prueba de 10 días gratis? Sin tarjeta, sin permanencia.',
@@ -206,7 +219,7 @@ function comercial_knowledge_v2_casawasap(): array {
             ),
         ),
         'MANEJO_OBJECIONES' => array(
-            'caro' => '100€/semana. Con 1 solo cliente que te traiga ya lo tienes pagado. Y tienes 10 días gratis para comprobarlo sin riesgo.',
+            'caro' => "{$weekly}/semana. Con 1 solo cliente que te traiga ya lo tienes pagado. Y tienes 10 días gratis para comprobarlo sin riesgo.",
             'ya_tengo_quien_contesta' => '¿Pero contesta a las 4am? ¿Los fines de semana? CasaWasap no duerme. Y es un extra, no un reemplazo.',
             'no_confio_en_ia' => 'Entra en demo.casawasap.com y chatea tú misma. Es tono natural, la gente no nota la diferencia. Pruébalo 10 días gratis.',
             'mis_clientes_quieren_hablar_conmigo' => 'CasaWasap solo contesta lo básico y te avisa cuando hay visita. Tú sigues hablando con quien quieras. Es un filtro, no un muro.',

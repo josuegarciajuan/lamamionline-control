@@ -272,7 +272,8 @@ function comercial_agent_build_phase_prompt(string $processSlug, string $mode, s
                 $sections[] = "═══ SIGUIENTE PASO ═══\n" . implode("\n", array_map(function($s) { return '- ' . $s; }, array_slice($nextSteps, 0, 2)));
             }
             $sections[] = "═══ REGLAS DE ESTA FASE ═══\n- Máximo 5 líneas.\n- Precio + 1 beneficio clave + siguiente paso.\n- NUNCA responder objeciones que no hayan hecho.\n- NUNCA 'si no te gusta...', 'sin compromiso'.\n- NUNCA presiones el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', urgencia fabricada.\n- Si el cliente pidió SOLO información, cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?').\n- Terminar con una pregunta abierta sin presión.";
-            $sections[] = "═══ EJEMPLO MALO ═══\n\"100€/semana. También tenemos líneas extra a 25€, dashboard de estadísticas, recordatorios ETA, anti-regateo, publicación de estados, memoria de clientes recurrentes...\" → SOLTÓ TODAS LAS FEATURES EN VEZ DE IR PASO A PASO.";
+            $casawasapPricing = function_exists('comercial_casawasap_pricing') ? comercial_casawasap_pricing() : ['weekly_price' => 50.0, 'extra_line_price' => 10.0];
+            $sections[] = "═══ EJEMPLO MALO ═══\n\"" . number_format($casawasapPricing['weekly_price'], 0, ',', '.') . "€/semana. También tenemos líneas extra a " . number_format($casawasapPricing['extra_line_price'], 0, ',', '.') . "€, dashboard de estadísticas, recordatorios ETA, anti-regateo, publicación de estados, memoria de clientes recurrentes...\" → SOLTÓ TODAS LAS FEATURES EN VEZ DE IR PASO A PASO.";
             $sections[] = "═══ EJEMPLO MALO ═══\n\"...Alta única 29€ y luego 10€ por cada 30 min de cliente que te llegue. ¿Te activo hoy mismo?\" → CIERRE AGRESIVO CON PRESIÓN: el cliente solo pidió información y se le pide activar ya. Sustitúyelo por un CTA suave sin urgencia.";
             break;
 

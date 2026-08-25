@@ -7,9 +7,7 @@ namespace WasapBot\Core;
 /**
  * Pricing — cálculo de precios del plan semanal de CasaWasap.
  *
- * Los precios base se leen de config (pricing.weekly_price, pricing.extra_line_price)
- * y admiten descuentos por usuario vía pricing.user_override (mapa username → importe).
- * Así, p. ej., un usuario de pruebas puede pagar 1€/semana en lugar de 100€.
+ * Los precios públicos se leen del único fichero no-secreto compartido con el CRM.
  */
 final class Pricing
 {
@@ -18,14 +16,7 @@ final class Pricing
      */
     public static function weeklyBase(int $userId): float
     {
-        $config = new Config(dirname(__DIR__, 2));
-        $default = (float) ($config->get('pricing.weekly_price') ?? 100);
-        $overrides = $config->get('pricing.user_override', []);
-        if (!is_array($overrides)) {
-            $overrides = [];
-        }
-
-        return self::resolveOverride($overrides, self::usernameOf($userId), $userId, $default);
+        return (float) self::sharedConfig()['weekly_price'];
     }
 
     /**
@@ -33,8 +24,7 @@ final class Pricing
      */
     public static function extraLine(): float
     {
-        $config = new Config(dirname(__DIR__, 2));
-        return (float) ($config->get('pricing.extra_line_price') ?? 25);
+        return (float) self::sharedConfig()['extra_line_price'];
     }
 
     /**
@@ -45,6 +35,38 @@ final class Pricing
     public static function weeklyTotal(int $userId, int $lineCount): float
     {
         return self::weeklyBase($userId) + (max($lineCount - 1, 0) * self::extraLine());
+    }
+
+    /**
+     * Initial extra-line charge, based on whole calendar days remaining.
+     */
+    public static function extraLineInitialPrice(int $userId, ?\DateTimeImmutable $now = null): float
+    {
+        $user = (new UserManager(dirname(__DIR__, 2)))->getUser($userId);
+        $end = is_array($user) ? (string) ($user['subscription_end'] ?? '') : '';
+        if ($end === '') return self::extraLine();
+
+        $days = self::wholeDaysRemaining($now ?? new \DateTimeImmutable('now', new \DateTimeZone('Europe/Madrid')), $end);
+        return self::proratedExtraLine($days);
+    }
+
+    public static function proratedExtraLine(int $daysRemaining): float
+    {
+        $days = max(0, min($daysRemaining, (int) self::sharedConfig()['period_days']));
+        return round(self::extraLine() * $days / (int) self::sharedConfig()['period_days'], 2);
+    }
+
+    public static function wholeDaysRemaining(\DateTimeImmutable $now, string $subscriptionEnd): int
+    {
+        try {
+            $end = new \DateTimeImmutable($subscriptionEnd, $now->getTimezone());
+        } catch (\Exception) {
+            return 0;
+        }
+
+        $today = new \DateTimeImmutable($now->format('Y-m-d'), $now->getTimezone());
+        $endDate = new \DateTimeImmutable($end->format('Y-m-d'), $now->getTimezone());
+        return max(0, (int) $today->diff($endDate)->format('%r%a'));
     }
 
     /**
@@ -81,38 +103,13 @@ final class Pricing
         return $count;
     }
 
-    /**
-     * Aplica el descuento por usuario: primero por username, luego por id numérico.
-     *
-     * Para el username se prueba primero el valor tal cual y después sin el prefijo
-     * de país "34" (formato nacional): así la clave de override "654464023" hace match
-     * con un usuario cuyo username sea "34654464023".
-     *
-     * @param array<mixed> $overrides Mapa username|id → importe en euros.
-     */
-    public static function resolveOverride(array $overrides, string $username, int $userId, float $default): float
+    /** @return array{currency: string, weekly_price: float, extra_line_price: float, period_days: int} */
+    private static function sharedConfig(): array
     {
-        if ($username !== '') {
-            if (isset($overrides[$username])) {
-                return (float) $overrides[$username];
-            }
-            $national = preg_replace('/^34/', '', $username, 1);
-            if (is_string($national) && $national !== '' && isset($overrides[$national])) {
-                return (float) $overrides[$national];
-            }
+        static $pricing;
+        if (!is_array($pricing)) {
+            $pricing = require dirname(__DIR__, 3) . '/config/casawasap_pricing.php';
         }
-        if (isset($overrides[(string) $userId])) {
-            return (float) $overrides[(string) $userId];
-        }
-
-        return $default;
-    }
-
-    private static function usernameOf(int $userId): string
-    {
-        $um = new UserManager(dirname(__DIR__, 2));
-        $user = $um->getUser($userId);
-
-        return (string) ($user['username'] ?? '');
+        return $pricing;
     }
 }
