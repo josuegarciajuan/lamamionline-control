@@ -26,6 +26,7 @@ require_once $phpBotRoot . '/src/Core/ConfigInterface.php';
 require_once $phpBotRoot . '/src/Core/Config.php';
 require_once $phpBotRoot . '/src/BotInterface.php';
 require_once $phpBotRoot . '/src/Bot.php';
+require_once $phpBotRoot . '/src/Cron/LeadFollowupEligibility.php';
 
 // Multi-user support: if cron_runner.php set a global config, use it
 if (isset($GLOBALS['_cron_runner_config']) && $GLOBALS['_cron_runner_config'] instanceof \WasapBot\Core\Config) {
@@ -575,8 +576,8 @@ function getEligibleLeads(array $alreadySentToday, int $maxLeads): array
             continue;
         }
 
-        // ── Skip leads marked as "arrived" (cliente ya fue) ─────────
-        if (!empty($record['arrived'])) {
+        // ── Follow-up is only for leads confirmed as arrived ────────
+        if (!\WasapBot\Cron\LeadFollowupEligibility::shouldInclude($record)) {
             continue;
         }
 

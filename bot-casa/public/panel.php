@@ -2739,6 +2739,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 Cuando está activado, cada ~6 horas re-contacta automáticamente a leads pasados enviándoles fotos de las chicas disponibles.
             </span>
         </div>
+        <div class="alert-warning" style="margin-bottom:16px;padding:10px 14px;border-radius:8px">
+            ⚠️ <strong>Importante:</strong> El follow-up se enviará a los leads que sí vinieron. Es importante marcarlos como "llegó" en Aprendizaje para que el sistema sepa cuáles acudieron.
+        </div>
 
         <h3>Parámetros</h3>
         <div class="form-row">
@@ -2846,6 +2849,9 @@ document.addEventListener('DOMContentLoaded', function() {
             <span style="color:var(--text-muted);font-size:.82rem">
                 Cuando está activado, cada minuto revisa si algún usuario dijo que venía en X minutos y, cuando ese tiempo expira, le envía un recordatorio automático.
             </span>
+        </div>
+        <div class="alert-warning" style="margin-bottom:16px;padding:10px 14px;border-radius:8px">
+            ⚠️ <strong>Importante:</strong> Un lead es el aviso que el bot ha enviado por el medio configurado al detectar que el cliente va de camino. Si el cliente llega y no lo marcas como "llegó" en Aprendizaje, al cumplirse la ETA (por ejemplo, 20 minutos) el sistema enviará un recordatorio aunque ya esté dentro, algo que puede resultar raro.
         </div>
 
         <div class="form-row">

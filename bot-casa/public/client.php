@@ -1397,10 +1397,10 @@ function dismissWizard() {
                 Es como un <strong>"te echamos de menos"</strong> automático.
             </p>
             <p style="color:var(--text-muted);font-size:.78rem">
-                <strong>¿Cuándo se envía?</strong> Solo a clientes con los que se habló hace 48-72h y que NO hayan sido marcados como "llegó".
+                <strong>¿Cuándo se envía?</strong> Solo a clientes con los que se habló hace 48-72h y que hayan sido marcados como "llegó".
             </p>
             <div class="alert-warning" style="margin-bottom:12px;font-size:.8rem;padding:10px 14px;border-radius:8px">
-                ⚠️ <strong>Importante:</strong> Marca los leads como "llegó" en la pestaña <strong>🧠 Aprendizaje</strong>. Si no los marcas, cuando pase el tiempo que el cliente dijo que iba a tardar, el bot le recordará igual que tiene una cita. Si no tienes tiempo de marcar llegadas, mejor <strong>desactiva esta función</strong>.
+                ⚠️ <strong>Importante:</strong> El follow-up se enviará a los leads que sí vinieron. Es importante marcarlos como "llegó" en <strong>🧠 Aprendizaje</strong> para que el sistema sepa cuáles acudieron.
             </div>
             <div class="form-row">
                 <div class="form-group"><label>Máx leads por ejecución</label><input type="number" name="cron[followup][max_leads_per_run]" value="<?php echo cv('cron.followup.max_leads_per_run','10'); ?>"></div>
@@ -1422,7 +1422,7 @@ function dismissWizard() {
                 Si un cliente dice <strong>"llego en 20 minutos"</strong>, el bot le enviará <strong>un solo recordatorio</strong> pasado ese tiempo para confirmar que sigue en camino.
             </p>
             <div class="alert-warning" style="margin-bottom:10px;font-size:.85rem;padding:12px 14px;border-radius:8px;border:2px solid var(--warn)">
-                ⚠️ <strong>IMPORTANTE:</strong> Este recordatorio se envía automáticamente aunque no hayas marcado el lead como "llegó" en 🧠 Aprendizaje. El bot se basa solo en lo que el cliente dijo. Si el cliente llega pero no lo marcaste, el bot le enviará el recordatorio igual. Si no tienes tiempo de marcar llegadas, <strong>mejor no uses esta función</strong>.
+                ⚠️ <strong>Importante:</strong> Un lead es el aviso que el bot ha enviado por el medio configurado al detectar que el cliente va de camino. Si el cliente llega y no lo marcas como "llegó" en <strong>🧠 Aprendizaje</strong>, al cumplirse la ETA (por ejemplo, 20 minutos) el sistema enviará un recordatorio aunque ya esté dentro, algo que puede resultar raro.
             </div>
         </div>
 
