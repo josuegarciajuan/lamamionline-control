@@ -13,6 +13,15 @@
 
 declare(strict_types=1);
 
+/** @return array{weekly_price: float, extra_line_price: float} */
+function comercial_casawasap_pricing(): array {
+    static $pricing;
+    if (!is_array($pricing)) {
+        $pricing = require dirname(__DIR__) . '/config/casawasap_pricing.php';
+    }
+    return $pricing;
+}
+
 /**
  * Devuelve la base de conocimiento completa para un negocio.
  * Si el slug no existe, devuelve la base genérica 'inbound'.
@@ -332,6 +341,9 @@ function comercial_knowledge_publicista(): array {
 // ═══════════════════════════════════════════════════════════════
 
 function comercial_knowledge_casawasap(): array {
+    $pricing = comercial_casawasap_pricing();
+    $weekly = number_format($pricing['weekly_price'], 0, ',', '.') . '€';
+    $extra = number_format($pricing['extra_line_price'], 0, ',', '.') . '€';
     return array(
         'slug'          => 'casawasap',
         'business_name' => 'CasaWasap',
@@ -361,9 +373,9 @@ function comercial_knowledge_casawasap(): array {
         )),
 
         'pricing' => implode("\n", array(
-            "Precio: 100€/semana.",
+            "Precio: {$weekly}/semana.",
             "10 DÍAS GRATIS de prueba (sin tarjeta, sin permanencia).",
-            "Líneas extra: 25€/semana cada una adicional.",
+            "Líneas extra: {$extra}/semana cada una adicional.",
             "PRECIOS FIJOS. NO negociables.",
             "NO ofrezcas descuentos ni rebajas.",
             "El valor está en la prueba gratuita de 10 días.",
@@ -372,7 +384,7 @@ function comercial_knowledge_casawasap(): array {
         'restrictions' => array(
             "NUNCA reveles que eres un bot, IA o sistema automatizado.",
             "NUNCA menciones otros negocios (Plaza, LaMami, Publiscort, Publicista).",
-            "NUNCA negocies precios. 100€/semana es fijo.",
+            "NUNCA negocies precios. {$weekly}/semana es fijo.",
             "NUNCA uses coletillas infantiles: 'guapa', 'cariño', 'reina', 'Holaaa' con letras repetidas.",
             "NO uses más de 1 emoji por mensaje.",
             "Responde PRIMERO a lo que preguntó el cliente, con información concreta.",
@@ -383,17 +395,17 @@ function comercial_knowledge_casawasap(): array {
         ),
 
         'faq' => array(
-            '¿Cuánto cuesta?'                   => '100€/semana. Pero tienes 10 DÍAS GRATIS de prueba, sin tarjeta y sin permanencia. Pruébalo y decides.',
+            '¿Cuánto cuesta?'                   => "{$weekly}/semana. Pero tienes 10 DÍAS GRATIS de prueba, sin tarjeta y sin permanencia. Pruébalo y decides.",
             '¿Mis clientes notarán que es un bot?' => 'Para nada. El 94% de los mensajes se responden al instante con tono natural. Los clientes notan que les contestan RÁPIDO, no que sea IA. Entra en demo.casawasap.com y chatea como si fueras cliente.',
             '¿Es difícil de instalar?'           => '3 pasos, 5 minutos. Sin instalar nada en tu móvil. Te guiamos paso a paso.',
             '¿Y si no me gusta?'                 => 'Por eso tienes 10 días gratis. Sin tarjeta, sin permanencia. Si no te convence, lo dejas y ya está.',
             '¿Cómo sé que funciona?'             => 'Tienes un dashboard con estadísticas en tiempo real: cuántos mensajes responde, cuántas visitas confirma, tasa de conversión. Lo ves todo.',
-            '¿Puedo tener varias líneas?'        => 'Sí, 25€/semana por cada línea extra. Ideal si tienes varios números o chicas.',
+            '¿Puedo tener varias líneas?'        => "Sí, {$extra}/semana por cada línea extra. Ideal si tienes varios números o chicas.",
             '¿Atiende a cualquier hora?'         => '24/7, sin pausa. Mientras duermes, CasaWasap sigue cerrando visitas.',
         ),
 
         'objections' => array(
-            'Es caro'                                      => '100€/semana. Con 1 solo cliente que te traiga, ya lo tienes pagado. Y tienes 10 días gratis para comprobarlo sin riesgo.',
+            'Es caro'                                      => "{$weekly}/semana. Con 1 solo cliente que te traiga, ya lo tienes pagado. Y tienes 10 días gratis para comprobarlo sin riesgo.",
             'Ya tengo a alguien que contesta'              => 'Claro, pero ¿contesta a las 4am? ¿Los fines de semana? CasaWasap no duerme. Y es un extra, no un reemplazo.',
             'No confío en una IA'                          => 'Entra en demo.casawasap.com y chatea tú misma. Es tono natural, la gente no nota la diferencia. Pruébalo 10 días gratis y decides.',
             'Mis clientes quieren hablar conmigo'          => 'CasaWasap solo contesta lo básico y te avisa cuando hay visita confirmada. Tú sigues hablando con quien quieras. Es un filtro, no un muro.',

@@ -96,7 +96,7 @@ class PayPalClient
     /**
      * Capture (finalize) a PayPal Order after buyer approval.
      *
-     * @return array{ok: bool, transaction_id?: string, amount?: float, error?: string}
+     * @return array{ok: bool, transaction_id?: string, amount?: float, amount_value?: string, error?: string}
      */
     public function captureOrder(string $orderId): array
     {
@@ -111,12 +111,14 @@ class PayPalClient
             // Extract PayPal transaction ID and captured amount
             $txnId = '';
             $amount = 0.0;
+            $amountValue = '0.00';
             $captures = $result['purchase_units'][0]['payments']['captures'] ?? [];
             if (count($captures) > 0) {
                 $txnId = (string) ($captures[0]['id'] ?? '');
-                $amount = (float) ($captures[0]['amount']['value'] ?? 0);
+                $amountValue = number_format((float) ($captures[0]['amount']['value'] ?? 0), 2, '.', '');
+                $amount = (float) $amountValue;
             }
-            return ['ok' => true, 'transaction_id' => $txnId, 'amount' => $amount];
+            return ['ok' => true, 'transaction_id' => $txnId, 'amount' => $amount, 'amount_value' => $amountValue];
         }
 
         $errorDetail = $result['message'] ?? ($result['error'] ?? 'Error al capturar el pago.');

@@ -41,6 +41,22 @@ if (!is_array($input)) $input = [];
 $um = new \WasapBot\Core\UserManager(WASAPBOT_ROOT);
 $subManager = new \WasapBot\Core\SubscriptionManager($um);
 
+function moneyCents(float|string $amount): int
+{
+    return (int) round((float) $amount * 100);
+}
+
+function expectedPaymentAmount(int $userId, bool $isExtraLine): float
+{
+    if ($isExtraLine) {
+        return \WasapBot\Core\Pricing::extraLineInitialPrice($userId);
+    }
+    return \WasapBot\Core\Pricing::weeklyTotal(
+        $userId,
+        max(1, \WasapBot\Core\Pricing::userLineCount($userId, WASAPBOT_ROOT))
+    );
+}
+
 // ─────────────────────────────────────────────────────────
 //  PayPal: create order
 // ─────────────────────────────────────────────────────────
@@ -50,13 +66,8 @@ if ($action === 'create-order') {
 
     // ── Importe autoritativo calculado en servidor (anti-manipulación) ──
     // No se confía en el amount enviado por el cliente: se recalcula según
-    // líneas del usuario y descuentos configurados (pricing.user_override).
-    if ($isExtraLine) {
-        $amount = \WasapBot\Core\Pricing::extraLine();
-    } else {
-        $lineCount = \WasapBot\Core\Pricing::userLineCount($userId, WASAPBOT_ROOT);
-        $amount = \WasapBot\Core\Pricing::weeklyTotal($userId, $lineCount);
-    }
+    // líneas del usuario y la configuración pública centralizada.
+    $amount = expectedPaymentAmount($userId, $isExtraLine);
 
     if ($amount <= 0) {
         http_response_code(400);
@@ -115,6 +126,12 @@ if ($action === 'capture-order') {
         exit;
     }
 
+    if (($storedOrderId = (string) ($_SESSION['paypal_order_id'] ?? '')) === '' || !hash_equals($storedOrderId, $orderId)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'La orden de PayPal no coincide con la sesión.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     $config = new \WasapBot\Core\Config(WASAPBOT_ROOT);
     $paypalCfg = $config->get('paypal');
     if (!is_array($paypalCfg)) {
@@ -133,13 +150,13 @@ if ($action === 'capture-order') {
     }
 
     // ── Payment captured: activate subscription ──
-    $amount      = (float) ($_SESSION['paypal_amount'] ?? 100);
     $isExtraLine = !empty($_SESSION['paypal_extra']);
+    $amount      = expectedPaymentAmount($userId, $isExtraLine);
     $txnId       = (string) ($result['transaction_id'] ?? '');
 
     // ── Verify captured amount matches the expected amount (anti-tampering) ──
-    $capturedAmount = (float) ($result['amount'] ?? 0.0);
-    if ($capturedAmount > 0.0 && abs($capturedAmount - $amount) > 0.01) {
+    $capturedAmount = (string) ($result['amount_value'] ?? $result['amount'] ?? '0');
+    if (moneyCents($capturedAmount) !== moneyCents($amount)) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'El importe capturado no coincide con el esperado. Contacta con soporte.'], JSON_UNESCAPED_UNICODE);
         exit;

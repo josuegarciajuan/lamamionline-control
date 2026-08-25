@@ -1787,7 +1787,7 @@ function addLine() {
     fetch('api/lines.php?action=add', {method:'POST',body:fd,credentials:'same-origin'}).then(r=>r.json()).then(d=>{
         if (d.extra_line_payment) {
             // Extra line requires payment — redirect to payment page
-            showToast('💡 Línea extra: +' + d.price + '€/sem. Redirigiendo al pago...', 'info');
+            showToast('💡 Línea extra: pago inicial prorrateado ' + Number(d.price).toFixed(2) + '€. Después +' + Number(d.weekly_price || 10).toFixed(2) + '€/sem. Redirigiendo al pago...', 'info');
             setTimeout(function(){ window.location.href = 'pago'; }, 1000);
         } else if (d.ok) {
             statusEl.textContent = '✅ Instancia creada en puerto '+(d.line?d.line.port:'?')+'. Usa el botón QR para vincular WhatsApp.';
