@@ -72,8 +72,12 @@ $csrfToken = generateCsrfToken();
 $apiToken = $csrfToken; // _apiToken uses same value
 
 // ── Read bot mode for initial state ──
-$config = new \WasapBot\Core\Config(WASAPBOT_ROOT, $userId);
+$configDir = \WasapBot\Bot::resolveUserConfigDir(WASAPBOT_ROOT, $userId);
+$config = new \WasapBot\Core\Config($configDir, WASAPBOT_ROOT);
 $modeFilePath = (string) $config->get('bot.mode_file', 'data/.bot_mode');
+if ($userId > 1) {
+    $modeFilePath = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, $modeFilePath);
+}
 if (!str_starts_with($modeFilePath, '/')) {
     $modeFilePath = WASAPBOT_ROOT . '/' . ltrim($modeFilePath, '/');
 }

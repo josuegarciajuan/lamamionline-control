@@ -28,7 +28,7 @@ $everOnFile = WASAPBOT_ROOT . '/data/users/' . $userId . '/.bot_has_been_on';
 
 // ── Config for setup checklist ──
 $configDir = \WasapBot\Bot::resolveUserConfigDir(WASAPBOT_ROOT, $userId);
-$config = new \WasapBot\Core\Config($configDir);
+$config = new \WasapBot\Core\Config($configDir, WASAPBOT_ROOT);
 
 // Factory-default tariffs for comparison
 $distTarifas = '';

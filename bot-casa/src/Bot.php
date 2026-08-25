@@ -769,54 +769,21 @@ final class Bot implements BotInterface
 
     /**
      * Get the config directory for a specific user.
-     * If userId > 0 and data/users/{userId}/config.local.json exists,
-     * the user dir becomes the config dir (so Config loads from there).
-     * Otherwise returns the root config dir.
+     * A tenant directory is always created for userId > 0. It is intentionally
+     * not initialized from the root config.local.json; Config overlays only
+     * approved central runtime settings when it is constructed.
      */
     public static function resolveUserConfigDir(string $rootDir, int $userId): string
     {
         if ($userId > 0) {
             $userDir = rtrim($rootDir, '/') . '/data/users/' . $userId;
-            if (is_dir($userDir) || file_exists($userDir . '/config.local.json')) {
-                if (!is_dir($userDir)) {
-                    @mkdir($userDir, 0755, true);
-                }
-                // If no config.local.json in user dir, create it by merging
-                // the dist template with the root's config.local.json so
-                // the user inherits real API keys (waha, openai, deepseek)
-                // instead of CHANGEME_* placeholders.
-                if (!file_exists($userDir . '/config.local.json')) {
-                    $merged = [];
-                    // 1. Base: dist template (structure + defaults)
-                    $rootDist = $rootDir . '/config.dist.json';
-                    if (file_exists($rootDist)) {
-                        $dist = @json_decode((string) @file_get_contents($rootDist), true);
-                        if (is_array($dist)) {
-                            $merged = $dist;
-                        }
-                    }
-                    // 2. Overlay: root config.local.json (real API keys, routing, etc.)
-                    $rootLocal = $rootDir . '/config.local.json';
-                    if (file_exists($rootLocal)) {
-                        $local = @json_decode((string) @file_get_contents($rootLocal), true);
-                        if (is_array($local)) {
-                            $merged = array_replace_recursive($merged, $local);
-                        }
-                    }
-                    // 3. Ensure user-specific routing starts clean (will be injected by bootstrap)
-                    $merged['routing'] = [
-                        'default_enabled_if_not_found' => false,
-                        'lines' => [],
-                        'sender_blacklist' => [],
-                    ];
-                    // 4. Write the merged config
-                    $json = json_encode($merged, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                    if ($json !== false) {
-                        @file_put_contents($userDir . '/config.local.json', $json . "\n", LOCK_EX);
-                    }
-                }
-                return $userDir;
+            if (!is_dir($userDir)) {
+                @mkdir($userDir, 0700, true);
             }
+            if (!is_dir($userDir)) {
+                throw new \RuntimeException('Cannot initialize tenant data directory.');
+            }
+            return $userDir;
         }
         return $rootDir;
     }
@@ -827,7 +794,7 @@ final class Bot implements BotInterface
         $configDir = self::resolveUserConfigDir($rootDir, $userId);
 
         // ── Core ─────────────────────────────────────────────────────
-        $config = new \WasapBot\Core\Config($configDir);
+        $config = new \WasapBot\Core\Config($configDir, $userId > 0 ? $rootDir : null);
 
         // ── Override relative data paths to be user-specific ─────────
         if ($userId > 0) {

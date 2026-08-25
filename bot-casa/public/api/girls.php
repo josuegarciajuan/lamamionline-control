@@ -518,7 +518,7 @@ try {
 
             if ($isAdmin && !$isSuplantando) {
                 // Admin → fetch from remote GirlsService
-                $cfg   = new \WasapBot\Core\Config(WASAPBOT_ROOT, $userId);
+                $cfg   = new \WasapBot\Core\Config(WASAPBOT_ROOT);
                 $logger = new \WasapBot\Core\Logger();
                 $http  = new \WasapBot\Core\HttpClient($logger);
                 $gs    = new \WasapBot\Services\GirlsService($cfg, $http, $logger);

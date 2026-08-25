@@ -45,7 +45,8 @@ $action = (string) ($_GET['action'] ?? ($_POST['action'] ?? ''));
 // ── Resolve mode file path ──
 // Admin (userId=1): data/.bot_mode
 // Per-user: data/users/{userId}/.bot_mode
-$config = new \WasapBot\Core\Config(WASAPBOT_ROOT, $userId);
+$configDir = \WasapBot\Bot::resolveUserConfigDir(WASAPBOT_ROOT, $userId);
+$config = new \WasapBot\Core\Config($configDir, WASAPBOT_ROOT);
 $modeFilePath = (string) $config->get('bot.mode_file', 'data/.bot_mode');
 if (!str_starts_with($modeFilePath, '/')) {
     $modeFilePath = WASAPBOT_ROOT . '/' . ltrim($modeFilePath, '/');
@@ -53,7 +54,7 @@ if (!str_starts_with($modeFilePath, '/')) {
 
 // For per-user isolation (userId>1), override with user-specific path
 if ($userId > 1) {
-    $modeFilePath = WASAPBOT_ROOT . '/data/users/' . $userId . '/.bot_mode';
+    $modeFilePath = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'data/.bot_mode');
 }
 
 /**
