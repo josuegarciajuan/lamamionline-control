@@ -605,6 +605,31 @@ function comercial_mb_strpos_safe($haystack, $needle) {
     return strpos($haystack, $needle);
 }
 
+function comercial_mb_stripos_safe($haystack, $needle) {
+    $haystack = (string)$haystack;
+    $needle = (string)$needle;
+    if (function_exists('mb_stripos')) {
+        return mb_stripos($haystack, $needle, 0, 'UTF-8');
+    }
+    return stripos($haystack, $needle);
+}
+
+function comercial_mb_strlen_safe($text) {
+    $text = (string)$text;
+    if (function_exists('mb_strlen')) {
+        return mb_strlen($text, 'UTF-8');
+    }
+    return strlen($text);
+}
+
+function comercial_mb_substr_safe($text, $start, $length = null) {
+    $text = (string)$text;
+    if (function_exists('mb_substr')) {
+        return $length === null ? mb_substr($text, (int)$start, null, 'UTF-8') : mb_substr($text, (int)$start, (int)$length, 'UTF-8');
+    }
+    return $length === null ? substr($text, (int)$start) : substr($text, (int)$start, (int)$length);
+}
+
 function comercial_guess_line_ids($names) {
     $rows = storage_read('telefonos.json');
     $wanted = array();
@@ -1926,17 +1951,17 @@ function comercial_filter_agent_threads($threads, $cutoffDays = 4) {
 function comercial_state_machine_determine_phase(array $thread, array $process, string $inboundText = ''): string {
     $replies = (int)($thread['replies_count'] ?? 0);
     $stage = (string)($thread['stage'] ?? '');
-    $inboundLower = trim(mb_strtolower((string)$inboundText, 'UTF-8'));
+    $inboundLower = trim(comercial_mb_strtolower_safe((string)$inboundText));
 
     // Señales de descarte inmediato
     if ($stage === 'discarded' || $stage === 'autoresponder') {
         return 'DESCARTADO';
     }
 
-    if (mb_stripos($inboundLower, 'no me interesa') !== false
-        || mb_stripos($inboundLower, 'no gracias') !== false
-        || mb_stripos($inboundLower, 'deja de escribirme') !== false
-        || mb_stripos($inboundLower, 'para de escribir') !== false) {
+    if (comercial_mb_stripos_safe($inboundLower, 'no me interesa') !== false
+        || comercial_mb_stripos_safe($inboundLower, 'no gracias') !== false
+        || comercial_mb_stripos_safe($inboundLower, 'deja de escribirme') !== false
+        || comercial_mb_stripos_safe($inboundLower, 'para de escribir') !== false) {
         return 'DESCARTADO';
     }
 
@@ -1946,7 +1971,7 @@ function comercial_state_machine_determine_phase(array $thread, array $process, 
         'dónde estáis', 'cómo llego', 'apuntarme', 'contratar');
     $buyingCount = 0;
     foreach ($buyingKeywords as $kw) {
-        if (mb_stripos($inboundLower, $kw) !== false) $buyingCount++;
+        if (comercial_mb_stripos_safe($inboundLower, $kw) !== false) $buyingCount++;
     }
     if ($buyingCount >= 2 || $stage === 'very_hot') {
         return 'CIERRE';
@@ -1959,7 +1984,7 @@ function comercial_state_machine_determine_phase(array $thread, array $process, 
         'no me lo creo', 'demasiado', 'no estoy segura', 'no estoy seguro',
         'déjame pensarlo', 'luego te digo');
     foreach ($objecionKeywords as $kw) {
-        if (mb_stripos($inboundLower, $kw) !== false) {
+        if (comercial_mb_stripos_safe($inboundLower, $kw) !== false) {
             return 'MANEJO_OBJECIONES';
         }
     }
@@ -2458,13 +2483,13 @@ function comercial_ai_memory_relevant_examples($processSlug, $inboundText, $phas
     $limit = max(1, min(6, (int)$limit));
 
     $rows = comercial_ai_memory_get_rows();
-    $inboundLower = mb_strtolower($inboundText, 'UTF-8');
+    $inboundLower = comercial_mb_strtolower_safe($inboundText);
 
     // Tokenizar el texto entrante (palabras >= 3 chars, sin stopwords)
     $stopwords = array('para', 'que', 'como', 'cuando', 'donde', 'estoy', 'tengo', 'quiero', 'saber', 'usted', 'ustedes', 'sobre', 'este', 'esta', 'esto', 'pero', 'mas', 'hay', 'con', 'por', 'una', 'uno', 'los', 'las', 'del', 'hola', 'buenas', 'buenos', 'buena', 'bueno', 'gracias', 'nada', 'todo', 'bien', 'muchas', 'muchos');
     $tokens = preg_split('/[^a-z0-9áéíóúñü]+/u', $inboundLower, -1, PREG_SPLIT_NO_EMPTY);
     $tokens = array_values(array_filter((array)$tokens, function ($t) use ($stopwords) {
-        return mb_strlen($t, 'UTF-8') >= 3 && !in_array($t, $stopwords, true);
+        return comercial_mb_strlen_safe($t) >= 3 && !in_array($t, $stopwords, true);
     }));
 
     $scored = array();
@@ -2474,12 +2499,12 @@ function comercial_ai_memory_relevant_examples($processSlug, $inboundText, $phas
         $text = trim((string)($row['text'] ?? ''));
         if ($text === '') continue;
 
-        $trigger = mb_strtolower(trim((string)($row['trigger_text'] ?? '')), 'UTF-8');
-        $textLower = mb_strtolower($text, 'UTF-8');
+        $trigger = comercial_mb_strtolower_safe(trim((string)($row['trigger_text'] ?? '')));
+        $textLower = comercial_mb_strtolower_safe($text);
 
         $overlap = 0;
         foreach ($tokens as $tok) {
-            if ($tok !== '' && (mb_stripos($textLower, $tok) !== false || ($trigger !== '' && mb_stripos($trigger, $tok) !== false))) {
+            if ($tok !== '' && (comercial_mb_stripos_safe($textLower, $tok) !== false || ($trigger !== '' && comercial_mb_stripos_safe($trigger, $tok) !== false))) {
                 $overlap++;
             }
         }
@@ -2597,7 +2622,7 @@ function plaza_room_photos_save(array $rows): void {
  * Detecta si procede enviar fotos: el cliente las pide o el bot las ofrece.
  */
 function comercial_plaza_wants_photos(string $inboundText, string $replyText): bool {
-    $haystack = mb_strtolower(trim($inboundText . ' ' . $replyText), 'UTF-8');
+    $haystack = comercial_mb_strtolower_safe(trim($inboundText . ' ' . $replyText));
     if ($haystack === '') return false;
     // Normalizar acentos/ñ para matchear con independencia de tildes
     $accents = array('á'=>'a','à'=>'a','ä'=>'a','â'=>'a','é'=>'e','è'=>'e','ë'=>'e','ê'=>'e','í'=>'i','ì'=>'i','ï'=>'i','î'=>'i','ó'=>'o','ò'=>'o','ö'=>'o','ô'=>'o','ú'=>'u','ù'=>'u','ü'=>'u','û'=>'u','ñ'=>'n');
@@ -2611,7 +2636,7 @@ function comercial_plaza_wants_photos(string $inboundText, string $replyText): b
  */
 function comercial_plaza_inject_room_photos(string $processSlug, string $replyText, string $inboundText): string {
     if (trim($processSlug) !== 'plaza') return $replyText;
-    if (mb_stripos($replyText, 'compartir.site') !== false) return $replyText; // ya lleva fotos
+    if (comercial_mb_stripos_safe($replyText, 'compartir.site') !== false) return $replyText; // ya lleva fotos
 
     $photos = plaza_room_photos_get();
     if (empty($photos)) return $replyText;
@@ -4252,7 +4277,7 @@ function comercial_send_hot_summary_to_owner($thread, $inboundText, $messageId =
         $dir = (string)($entry['direction'] ?? '') === 'in' ? '📥' : '📤';
         $txt = trim((string)($entry['text'] ?? ''));
         if ($txt !== '') {
-            $summaryLines[] = $dir . ' ' . mb_substr($txt, 0, 120, 'UTF-8');
+            $summaryLines[] = $dir . ' ' . comercial_mb_substr_safe($txt, 0, 120);
         }
     }
     $conversationSummary = !empty($summaryLines) ? implode("\n", array_slice($summaryLines, -8)) : '(sin historial)';
@@ -4273,7 +4298,7 @@ function comercial_send_hot_summary_to_owner($thread, $inboundText, $messageId =
     $msg .= "📱 *Línea:* " . $lineInfo . "\n";
     $msg .= "📞 *Cliente:* " . $phone . "\n";
     $msg .= "🏷️ *Proceso:* " . $processSlug . "\n";
-    $msg .= "💬 *Último mensaje:* " . (mb_strlen($inboundText, 'UTF-8') > 100 ? mb_substr($inboundText, 0, 100, 'UTF-8') . '...' : $inboundText) . "\n\n";
+    $msg .= "💬 *Último mensaje:* " . (comercial_mb_strlen_safe($inboundText) > 100 ? comercial_mb_substr_safe($inboundText, 0, 100) . '...' : $inboundText) . "\n\n";
     $msg .= "*Resumen de la conversación:*\n" . $conversationSummary . "\n\n";
     $msg .= "*Sugerencias para seguirla:*\n" . $suggestions;
 
@@ -6893,7 +6918,7 @@ function comercial_text_is_ack_only($text) {
     $normalized = comercial_text_fold(trim((string)$text));
     if ($normalized === '') return false;
     // Si el mensaje tiene más de 20 caracteres normalizados, no es solo acuse
-    if (mb_strlen($normalized, 'UTF-8') > 20) return false;
+    if (comercial_mb_strlen_safe($normalized) > 20) return false;
     $ackPhrases = array(
         'ok', 'okey', 'oki', 'vale', 'si', 'sí', 'gracias', 'bien',
         'de acuerdo', 'entendido', 'genial', 'bien ahi',
@@ -7140,7 +7165,7 @@ function comercial_handle_inbound_message($payload) {
         comercial_event_append('thread_busy', array(
             'thread_id' => (string)$thread['id'],
             'target_phone' => $thread['target_phone'],
-            'text_preview' => mb_substr($text, 0, 120),
+            'text_preview' => comercial_mb_substr_safe($text, 0, 120),
         ));
         return array(
             'ok' => true,
@@ -7340,7 +7365,7 @@ function comercial_handle_inbound_message($payload) {
             'thread_id' => $thread['id'],
             'process_slug' => $thread['process_slug'],
             'target_phone' => $thread['target_phone'],
-            'text_preview' => mb_substr($text, 0, 200),
+            'text_preview' => comercial_mb_substr_safe($text, 0, 200),
         ));
         return array(
             'ok' => true,
