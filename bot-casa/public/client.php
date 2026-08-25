@@ -486,7 +486,7 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
 <title>bot-casa — <?php echo $clientName; ?></title>
 <link rel="stylesheet" href="assets/style.css?v=20260825_2">
 <link rel="stylesheet" href="assets/chat.css?v=20260629_1">
-<link rel="stylesheet" href="assets/tutorial.css?v=20260825_1">
+<link rel="stylesheet" href="assets/tutorial.css?v=20260825_2">
 <?php if ($isDirectAccess): ?>
 <script src="assets/pwa.js?v=20260825_1"></script>
 <?php endif; ?>
@@ -538,7 +538,7 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
         </button>
         <form method="post" action="cliente?action=toggle_bot" style="display:inline"<?php echo $isDemo ? ' onsubmit="showDemoToast(event)"' : ''; ?>>
             <input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
-            <button type="submit" class="btn <?php echo $botMode === 'start' ? 'btn-danger' : 'btn-success'; ?> btn-sm"<?php echo ($isDemo || ($subExpired && $botMode !== 'start')) ? ' disabled' : ''; ?> title="<?php echo $subExpired ? 'Acceso expirado — activa tu plan para usar el bot' : ''; ?>">
+            <button type="submit" id="tutorial-anchor-bot-toggle" class="btn <?php echo $botMode === 'start' ? 'btn-danger' : 'btn-success'; ?> btn-sm"<?php echo ($isDemo || ($subExpired && $botMode !== 'start')) ? ' disabled' : ''; ?> title="<?php echo $subExpired ? 'Acceso expirado — activa tu plan para usar el bot' : ''; ?>">
                 <?php echo $botMode === 'start' ? '⏹ APAGAR' : '▶ ENCENDER'; ?>
             </button>
         </form>
@@ -641,7 +641,7 @@ if (file_exists(WASAPBOT_ROOT . '/data/users/' . $clientUserId . '/girls.json'))
 if ($hasNotifications) $progressDone++;
 $progressPct = $progressDone > 0 ? round($progressDone / $progressTotal * 100) : 0;
 ?>
-<div id="dashboard-progress">
+<div id="dashboard-progress" data-tutorial-target="summary">
 <?php if ($progressPct < 100): ?>
 <div class="progress-bar-wrap">
     <div class="progress-bar">
@@ -702,8 +702,8 @@ function dismissWizard() {
     <button type="button" class="active" data-tab="tab-dashboard" id="tutorial-anchor-dashboard">📊 Inicio</button>
     <button type="button" data-tab="tab-personalidad" id="tutorial-anchor-personality">🎭 Personalidad</button>
     <button type="button" data-tab="tab-lineas" id="tutorial-anchor-lines">📱 Líneas</button>
-    <button type="button" data-tab="tab-chicas">👩 Chicas</button>
-    <button type="button" data-tab="tab-clientes">🔔 Notificaciones</button>
+    <button type="button" data-tab="tab-chicas" id="tutorial-anchor-girls">👩 Chicas</button>
+    <button type="button" data-tab="tab-clientes" id="tutorial-anchor-notifications">🔔 Notificaciones</button>
     <button type="button" data-tab="tab-mensajes" id="tutorial-anchor-chat">💬 Chat</button>
     <button type="button" data-tab="tab-estados">📢 Estados</button>
     <button type="button" data-tab="tab-seguimiento">📨 Seguimiento</button>
@@ -879,7 +879,7 @@ function dismissWizard() {
     <div class="prompt-layout">
         <div class="prompt-edit-col">
             <!-- Estilo / tono parametrizado -->
-            <div class="card">
+            <div class="card" id="tutorial-target-style">
                 <h2>🎨 Estilo del bot
                     <span class="tooltip-wrap">
                         <span class="tooltip-icon">?</span>
@@ -963,7 +963,7 @@ function dismissWizard() {
             </div>
 
             <!-- Tarifas (A11: accordion + bigger) -->
-            <details class="prompt-details" open>
+            <details class="prompt-details" open id="tutorial-target-rates">
                 <summary class="prompt-summary">💰 Tarifas y precios</summary>
                 <div class="detail-body">
                 <p class="form-hint">
@@ -995,7 +995,7 @@ function dismissWizard() {
             </details>
 
             <!-- Ubicación (A13: simplificado) -->
-            <details class="prompt-details">
+            <details class="prompt-details" id="tutorial-target-services-location">
                 <summary class="prompt-summary">📍 Ubicación</summary>
                 <div class="detail-body">
                 <div class="form-row">
@@ -1656,7 +1656,7 @@ function updateAllCsrfInputs(token) {
 })();
 </script>
 <script src="assets/chat.js?v=20260629_1"></script>
-<script src="assets/tutorial.js?v=20260825_1"></script>
+<script src="assets/tutorial.js?v=20260825_2"></script>
 <script>
 var _csrf = <?php echo json_encode(generateCsrfToken()); ?>;
 // ── Keepalive de sesión + CSRF refresh: ping cada 5 min ──

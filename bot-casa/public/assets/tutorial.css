@@ -4,11 +4,19 @@
     inset: 0;
     z-index: 21000;
     color: #f7f7ff;
+    pointer-events: none;
 }
 .cw-tutorial__veil {
     position: absolute;
     inset: 0;
     background: rgba(5, 5, 16, .68);
+    pointer-events: none;
+}
+.cw-tutorial__blocker {
+    position: fixed;
+    pointer-events: auto;
+    background: transparent;
+    z-index: 1;
 }
 .cw-tutorial__spotlight {
     position: fixed;
@@ -16,6 +24,8 @@
     border: 2px solid var(--accent, #ff3b8d);
     border-radius: 12px;
     box-shadow: 0 0 0 9999px rgba(5, 5, 16, .68), 0 0 24px rgba(255, 59, 141, .5);
+    pointer-events: none;
+    z-index: 2;
     transition: top .2s ease, left .2s ease, width .2s ease, height .2s ease;
 }
 .cw-tutorial__card {
@@ -26,6 +36,8 @@
     border: 1px solid rgba(255, 59, 141, .3);
     border-radius: 18px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, .55);
+    pointer-events: auto;
+    z-index: 3;
 }
 .cw-tutorial__card h2 { margin: 0 0 8px; font-size: 1.2rem; }
 .cw-tutorial__card p { margin: 0 0 18px; color: #c7c7d8; line-height: 1.5; font-size: .9rem; }

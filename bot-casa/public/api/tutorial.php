@@ -24,6 +24,7 @@ if (empty($_SESSION['user_id'])) {
 function tutorialCsrfValid(string $token): bool
 {
     if ($token === '') return false;
+    if (!empty($_SESSION['csrf_token']) && hash_equals((string) $_SESSION['csrf_token'], $token)) return true;
     $csrfKeyPath = WASAPBOT_ROOT . '/data/.csrf_secret';
     $csrfKey = is_readable($csrfKeyPath) ? trim((string) @file_get_contents($csrfKeyPath)) : '';
     if (strlen($csrfKey) < 32) return false;
@@ -56,7 +57,7 @@ if ($method === 'GET' && $action === 'status') {
     exit;
 }
 
-if ($method !== 'POST' || !in_array($action, ['complete', 'skip'], true)) {
+if ($method !== 'POST' || !in_array($action, ['start', 'step', 'pause', 'complete', 'restart', 'skip'], true)) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Invalid action'], JSON_UNESCAPED_UNICODE);
     exit;
@@ -68,10 +69,31 @@ if (!tutorialCsrfValid((string) ($_POST['csrf_token'] ?? ''))) {
     exit;
 }
 
-if ($action === 'complete') {
-    $state->markCompleted();
-} else {
-    $state->markSkipped();
+switch ($action) {
+    case 'start':
+        $state->start();
+        break;
+    case 'step':
+        $step = filter_var($_POST['step'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => OnboardingState::STEP_COUNT - 1]]);
+        if ($step === false) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'error' => 'Invalid step'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $state->step((int) $step);
+        break;
+    case 'pause':
+        $state->pause();
+        break;
+    case 'complete':
+        $state->markCompleted();
+        break;
+    case 'restart':
+        $state->restart();
+        break;
+    case 'skip':
+        $state->markSkipped();
+        break;
 }
 
 echo json_encode(['ok' => true, 'state' => $state->read()], JSON_UNESCAPED_UNICODE);
