@@ -5195,9 +5195,7 @@ function render_sidebar($page) {
         'josue' => 'Josué',
         'bots' => 'Bots',
         'publicista' => 'Publicista',
-        'comercial' => 'Comercial',
-        'afiliados' => 'Afiliados',
-        'logout' => 'Salir'
+        'comercial' => 'Comercial'
     );
 
     $lamamiPages = array('lamami', 'interesadas', 'clientas', 'lamamibot');
@@ -5219,6 +5217,15 @@ function render_sidebar($page) {
         $class = $isActive ? 'active' : '';
         echo '<a class="' . $class . '" href="index.php?page=' . e($slug) . '">' . e($label) . '</a>';
     }
+
+    echo '<div class="nav-external-projects">';
+    foreach (array('autotube' => 'Autotube', 'afiliados' => 'Afiliados') as $slug => $label) {
+        $class = $page === $slug ? 'active' : '';
+        echo '<a class="' . $class . '" href="index.php?page=' . e($slug) . '">' . e($label) . '</a>';
+    }
+    echo '</div>';
+
+    echo '<a href="index.php?page=logout">Salir</a>';
 
     echo '</nav>';
     echo '</aside>';
@@ -5355,6 +5362,13 @@ function render_afiliados_page() {
     echo "    resizeIframe();\n";
     echo "  });\n";
     echo "})();</script>";
+}
+
+function render_autotube_page() {
+    page_header('Autotube', 'Panel de gestión de automatizaciones');
+    echo '<div class="panel panel-space" style="padding:0;overflow:visible;border-radius:var(--radius-md)">';
+    echo '<iframe id="autotube-iframe" src="https://lamami.online/autotube/" style="width:100%;min-height:calc(100vh - 200px);height:auto;border:none;display:block" title="Panel Autotube" loading="lazy"></iframe>';
+    echo '</div>';
 }
 
 function render_dashboard_page() {
