@@ -173,8 +173,8 @@ El Generator recibe **solo la info de la fase actual** (no toda la knowledge bas
 [1-2 beneficios clave alineados con lo que preguntó]
 [Siguiente paso concreto]
 [Reglas: máx 5 líneas, precio + 1 beneficio + siguiente paso, NUNCA responder objeciones no dichas]
-[Ejemplo bueno: "100€/semana. Y tienes 10 días gratis de prueba sin tarjeta para verlo funcionando en tu número. ¿Te activo la prueba?"]
-[Ejemplo malo: "100€/semana. También tenemos líneas extra a 25€, dashboard de estadísticas, recordatorios ETA, anti-regateo, publicación de estados, memoria de clientes..." → SOLTÓ TODAS LAS FEATURES]
+[Ejemplo bueno: "50€/semana. Y tienes 10 días gratis de prueba sin tarjeta para verlo funcionando en tu número. ¿Te activo la prueba?"]
+[Ejemplo malo: "50€/semana. También tenemos líneas extra a 10€, dashboard de estadísticas, recordatorios ETA, anti-regateo, publicación de estados, memoria de clientes..." → SOLTÓ TODAS LAS FEATURES]
 [Historial: últimos 3 mensajes]
 [Texto entrante]
 ```
