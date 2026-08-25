@@ -4,7 +4,7 @@
   "private": true,
   "description": "bot-casa WhatsApp chat tests",
   "scripts": {
-    "test:js": "node --test tests/js/chat.test.js",
+    "test:js": "node --test tests/js/chat.test.js tests/js/tutorial.test.js",
     "test:e2e": "playwright test --config tests/e2e/playwright.config.js",
     "test": "npm run test:js && npm run test:e2e"
   },
