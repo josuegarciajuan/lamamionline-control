@@ -5300,6 +5300,79 @@ function render_bot_casa_page() {
     echo "})();</script>";
 }
 
+/**
+ * Emite el script de auto-alto para un iframe embebido en el CRM.
+ * Estira la altura del iframe hasta la de su contenido para que NO aparezcan
+ * barras de scroll internas (ni vertical ni horizontal), integrándolo en la
+ * capa padre (que es quien hace scroll). Funciona con paneles mismo-origen
+ * (lee contentDocument vía ResizeObserver) y cross-origin (escucha postMessage
+ * de altura, p.ej. el panel Afiliados que ya emite {afiliados, height}).
+ */
+function render_iframe_autosize_script($iframeId) {
+    $id = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)$iframeId);
+    echo "<script>(function(){\n";
+    echo "  var iframe = document.getElementById('" . $id . "');\n";
+    echo "  if (!iframe) return;\n";
+    echo "  var targetOrigin = null;\n";
+    echo "  try { targetOrigin = new URL(iframe.src).origin; } catch (e) {}\n";
+    echo "  var canRead = false;\n";
+    echo "  var firstTry = true;\n";
+    echo "  function setHeight(h){\n";
+    echo "    var n = parseInt(h, 10);\n";
+    echo "    if (!isFinite(n) || n <= 0) return;\n";
+    echo "    if (n < 560) n = 560;\n";
+    echo "    iframe.style.height = n + 'px';\n";
+    echo "  }\n";
+    echo "  function measure(){\n";
+    echo "    try {\n";
+    echo "      var doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);\n";
+    echo "      if (!doc) return false;\n";
+    echo "      var body = doc.body, html = doc.documentElement;\n";
+    echo "      setHeight(Math.max(\n";
+    echo "        body ? body.scrollHeight : 0,\n";
+    echo "        html ? html.scrollHeight : 0,\n";
+    echo "        body ? body.offsetHeight : 0,\n";
+    echo "        html ? html.offsetHeight : 0\n";
+    echo "      ));\n";
+    echo "      return true;\n";
+    echo "    } catch (e) { return false; }\n";
+    echo "  }\n";
+    echo "  window.addEventListener('message', function(e){\n";
+    echo "    if (!e.data || typeof e.data !== 'object') return;\n";
+    echo "    if (!e.data.afiliados && !e.data.autotube) return;\n";
+    echo "    var h = parseInt(e.data.height, 10);\n";
+    echo "    if (!isFinite(h) || h <= 0) return;\n";
+    echo "    if (targetOrigin && e.origin && e.origin !== targetOrigin) return;\n";
+    echo "    setHeight(h);\n";
+    echo "  });\n";
+    echo "  function onLoad(){\n";
+    echo "    canRead = measure() || canRead;\n";
+    echo "    setTimeout(function(){ measure(); }, 300);\n";
+    echo "    setTimeout(function(){ measure(); }, 1000);\n";
+    echo "  }\n";
+    echo "  iframe.addEventListener('load', onLoad);\n";
+    echo "  window.addEventListener('resize', function(){\n";
+    echo "    if (canRead) measure();\n";
+    echo "  });\n";
+    echo "  if (window.ResizeObserver) {\n";
+    echo "    try {\n";
+    echo "      var ro = new ResizeObserver(function(){ if (canRead) measure(); });\n";
+    echo "      iframe.addEventListener('load', function(){\n";
+    echo "        try {\n";
+    echo "          var d = iframe.contentDocument;\n";
+    echo "          if (d && d.body) ro.observe(d.body);\n";
+    echo "          if (d && d.documentElement) ro.observe(d.documentElement);\n";
+    echo "        } catch (e) {}\n";
+    echo "      });\n";
+    echo "    } catch (e) {}\n";
+    echo "  }\n";
+    echo "  setInterval(function(){\n";
+    echo "    if (canRead) { measure(); return; }\n";
+    echo "    if (firstTry) { canRead = measure(); firstTry = false; }\n";
+    echo "  }, 2500);\n";
+    echo "})();</script>";
+}
+
 function render_afiliados_page() {
     $adminUrl = '';
     $adminToken = '';
@@ -5331,44 +5404,17 @@ function render_afiliados_page() {
         $iframeSrc .= '?t=' . rawurlencode($adminToken);
     }
     echo '<div class="panel panel-space" style="padding:0;overflow:visible;border-radius:var(--radius-md)">';
-    echo '<iframe id="afiliados-iframe" src="' . e($iframeSrc) . '" style="width:100%;min-height:calc(100vh - 200px);height:auto;border:none;display:block" title="Panel Afiliados"></iframe>';
+    echo '<iframe id="afiliados-iframe" src="' . e($iframeSrc) . '" style="width:100%;min-height:560px;height:auto;border:none;display:block" title="Panel Afiliados"></iframe>';
     echo '</div>';
-    echo "<script>(function(){\n";
-    echo "  var iframe = document.getElementById('afiliados-iframe');\n";
-    echo "  if (!iframe) return;\n";
-    echo "  var minHeight = Math.max(window.innerHeight - 200, 560);\n";
-    echo "  function resizeIframe(){\n";
-    echo "    try {\n";
-    echo "      var doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);\n";
-    echo "      if (!doc) return;\n";
-    echo "      var body = doc.body;\n";
-    echo "      var html = doc.documentElement;\n";
-    echo "      var contentHeight = Math.max(\n";
-    echo "        body ? body.scrollHeight : 0,\n";
-    echo "        html ? html.scrollHeight : 0,\n";
-    echo "        body ? body.offsetHeight : 0,\n";
-    echo "        html ? html.offsetHeight : 0\n";
-    echo "      );\n";
-    echo "      iframe.style.height = Math.max(contentHeight, minHeight) + 'px';\n";
-    echo "    } catch (e) {}\n";
-    echo "  }\n";
-    echo "  iframe.addEventListener('load', function(){\n";
-    echo "    resizeIframe();\n";
-    echo "    setTimeout(resizeIframe, 250);\n";
-    echo "    setTimeout(resizeIframe, 1000);\n";
-    echo "  });\n";
-    echo "  window.addEventListener('resize', function(){\n";
-    echo "    minHeight = Math.max(window.innerHeight - 200, 560);\n";
-    echo "    resizeIframe();\n";
-    echo "  });\n";
-    echo "})();</script>";
+    render_iframe_autosize_script('afiliados-iframe');
 }
 
 function render_autotube_page() {
     page_header('Autotube', 'Panel de gestión de automatizaciones');
     echo '<div class="panel panel-space" style="padding:0;overflow:visible;border-radius:var(--radius-md)">';
-    echo '<iframe id="autotube-iframe" src="https://lamami.online/autotube/" style="width:100%;min-height:calc(100vh - 200px);height:auto;border:none;display:block" title="Panel Autotube" loading="lazy"></iframe>';
+    echo '<iframe id="autotube-iframe" src="https://lamami.online/autotube/" style="width:100%;min-height:560px;height:auto;border:none;display:block" title="Panel Autotube" loading="lazy"></iframe>';
     echo '</div>';
+    render_iframe_autosize_script('autotube-iframe');
 }
 
 function render_dashboard_page() {
