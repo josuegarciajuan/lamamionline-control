@@ -80,6 +80,27 @@ final class TenantConfigIsolationTest extends TestCase
         self::assertSame('https://root.example/maps', $root['urls']['google_maps_location']);
     }
 
+    public function test_legacy_cloned_tenant_file_is_scrubbed_before_values_are_used(): void
+    {
+        $tenantDir = Bot::resolveUserConfigDir($this->rootDir, 42);
+        file_put_contents($tenantDir . '/config.local.json', json_encode([
+            'openai' => ['api_key' => 'copied-key'],
+            'telegram' => ['chat_ids' => ['copied-chat']],
+            'routing' => ['lines' => [['last9' => 'copied-line']]],
+            'files' => ['session_memory' => '/root/copied.ndjson'],
+            'urls' => ['google_maps_location' => 'https://copied.example/maps'],
+        ], JSON_THROW_ON_ERROR));
+
+        new Config($tenantDir, $this->rootDir);
+        $saved = json_decode((string) file_get_contents($tenantDir . '/config.local.json'), true, 512, JSON_THROW_ON_ERROR);
+
+        self::assertArrayNotHasKey('openai', $saved);
+        self::assertArrayNotHasKey('routing', $saved);
+        self::assertArrayNotHasKey('files', $saved);
+        self::assertSame([], $saved['telegram'] ?? []);
+        self::assertArrayNotHasKey('google_maps_location', $saved['urls'] ?? []);
+    }
+
     private function removeTree(string $dir): void
     {
         if (!is_dir($dir)) return;

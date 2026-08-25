@@ -137,7 +137,11 @@ final class Config implements ConfigInterface
         // Overlay local
         $local = $this->readJsonFile($localPath);
         if ($this->centralConfigDir !== null) {
+            $originalLocal = $local;
             $local = $this->removeLegacyTenantInheritance($local);
+            if ($local !== $originalLocal) {
+                $this->writeTenantLocal($this->tenantLocalData($local));
+            }
         }
         if ($local !== []) {
             $this->data = array_replace_recursive($this->data, $local);
@@ -224,6 +228,15 @@ final class Config implements ConfigInterface
             unset($local['urls']['google_maps_location'], $local['urls']['blacklist_ws']);
         }
         return $local;
+    }
+
+    /** @param array<string, mixed> $data */
+    private function writeTenantLocal(array $data): void
+    {
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json !== false) {
+            @file_put_contents($this->configDir . '/config.local.json', $json . "\n", LOCK_EX);
+        }
     }
 
     /**
