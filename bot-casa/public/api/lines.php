@@ -213,72 +213,17 @@ function loadRoutingLinesFallback(): array {
  * @param int $userId Owner user ID
  * @param object $wm WahaManager instance
  * @param string $linesMapFile Path to lines_map.json
- * @return array{ok: bool, line?: array, error?: string}
+ * @param int $requestedPort Optional requested port
+ * @return array{ok: bool, line?: array, error?: string, warning?: string}
  */
-function wasapbot_create_line(string $phone, string $label, int $userId, object $wm, string $linesMapFile): array {
-    $last9 = preg_replace('/[^0-9]/', '', $phone);
-    if (strlen($last9) < 9) $last9 = str_pad($last9, 9, '0', STR_PAD_LEFT);
-    $last9 = mb_substr($last9, -9);
-
-    // Load existing lines
-    $linesFile = WASAPBOT_ROOT . '/data/users/' . $userId . '/lines.json';
-    $lines = [];
-    if (file_exists($linesFile)) {
-        $data = @json_decode((string)@file_get_contents($linesFile), true);
-        if (is_array($data)) $lines = $data;
-    }
-
-    // Allocate port
-    $port = 0;
-    $status = $wm->getStatus();
-    $port = (int) ($status['next_port'] ?? 3020);
-
-    // Create WAHA instance
-    $result = ['ok' => false, 'error' => 'WAHA no disponible — línea creada localmente.'];
-    try {
-        $result = $wm->createInstance($port);
-    } catch (\Throwable $e) {
-        $result = ['ok' => false, 'error' => 'WAHA no disponible'];
-    }
-
-    if (!$result['ok']) {
-        return ['ok' => false, 'error' => $result['error'] ?? 'Error al crear instancia WAHA'];
-    }
-
-    $nextId = count($lines) > 0 ? max(array_column($lines, 'id')) + 1 : 1;
-    $line = [
-        'id' => $nextId,
-        'last9' => $last9,
-        'phone' => $phone,
-        'label' => $label !== '' ? $label : ('Línea ' . $nextId),
-        'port' => $result['port'] ?? $port,
-        'container_port' => $port,
-        'created_at' => date('c'),
-        'health_status' => 'starting',
-        'error' => '',
-    ];
-
-    $lines[] = $line;
-
-    // Save lines.json
-    $dir = dirname($linesFile);
-    if (!is_dir($dir)) @mkdir($dir, 0700, true);
-    @file_put_contents($linesFile, json_encode($lines, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)."\n", LOCK_EX);
-
-    // Update lines_map
-    $map = [];
-    if (file_exists($linesMapFile)) {
-        $map = @json_decode((string)@file_get_contents($linesMapFile), true);
-        if (!is_array($map)) $map = [];
-    }
-    $map[$last9] = $userId;
-    if (file_exists($linesMapFile) && !is_writable($linesMapFile)) {
-        @unlink($linesMapFile);
-        clearstatcache(true, $linesMapFile);
-    }
-    @file_put_contents($linesMapFile, json_encode($map, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE)."\n", LOCK_EX);
-
-    return ['ok' => true, 'line' => $line];
+function wasapbot_create_line(string $phone, string $label, int $userId, object $wm, string $linesMapFile, int $requestedPort = 0): array {
+    $provisioner = new \WasapBot\Services\TenantLineProvisioner(
+        WASAPBOT_ROOT,
+        $wm,
+        $linesMapFile,
+        'https://lamami.online/control/bot-casa/public/webhook.php',
+    );
+    return $provisioner->create($phone, $label, $userId, $requestedPort);
 }
 
 $wahaCfg = [
@@ -434,6 +379,15 @@ try {
             if ($port <= 0) {
                 $status = $wm->getStatus();
                 $port = (int) ($status['next_port'] ?? 3020);
+            }
+
+            // Tenant lines use the shared provisioner so native outbound capture
+            // and webhook configuration are applied at creation time. Internal
+            // admin/root lines retain their existing behavior below.
+            if ($userId > 1) {
+                $provisioned = wasapbot_create_line($phone, $label, $userId, $wm, $linesMapFile, $port);
+                echo json_encode($provisioned + (isset($provisioned['line']) ? ['result' => ['ok' => true]] : []));
+                break;
             }
 
             // Try to create WAHA instance (fails gracefully if WAHA not available)

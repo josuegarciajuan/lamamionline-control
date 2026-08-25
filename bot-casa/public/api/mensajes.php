@@ -379,6 +379,49 @@ try {
             $threadId = trim((string) ($_GET['thread_id'] ?? ''));
             if ($threadId === '') { echo json_encode(['ok'=>false,'error'=>'thread_id required']); break; }
             $records = readNdjson($memoryFile);
+
+            // Native outbound sync is deliberately restricted to marked tenant
+            // lines created through the public client API. Root/admin and legacy
+            // lines never reach WAHA /api/messages here.
+            if ($userId > 1) {
+                $lineKey = explode('_', $threadId, 2)[0] ?? '';
+                $markedLine = null;
+                $tenantLinesFile = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'lines.json');
+                $tenantLines = file_exists($tenantLinesFile)
+                    ? json_decode((string) @file_get_contents($tenantLinesFile), true)
+                    : [];
+                if (is_array($tenantLines)) {
+                    foreach ($tenantLines as $tenantLine) {
+                        if (is_array($tenantLine)
+                            && (string) ($tenantLine['last9'] ?? '') === $lineKey
+                            && !empty($tenantLine['capture_native_outbound'])) {
+                            $markedLine = $tenantLine;
+                            break;
+                        }
+                    }
+                }
+                if (is_array($markedLine)) {
+                    $threadPhone = explode('_', $threadId, 2)[1] ?? '';
+                    $senderLid = '';
+                    foreach ($records as $record) {
+                        if ((string) ($record['thread_id'] ?? '') === $threadId && (string) ($record['sender_lid'] ?? '') !== '') {
+                            $senderLid = (string) $record['sender_lid'];
+                            break;
+                        }
+                    }
+                    $nativeLogger = new \WasapBot\Core\FileLogger($userCfg);
+                    $nativeSync = new \WasapBot\Services\NativeOutboundSync(
+                        $userCfg,
+                        new \WasapBot\Core\HttpClient($nativeLogger),
+                        new \WasapBot\Memory\SessionMemory($userCfg, $nativeLogger),
+                        $nativeLogger,
+                        $memoryFile,
+                        \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, 'paused_threads.ndjson'),
+                    );
+                    $nativeSync->sync($userId, $markedLine, $threadId, $threadPhone, $senderLid);
+                    $records = readNdjson($memoryFile);
+                }
+            }
             $conv = [];
             foreach ($records as $r) {
                 if (((string)($r['thread_id']??'')) === $threadId) {
