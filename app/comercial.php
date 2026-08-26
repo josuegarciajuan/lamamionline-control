@@ -461,6 +461,7 @@ function comercial_build_default_processes() {
         comercial_default_process_seed('publiscort'),
         comercial_default_process_seed('publicista'),
         comercial_default_process_seed('casawasap'),
+        comercial_default_process_seed('shhexxchollos'),
     );
 }
 
@@ -512,6 +513,17 @@ function comercial_default_process_seed($slug) {
         'last_result' => '',
         'last_error' => '',
     );
+
+    if ($slug === 'shhexxchollos') {
+        $base['nombre'] = 'Shhexxchollos';
+        $base['enabled'] = 0;
+        $base['daily_target_percent'] = 0;
+        $base['source_type'] = 'jsonl_queue';
+        $base['source_queue_files'] = array();
+        $base['source_mysql_query'] = '';
+        $base['assigned_line_ids'] = array();
+        return $base;
+    }
 
     if ($slug === 'plaza') {
         $base['nombre'] = 'Plaza';
@@ -782,7 +794,7 @@ function comercial_get_processes() {
 
     // Migración segura para instalaciones existentes:
     // asegurar procesos requeridos sin tocar configuraciones ya presentes.
-    $requiredSlugs = array('publiscort');
+    $requiredSlugs = array('publiscort', 'shhexxchollos');
     $existingBySlug = array();
     foreach ($out as $row) {
         $slug = trim((string)($row['slug'] ?? ''));
