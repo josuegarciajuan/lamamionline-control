@@ -9337,7 +9337,7 @@ if (!empty($sendtaxsState)) {
                 if (!ibtn) return;
                 var iid = ibtn.getAttribute("data-identify-id") || "";
                 if (!iid) return;
-                var ires = document.querySelector('[data-identify-result="' + iid + '"]');
+                var ires = document.querySelector(\'[data-identify-result="\' + iid + \'"]\');
                 identify(iid, ibtn, ires);
             });
             document.getElementById("twaQrModalBg").addEventListener("click", closeQr);
