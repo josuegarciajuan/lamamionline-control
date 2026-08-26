@@ -118,6 +118,31 @@ var ChatApp = (function() {
     }
 
     /**
+     * Render de media recibida (imagen/audio/vídeo) + transcripción en cursiva.
+     * Usa media_proxy.php para servir la media de Evolution (MinIO).
+     */
+    function renderMediaBlock(msg) {
+        var media = msg && msg.media;
+        var transcription = (msg && msg.transcription || '').trim();
+        if (!media || !media.url) {
+            return transcription ? ('<div class="msg-transcription"><em>🎙️ ' + esc(transcription) + '</em></div>') : '';
+        }
+        var proxy = '/control/media_proxy.php?url=' + encodeURIComponent(media.url) + '&type=' + encodeURIComponent(media.type || '');
+        var html = '';
+        if (media.type === 'audio') {
+            html += '<audio controls style="max-width:220px;display:block;margin:4px 0" src="' + proxy + '"></audio>';
+        } else if (media.type === 'image') {
+            html += '<img src="' + proxy + '" style="max-width:200px;border-radius:8px;display:block;margin:4px 0" alt="Imagen">';
+        } else if (media.type === 'video') {
+            html += '<video controls style="max-width:220px;border-radius:8px;display:block;margin:4px 0" src="' + proxy + '"></video>';
+        }
+        if (transcription) {
+            html += '<div class="msg-transcription"><em>🎙️ ' + esc(transcription) + '</em></div>';
+        }
+        return html;
+    }
+
+    /**
      * Send a message to the parent window if we're inside an iframe.
      * The CRM's views.php listens for 'chatOpened'/'chatClosed' to make
      * the iframe fullscreen on mobile so the chat overlay fills 100% of the screen.
@@ -941,9 +966,12 @@ var ChatApp = (function() {
             var botMsg = (msg.bot_reply || '').trim();
 
             if (userMsg) {
+                var userBody = (msg.media && msg.media.type === 'audio')
+                    ? renderMediaBlock(msg)
+                    : formatMessageBody(userMsg) + renderMediaBlock(msg);
                 html += '<div class="chat-msg user">' +
                     '<div class="bubble">' +
-                        '<div class="msg-body">' + formatMessageBody(userMsg) + '</div>' +
+                        '<div class="msg-body">' + userBody + '</div>' +
                         '<div class="msg-time">' + esc(formatTime(ts)) + '</div>' +
                     '</div>' +
                 '</div>';

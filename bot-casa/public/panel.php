@@ -4136,7 +4136,7 @@ setInterval(function() {
     };
 })();
 </script>
-<script src="assets/chat.js?v=20260629_1"></script>
+<script src="assets/chat.js?v=20260826_1"></script>
 
 </body>
 </html>

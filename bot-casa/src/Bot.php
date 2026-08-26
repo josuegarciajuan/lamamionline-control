@@ -255,7 +255,9 @@ final class Bot implements BotInterface
 
             // ── 8. Audio auto-reply shortcut ─────────────────────────
             $isAudio = (int) ($ctx['is_audio_i'] ?? 0);
-            if ($isAudio === 1) {
+            $transcription = trim((string) ($ctx['transcription'] ?? ''));
+            // Si hay transcripción, el bot SÍ entiende el audio: dejamos que el LLM responda.
+            if ($isAudio === 1 && $transcription === '') {
                 $variants = (array) $this->config->get('message_variants.audio_auto_reply', []);
                 $audioReply = $variants !== [] ? $variants[array_rand($variants)] : 'no puedo escuchar audios amor, me lo escribes mejor?';
 

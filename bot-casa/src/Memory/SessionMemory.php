@@ -406,6 +406,8 @@ final class SessionMemory implements SessionMemoryInterface
             'sender_lid'         => (string) ($meta['sender_lid'] ?? ''),
             'from_me'            => !empty($meta['from_me']),
             'waha_message_id'    => (string) ($meta['waha_message_id'] ?? ''),
+            'transcription'      => (string) ($meta['transcription'] ?? ''),
+            'media'              => is_array($meta['media'] ?? null) ? $meta['media'] : [],
         ];
     }
 

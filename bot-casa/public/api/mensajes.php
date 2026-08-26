@@ -433,6 +433,8 @@ try {
                         '_pending' => (bool) ($r['_pending'] ?? false),
                         'sender_lid' => (string) ($r['sender_lid'] ?? ''),
                         'from_me'    => (bool) ($r['from_me'] ?? false),
+                        'transcription' => (string) ($r['transcription'] ?? ''),
+                        'media' => (isset($r['media']) && is_array($r['media'])) ? $r['media'] : [],
                     ];
                 }
             }

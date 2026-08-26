@@ -43,6 +43,41 @@ if (file_exists($vendorAutoload)) {
     });
 }
 
+// Helper de transcripción de audio (faster-whisper) para media de Evolution
+$_transcribeHelper = dirname(__DIR__, 2) . '/app/evolution/transcribe.php';
+if (file_exists($_transcribeHelper)) {
+    require_once $_transcribeHelper;
+}
+
+/**
+ * Extrae info de media (type/url) de un payload de WAHA o Evolution.
+ * @param array<string,mixed> $payload
+ * @param array<string,mixed> $body
+ * @return array<string,mixed>|null ['type'=>..., 'url'=>..., 'mimetype'=>...]
+ */
+function wasap_extract_media_info(array $payload, array $body): ?array
+{
+    // Evolution: message.audioMessage / imageMessage / videoMessage
+    $message = $payload['message'] ?? $body['message'] ?? null;
+    if (is_array($message)) {
+        foreach (['audioMessage' => 'audio', 'imageMessage' => 'image', 'videoMessage' => 'video', 'documentMessage' => 'document'] as $k => $type) {
+            if (isset($message[$k]) && is_array($message[$k])) {
+                $m = $message[$k];
+                return ['type' => $type, 'url' => $m['url'] ?? null, 'mimetype' => $m['mimetype'] ?? null, 'fileName' => $m['fileName'] ?? null];
+            }
+        }
+    }
+    // WAHA: body.media / payload.media
+    $media = $body['media'] ?? $payload['media'] ?? null;
+    if (is_array($media)) {
+        $url = $media['url'] ?? $media['URL'] ?? $media['link'] ?? null;
+        $type = strtolower((string)($media['mimetype'] ?? ''));
+        $kind = str_contains($type, 'audio') ? 'audio' : (str_contains($type, 'image') ? 'image' : 'media');
+        return ['type' => $kind, 'url' => is_string($url) ? $url : null, 'mimetype' => $type, 'fileName' => null];
+    }
+    return null;
+}
+
 // ─────────────────────────────────────────────────────────────────────
 //  Verify request method
 // ─────────────────────────────────────────────────────────────────────
@@ -219,6 +254,20 @@ try {
         }
     }
 
+    // ── Transcripción de audio (media descargable, p.ej. Evolution/MinIO) ──
+    $transcription = '';
+    $mediaInfo = null;
+    if (($nonTextType === 'audio' || $msgText === '') && function_exists('whatsapp_transcribe_media')) {
+        $mediaInfo = wasap_extract_media_info($payload, $body);
+        if ($mediaInfo !== null && ($mediaInfo['type'] ?? '') === 'audio') {
+            $trans = whatsapp_transcribe_media($mediaInfo);
+            if ($trans !== null && trim($trans) !== '') {
+                $transcription = trim($trans);
+                $displayText = $transcription;
+            }
+        }
+    }
+
     // Deduplication content: real text if available, otherwise synthetic key.
     $dedupContent = $msgText !== '' ? $msgText : ($nonTextType !== '' ? ('__' . $nonTextType) : '');
 
@@ -340,6 +389,12 @@ try {
             '_pending'   => $fromMe ? false : ($botIsRunning && !$threadPaused),
             'from_me'    => $fromMe,
         ];
+        if ($transcription !== '') {
+            $immediateRecord['transcription'] = $transcription;
+        }
+        if (is_array($mediaInfo)) {
+            $immediateRecord['media'] = $mediaInfo;
+        }
         try {
             $memPath = (string) $instances['config']->get('files.session_memory', '');
             if ($memPath !== '') {
@@ -469,6 +524,12 @@ try {
     }
 
     // Process through pipeline
+    if ($transcription !== '') {
+        $payload['transcription'] = $transcription;
+    }
+    if (is_array($mediaInfo)) {
+        $payload['media'] = $mediaInfo;
+    }
     $result = $bot->handleWebhook($payload);
 
     // Respond OK regardless of result (WAHA needs 200 to mark as delivered)

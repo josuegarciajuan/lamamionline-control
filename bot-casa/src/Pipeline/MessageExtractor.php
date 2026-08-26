@@ -108,11 +108,20 @@ final readonly class MessageExtractor implements PipelineStageInterface
             }
 
             // ── Placeholder substitution ──────────────────────────────
+            $transcription = '';
+            if (is_array($payload) && isset($payload['transcription']) && is_string($payload['transcription'])) {
+                $transcription = trim($payload['transcription']);
+            }
             if ($isAudio) {
-                $text = (string) $this->config->get(
-                    'message_variants.audio_placeholder',
-                    '[AUDIO]'
-                );
+                if ($transcription !== '') {
+                    // La transcripción ES lo que dijo el cliente: el bot lo usa como texto.
+                    $text = $transcription;
+                } else {
+                    $text = (string) $this->config->get(
+                        'message_variants.audio_placeholder',
+                        '[AUDIO]'
+                    );
+                }
             } elseif ($isLocation) {
                 // El cliente envió su ubicación: usamos un placeholder
                 // significativo (no [SIN_TEXTO]) para que el pipeline lo
@@ -144,6 +153,8 @@ final readonly class MessageExtractor implements PipelineStageInterface
             $ctx['is_audio']   = $isAudio;
             $ctx['is_image']   = $isImage;
             $ctx['is_location'] = $isLocation;
+            $ctx['transcription'] = $transcription;
+            $ctx['media'] = (isset($payload['media']) && is_array($payload['media'])) ? $payload['media'] : [];
             $ctx['from_phone'] = $fromPhone;
             $ctx['message_id'] = $messageId;
             $ctx['timestamp']  = $timestamp;
