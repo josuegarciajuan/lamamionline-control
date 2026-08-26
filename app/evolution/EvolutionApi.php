@@ -54,6 +54,14 @@ class EvolutionApi
         $this->countryCode = $countryCode;
     }
 
+    /**
+     * Nombre de la instancia Evolution asociada a este cliente.
+     */
+    public function instanceName(): string
+    {
+        return $this->instance;
+    }
+
     /* ───────────────────────────── HTTP BASE ───────────────────────────── */
 
     /**

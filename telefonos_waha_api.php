@@ -104,7 +104,7 @@ function telefonos_waha_dispatch_inner(): void
         return;
     }
 
-    $mutating = in_array($action, ['restart', 'identify'], true);
+    $mutating = in_array($action, ['restart', 'identify', 'evo_qr', 'evo_restart'], true);
     if ($mutating) {
         $validation = telefonos_waha_validate_mutation($method, csrf_validate((string)($_POST['csrf_token'] ?? '')));
         if ($validation['status'] !== 200) {
@@ -122,6 +122,78 @@ function telefonos_waha_dispatch_inner(): void
     $rows = is_array($rows) ? $rows : [];
     $commercialSettings = comercial_get_settings();
     $personalSettings = telefonos_waha_personal_settings();
+
+    // ── Evolución: estados/QR de Evolution por línea (2º backend) ──
+    if (in_array($action, ['evo_status', 'evo_qr', 'evo_restart'], true)) {
+        $evoId = trim((string)($method === 'POST' ? ($_POST['telefono_id'] ?? '') : ($_GET['telefono_id'] ?? '')));
+        $row = telefonos_waha_find_row($rows, $evoId);
+        if ($row === null) {
+            telefonos_waha_json(['ok' => false, 'error' => 'Teléfono no encontrado'], 404);
+            return;
+        }
+        $client = evolution_client_for_row($row);
+        $cfg = evolution_config();
+        if ($cfg['api_key'] === '' || $cfg['host'] === '') {
+            telefonos_waha_json(['ok' => false, 'error' => 'Evolution no configurado (falta data/evolution_config.json)'], 400);
+            return;
+        }
+
+        if ($action === 'evo_status') {
+            $r = $client->getStatus();
+            $state = strtoupper((string)($r['data']['state'] ?? ''));
+            $label = match ($state) {
+                'OPEN' => 'Conectado',
+                'CONNECTING' => 'Esperando QR / conectando',
+                'CLOSE' => 'Desconectado',
+                default => ($r['data']['state'] ?? 'UNKNOWN'),
+            };
+            $icon = match ($state) {
+                'OPEN' => '🟢',
+                'CONNECTING' => '🟡',
+                'CLOSE' => '🔴',
+                default => '⚪',
+            };
+            telefonos_waha_json([
+                'ok' => $r['ok'] || $state !== '',
+                'http_status' => $r['ok'] ? 200 : 502,
+                'status' => $state,
+                'status_label' => $r['ok'] ? $label : ($r['error'] ?? 'Evolution no responde'),
+                'status_icon' => $r['ok'] ? $icon : '🔴',
+                'is_connected' => $r['ok'] && $state === 'OPEN',
+                'phone' => '',
+                'instance' => $client->instanceName(),
+            ]);
+            return;
+        }
+
+        if ($action === 'evo_qr') {
+            // Asegurar que la instancia existe
+            $st = $client->connectionState();
+            if (!$st['ok']) {
+                $client->createInstance($client->instanceName(), true);
+                usleep(1500000);
+            }
+            // Reintentar hasta que el QR esté disponible (instancias nuevas tardan unos segundos)
+            $lastError = 'No se pudo obtener el QR de Evolution';
+            for ($attempt = 1; $attempt <= 5; $attempt++) {
+                $qr = $client->getQr(true);
+                if ($qr['ok'] && !empty($qr['data']['base64'])) {
+                    telefonos_waha_json(['ok' => true, 'http_status' => 200, 'qr_base64' => $qr['data']['base64'], 'instance' => $client->instanceName()]);
+                    return;
+                }
+                $lastError = $qr['error'] ?? $lastError;
+                if ($attempt < 5) usleep(2000000);
+            }
+            telefonos_waha_json(['ok' => false, 'http_status' => 502, 'error' => $lastError, 'instance' => $client->instanceName()], 502);
+            return;
+        }
+
+        if ($action === 'evo_restart') {
+            $r = $client->restart();
+            telefonos_waha_json(['ok' => $r['ok'], 'http_status' => $r['ok'] ? 200 : 502, 'message' => $r['ok'] ? 'Evolution reiniciado' : ($r['error'] ?? 'Error'), 'instance' => $client->instanceName()], $r['ok'] ? 200 : 502);
+            return;
+        }
+    }
 
     if ($action === 'identify') {
         if (!isset($_SESSION['telefonos_waha_identify_success']) || !is_array($_SESSION['telefonos_waha_identify_success'])) {

@@ -8948,6 +8948,13 @@ if (!empty($sendtaxsState)) {
                     echo '<span class="twa-action-result muted" aria-live="polite"></span>';
                     echo '</div>';
                 }
+                echo '<div class="evo-line-block" style="margin-top:6px;border-top:1px solid rgba(128,128,128,.25);padding-top:6px;">';
+                echo '<span id="evo-salud-' . e($row['id'] ?? '') . '" class="waha-indicator" aria-label="Estado Evolution: sin comprobar"><span class="waha-status-dot is-unknown" aria-hidden="true"></span>Evo: sin comprobar</span>';
+                echo '<div class="waha-line-actions" id="evo-actions-' . e($row['id'] ?? '') . '" data-evo-id="' . e($row['id'] ?? '') . '">';
+                echo '<button type="button" class="btn-secondary-mini twa-action-button" data-action="evo-qr" title="Vincular QR Evolution" aria-label="Vincular QR Evolution">📱</button>';
+                echo '<button type="button" class="btn-secondary-mini twa-action-button" data-action="evo-restart" title="Reescanear Evolution" aria-label="Reescanear Evolution">↻</button>';
+                echo '</div>';
+                echo '</div>';
                 echo '</td>';
                 echo '<td>' . e($row['notas'] ?? '') . '</td>';
                 echo '<td>' . e($destLabel) . '</td>';
@@ -9331,6 +9338,179 @@ if (!empty($sendtaxsState)) {
             setInterval(checkAllLines, 15000);
         })();
         </script>';
+
+        // ── Modal QR Evolution (2º backend) ──
+        echo '<div id="evoQrModal" class="wasap-qr-modal" style="display:none">';
+        echo '<div class="wasap-qr-modal-bg" id="evoQrModalBg"></div>';
+        echo '<div class="wasap-qr-modal-box">';
+        echo '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+        echo '<h3 style="margin:0">Vincular Evolution API</h3>';
+        echo '<button type="button" id="evoQrCloseTop" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text)">✕</button>';
+        echo '</div>';
+        echo '<div id="evoQrLineName" style="font-size:13px;color:var(--muted);margin-bottom:10px"></div>';
+        echo '<div id="evoQrImageWrap" style="text-align:center;padding:16px;background:#fff;border-radius:8px;margin-bottom:12px">';
+        echo '<span class="muted">Cargando QR...</span>';
+        echo '</div>';
+        echo '<p id="evoQrStatus" class="muted" style="text-align:center;margin-bottom:10px">Esperando...</p>';
+        echo '<div style="display:flex;gap:8px;justify-content:center">';
+        echo '<button type="button" id="evoQrRegenerate" class="btn-secondary-mini">🔄 Regenerar QR</button>';
+        echo '<button type="button" id="evoQrCloseBottom" class="btn-secondary-mini">Cerrar</button>';
+        echo '</div>';
+        echo '</div>';
+        echo '</div>';
+
+        // ── JS: salud + QR + restart de Evolution por línea (2º backend) ──
+        echo '<script>
+        (function(){
+            var apiBase = "telefonos_waha_api.php";
+            var csrfToken = ' . json_encode(csrf_token()) . ';
+            var evoQrCurrentId = "";
+            var evoQrPolling = null;
+
+            function evoFetchTimeout(url, options, timeoutMs) {
+                return new Promise(function(resolve, reject) {
+                    var done = false;
+                    options = options || {};
+                    var controller = window.AbortController ? new AbortController() : null;
+                    if (controller) options.signal = controller.signal;
+                    var timer = setTimeout(function(){ if (!done) { done = true; if (controller) controller.abort(); reject(new Error("Tiempo agotado")); } }, timeoutMs);
+                    fetch(url, options).then(function(r){ if (!done) { done = true; clearTimeout(timer); resolve(r); } }).catch(function(e){ if (!done) { done = true; clearTimeout(timer); reject(e); } });
+                });
+            }
+            function evoJson(url, options, timeoutMs) {
+                return evoFetchTimeout(url, options, timeoutMs).then(function(r){ return r.json().catch(function(){ throw new Error("Respuesta inválida"); }).then(function(d){ if (!r.ok || !d.ok) throw new Error(d.error || ("HTTP " + r.status)); return d; }); });
+            }
+            function evoHealthKind(status) {
+                status = (status || "").toUpperCase();
+                if (status === "OPEN") return "up";
+                if (status === "CONNECTING") return "starting";
+                if (!status) return "unknown";
+                return "down";
+            }
+            function evoRender(element, status, label, instance) {
+                if (!element) return;
+                var text = label || "Desconocido";
+                var instText = instance ? (" · " + instance) : "";
+                element.setAttribute("aria-label", "Estado Evolution: " + text + instText);
+                while (element.firstChild) element.removeChild(element.firstChild);
+                var dot = document.createElement("span");
+                dot.className = "waha-status-dot is-" + evoHealthKind(status);
+                dot.setAttribute("aria-hidden", "true");
+                element.appendChild(dot);
+                element.appendChild(document.createTextNode(text + instText));
+            }
+            function evoCheckLine(id) {
+                var health = document.getElementById("evo-salud-" + id);
+                var url = apiBase + "?action=evo_status&telefono_id=" + encodeURIComponent(id) + "&_=" + Date.now();
+                evoJson(url, undefined, 12000).then(function(data){
+                    evoRender(health, data.status, data.status_label || data.status, data.instance || "");
+                }).catch(function(error){
+                    evoRender(health, "FAILED", error.message || "Error Evolution", "");
+                });
+            }
+            function evoCheckAll() {
+                var rows = document.getElementById("telefonosRows");
+                if (!rows) return;
+                rows.querySelectorAll("[data-evo-id]").forEach(function(group){
+                    var id = group.getAttribute("data-evo-id") || "";
+                    if (id) evoCheckLine(id);
+                });
+            }
+            function evoSetQr(message, isError) {
+                var wrap = document.getElementById("evoQrImageWrap");
+                if (!wrap) return;
+                while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
+                var t = document.createElement("span");
+                t.className = isError ? "" : "muted";
+                if (isError) t.style.color = "var(--danger)";
+                t.textContent = message;
+                wrap.appendChild(t);
+            }
+            function evoStopPolling() { if (evoQrPolling) clearInterval(evoQrPolling); evoQrPolling = null; }
+            function evoFetchQr() {
+                var wrap = document.getElementById("evoQrImageWrap");
+                var status = document.getElementById("evoQrStatus");
+                var url = apiBase + "?action=evo_qr&telefono_id=" + encodeURIComponent(evoQrCurrentId) + "&_=" + Date.now();
+                return evoJson(url, undefined, 25000).then(function(data){
+                    if (!data.qr_base64) throw new Error("Evolution no devolvió un QR");
+                    while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
+                    var image = document.createElement("img");
+                    image.src = "data:image/png;base64," + data.qr_base64;
+                    image.style.maxWidth = "260px";
+                    image.style.borderRadius = "4px";
+                    image.alt = "QR";
+                    image.addEventListener("error", function(){ evoSetQr("Error al mostrar QR", true); });
+                    wrap.appendChild(image);
+                    status.textContent = "Escanea con WhatsApp → Vincular dispositivo (Evolution)";
+                    return true;
+                }).catch(function(error){
+                    evoSetQr(error.message || "No se pudo obtener el QR", true);
+                    status.textContent = "No se iniciará la comprobación automática.";
+                    return false;
+                });
+            }
+            function evoShowQr(id) {
+                evoQrCurrentId = id;
+                evoStopPolling();
+                document.getElementById("evoQrModal").style.display = "flex";
+                document.getElementById("evoQrLineName").textContent = "Línea: " + id;
+                document.getElementById("evoQrStatus").textContent = "Obteniendo QR...";
+                evoSetQr("Cargando QR...", false);
+                evoFetchQr();
+            }
+            function evoCloseQr() {
+                document.getElementById("evoQrModal").style.display = "none";
+                evoStopPolling();
+                evoCheckAll();
+            }
+            function evoRegenerate() {
+                evoStopPolling();
+                evoSetQr("Regenerando QR...", false);
+                document.getElementById("evoQrStatus").textContent = "Solicitando nuevo QR...";
+                evoFetchQr();
+            }
+            function evoPost(action, id) {
+                var body = new FormData();
+                body.append("action", action);
+                body.append("telefono_id", id);
+                body.append("csrf_token", csrfToken);
+                return body;
+            }
+            function evoRestart(id) {
+                if (!confirm("Reiniciar sesión Evolution de esta línea? Deberás escanear el QR de nuevo.")) return;
+                var health = document.getElementById("evo-salud-" + id);
+                evoRender(health, "CONNECTING", "Reiniciando...", "");
+                evoJson(apiBase, {method:"POST", body:evoPost("evo_restart", id), credentials:"same-origin"}, 30000).then(function(){
+                    setTimeout(function(){ evoShowQr(id); }, 1500);
+                }).catch(function(error){
+                    evoRender(health, "FAILED", error.message || "Error al reiniciar Evolution", "");
+                });
+            }
+
+            var rows = document.getElementById("telefonosRows");
+            if (rows) rows.addEventListener("click", function(event){
+                var button = event.target.closest ? event.target.closest("button[data-action]") : null;
+                if (!button || !rows.contains(button)) return;
+                var action = button.getAttribute("data-action");
+                if (action === "evo-qr") {
+                    var group = button.closest("[data-evo-id]");
+                    if (group) evoShowQr(group.getAttribute("data-evo-id"));
+                } else if (action === "evo-restart") {
+                    var group2 = button.closest("[data-evo-id]");
+                    if (group2) evoRestart(group2.getAttribute("data-evo-id"));
+                }
+            });
+            document.getElementById("evoQrModalBg").addEventListener("click", evoCloseQr);
+            document.getElementById("evoQrCloseTop").addEventListener("click", evoCloseQr);
+            document.getElementById("evoQrCloseBottom").addEventListener("click", evoCloseQr);
+            document.getElementById("evoQrRegenerate").addEventListener("click", evoRegenerate);
+
+            if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", evoCheckAll);
+            else evoCheckAll();
+            setInterval(evoCheckAll, 15000);
+        })();
+        </script>';
+
 
     } elseif ($tab === 'autotube') {
         echo '<div class="josue-head"><h2>Autotube</h2></div>';

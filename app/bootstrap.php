@@ -95,6 +95,7 @@ session_start();
 
 require_once APP_PATH . '/helpers.php';
 require_once APP_PATH . '/evolution/transport.php';
+require_once APP_PATH . '/evolution/config.php';
 require_once APP_PATH . '/db.php';
 require_once APP_PATH . '/storage.php';
 require_once APP_PATH . '/avisos.php';
