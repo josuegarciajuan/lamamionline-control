@@ -172,6 +172,11 @@ function telefonos_waha_dispatch_inner(): void
             if (!$st['ok']) {
                 $client->createInstance($client->instanceName(), true);
                 usleep(1500000);
+                // Configurar el webhook receptor de Evolution si la línea lo tiene definido
+                $evoWebhook = evolution_webhook_url_for_row($row);
+                if ($evoWebhook !== '') {
+                    $client->setWebhook($evoWebhook);
+                }
             }
             // Reintentar hasta que el QR esté disponible (instancias nuevas tardan unos segundos)
             $lastError = 'No se pudo obtener el QR de Evolution';

@@ -79,3 +79,21 @@ if (!function_exists('evolution_client_for_row')) {
         );
     }
 }
+
+if (!function_exists('evolution_webhook_url_for_row')) {
+    /**
+     * URL del webhook receptor de Evolution según el uso de la línea.
+     * Devuelve '' si la línea aún no tiene webhook Evolution configurado.
+     *
+     * @param array<string,mixed> $row
+     */
+    function evolution_webhook_url_for_row(array $row): string
+    {
+        $uso = strtolower(trim((string)($row['uso'] ?? '')));
+        if ($uso === 'personal') {
+            return 'http://100.76.30.118/control/personal_wasap_webhook_evo.php';
+        }
+        // bot casa / comercial: se configuran en fases posteriores
+        return '';
+    }
+}
