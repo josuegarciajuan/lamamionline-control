@@ -10203,14 +10203,35 @@ if (!empty($sendtaxsState)) {
                             h += "<div class=\"wasap-date-sep\"><span>" + esc(d) + "</span></div>";
                             lastDate = d;
                         }
+                        var mediaHtml = wasapRenderMedia(m);
                         if (m.direction === "in") {
-                            h += "<div class=\"wasap-bubble in\"><div class=\"wasap-bubble-text\">" + esc(m.text||"") + "</div><div class=\"wasap-bubble-time\">" + esc(formatMsgTime(m.ts||"")) + "</div></div>";
+                            h += "<div class=\"wasap-bubble in\"><div class=\"wasap-bubble-text\">" + esc(m.text||"") + mediaHtml + "</div><div class=\"wasap-bubble-time\">" + esc(formatMsgTime(m.ts||"")) + "</div></div>";
                         } else {
-                            h += "<div class=\"wasap-bubble out\"><div class=\"wasap-bubble-text\">" + esc(m.text||"") + "</div><div class=\"wasap-bubble-time\">" + esc(formatMsgTime(m.ts||"")) + " ✓✓</div></div>";
+                            h += "<div class=\"wasap-bubble out\"><div class=\"wasap-bubble-text\">" + esc(m.text||"") + mediaHtml + "</div><div class=\"wasap-bubble-time\">" + esc(formatMsgTime(m.ts||"")) + " ✓✓</div></div>";
                         }
                     }
                     area.innerHTML = h;
                     if (wasAtBottom) area.scrollTop = area.scrollHeight;
+                }
+
+                // ── Render de media recibida (imagen/audio/vídeo) ──
+                function wasapRenderMedia(m) {
+                    var media = m.media;
+                    if (!media || !media.url) return "";
+                    var url = "/control/media_proxy.php?url=" + encodeURIComponent(media.url) + "&type=" + encodeURIComponent(media.type || "");
+                    if (media.type === "image") {
+                        return "<div style=\"margin:6px 0\"><img src=\"" + url + "\" alt=\"Imagen\" style=\"max-width:220px;max-height:260px;border-radius:8px;display:block\"></div>";
+                    }
+                    if (media.type === "audio") {
+                        return "<div style=\"margin:6px 0\"><audio controls style=\"max-width:220px\" src=\"" + url + "\"></audio></div>";
+                    }
+                    if (media.type === "video") {
+                        return "<div style=\"margin:6px 0\"><video controls style=\"max-width:240px;border-radius:8px\" src=\"" + url + "\"></video></div>";
+                    }
+                    if (media.type === "document") {
+                        return "<div style=\"margin:6px 0\"><a href=\"" + url + "\" target=\"_blank\" rel=\"noopener\">📄 " + esc(media.fileName || "Documento") + "</a></div>";
+                    }
+                    return "";
                 }
 
                 // ── Enviar mensaje ──
