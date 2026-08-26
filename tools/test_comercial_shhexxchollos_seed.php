@@ -19,14 +19,18 @@ function shhexxchollos_assert($condition, $label) {
 }
 
 $pass = true;
+$lamamiQuery = "SELECT id, telefono, updatedsamp, nombre_comercial FROM f_clientes WHERE baja = 0 ORDER BY updatedsamp DESC LIMIT 300";
 $seed = comercial_default_process_seed('shhexxchollos');
 $pass = shhexxchollos_assert($seed['slug'] === 'shhexxchollos', 'la semilla usa el slug esperado') && $pass;
 $pass = shhexxchollos_assert($seed['nombre'] === 'Shhexxchollos', 'la semilla usa el nombre esperado') && $pass;
 $pass = shhexxchollos_assert((int)$seed['enabled'] === 0, 'la semilla nace deshabilitada') && $pass;
-$pass = shhexxchollos_assert((float)$seed['daily_target_percent'] === 0.0, 'la semilla no tiene objetivo diario') && $pass;
-$pass = shhexxchollos_assert($seed['source_mysql_query'] === '', 'la semilla no tiene consulta MySQL') && $pass;
+$pass = shhexxchollos_assert((float)$seed['daily_target_percent'] === 12.0, 'la semilla usa el 12% del objetivo diario') && $pass;
+$pass = shhexxchollos_assert($seed['source_type'] === 'mysql_recent', 'la semilla usa números de la misma consulta que lamami/plaza') && $pass;
+$pass = shhexxchollos_assert($seed['source_mysql_query'] === $lamamiQuery, 'la semilla usa la misma consulta MySQL que lamami') && $pass;
 $pass = shhexxchollos_assert($seed['source_queue_files'] === array(), 'la semilla no tiene colas') && $pass;
-$pass = shhexxchollos_assert($seed['assigned_line_ids'] === array(), 'la semilla no tiene líneas asignadas') && $pass;
+$pass = shhexxchollos_assert($seed['assigned_line_ids'] === comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal')), 'la semilla asigna las mismas líneas que lamami/plaza') && $pass;
+$pass = shhexxchollos_assert($seed['conversation_max_auto_turns'] === 5 && $seed['escalation_score_threshold'] === 78, 'la semilla usa los límites de conversación estándar') && $pass;
+$pass = shhexxchollos_assert(count($seed['positive_keywords']) > 10, 'la semilla incluye palabras qualified para chollos') && $pass;
 
 $defaults = comercial_build_default_processes();
 $defaultSlugs = array_column($defaults, 'slug');
@@ -64,10 +68,10 @@ $pass = shhexxchollos_assert(count($matches) === 1, 'la migración añade el pro
 if (count($matches) === 1) {
     $process = $matches[0];
     $pass = shhexxchollos_assert((int)$process['enabled'] === 0, 'la migración mantiene enabled=0') && $pass;
-    $pass = shhexxchollos_assert((float)$process['daily_target_percent'] === 0.0, 'la migración mantiene daily_target_percent=0') && $pass;
-    $pass = shhexxchollos_assert($process['source_mysql_query'] === '', 'la migración no añade consulta MySQL') && $pass;
+    $pass = shhexxchollos_assert((float)$process['daily_target_percent'] === 12.0, 'la migración mantiene el 12% del objetivo') && $pass;
+    $pass = shhexxchollos_assert($process['source_mysql_query'] === $lamamiQuery, 'la migración mantiene la consulta MySQL de lamami') && $pass;
     $pass = shhexxchollos_assert($process['source_queue_files'] === array(), 'la migración no añade colas') && $pass;
-    $pass = shhexxchollos_assert($process['assigned_line_ids'] === array(), 'la migración no añade líneas') && $pass;
+    $pass = shhexxchollos_assert($process['assigned_line_ids'] === comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal')), 'la migración asigna las mismas líneas que lamami/plaza') && $pass;
 }
 
 $migratedAgain = comercial_get_processes();
