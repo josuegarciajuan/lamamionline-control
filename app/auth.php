@@ -8,6 +8,16 @@ function auth_is_admin() {
     return is_logged_in() && hash_equals('josue', (string)($_SESSION['username'] ?? ''));
 }
 
+function auth_josue_adicionales_unlocked() {
+    return is_logged_in() && !empty($_SESSION['josue_adicionales_unlocked']);
+}
+
+function auth_can_manage_telefonos() {
+    return auth_is_admin()
+        || (($_SESSION['username'] ?? '') === 'telefono')
+        || auth_josue_adicionales_unlocked();
+}
+
 function login_user($username, $password) {
     // Credenciales hardcodeadas
     if ($username === 'josue' && $password === 'vsomnos1Q#') {

@@ -8397,16 +8397,9 @@ function render_configm_section() {
 }
 
 function render_josue_page() {
-    $anunciosUnlocked = !empty($_SESSION['josue_anuncios_unlocked']);
-    $isAdmin = auth_is_admin();
+    $anunciosUnlocked = auth_josue_adicionales_unlocked();
     // El usuario 'telefono' (dispositivo móvil) ve y gestiona las líneas (Telefonos) igual que el admin.
-    $canManageTelefonos = $isAdmin || (($_SESSION['username'] ?? '') === 'telefono');
-
-    // Modo Lite (coche): auto-desbloquear anuncios — el usuario no puede interactuar con el formulario
-    if (($_SESSION['username'] ?? '') === 'lite' && !$anunciosUnlocked) {
-        $_SESSION['josue_anuncios_unlocked'] = true;
-        $anunciosUnlocked = true;
-    }
+    $canManageTelefonos = auth_can_manage_telefonos();
 
     // WhatsApp Personal — protegido con contraseña en modo Lite
     $isLite = ($_SESSION['username'] ?? '') === 'lite';
@@ -8468,8 +8461,9 @@ function render_josue_page() {
         echo '<div class="josue-unlock-box">';
         echo '<form method="post" class="josue-unlock-form">';
         echo '<input type="hidden" name="action" value="unlock_josue_anuncios">';
+        echo '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
         echo '<div class="field">';
-        echo '<label>Desbloquear Anuncios</label>';
+        echo '<label>Desbloquear Adicionales</label>';
         echo '<input type="password" name="password" placeholder="Contraseña">';
         echo '</div>';
         echo '<button class="btn-secondary-mini">Entrar</button>';
