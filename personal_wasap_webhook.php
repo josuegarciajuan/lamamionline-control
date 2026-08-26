@@ -43,6 +43,27 @@ if (!is_array($payload)) {
 // ── Log raw payload para debugging (primeros 2000 bytes) ──
 wasap_log('raw_payload', ['body' => mb_substr($rawBody, 0, 2000)]);
 
+// ── Gate de transporte: si la línea personal opera por Evolution, WAHA no responde ──
+// (Las líneas quedan vinculadas a WAHA y Evolution; este gate evita la doble respuesta.)
+require_once __DIR__ . '/app/evolution/transport.php';
+$personalTransport = 'waha';
+$telefonos = json_decode((string) @file_get_contents(__DIR__ . '/data/telefonos.json'), true);
+if (is_array($telefonos)) {
+    foreach ($telefonos as $t) {
+        if ((string)($t['uso'] ?? '') === 'personal' || (string)($t['tfono'] ?? '') === '654464023') {
+            $personalTransport = whatsapp_transport_for($t);
+            break;
+        }
+    }
+}
+if ($personalTransport === 'evolution') {
+    wasap_log('transport_gate_dropped', ['transport' => 'evolution']);
+    http_response_code(200);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => true, 'transport' => 'evolution', 'skipped' => true]);
+    exit;
+}
+
 // ── Helpers ──
 function wasap_extract_digits(string $value): string {
     // WAHA puede venir con formato "34604829142:95@s.whatsapp.net"

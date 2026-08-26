@@ -3607,6 +3607,14 @@ function comercial_handle_webhook_http() {
         // Limpieza probabilística de marcadores de cancelación huérfanos
         comercial_thread_cancel_gc();
 
+        // ── Gate de transporte: si la línea opera por Evolution, WAHA descarta ──
+        // (línea vinculada a ambos; este gate evita que WAHA responda en paralelo)
+        $gateLine = comercial_find_line_for_inbound((string)($payload['to'] ?? ''), (string)($payload['port'] ?? ''));
+        if (whatsapp_transport_for($gateLine) === 'evolution') {
+            comercial_webhook_log_append('transport_gate_dropped_waha', $logContext + array('transport' => 'evolution', 'http_status' => 200));
+            voice_json_response(array('ok' => true, 'transport' => 'evolution', 'skipped' => true));
+        }
+
         if (!empty($payload['from_me'])) {
             // ── fromMe=true → un humano respondió desde WhatsApp nativo ──
             // source=api ⇒ lo envió el propio bot vía WAHA API y ya está
@@ -8316,6 +8324,7 @@ HTML;
                 'compania'      => $line['compania'] ?? '',
                 'waha_port'     => $line['waha_port'] ?? '',
                 'waha'          => $line['waha'] ?? '',
+                'transport'     => whatsapp_transport_normalize($line['transport'] ?? 'waha'),
                 'destacamos_id' => $line['destacamos_id'] ?? '',
                 'notas'         => $line['notas'] ?? '',
             ), JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS);
@@ -8414,6 +8423,14 @@ HTML;
         field_input('compania', 'Compañía', '');
         field_input('waha_port', 'WAHA Port', '');
         field_input('waha', 'WAHA', '');
+        echo '<div class="field">';
+        echo '<label>Transporte (mensajería)</label>';
+        echo '<select name="transport">';
+        echo '<option value="waha">WAHA</option>';
+        echo '<option value="evolution">Evolution API</option>';
+        echo '</select>';
+        echo '<small class="muted">Estados siempre por WAHA.</small>';
+        echo '</div>';
         echo '<div class="field">';
         echo '<label>Destacamos</label>';
         echo '<select name="destacamos_id">';

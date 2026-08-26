@@ -2607,6 +2607,7 @@ window.KittPlayer = {
             setModalField('compania', lineData.compania);
             setModalField('waha_port', lineData.waha_port);
             setModalField('waha', lineData.waha);
+            setModalField('transport', lineData.transport || 'waha');
             setModalField('destacamos_id', lineData.destacamos_id);
             setModalField('notas', lineData.notas);
             if (deleteBtn) deleteBtn.style.display = 'inline-block';
@@ -2707,6 +2708,7 @@ window.KittPlayer = {
             setTelefonoModalField('compania', lineData.compania);
             setTelefonoModalField('waha_port', lineData.waha_port);
             setTelefonoModalField('waha', lineData.waha);
+            setTelefonoModalField('transport', lineData.transport || 'waha');
             setTelefonoModalField('destacamos_id', lineData.destacamos_id);
             setTelefonoModalField('notas', lineData.notas);
             if (deleteBtn) deleteBtn.style.display = 'inline-block';

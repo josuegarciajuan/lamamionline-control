@@ -4476,6 +4476,7 @@ function action_save_telefono() {
         'compania' => trim(request_post('compania')),
         'waha_port' => $wahaPort,
         'waha' => $wahaPort === TELEFONOS_WAHA_PERSONAL_PORT ? 'default' : $wahaSession,
+        'transport' => whatsapp_transport_normalize(request_post('transport')),
         'notas' => trim(request_post('notas')),
         'destacamos_id' => trim(request_post('destacamos_id')),
         'updated_at' => now_datetime(),

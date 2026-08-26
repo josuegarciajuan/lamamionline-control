@@ -8928,6 +8928,7 @@ if (!empty($sendtaxsState)) {
                     'compania'       => $row['compania'] ?? '',
                     'waha_port'      => $row['waha_port'] ?? '',
                     'waha'           => $row['waha'] ?? '',
+                    'transport'      => whatsapp_transport_normalize($row['transport'] ?? 'waha'),
                     'destacamos_id'  => $row['destacamos_id'] ?? '',
                     'notas'          => $row['notas'] ?? '',
                 ), JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS);
@@ -8983,6 +8984,14 @@ if (!empty($sendtaxsState)) {
         field_input('compania', 'Compañía', '');
         field_input('waha_port', 'WAHA Port', '');
         field_input('waha', 'WAHA', '');
+        echo '<div class="field">';
+        echo '<label>Transporte (mensajería)</label>';
+        echo '<select name="transport">';
+        echo '<option value="waha">WAHA</option>';
+        echo '<option value="evolution">Evolution API</option>';
+        echo '</select>';
+        echo '<small class="muted">Estados siempre por WAHA.</small>';
+        echo '</div>';
         echo '<div class="field">';
         echo '<label>Destacamos</label>';
         echo '<select name="destacamos_id">';
