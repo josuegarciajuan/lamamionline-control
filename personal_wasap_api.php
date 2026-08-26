@@ -38,6 +38,38 @@ define('WASAP_WAHA_HOST', 'http://100.117.92.74');
 define('WASAP_WAHA_KEY', 'local321');
 define('WASAP_WAHA_SESSION', 'default');
 
+// ── Transporte activo de la línea personal (waha|evolution) ──
+function wasap_personal_transport(): string {
+    $t = 'waha';
+    $path = __DIR__ . '/data/telefonos.json';
+    if (is_file($path)) {
+        $data = json_decode((string) file_get_contents($path), true);
+        if (is_array($data)) {
+            foreach ($data as $r) {
+                if ((string)($r['uso'] ?? '') === 'personal' || (string)($r['tfono'] ?? '') === '654464023') {
+                    $t = whatsapp_transport_for($r);
+                    break;
+                }
+            }
+        }
+    }
+    return $t;
+}
+
+/** @return array<string,mixed>|null */
+function wasap_personal_line_row(): ?array {
+    $path = __DIR__ . '/data/telefonos.json';
+    if (!is_file($path)) return null;
+    $data = json_decode((string) file_get_contents($path), true);
+    if (!is_array($data)) return null;
+    foreach ($data as $r) {
+        if ((string)($r['uso'] ?? '') === 'personal' || (string)($r['tfono'] ?? '') === '654464023') {
+            return $r;
+        }
+    }
+    return null;
+}
+
 // ── Debug logging ──
 function wasap_debug_log(string $action, array $data): void {
     $logPath = __DIR__ . '/data/personal_wasap_debug.log';
@@ -320,23 +352,36 @@ switch ($action) {
             break;
         }
 
-        // Llamar a WAHA para enviar
-        $wahaResult = wasap_waha_call('POST', '/api/sendText', [
-            'chatId' => $chatId,
-            'text' => $text,
-            'session' => WASAP_WAHA_SESSION,
-        ]);
+        // Llamar al backend activo (Evolution o WAHA) para enviar
+        $sendResult = null;
+        if (wasap_personal_transport() === 'evolution') {
+            $row = wasap_personal_line_row();
+            $evo = evolution_client_for_row($row);
+            $peer = wasap_extract_phone_from_chatid($chatId);
+            $evoRes = $evo->sendText($peer, $text);
+            if ($evoRes['ok']) {
+                $sendResult = ['ok' => true, 'data' => ['id' => ($evoRes['data']['key']['id'] ?? ''), 'evo' => true]];
+            } else {
+                $sendResult = ['ok' => false, 'error' => $evoRes['error'] ?? 'Evolution send failed', 'http_code' => $evoRes['http_code']];
+            }
+        } else {
+            $sendResult = wasap_waha_call('POST', '/api/sendText', [
+                'chatId' => $chatId,
+                'text' => $text,
+                'session' => WASAP_WAHA_SESSION,
+            ]);
+        }
 
-        if (empty($wahaResult['ok'])) {
-            echo json_encode(['ok' => false, 'error' => 'WAHA send failed: ' . ($wahaResult['error'] ?? 'unknown'), 'waha' => $wahaResult]);
+        if (empty($sendResult['ok'])) {
+            echo json_encode(['ok' => false, 'error' => 'Envío fallido: ' . ($sendResult['error'] ?? 'unknown'), 'backend' => wasap_personal_transport(), 'detail' => $sendResult]);
             break;
         }
 
         // Guardar en store local
         $store = wasap_store_read();
         $now = date('c');
-        // Usar el ID real de WAHA para que el webhook y el merge-dedup funcionen
-        $msgId = (string)($wahaResult['data']['id'] ?? '');
+        // Usar el ID real del backend para que el webhook y el merge-dedup funcionen
+        $msgId = (string)($sendResult['data']['id'] ?? '');
         if ($msgId === '') $msgId = 'msg_sent_' . bin2hex(random_bytes(8));
         if (!isset($store['chats'][$chatId])) {
             $store['chats'][$chatId] = [
@@ -365,7 +410,7 @@ switch ($action) {
 
         wasap_store_write($store);
 
-        echo json_encode(['ok' => true, 'message_id' => $msgId, 'waha' => $wahaResult['data'] ?? null]);
+        echo json_encode(['ok' => true, 'message_id' => $msgId, 'waha' => $sendResult['data'] ?? null]);
         break;
 
     // ── Marcar como leído ──
@@ -475,6 +520,32 @@ switch ($action) {
 
     // ── Estado de conexión WAHA (mejorado con diagnóstico) ──
     case 'status':
+        if (wasap_personal_transport() === 'evolution') {
+            $row = wasap_personal_line_row();
+            $evo = evolution_client_for_row($row);
+            $st = $evo->getStatus();
+            $state = strtoupper((string)($st['data']['state'] ?? ''));
+            $label = match ($state) {
+                'OPEN' => 'Conectado',
+                'CONNECTING' => 'Esperando QR / conectando',
+                'CLOSE' => 'Desconectado',
+                default => ($st['data']['state'] ?? 'UNKNOWN'),
+            };
+            $icon = match ($state) { 'OPEN' => '🟢', 'CONNECTING' => '🟡', 'CLOSE' => '🔴', default => '⚪' };
+            $ok = $st['ok'] || $state !== '';
+            echo json_encode([
+                'ok' => $ok,
+                'status' => $state,
+                'status_label' => $st['ok'] ? $label : ($st['error'] ?? 'Evolution no responde'),
+                'status_icon' => $st['ok'] ? $icon : '🔴',
+                'is_connected' => $st['ok'] && $state === 'OPEN',
+                'health_phone' => '654464023',
+                'phone' => '654464023',
+                'qr_available' => ($st['ok'] && $state === 'CONNECTING'),
+                'backend' => 'evolution',
+            ]);
+            break;
+        }
         $wahaPort = WASAP_WAHA_PORT;
         $wahaHost = WASAP_WAHA_HOST;
         $statusUrl = "{$wahaHost}:{$wahaPort}/api/sessions/default";
