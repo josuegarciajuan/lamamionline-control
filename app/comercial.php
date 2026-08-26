@@ -6073,7 +6073,7 @@ function comercial_refresh_lines_health($force = false) {
     return $results;
 }
 
-function comercial_send_text_via_line($line, $targetPhone, $text, $process = null) {
+function comercial_send_text_via_line($line, $targetPhone, $text, $process = null, $fast = false) {
     $settings = comercial_get_settings();
     $lineId = (string)($line['id'] ?? '');
     $port = trim((string)($line['waha_port'] ?? ''));
@@ -6096,7 +6096,7 @@ function comercial_send_text_via_line($line, $targetPhone, $text, $process = nul
         } else {
             $jid = $evo->toJid($targetDigits);
             $evo->markChatAsRead($jid);
-            $evo->startTyping($jid, 700);
+            $evo->startTyping($jid, $fast ? 400 : 900);
             $send = $evo->sendText($targetDigits, $text);
             $evo->stopTyping($jid);
         }
@@ -6109,13 +6109,13 @@ function comercial_send_text_via_line($line, $targetPhone, $text, $process = nul
             $sendError = 'Evolution sendText failed';
         }
     } else {
-        $preDelay = comercial_random_between((int)$settings['typing_pre_min_sec'], (int)$settings['typing_pre_max_sec']);
-        $typingDelay = comercial_calc_typing_delay($text, $settings);
+        $preDelay = $fast ? 0 : comercial_random_between((int)$settings['typing_pre_min_sec'], (int)$settings['typing_pre_max_sec']);
+        $typingDelay = $fast ? 500 : comercial_calc_typing_delay($text, $settings);
 
-        sleep($preDelay);
+        if ($preDelay > 0) sleep($preDelay);
         $typingPayload = array('session' => (string)$settings['waha_session'], 'chatId' => $chatId);
         $start = comercial_waha_post_json($settings, $port, 'api/startTyping', $typingPayload);
-        sleep($typingDelay);
+        if ($typingDelay > 0) sleep($typingDelay);
         $sendPayload = array('session' => (string)$settings['waha_session'], 'chatId' => $chatId, 'text' => (string)$text);
         $send = comercial_waha_post_json($settings, $port, 'api/sendText', $sendPayload);
         $stop = comercial_waha_post_json($settings, $port, 'api/stopTyping', $typingPayload);
@@ -6225,7 +6225,7 @@ function comercial_send_thread_message($thread, $text, $options = array()) {
         if ($i > 0) {
             sleep((int)COMERCIAL_PHOTO_LINK_SLEEP_SEC);
         }
-        $send = comercial_send_text_via_line($line, (string)($thread['target_phone'] ?? ''), $msg, $process ?: array());
+        $send = comercial_send_text_via_line($line, (string)($thread['target_phone'] ?? ''), $msg, $process ?: array(), !empty($thread['fast_typing']));
         if (!empty($send['ok'])) $sentCount++;
     }
 
@@ -7280,6 +7280,11 @@ function comercial_handle_inbound_message($payload) {
     $thread = comercial_find_open_thread_for_inbound($fromPhone, $toPhone, $linePort);
     if (!$thread) {
         $thread = comercial_register_unmatched_inbound_thread($payload);
+        // Fast mode: si el mensaje entrante era un audio transcrito, la respuesta
+        // debe llegar rápido (compensa la latencia de whisper).
+        if ($transcription !== '') {
+            $thread['fast_typing'] = 1;
+        }
         $genericProcess = comercial_generic_inbound_process();
         $classificationData = comercial_classify_reply($genericProcess, $text, $thread);
         $originalClassification = (string)($classificationData['classification'] ?? 'opened');
@@ -7299,6 +7304,10 @@ function comercial_handle_inbound_message($payload) {
             $thread = comercial_thread_apply_stage($thread, 'opened');
         }
         // No enviar followup si es auto-responder
+        if ($transcription !== '') {
+            // Fast mode: la respuesta a un audio transcrito debe llegar rápido
+            $thread['fast_typing'] = 1;
+        }
         if ($originalClassification !== 'autoresponder') {
             // ── Usar LLM agent para generar respuesta contextual personalizada ──
             $thread['process_slug'] = 'inbound';

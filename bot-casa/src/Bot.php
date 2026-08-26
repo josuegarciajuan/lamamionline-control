@@ -1524,9 +1524,10 @@ final class Bot implements BotInterface
      */
     private function evoApiClient(array $ctx): ?\EvolutionApi
     {
-        static $client = null;
-        if ($client !== null) {
-            return $client;
+        static $clients = [];
+        $instance = (string) ($ctx['evo_instance'] ?? '');
+        if (isset($clients[$instance])) {
+            return $clients[$instance];
         }
         $evoFile = dirname(__DIR__, 2) . '/data/evolution_config.json';
         if (!is_file($evoFile)) {
@@ -1537,13 +1538,13 @@ final class Bot implements BotInterface
             return null;
         }
         require_once dirname(__DIR__, 2) . '/app/evolution/EvolutionApi.php';
-        $client = new \EvolutionApi(
+        $clients[$instance] = new \EvolutionApi(
             (string) $cfg['host'],
             (string) $cfg['api_key'],
-            (string) ($ctx['evo_instance'] ?? ''),
+            $instance,
             30
         );
-        return $client;
+        return $clients[$instance];
     }
 
     /**
