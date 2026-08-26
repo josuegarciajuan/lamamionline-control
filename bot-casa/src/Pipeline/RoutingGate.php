@@ -140,6 +140,26 @@ final readonly class RoutingGate implements PipelineStageInterface
             $ctx['waha_api_key']  = '';
             $ctx['waha_session']  = $wahaSession;
 
+            // ── Transporte por línea: waha | evolution ─────────────────
+            $transport = 'waha';
+            $evoInstance = '';
+            if (is_array($entry)) {
+                $t = strtolower(trim((string) ($entry['transport'] ?? '')));
+                if ($t === 'evolution') {
+                    $transport = 'evolution';
+                    $evoInstance = trim((string) ($entry['evo_instance'] ?? ''));
+                }
+            }
+            $ctx['transport'] = $transport;
+            if ($transport === 'evolution') {
+                $ctx['evo_instance'] = $evoInstance;
+                if (str_contains(mb_strtolower($rawFrom), '@lid')) {
+                    $ctx['evo_chat_id'] = (string) $rawFrom;
+                } else {
+                    $ctx['evo_chat_id'] = $fromPhone . '@s.whatsapp.net';
+                }
+            }
+
             return $ctx;
         } catch (\Throwable) {
             // Never throw — halt pipeline on error (fail-closed for security gate)

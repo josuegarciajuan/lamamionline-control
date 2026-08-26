@@ -1519,9 +1519,89 @@ final class Bot implements BotInterface
         return null;
     }
 
-    private function sendMessages(array &$ctx, array $messages, string $lockDir = '', string $fromPhone = ''): void
+    /**
+     * Cliente EvolutionApi (compartido con el CRM) para líneas en transport=evolution.
+     */
+    private function evoApiClient(array $ctx): ?\EvolutionApi
     {
-        // ── Cancel + pause check: if user paused this thread, abort send ──
+        static $client = null;
+        if ($client !== null) {
+            return $client;
+        }
+        $evoFile = dirname(__DIR__, 2) . '/data/evolution_config.json';
+        if (!is_file($evoFile)) {
+            return null;
+        }
+        $cfg = json_decode((string) file_get_contents($evoFile), true);
+        if (!is_array($cfg) || empty($cfg['api_key']) || empty($cfg['host'])) {
+            return null;
+        }
+        require_once dirname(__DIR__, 2) . '/app/evolution/EvolutionApi.php';
+        $client = new \EvolutionApi(
+            (string) $cfg['host'],
+            (string) $cfg['api_key'],
+            (string) ($ctx['evo_instance'] ?? ''),
+            30
+        );
+        return $client;
+    }
+
+    /**
+     * Envía un mensaje por Evolution (foto nativa, texto humano, audio rápido).
+     */
+    private function sendMessageEvo(array $ctx, string $msgStr, bool $isFirst, bool $isAudioReply): bool
+    {
+        $evo = $this->evoApiClient($ctx);
+        $chatId = (string) ($ctx['evo_chat_id'] ?? '');
+        if ($evo === null || $chatId === '') {
+            return false;
+        }
+        // Foto → nativa (1 por mensaje)
+        if ($this->isImageUrl($msgStr)) {
+            $res = $evo->sendMedia($chatId, \EvolutionApi::MEDIA_IMAGE, $this->directImageUrl($msgStr), null, null, 0);
+            return (bool) ($res['ok'] ?? false);
+        }
+        // Audio transcrito → respuesta rápida (delays mínimos por la latencia de whisper)
+        if ($isAudioReply) {
+            $res = $evo->sendHumanized($chatId, $msgStr, ['seen_delay_ms' => 0, 'typing_ms' => 600, 'after_ms' => 0]);
+            return (bool) ($res['ok'] ?? false);
+        }
+        // Texto normal humano
+        if ($isFirst) {
+            $res = $evo->sendHumanized($chatId, $msgStr, ['seen_delay_ms' => 350, 'typing_ms' => 1300, 'after_ms' => 500]);
+        } else {
+            $res = $evo->sendText($chatId, $msgStr);
+        }
+        return (bool) ($res['ok'] ?? false);
+    }
+
+    /**
+     * Detección de URL de imagen (compartir.site / extensiones / image-proxy).
+     */
+    private function isImageUrl(string $text): bool
+    {
+        if (preg_match('#https?://compartir\.site/#i', $text)) {
+            return true;
+        }
+        if (preg_match('#https?://[^\s]+\.(jpe?g|png|webp|gif)(\?[^\s]*)?#i', $text)) {
+            return true;
+        }
+        return str_contains($text, '/api/image-proxy.php');
+    }
+
+    /**
+     * Convierte un shortlink compartir.site a la URL directa de la imagen.
+     */
+    private function directImageUrl(string $url): string
+    {
+        if (preg_match('#^https?://compartir\.site/([a-zA-Z0-9_-]+)/?$#i', $url, $m)) {
+            return 'https://compartir.site/' . $m[1] . '/' . $m[1] . '.jpg';
+        }
+        return $url;
+    }
+
+    private function sendMessages(array &$ctx, array $messages, string $lockDir = '', string $fromPhone = ''): void
+    {        // ── Cancel + pause check: if user paused this thread, abort send ──
         $threadId = (string) ($ctx['thread_id'] ?? $ctx['__thread_id'] ?? '');
         $pauseGate = $this->getPauseGate();
         if ($threadId !== '' && $pauseGate !== null) {
@@ -1715,8 +1795,11 @@ final class Bot implements BotInterface
                 break;
             }
 
-            // Use quick send for URL-only follow-up messages (no humanization)
-            if (!$isFirst) {
+            // Dispatch por transporte: evolution (fotos nativas/audio) o WAHA (URLs)
+            $isAudioReply = ((int) ($ctx['is_audio_i'] ?? 0) === 1) && trim((string) ($ctx['transcription'] ?? '')) !== '';
+            if (($ctx['transport'] ?? 'waha') === 'evolution') {
+                $ok = $this->sendMessageEvo($ctx, $msgStr, $isFirst, $isAudioReply);
+            } elseif (!$isFirst) {
                 $ok = $this->wahaApi->sendQuick(
                     $wahaBaseUrl,
                     $wahaChatId,
