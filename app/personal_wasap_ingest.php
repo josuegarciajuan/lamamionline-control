@@ -89,7 +89,13 @@ if (!function_exists('wasap_ingest_store_write')) {
                 }
             }
         }
-        if (isset($data['contacts_index'])) $existing['contacts_index'] = array_merge($existing['contacts_index'], $data['contacts_index']);
+        if (isset($data['contacts_index']) && is_array($data['contacts_index'])) {
+            // Merge manual con claves string: array_merge reindexa claves numéricas
+            // (los teléfonos se castean a int) y convertía el índice en lista infinita.
+            foreach ($data['contacts_index'] as $ck => $cv) {
+                $existing['contacts_index'][(string) $ck] = $cv;
+            }
+        }
         if (isset($data['learning'])) {
             foreach (['daily_stats' => [], 'pending_classification' => []] as $lk => $ld) {
                 if (isset($data['learning'][$lk])) {
@@ -187,7 +193,8 @@ if (!function_exists('wasap_ingest_message')) {
                 $chat['messages'] = array_slice($chat['messages'], -500);
             }
 
-            $contactKey = $peerPhone;
+            // Prefijo string: evita que PHP caste el teléfono a int (rompía el merge)
+            $contactKey = 'c_' . $peerPhone;
             if (!isset($store['contacts_index'][$contactKey])) {
                 $store['contacts_index'][$contactKey] = [
                     'name' => $chat['contact_name'] ?? '',
