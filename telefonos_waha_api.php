@@ -104,7 +104,7 @@ function telefonos_waha_dispatch_inner(): void
         return;
     }
 
-    $mutating = in_array($action, ['restart', 'identify', 'evo_qr', 'evo_restart'], true);
+    $mutating = in_array($action, ['restart', 'identify', 'evo_restart'], true);
     if ($mutating) {
         $validation = telefonos_waha_validate_mutation($method, csrf_validate((string)($_POST['csrf_token'] ?? '')));
         if ($validation['status'] !== 200) {
