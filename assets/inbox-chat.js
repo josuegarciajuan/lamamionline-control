@@ -1188,14 +1188,21 @@
         var media = m && m.media;
         var transcription = (m && m.transcription || '').trim();
         var body = m ? formatMessageBody(m.text || '') : '';
-        if (media && media.url) {
-            var proxy = '/control/media_proxy.php?url=' + encodeURIComponent(media.url) + '&type=' + encodeURIComponent(media.type || '');
-            if (media.type === 'audio') {
-                body = '<audio controls style="max-width:220px;display:block;margin:4px 0" src="' + proxy + '"></audio>' + body;
-            } else if (media.type === 'image') {
-                body = '<img src="' + proxy + '" style="max-width:200px;border-radius:8px;display:block;margin:4px 0" alt="Imagen">' + body;
-            } else if (media.type === 'video') {
-                body = '<video controls style="max-width:220px;border-radius:8px;display:block;margin:4px 0" src="' + proxy + '"></video>' + body;
+        if (media) {
+            var proxy = '';
+            if (media.instance && m && m.id) {
+                proxy = '/control/media_proxy.php?instance=' + encodeURIComponent(media.instance) + '&msg_id=' + encodeURIComponent(m.id) + '&type=' + encodeURIComponent(media.type || '');
+            } else if (media.url) {
+                proxy = '/control/media_proxy.php?url=' + encodeURIComponent(media.url) + '&type=' + encodeURIComponent(media.type || '');
+            }
+            if (proxy) {
+                if (media.type === 'audio') {
+                    body = '<audio controls style="max-width:220px;display:block;margin:4px 0" src="' + proxy + '"></audio>' + body;
+                } else if (media.type === 'image') {
+                    body = '<img src="' + proxy + '" style="max-width:200px;border-radius:8px;display:block;margin:4px 0" alt="Imagen">' + body;
+                } else if (media.type === 'video') {
+                    body = '<video controls style="max-width:220px;border-radius:8px;display:block;margin:4px 0" src="' + proxy + '"></video>' + body;
+                }
             }
         }
         if (transcription) {

@@ -171,8 +171,9 @@ class EvolutionApi
      */
     public function setWebhook(string $url, array $events = ['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'SEND_MESSAGE'], bool $byEvents = false): array
     {
-        return $this->call('POST', '/webhook/instance', [
+        return $this->call('POST', "/webhook/set/{$this->instance}", [
             'webhook' => [
+                'enabled' => true,
                 'url' => $url,
                 'webhook_by_events' => $byEvents,
                 'events' => $events,
@@ -191,6 +192,30 @@ class EvolutionApi
     }
 
     /* ─────────────────────────── ENVÍO DE MENSAJES ─────────────────────────── */
+
+    /**
+     * Descarga y descifra la media de un mensaje recibido (getBase64FromMediaMessage).
+     * Devuelve ['base64'=>..., 'mimetype'=>..., 'mediaType'=>..., 'fileName'=>...] o null.
+     *
+     * @param array<string,mixed> $message registro completo del mensaje (key/message/messageType)
+     */
+    public function getMediaBase64(array $message): ?array
+    {
+        $r = $this->call('POST', "/chat/getBase64FromMediaMessage/{$this->instance}", ['message' => $message], 45000);
+        if (!$r['ok'] || !is_array($r['data'])) {
+            return null;
+        }
+        $b64 = (string) ($r['data']['base64'] ?? '');
+        if ($b64 === '') {
+            return null;
+        }
+        return [
+            'base64' => $b64,
+            'mimetype' => (string) ($r['data']['mimetype'] ?? 'application/octet-stream'),
+            'mediaType' => (string) ($r['data']['mediaType'] ?? ''),
+            'fileName' => (string) ($r['data']['fileName'] ?? ''),
+        ];
+    }
 
     /**
      * Envía un mensaje de texto.

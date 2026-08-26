@@ -174,10 +174,17 @@ var ChatOperator = (function() {
     function renderMediaBlock(msg) {
         var media = msg && msg.media;
         var transcription = (msg && msg.transcription || '').trim();
-        if (!media || !media.url) {
+        var proxy = '';
+        if (media) {
+            if (media.instance && msg && msg.id) {
+                proxy = '/control/media_proxy.php?instance=' + encodeURIComponent(media.instance) + '&msg_id=' + encodeURIComponent(msg.id) + '&type=' + encodeURIComponent(media.type || '');
+            } else if (media.url) {
+                proxy = '/control/media_proxy.php?url=' + encodeURIComponent(media.url) + '&type=' + encodeURIComponent(media.type || '');
+            }
+        }
+        if (!proxy) {
             return transcription ? ('<div class="msg-transcription"><em>🎙️ ' + esc(transcription) + '</em></div>') : '';
         }
-        var proxy = '/control/media_proxy.php?url=' + encodeURIComponent(media.url) + '&type=' + encodeURIComponent(media.type || '');
         var html = '';
         if (media.type === 'audio') {
             html += '<audio controls style="max-width:220px;display:block;margin:4px 0" src="' + proxy + '"></audio>';

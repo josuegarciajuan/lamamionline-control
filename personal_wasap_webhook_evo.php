@@ -86,7 +86,7 @@ function personal_wasap_webhook_evo_handle(): void
     $processed = 0;
     foreach ($messages as $msg) {
         if (!is_array($msg)) continue;
-        $ingest = personal_wasap_evo_translate($msg);
+        $ingest = personal_wasap_evo_translate($msg, (string) ($payload['instance'] ?? ''));
         if ($ingest === null) continue;
         wasap_ingest_message($ingest);
         $processed++;

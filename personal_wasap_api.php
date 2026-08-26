@@ -89,7 +89,7 @@ function wasap_sync_evolution_outbound(): int {
         if (!is_array($m)) continue;
         $ts = (int) ($m['messageTimestamp'] ?? 0);
         if ($ts > 0 && $ts < $since) continue; // antiguo: saltar
-        $ingest = personal_wasap_evo_translate($m);
+        $ingest = personal_wasap_evo_translate($m, evolution_instance_name($row));
         if ($ingest === null) continue;
         wasap_ingest_message($ingest);
         $count++;

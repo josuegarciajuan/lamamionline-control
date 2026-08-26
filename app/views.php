@@ -10217,21 +10217,27 @@ if (!empty($sendtaxsState)) {
                 // ── Render de media recibida (imagen/audio/vídeo) ──
                 function wasapRenderMedia(m) {
                     var media = m.media;
-                    if (!media || !media.url) return "";
-                    var url = "/control/media_proxy.php?url=" + encodeURIComponent(media.url) + "&type=" + encodeURIComponent(media.type || "");
+                    if (!media) return "";
+                    var src = "";
+                    if (media.instance && m.id) {
+                        src = "/control/media_proxy.php?instance=" + encodeURIComponent(media.instance) + "&msg_id=" + encodeURIComponent(m.id) + "&type=" + encodeURIComponent(media.type || "");
+                    } else if (media.url) {
+                        src = "/control/media_proxy.php?url=" + encodeURIComponent(media.url) + "&type=" + encodeURIComponent(media.type || "");
+                    }
+                    if (!src) return "";
                     if (media.type === "image") {
-                        return "<div style=\"margin:6px 0\"><img src=\"" + url + "\" alt=\"Imagen\" style=\"max-width:220px;max-height:260px;border-radius:8px;display:block\"></div>";
+                        return "<div style=\"margin:6px 0\"><img src=\"" + src + "\" alt=\"Imagen\" style=\"max-width:220px;max-height:260px;border-radius:8px;display:block\"></div>";
                     }
                     if (media.type === "audio") {
-                        var ah = "<div style=\"margin:6px 0\"><audio controls style=\"max-width:220px\" src=\"" + url + "\"></audio>";
+                        var ah = "<div style=\"margin:6px 0\"><audio controls style=\"max-width:220px\" src=\"" + src + "\"></audio>";
                         if (media.transcription) ah += "<div style=\"font-style:italic;color:var(--muted);font-size:12px;margin-top:3px\">🎙️ " + esc(media.transcription) + "</div>";
                         return ah + "</div>";
                     }
                     if (media.type === "video") {
-                        return "<div style=\"margin:6px 0\"><video controls style=\"max-width:240px;border-radius:8px\" src=\"" + url + "\"></video></div>";
+                        return "<div style=\"margin:6px 0\"><video controls style=\"max-width:240px;border-radius:8px\" src=\"" + src + "\"></video></div>";
                     }
                     if (media.type === "document") {
-                        return "<div style=\"margin:6px 0\"><a href=\"" + url + "\" target=\"_blank\" rel=\"noopener\">📄 " + esc(media.fileName || "Documento") + "</a></div>";
+                        return "<div style=\"margin:6px 0\"><a href=\"" + src + "\" target=\"_blank\" rel=\"noopener\">📄 " + esc(media.fileName || "Documento") + "</a></div>";
                     }
                     return "";
                 }

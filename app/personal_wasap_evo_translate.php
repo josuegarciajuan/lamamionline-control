@@ -32,9 +32,10 @@ if (!function_exists('personal_wasap_evo_translate')) {
     /**
      * Traduce un mensaje de Evolution al formato de wasap_ingest_message().
      * @param array<string,mixed> $msg
+     * @param string $instance nombre de instancia Evolution (para el proxy de media)
      * @return array<string,mixed>|null
      */
-    function personal_wasap_evo_translate(array $msg): ?array
+    function personal_wasap_evo_translate(array $msg, string $instance = ''): ?array
     {
         $key = $msg['key'] ?? [];
         $remoteJid = (string)($key['remoteJid'] ?? '');
@@ -62,6 +63,9 @@ if (!function_exists('personal_wasap_evo_translate')) {
             if ($trans !== null) {
                 $media['transcription'] = $trans;
             }
+        }
+        if ($media !== null && $instance !== '') {
+            $media['instance'] = $instance;
         }
 
         $direction = $fromMe ? 'out' : 'in';

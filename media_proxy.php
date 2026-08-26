@@ -33,8 +33,65 @@ if ($url === '') {
 }
 
 $type = strtolower(trim((string) ($_GET['type'] ?? '')));
-$allowHosts = ['minio:9000', '127.0.0.1:9000', '100.117.92.74:9000', 'localhost:9000'];
 $allowedType = in_array($type, ['image', 'audio', 'video', 'document'], true) ? $type : '';
+
+// ── Modo 2: media recibida de Evolution descifrada on-demand (instance + msg_id) ──
+$instance = trim((string) ($_GET['instance'] ?? ''));
+$msgId = trim((string) ($_GET['msg_id'] ?? ''));
+if ($instance !== '' && $msgId !== '') {
+    $cfg = evolution_config();
+    if ($cfg['api_key'] === '') {
+        http_response_code(502);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'error' => 'evolution not configured']);
+        exit;
+    }
+    $evo = new EvolutionApi($cfg['host'], $cfg['api_key'], $instance, 45);
+    // Localizar el mensaje por id (findMessages devuelve los recientes; escaneamos)
+    $found = null;
+    $res = $evo->findMessages([], 200, 0, ['messageTimestamp' => 'desc']);
+    foreach ($res['data']['messages']['records'] ?? [] as $rec) {
+        if (is_array($rec) && (string) ($rec['key']['id'] ?? '') === $msgId) {
+            $found = $rec;
+            break;
+        }
+    }
+    if ($found === null) {
+        http_response_code(404);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'error' => 'message not found']);
+        exit;
+    }
+    $media = $evo->getMediaBase64($found);
+    if ($media === null) {
+        http_response_code(502);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'error' => 'media decrypt failed']);
+        exit;
+    }
+    $bytes = base64_decode((string) $media['base64'], true);
+    if ($bytes === false) {
+        http_response_code(502);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'error' => 'invalid base64']);
+        exit;
+    }
+    header('Content-Type: ' . ($media['mimetype'] !== '' ? $media['mimetype'] : ($allowedType === 'image' ? 'image/jpeg' : 'application/octet-stream')));
+    header('Cache-Control: private, max-age=86400');
+    header('X-Content-Type-Options: nosniff');
+    header('Content-Length: ' . strlen($bytes));
+    echo $bytes;
+    exit;
+}
+
+// ── Modo 1: MinIO (media ya descifrada) ──
+if ($url === '') {
+    http_response_code(400);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => false, 'error' => 'url or instance+msg_id required']);
+    exit;
+}
+$allowHosts = ['minio:9000', '127.0.0.1:9000', '100.117.92.74:9000', 'localhost:9000'];
 
 // ── Validar URL (anti-SSRF): solo nuestro MinIO ──
 $parsed = parse_url($url);

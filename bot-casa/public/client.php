@@ -1667,7 +1667,7 @@ function updateAllCsrfInputs(token) {
     };
 })();
 </script>
-<script src="assets/chat.js?v=20260826_1"></script>
+<script src="assets/chat.js?v=20260826_2"></script>
 <script src="assets/tutorial.js?v=20260825_5"></script>
 <script>
 var _csrf = <?php echo json_encode(generateCsrfToken()); ?>;
