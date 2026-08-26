@@ -81,17 +81,29 @@ function wasap_sync_evolution_outbound(): int {
     $row = wasap_personal_line_row();
     if (!is_array($row)) return 0;
     $evo = evolution_client_for_row($row);
+    // Índice de ids ya ingeridos (evita re-transcribir audios en cada poll)
+    $store = wasap_ingest_store_read();
+    $known = [];
+    foreach ($store['chats'] ?? [] as $c) {
+        foreach ($c['messages'] ?? [] as $em) {
+            $mid = (string) ($em['id'] ?? '');
+            if ($mid !== '') $known[$mid] = true;
+        }
+    }
     $since = time() - 900; // últimos 15 minutos
     $res = $evo->findMessages([], 200, 0, ['messageTimestamp' => 'desc']);
     $records = $res['data']['messages']['records'] ?? [];
     $count = 0;
     foreach ($records as $m) {
         if (!is_array($m)) continue;
+        $mid = (string) ($m['key']['id'] ?? '');
+        if ($mid !== '' && isset($known[$mid])) continue; // ya ingerido: no re-transcribir
         $ts = (int) ($m['messageTimestamp'] ?? 0);
         if ($ts > 0 && $ts < $since) continue; // antiguo: saltar
         $ingest = personal_wasap_evo_translate($m, evolution_instance_name($row));
         if ($ingest === null) continue;
         wasap_ingest_message($ingest);
+        $known[$mid] = true;
         $count++;
     }
     return $count;
