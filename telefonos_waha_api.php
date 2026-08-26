@@ -181,9 +181,10 @@ function telefonos_waha_dispatch_inner(): void
             // Reintentar hasta que el QR esté disponible (instancias nuevas tardan unos segundos)
             $lastError = 'No se pudo obtener el QR de Evolution';
             for ($attempt = 1; $attempt <= 5; $attempt++) {
-                $qr = $client->getQr(true);
-                if ($qr['ok'] && !empty($qr['data']['base64'])) {
-                    telefonos_waha_json(['ok' => true, 'http_status' => 200, 'qr_base64' => $qr['data']['base64'], 'instance' => $client->instanceName()]);
+                $qr = $client->getQr(false);
+                $raw = $qr['data']['base64_raw'] ?? '';
+                if ($qr['ok'] && $raw !== '') {
+                    telefonos_waha_json(['ok' => true, 'http_status' => 200, 'qr_base64' => $raw, 'instance' => $client->instanceName()]);
                     return;
                 }
                 $lastError = $qr['error'] ?? $lastError;
