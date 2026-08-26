@@ -107,6 +107,12 @@ function webhookPausedThreadsPath(int $userId): string
 try {
     // ── Resolve user_id from the incoming payload (last9 → user_id) ──
     $rawBody = file_get_contents('php://input');
+    // Override para el receptor de Evolution (webhook_evo.php): permite reutilizar
+    // todo este flujo con un body ya traducido a forma WAHA.
+    if (isset($GLOBALS['WASAPBOT_OVERRIDE_BODY']) && is_string($GLOBALS['WASAPBOT_OVERRIDE_BODY']) && $GLOBALS['WASAPBOT_OVERRIDE_BODY'] !== '') {
+        $rawBody = $GLOBALS['WASAPBOT_OVERRIDE_BODY'];
+        unset($GLOBALS['WASAPBOT_OVERRIDE_BODY']);
+    }
     if ($rawBody === false || $rawBody === '') {
         http_response_code(400);
         header('Content-Type: application/json; charset=utf-8');
