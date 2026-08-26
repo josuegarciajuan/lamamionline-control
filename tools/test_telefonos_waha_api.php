@@ -47,6 +47,12 @@ foreach (['lite', 'telefono', 'coche', 'nuria', ''] as $username) {
     $_SESSION = ['logged_in' => true, 'username' => $username];
     twa_test_assert(!auth_is_admin(), "deniega identidad no admin {$username}");
 }
+$_SESSION = ['logged_in' => true, 'username' => 'lite'];
+twa_test_assert(!auth_can_manage_telefonos(), 'lite permanece bloqueado antes de desbloquear adicionales');
+$_SESSION['josue_adicionales_unlocked'] = true;
+twa_test_assert(auth_can_manage_telefonos(), 'lite gestiona teléfonos tras desbloquear adicionales');
+$_SESSION = ['logged_in' => true, 'username' => 'telefono'];
+twa_test_assert(auth_can_manage_telefonos(), 'telefono conserva gestión de teléfonos');
 $_SESSION = ['logged_in' => true, 'username' => 'josue', 'auth_via_device' => true];
 twa_test_assert(auth_is_admin(), 'trusted-device josue conserva acceso admin');
 $_SESSION = [];
@@ -276,8 +282,8 @@ $apiSource = (string)file_get_contents($root . '/telefonos_waha_api.php');
 $viewsSource = (string)file_get_contents($root . '/app/views.php');
 $commercialSource = (string)file_get_contents($root . '/app/comercial.php');
 $actionsSource = (string)file_get_contents($root . '/app/actions.php');
-twa_test_assert(strpos($apiSource, 'auth_is_admin()') !== false, 'dispatch comprueba admin');
-twa_test_assert(strpos($apiSource, 'auth_is_admin()') < strpos($apiSource, "storage_read('telefonos.json')"), '403 ocurre antes de lookup');
+twa_test_assert(strpos($apiSource, 'auth_can_manage_telefonos()') !== false, 'dispatch comprueba permiso de teléfonos');
+twa_test_assert(strpos($apiSource, 'auth_can_manage_telefonos()') < strpos($apiSource, "storage_read('telefonos.json')"), '403 ocurre antes de lookup');
 twa_test_assert(strpos($apiSource, 'catch (Throwable $e)') !== false, 'dispatch captura Throwable');
 twa_test_assert(strpos($viewsSource, 'Legacy WAHA script') === false, 'UI no conserva JS legado comentado');
 twa_test_assert(strpos($viewsSource, 'identifyResult[id] = "Enviado desde "') !== false && strpos($viewsSource, 'result.textContent = identifyResult[id]') !== false, 'UI muestra éxito seguro incluso deduplicado');
@@ -294,7 +300,10 @@ foreach ([
 foreach (['action_save_telefono', 'action_delete_telefono', 'action_save_comercial_settings'] as $function) {
     $start = strpos($actionsSource, 'function ' . $function . '(');
     $slice = $start === false ? '' : substr($actionsSource, $start, 700);
-    twa_test_assert(strpos($slice, 'auth_is_admin()') !== false && strpos($slice, 'csrf_validate') !== false, "{$function} aplica admin y CSRF en servidor");
+    $permissionCheck = in_array($function, ['action_save_telefono', 'action_delete_telefono'], true)
+        ? 'auth_can_manage_telefonos()'
+        : 'auth_is_admin()';
+    twa_test_assert(strpos($slice, $permissionCheck) !== false && strpos($slice, 'csrf_validate') !== false, "{$function} aplica permiso y CSRF en servidor");
 }
 
 exit($failures === 0 ? 0 : 1);

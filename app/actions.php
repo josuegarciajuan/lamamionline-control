@@ -3193,11 +3193,20 @@ function action_jostal_send_deuda_wasap() {
 }
 
 function action_unlock_josue_anuncios() {
+    if (!is_logged_in()) {
+        set_flash('error', 'Debes iniciar sesión.');
+        redirect_to('index.php?page=login');
+    }
+    if (!csrf_validate((string)request_post('csrf_token'))) {
+        set_flash('error', 'La sesión del formulario ha caducado. Recarga la página e inténtalo de nuevo.');
+        redirect_to('index.php?page=josue');
+    }
     $password = trim(request_post('password'));
 
     if ($password === 'hola1234') {
+        $_SESSION['josue_adicionales_unlocked'] = true;
         $_SESSION['josue_anuncios_unlocked'] = true;
-        set_flash('ok', 'Sección Anuncios desbloqueada.');
+        set_flash('ok', 'Secciones Anuncios y Teléfonos desbloqueadas.');
     } else {
         set_flash('error', 'Contraseña incorrecta.');
     }
@@ -4430,7 +4439,7 @@ function action_set_publicista_task_status() {
 
 function action_save_telefono() {
     // Admin o usuario 'telefono' (dispositivo móvil) gestionan las líneas
-    if (!auth_is_admin() && ($_SESSION['username'] ?? '') !== 'telefono') {
+    if (!auth_can_manage_telefonos()) {
         set_flash('error', 'Acceso denegado.');
         redirect_to(comercial_page_url('lineas'));
     }
@@ -4480,7 +4489,7 @@ function action_save_telefono() {
 
 function action_delete_telefono() {
     // Admin o usuario 'telefono' (dispositivo móvil) gestionan las líneas
-    if (!auth_is_admin() && ($_SESSION['username'] ?? '') !== 'telefono') {
+    if (!auth_can_manage_telefonos()) {
         set_flash('error', 'Acceso denegado.');
         redirect_to(comercial_page_url('lineas'));
     }
