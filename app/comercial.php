@@ -523,11 +523,17 @@ function comercial_default_process_seed($slug) {
     if ($slug === 'shhexxchollos') {
         $base['nombre'] = 'Shhexxchollos';
         $base['enabled'] = 0;
-        $base['daily_target_percent'] = 0;
-        $base['source_type'] = 'jsonl_queue';
+        $base['daily_target_percent'] = 12;
+        $base['source_type'] = 'mysql_recent';
         $base['source_queue_files'] = array();
-        $base['source_mysql_query'] = '';
-        $base['assigned_line_ids'] = array();
+        $base['source_mysql_query'] = "SELECT id, telefono, updatedsamp, nombre_comercial FROM f_clientes WHERE baja = 0 ORDER BY updatedsamp DESC LIMIT 300";
+        $base['assigned_line_ids'] = comercial_guess_line_ids(array('jostal dulce', 'nuria-jostal'));
+        $base['message_templates'] = array();
+        $base['followup_templates'] = array();
+        $base['positive_keywords'] = array('info', 'interesa', 'interesada', 'precio', 'como', 'cómo', 'vale', 'ok', 'si', 'sí', 'chollo', 'chollos', 'oferta', 'ofertas', 'descuento', 'descuentos', 'enlace', 'link', 'web', 'dónde', 'donde', 'mira', 'ver', 'quiero', 'dale', 'perfecto', 'compartir', 'amiga', 'amigas', 'vistazo', 'probar', 'probarlo');
+        $base['ia_context_prompt'] = ''; // Ahora se usa comercial_knowledge_get('shhexxchollos')
+        $base['conversation_max_auto_turns'] = 5;
+        $base['escalation_score_threshold'] = 78;
         return $base;
     }
 
@@ -8216,24 +8222,29 @@ function render_comercial_page() {
             echo '<div class="field"><label>Intervalo calculado</label><input type="text" value="' . e((string)round($selectedPlan['min_seconds'] / 60)) . '–' . e((string)round($selectedPlan['max_seconds'] / 60)) . ' min" readonly></div>';
             echo '</div>';
 
+            $isMysql = (string)($selectedProcess['source_type'] ?? '') === 'mysql_recent';
+            $isQueue = (string)($selectedProcess['source_type'] ?? '') === 'jsonl_queue';
+            echo '<div id="comercial-mysql-block"' . ($isMysql ? '' : ' style="display:none;"') . '>';
             echo '<div class="form-grid-2">';
             comercial_field_text('source_mysql_host', 'MySQL host', $selectedProcess['source_mysql_host']);
             comercial_field_text('source_mysql_db', 'MySQL DB', $selectedProcess['source_mysql_db']);
             comercial_field_text('source_mysql_user', 'MySQL user', $selectedProcess['source_mysql_user']);
             comercial_field_text('source_mysql_pass', 'MySQL pass', $selectedProcess['source_mysql_pass']);
             echo '</div>';
-            comercial_field_textarea('source_mysql_query', 'Consulta MySQL', $selectedProcess['source_mysql_query'], 5);
+            comercial_field_textarea('source_mysql_query', 'Consulta MySQL (números de envío)', $selectedProcess['source_mysql_query'], 5);
+            echo '</div>';
+            echo '<div id="comercial-queue-block"' . ($isQueue ? '' : ' style="display:none;"') . '>';
             comercial_field_text('source_phone_field', 'Campo teléfono JSONL', $selectedProcess['source_phone_field']);
             comercial_field_textarea('source_queue_files', 'Rutas de colas JSONL (una por línea)', comercial_array_to_textarea($selectedProcess['source_queue_files']), 5);
             echo '<div class="field-help" style="margin-top:-6px; margin-bottom:12px;">Para este proyecto, las colas por defecto viven en <code>data/comercial_queues/</code>. Cada línea del fichero debe ser un JSON y el teléfono debe ir en el campo <code>' . e($selectedProcess['source_phone_field']) . '</code> (por defecto <code>group_key</code>).</div>';
-            comercial_field_textarea('message_templates', 'Textos iniciales (una variante por bloque, separados por línea con ---)', comercial_templates_to_textarea(comercial_process_message_pool($selectedProcess, 'message_templates')), 18);
-            comercial_field_textarea('followup_templates', 'Textos de seguimiento (una variante por bloque, separados por línea con ---)', comercial_templates_to_textarea(comercial_process_message_pool($selectedProcess, 'followup_templates')), 10);
+            echo '</div>';
+            echo '<div class="info-strip" style="margin-bottom:12px;">Los mensajes iniciales y de seguimiento los genera la IA en tiempo real según la base de conocimiento de la rama (KB). No hace falta escribir textos aquí; el campo <strong>Contexto IA</strong> sirve para afinar tono y objetivo.</div>';
             comercial_field_textarea('positive_keywords', 'Palabras qualified (una por línea)', comercial_array_to_textarea($selectedProcess['positive_keywords']), 5);
             comercial_field_textarea('negative_keywords', 'Keywords negativas (una por línea)', comercial_array_to_textarea($selectedProcess['negative_keywords']), 5);
 
             // --- Campos IA ---
             comercial_field_textarea('ia_context_prompt', 'Contexto IA (instrucciones de tono y objetivo)', (string)($selectedProcess['ia_context_prompt'] ?? ''), 8);
-            echo '<div class="field-help" style="margin-top:-6px; margin-bottom:12px;">Texto que se inyecta en el prompt de la IA para definir el tono, objetivo comercial y estilo de conversación.</div>';
+            echo '<div class="field-help" style="margin-top:-6px; margin-bottom:12px;">Si se deja vacío, la IA usa la base de conocimiento de la rama (KB). Rellénalo solo si quieres añadir instrucciones extra de tono u objetivo.</div>';
             comercial_field_textarea('signal_detection_rules', 'Reglas de detección de señales (formato: frase|señal|confianza)', comercial_array_to_textarea($selectedProcess['signal_detection_rules'] ?? array()), 10);
             echo '<div class="field-help" style="margin-top:-6px; margin-bottom:12px;">Una regla por línea. Ej: "quiero comprar|wa.intent_buy_explicit|0.90"</div>';
             echo '<div class="form-grid-2">';
@@ -8264,6 +8275,21 @@ function render_comercial_page() {
 
             echo '<div class="toolbar"><button type="submit" class="btn-primary">Guardar proceso</button></div>';
             echo '</form>';
+            echo '<script>
+(function () {
+    var sel = document.querySelector("select[name=\"source_type\"]");
+    var mysqlBlock = document.getElementById("comercial-mysql-block");
+    var queueBlock = document.getElementById("comercial-queue-block");
+    if (!sel || !mysqlBlock || !queueBlock) return;
+    function syncSourceType() {
+        var v = sel.value;
+        mysqlBlock.style.display = (v === "mysql_recent") ? "" : "none";
+        queueBlock.style.display = (v === "jsonl_queue") ? "" : "none";
+    }
+    sel.addEventListener("change", syncSourceType);
+    syncSourceType();
+})();
+</script>';
             echo '<form method="post" style="margin-top:8px;">';
             echo '<input type="hidden" name="action" value="comercial_run_tick">';
             echo '<input type="hidden" name="process_id" value="' . e($selectedProcess['id']) . '">';
