@@ -236,12 +236,11 @@ function comercial_agent_build_phase_prompt(string $processSlug, string $mode, s
     // ── Contenido fase-específico ──
     switch ($phase) {
         case 'SALUDO_INICIAL':
-            $openers = $kb['openers'] ?? array();
-            if (!empty($openers)) {
-                $samples = array_slice($openers, 0, 3);
-                $sections[] = "═══ EJEMPLOS DE APERTURAS ═══\n" . implode("\n---\n", array_map(function($o, $i) { return ($i+1).') "'.$o.'"'; }, $samples, array_keys($samples)));
+            $openingGuidance = $kb['opening_guidance'] ?? array();
+            if (!empty($openingGuidance)) {
+                $sections[] = "═══ IDEAS PARA LA APERTURA ═══\n- " . implode("\n- ", $openingGuidance);
             }
-            $sections[] = "═══ REGLAS DE ESTA FASE ═══\n- Máximo 4 líneas.\n- Un solo tema.\n- Ir directo al producto, sin presentación ni 'hola'.\n- NUNCA 'somos del equipo', 'soy X', autoreferencia.\n- NUNCA precio, web, ni features completas.\n- Terminar con pregunta abierta.\n- 1 emoji máximo.";
+             $sections[] = "═══ REGLAS DE ESTA FASE ═══\n- Máximo 4 líneas.\n- Un solo tema.\n- Ir directo al producto, sin presentación ni 'hola'.\n- NUNCA 'somos del equipo', 'soy X', autoreferencia.\n- NUNCA precio ni porcentajes. Solo bajo demanda.\n- No usar preguntas retóricas ni encadenar preguntas.\n- Terminar con una invitación natural a responder.\n- 1 emoji máximo.";
             $sections[] = "═══ EJEMPLO MALO ═══\n\"Hola, soy de Casa Burriana. Ofrecemos habitaciones y plazas con wifi, smartTV, limpieza diaria, sábanas incluidas. Dos modalidades: plaza 60/40 y alquiler...\" → DEMASIADO LARGO, autoreferencia, suelta todo de golpe.";
             break;
 
@@ -382,10 +381,11 @@ function comercial_agent_generate_opener(array $thread, string $processSlug, str
         "- NO uses frases genéricas de telemarketing.\n" .
         "- NO empieces siempre con 'Hola'. Varía el saludo.\n" .
         "- Sé breve (máximo 4 líneas de WhatsApp).\n" .
-        "- Incluye un CTA suave (pregunta abierta, invitación a responder).\n" .
+         "- Incluye una invitación suave a responder, sin pregunta retórica.\n" .
         "- NO preguntes '¿cómo estás?' de forma genérica.\n" .
-        "- Usa la información de la sección LO QUE VENDES con naturalidad.\n" .
-        "- Si hay precios, menciónalos sin que suene a catálogo.\n" .
+         "- Usa la información de la sección LO QUE VENDES con naturalidad.\n" .
+         "- No menciones precios ni porcentajes en la apertura, aunque estén en la base; solo bajo demanda.\n" .
+         "- Evita los signos iniciales ¿ y ¡.\n" .
         "- RESPONDE ÚNICAMENTE con el texto del mensaje. Nada más.";
 
     // reasoning_effort low: el opener de campaña no es hot-path (se envía por cron),
@@ -450,6 +450,8 @@ function comercial_agent_generate_reply(array $thread, string $processSlug, stri
         "- NO insistas más de 2 veces sobre el mismo punto.\n" .
         "- NO inventes datos, precios ni URLs.\n" .
         "- NO uses el mismo patrón de respuesta que los mensajes anteriores tuyos.\n" .
+        "- Evita los signos iniciales ¿ y ¡; escribe con puntuación natural de WhatsApp.\n" .
+        "- Evita preguntas retóricas y no encadenes preguntas innecesarias.\n" .
         "- NUNCA presiones ni fuerces el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', 'te lo dejo funcionando hoy', urgencia fabricada ('hoy mismo', 'ya').\n" .
         "- Si el cliente pidió SOLO información, responde esa información y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?'). No pidas activar/empezar sin intención clara de compra.\n" .
         "- RESPONDE ÚNICAMENTE con el texto del mensaje. Nada más.";

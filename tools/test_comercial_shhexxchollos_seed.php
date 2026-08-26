@@ -9,6 +9,8 @@ require_once APP_PATH . '/helpers.php';
 require_once APP_PATH . '/db.php';
 require_once APP_PATH . '/storage.php';
 require_once APP_PATH . '/comercial.php';
+require_once APP_PATH . '/comercial_knowledge.php';
+require_once APP_PATH . '/comercial_knowledge_v2.php';
 
 function shhexxchollos_assert($condition, $label) {
     $stream = $condition ? STDOUT : STDERR;
@@ -29,9 +31,32 @@ $pass = shhexxchollos_assert($seed['assigned_line_ids'] === array(), 'la semilla
 $defaults = comercial_build_default_processes();
 $defaultSlugs = array_column($defaults, 'slug');
 $pass = shhexxchollos_assert(in_array('shhexxchollos', $defaultSlugs, true), 'la semilla forma parte de los procesos por defecto') && $pass;
+$shhexxKnowledge = comercial_knowledge_get('shhexxchollos');
+$pass = shhexxchollos_assert(strpos($shhexxKnowledge['product'], 'https://shhexxchollos.com') !== false, 'la knowledge v1 incluye la web') && $pass;
+$shhexxV2 = comercial_knowledge_v2_get('shhexxchollos', 'SALUDO_INICIAL');
+$pass = shhexxchollos_assert(strpos(implode(' ', $shhexxV2['opening_guidance']), 'https://shhexxchollos.com') !== false, 'la knowledge v2 incluye la web en apertura') && $pass;
+$pass = shhexxchollos_assert(comercial_default_process_seed('publicista')['daily_target_percent'] === 0, 'publicista no tiene prospección proactiva') && $pass;
+$publiscortSeed = comercial_default_process_seed('publiscort');
+$pass = shhexxchollos_assert((int)$publiscortSeed['enabled'] === 1, 'publiscort está activo') && $pass;
+$pass = shhexxchollos_assert((float)$publiscortSeed['daily_target_percent'] === 25.0, 'publiscort usa el 25% del objetivo') && $pass;
+$pass = shhexxchollos_assert(strpos(comercial_knowledge_get('publiscort')['pricing'], '40€') !== false, 'publiscort mantiene 40€ en knowledge v1') && $pass;
+$pass = shhexxchollos_assert(strpos((string)comercial_knowledge_v2_get('publiscort', 'PRESENTACION')['pricing'], '40€') !== false, 'publiscort mantiene 40€ en knowledge v2') && $pass;
+$pass = shhexxchollos_assert(comercial_default_process_seed('publicista')['daily_target_percent'] === 0, 'publicista no tiene prospección proactiva') && $pass;
+$lamamiV2 = comercial_knowledge_v2_get('lamami', 'SALUDO_INICIAL');
+$pass = shhexxchollos_assert(strpos(implode(' ', $lamamiV2['opening_guidance']), 'No mencionar precios') !== false, 'LaMami abre de forma progresiva y sin precios') && $pass;
+$plazaV1 = comercial_knowledge_get('plaza');
+$pass = shhexxchollos_assert(strpos($plazaV1['product'], '50/50') !== false && strpos($plazaV1['pricing'], '150€ y 170€') !== false, 'Plaza mantiene 50/50 y alquiler 150-170') && $pass;
+$casawasapV2 = comercial_knowledge_v2_get('casawasap', 'SALUDO_INICIAL');
+$pass = shhexxchollos_assert(strpos(implode(' ', $casawasapV2['opening_guidance']), 'No mencionar precio') !== false, 'CasaWasap abre sin precio ni preguntas retóricas') && $pass;
+$pass = shhexxchollos_assert(comercial_default_process_seed('lamami')['ia_opener_enabled'] === 1, 'LaMami usa apertura LLM') && $pass;
+$pass = shhexxchollos_assert(comercial_default_process_templates('plaza') === array(), 'no hay plantillas fijas de apertura') && $pass;
 
 storage_write('comercial_processes.json', array(comercial_default_process_seed('lamami')));
 $migrated = comercial_get_processes();
+$migratedPubliscort = array_values(array_filter($migrated, function ($process) {
+    return ($process['slug'] ?? '') === 'publiscort';
+}));
+$pass = shhexxchollos_assert(count($migratedPubliscort) === 1 && (int)$migratedPubliscort[0]['enabled'] === 1 && (float)$migratedPubliscort[0]['daily_target_percent'] === 25.0, 'la migración reactiva Publiscort al 25%') && $pass;
 $matches = array_values(array_filter($migrated, function ($process) {
     return ($process['slug'] ?? '') === 'shhexxchollos';
 }));
