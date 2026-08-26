@@ -8399,6 +8399,8 @@ function render_configm_section() {
 function render_josue_page() {
     $anunciosUnlocked = !empty($_SESSION['josue_anuncios_unlocked']);
     $isAdmin = auth_is_admin();
+    // El usuario 'telefono' (dispositivo móvil) ve y gestiona las líneas (Telefonos) igual que el admin.
+    $canManageTelefonos = $isAdmin || (($_SESSION['username'] ?? '') === 'telefono');
 
     // Modo Lite (coche): auto-desbloquear anuncios — el usuario no puede interactuar con el formulario
     if (($_SESSION['username'] ?? '') === 'lite' && !$anunciosUnlocked) {
@@ -8412,7 +8414,7 @@ function render_josue_page() {
 
     $tab = request_get('tab', 'publias');
     $allowed = array('publias', 'captacion', 'sendtaxs', 'notas', 'autotube', 'reproductor', 'waha', 'agenda', 'eurekas', 'config', 'configm', 'rutas', 'diario');
-    if ($isAdmin) {
+    if ($canManageTelefonos) {
         $allowed[] = 'telefonos';
     }
     if ($anunciosUnlocked) {
@@ -8493,7 +8495,7 @@ function render_josue_page() {
     if ($anunciosUnlocked) {
         echo '<a class="subtab ' . ($tab === 'anuncios' ? 'active' : '') . '" href="index.php?page=josue&tab=anuncios">Anuncios</a>';
     }
-    if ($isAdmin) {
+    if ($canManageTelefonos) {
         echo '<a class="subtab ' . ($tab === 'telefonos' ? 'active' : '') . '" href="index.php?page=josue&tab=telefonos">Telefonos</a>';
     }
     // echo '<a class="subtab ' . ($tab === 'waha' ? 'active' : '') . '" href="index.php?page=josue&tab=waha">WAHA</a>';

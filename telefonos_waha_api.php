@@ -91,7 +91,8 @@ function telefonos_waha_get_qr(array $config): array
 function telefonos_waha_dispatch_inner(): void
 {
     $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
-    $access = telefonos_waha_authorize(is_logged_in(), auth_is_admin());
+    $canManageTelefonos = auth_is_admin() || (($_SESSION['username'] ?? '') === 'telefono');
+    $access = telefonos_waha_authorize(is_logged_in(), $canManageTelefonos);
     if ($access['status'] !== 200) {
         telefonos_waha_json(['ok' => false, 'error' => $access['error']], $access['status']);
         return;

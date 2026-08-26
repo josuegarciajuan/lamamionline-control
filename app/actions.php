@@ -4429,7 +4429,8 @@ function action_set_publicista_task_status() {
 }
 
 function action_save_telefono() {
-    if (!auth_is_admin()) {
+    // Admin o usuario 'telefono' (dispositivo móvil) gestionan las líneas
+    if (!auth_is_admin() && ($_SESSION['username'] ?? '') !== 'telefono') {
         set_flash('error', 'Acceso denegado.');
         redirect_to(comercial_page_url('lineas'));
     }
@@ -4478,7 +4479,8 @@ function action_save_telefono() {
 }
 
 function action_delete_telefono() {
-    if (!auth_is_admin()) {
+    // Admin o usuario 'telefono' (dispositivo móvil) gestionan las líneas
+    if (!auth_is_admin() && ($_SESSION['username'] ?? '') !== 'telefono') {
         set_flash('error', 'Acceso denegado.');
         redirect_to(comercial_page_url('lineas'));
     }
