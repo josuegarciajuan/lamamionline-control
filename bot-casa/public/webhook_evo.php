@@ -120,6 +120,10 @@ function wasapbot_evo_translate(array $msg, array $line): ?array
     $transcription = '';
     if ($mediaInfo !== null && ($mediaInfo['type'] ?? '') === 'audio' && function_exists('whatsapp_transcribe_media')) {
         $trans = whatsapp_transcribe_media($mediaInfo);
+        if ($trans === null && function_exists('whatsapp_transcribe_media_message')) {
+            // Media recibida cifrada (CDN): descifrar vía Evolution y transcribir
+            $trans = whatsapp_transcribe_media_message($msg, evolution_instance_name($line));
+        }
         if ($trans !== null) $transcription = trim($trans);
     }
 
