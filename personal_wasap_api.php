@@ -72,24 +72,21 @@ function wasap_personal_line_row(): ?array {
 }
 
 /**
- * Captura los "salientes nativos" (mensajes enviados desde el móvil primario) de
- * Evolution, que el webhook no emite. Sondea findMessages(fromMe=true) recientes
- * y los persiste. Devuelve cuántos se ingresaron.
+ * Captura mensajes recientes de Evolution (entrantes y salientes del móvil) que
+ * el webhook no emite de forma fiable (MESSAGES_UPSERT). Sondea findMessages
+ * (devuelve ~50 registros recientes mezclados) y persiste los nuevos.
  */
 function wasap_sync_evolution_outbound(): int {
     if (wasap_personal_transport() !== 'evolution') return 0;
     $row = wasap_personal_line_row();
     if (!is_array($row)) return 0;
     $evo = evolution_client_for_row($row);
-    // findMessages ignora where/take en esta versión: devuelve ~50 registros recientes
-    // mezclados. Escaneamos todos y filtramos en PHP por fromMe=true y ventana reciente.
     $since = time() - 900; // últimos 15 minutos
     $res = $evo->findMessages([], 200, 0, ['messageTimestamp' => 'desc']);
     $records = $res['data']['messages']['records'] ?? [];
     $count = 0;
     foreach ($records as $m) {
         if (!is_array($m)) continue;
-        if (empty($m['key']['fromMe'])) continue;
         $ts = (int) ($m['messageTimestamp'] ?? 0);
         if ($ts > 0 && $ts < $since) continue; // antiguo: saltar
         $ingest = personal_wasap_evo_translate($m);
