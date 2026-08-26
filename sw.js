@@ -3,7 +3,7 @@ const CACHE = 'lamami-lite-v13';
 
 const PRECACHE = [
   '/control/assets/lite.css?v=1785145047',
-  '/control/assets/app.js?v=1785492066',
+  '/control/assets/app.js?v=1787697741',
   '/control/manifest-lite.json?v=1784940661',
   '/control/icon-192.png',
   '/control/icon-512.png',
