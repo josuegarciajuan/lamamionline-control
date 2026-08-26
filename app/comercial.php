@@ -2280,6 +2280,12 @@ function comercial_thread_history($thread, $limit = 1500) {
             'text' => $text,
             'label' => '',
         );
+        if (!empty($payload['transcription'])) {
+            $entry['transcription'] = trim((string)($payload['transcription']));
+        }
+        if (isset($payload['media']) && is_array($payload['media'])) {
+            $entry['media'] = $payload['media'];
+        }
 
         if (in_array($type, array('send_ok', 'manual_outbound_sent', 'qualified_auto_reply_sent', 'thread_message_sent'), true) && $text !== '') {
             $entry['direction'] = 'out';
@@ -7084,6 +7090,36 @@ function comercial_agent_normalize_intent_for_handler($classification) {
     return $classification;
 }
 
+/**
+ * Extrae info de media (audio/imagen/vídeo) de un payload comercial (WAHA/Evolution).
+ * @param array<string,mixed> $payload
+ * @return array<string,mixed>|null
+ */
+function comercial_inbound_media_info(array $payload): ?array
+{
+    $raw = $payload['raw'] ?? array();
+    if (!is_array($raw)) return null;
+    // Evolution: raw.message.audioMessage / imageMessage / videoMessage
+    $message = $raw['message'] ?? null;
+    if (is_array($message)) {
+        foreach (['audioMessage' => 'audio', 'imageMessage' => 'image', 'videoMessage' => 'video', 'documentMessage' => 'document'] as $k => $type) {
+            if (isset($message[$k]) && is_array($message[$k])) {
+                $m = $message[$k];
+                return ['type' => $type, 'url' => $m['url'] ?? null, 'mimetype' => $m['mimetype'] ?? null, 'fileName' => $m['fileName'] ?? null];
+            }
+        }
+    }
+    // WAHA: raw.media
+    $media = $raw['media'] ?? null;
+    if (is_array($media)) {
+        $url = $media['url'] ?? $media['URL'] ?? $media['link'] ?? null;
+        $type = strtolower((string)($media['mimetype'] ?? ''));
+        $kind = str_contains($type, 'audio') ? 'audio' : (str_contains($type, 'image') ? 'image' : 'media');
+        return ['type' => $kind, 'url' => is_string($url) ? $url : null, 'mimetype' => $type, 'fileName' => null];
+    }
+    return null;
+}
+
 function comercial_handle_inbound_message($payload) {
     $payload = is_array($payload) ? $payload : array();
     $fromPhone = comercial_only_digits((string)($payload['from'] ?? $payload['from_phone'] ?? $payload['phone'] ?? ''));
@@ -7091,6 +7127,16 @@ function comercial_handle_inbound_message($payload) {
     $linePort = trim((string)($payload['port'] ?? $payload['waha_port'] ?? ''));
     $text = trim((string)($payload['text'] ?? $payload['body'] ?? $payload['message'] ?? ''));
     $messageId = trim((string)($payload['message_id'] ?? ''));
+
+    // ── Transcripción de audio (media de Evolution/MinIO) ──
+    $mediaInfo = comercial_inbound_media_info($payload);
+    $transcription = '';
+    if ($mediaInfo !== null && ($mediaInfo['type'] ?? '') === 'audio' && $text === '') {
+        $transcription = whatsapp_transcribe_media($mediaInfo) ?? '';
+        if ($transcription !== '') {
+            $text = $transcription;
+        }
+    }
 
     if ($fromPhone === '') {
         return array('ok' => true, 'ignored' => 'no_sender', 'note' => 'Webhook sin remitente identificable — ignorado sin reintento.');
@@ -7335,6 +7381,12 @@ function comercial_handle_inbound_message($payload) {
         'confidence' => $thread['last_confidence'],
         'text' => $text,
     );
+    if ($transcription !== '') {
+        $eventPayload['transcription'] = $transcription;
+    }
+    if (is_array($mediaInfo)) {
+        $eventPayload['media'] = $mediaInfo;
+    }
     if (comercial_thread_is_test_probe($thread)) {
         $eventPayload['test_probe'] = 1;
         $eventPayload['test_key'] = trim((string)($thread['test_key'] ?? comercial_test_probe_key()));

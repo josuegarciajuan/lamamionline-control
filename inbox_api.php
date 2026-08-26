@@ -342,6 +342,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'thread') {
             'text'      => trim((string)($h['text'] ?? '')),
             'is_bot'    => !empty($h['is_bot']),
             'event'     => trim((string)($h['event'] ?? '')),
+            'transcription' => trim((string)($h['transcription'] ?? '')),
+            'media'     => (isset($h['media']) && is_array($h['media'])) ? $h['media'] : [],
         ];
     }
 

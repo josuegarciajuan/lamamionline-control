@@ -746,7 +746,7 @@
             lastAuthor = dir;
             h += '<div class="inbox-msg-bubble ' + dir + cont + '">';
             if (botTag) h += botTag;
-            h += '<div class="msg-text">' + formatMessageBody(m.text || '') + '</div>';
+            h += '<div class="msg-text">' + renderInboxMedia(m, dir) + '</div>';
             h += '<div class="msg-time">' + esc(time);
             if (dir === 'out') h += '<span class="msg-checks">✓✓</span>';
             h += '</div>';
@@ -1137,7 +1137,7 @@
             lastAuthor = dir;
             h += '<div class="inbox-msg-bubble ' + dir + cont + '">';
             if (botTag) h += botTag;
-            h += '<div class="msg-text">' + formatMessageBody(m.text || '') + '</div>';
+            h += '<div class="msg-text">' + renderInboxMedia(m, dir) + '</div>';
             h += '<div class="msg-time">' + esc(time);
             if (dir === 'out') h += '<span class="msg-checks">✓✓</span>';
             h += '</div>';
@@ -1179,6 +1179,29 @@
             out = out.split(e).join(linkHtml);
         }
         return out;
+    }
+
+    /**
+     * Render de media recibida + transcripción en cursiva (inbox comercial).
+     */
+    function renderInboxMedia(m, dir) {
+        var media = m && m.media;
+        var transcription = (m && m.transcription || '').trim();
+        var body = m ? formatMessageBody(m.text || '') : '';
+        if (media && media.url) {
+            var proxy = '/control/media_proxy.php?url=' + encodeURIComponent(media.url) + '&type=' + encodeURIComponent(media.type || '');
+            if (media.type === 'audio') {
+                body = '<audio controls style="max-width:220px;display:block;margin:4px 0" src="' + proxy + '"></audio>' + body;
+            } else if (media.type === 'image') {
+                body = '<img src="' + proxy + '" style="max-width:200px;border-radius:8px;display:block;margin:4px 0" alt="Imagen">' + body;
+            } else if (media.type === 'video') {
+                body = '<video controls style="max-width:220px;border-radius:8px;display:block;margin:4px 0" src="' + proxy + '"></video>' + body;
+            }
+        }
+        if (transcription) {
+            body += '<div class="msg-transcription"><em>🎙️ ' + esc(transcription) + '</em></div>';
+        }
+        return body;
     }
 
     function formatDate(ts) {
