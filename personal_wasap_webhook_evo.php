@@ -19,6 +19,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/app/evolution/transport.php';
 require_once __DIR__ . '/app/evolution/config.php';
+require_once __DIR__ . '/app/evolution/transcribe.php';
 require_once __DIR__ . '/app/personal_wasap_ingest.php';
 
 /**
@@ -47,6 +48,14 @@ function personal_wasap_evo_translate(array $msg): ?array
 
     $text = personal_wasap_evo_text($message);
     $media = EvolutionApi::mediaUrlFromMessage($message);
+
+    // Transcripción de audio (faster-whisper) — solo media de Evolution (MinIO)
+    if ($media !== null && ($media['type'] ?? '') === 'audio') {
+        $trans = whatsapp_transcribe_media($media);
+        if ($trans !== null) {
+            $media['transcription'] = $trans;
+        }
+    }
 
     $direction = $fromMe ? 'out' : 'in';
     $chatId = $peerPhone . ($isGroup ? '@g.us' : '@c.us');

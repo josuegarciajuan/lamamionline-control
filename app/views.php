@@ -10223,7 +10223,9 @@ if (!empty($sendtaxsState)) {
                         return "<div style=\"margin:6px 0\"><img src=\"" + url + "\" alt=\"Imagen\" style=\"max-width:220px;max-height:260px;border-radius:8px;display:block\"></div>";
                     }
                     if (media.type === "audio") {
-                        return "<div style=\"margin:6px 0\"><audio controls style=\"max-width:220px\" src=\"" + url + "\"></audio></div>";
+                        var ah = "<div style=\"margin:6px 0\"><audio controls style=\"max-width:220px\" src=\"" + url + "\"></audio>";
+                        if (media.transcription) ah += "<div style=\"font-style:italic;color:var(--muted);font-size:12px;margin-top:3px\">🎙️ " + esc(media.transcription) + "</div>";
+                        return ah + "</div>";
                     }
                     if (media.type === "video") {
                         return "<div style=\"margin:6px 0\"><video controls style=\"max-width:240px;border-radius:8px\" src=\"" + url + "\"></video></div>";
