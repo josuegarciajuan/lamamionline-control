@@ -4,7 +4,7 @@
  *
  * Evalúa cada respuesta generada por GPT-4o-mini antes del envío.
  * Si no pasa la checklist, DeepSeek la reescribe.
- * Si aún falla, se usa un fallback determinista por fase.
+ * Si falla, el pipeline conserva el texto LLM original o no envía nada.
  *
  * DeepSeek es ~10x más barato que GPT-4o-mini para esta tarea.
  */
@@ -289,54 +289,6 @@ PROMPT;
  * Se usa cuando tanto el generator como el crítico fallan.
  */
 function comercial_agent_critic_fallback(string $slug, string $phase): string {
-    if (!function_exists('comercial_knowledge_v2_get')) {
-        // Fallback genérico si KB v2 no existe
-        $generics = array(
-            'SALUDO_INICIAL'    => 'Hola, ¿te cuento?',
-            'DESCUBRIMIENTO'    => 'Cuéntame un poco más, ¿qué es lo que más te interesa?',
-            'PRESENTACION'      => '¿Te interesa que te explique más?',
-            'MANEJO_OBJECIONES' => 'Entiendo. ¿Hay algo más que te gustaría saber?',
-            'CIERRE'            => 'Perfecto, te paso con mi compañera que te lo gestiona. Un placer 😊',
-            'DESCARTADO'        => 'De acuerdo, gracias por tu tiempo.',
-        );
-        return $generics[$phase] ?? 'Dime, ¿en qué puedo ayudarte?';
-    }
-
-    $kb = comercial_knowledge_v2_get($slug, $phase);
-
-    switch ($phase) {
-        case 'SALUDO_INICIAL':
-            $openers = $kb['openers'] ?? array();
-            return !empty($openers) ? $openers[array_rand($openers)] : 'Hola, ¿te cuento?';
-
-        case 'DESCUBRIMIENTO':
-            $questions = $kb['qualifying_questions'] ?? array();
-            if (!empty($questions)) {
-                return $questions[array_rand($questions)];
-            }
-            return 'Cuéntame un poco más, ¿qué es lo que más te interesa?';
-
-        case 'PRESENTACION':
-            $pricing = $kb['pricing'] ?? '';
-            $nextSteps = $kb['next_steps'] ?? array();
-            $next = !empty($nextSteps) ? $nextSteps[array_rand($nextSteps)] : '¿Te interesa?';
-            return trim(trim($pricing) . ' ' . $next);
-
-        case 'MANEJO_OBJECIONES':
-            // Intentar devolver cualquiera de las objeciones predefinidas
-            $objections = array_filter($kb, function($v, $k) {
-                return is_string($v) && $v !== '' && !in_array($k, array('product_line', 'tone', 'pitch', 'pricing', 'features', 'hook', 'escalation'));
-            }, ARRAY_FILTER_USE_BOTH);
-            if (!empty($objections)) {
-                $vals = array_values($objections);
-                return $vals[array_rand($vals)];
-            }
-            return 'Entiendo. ¿Hay algo más que te gustaría saber?';
-
-        case 'CIERRE':
-            return $kb['escalation'] ?? 'Perfecto, te paso con mi compañera que te lo gestiona. Un placer 😊';
-
-        default:
-            return 'Dime, ¿en qué puedo ayudarte?';
-    }
+    // Compatibilidad de API: nunca devolver frases prefabricadas.
+    return '';
 }

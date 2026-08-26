@@ -40,6 +40,41 @@ function comercial_knowledge_v2_all(): array {
         'casawasap'  => comercial_knowledge_v2_casawasap(),
         'publiscort' => comercial_knowledge_v2_publiscort(),
         'inbound'    => comercial_knowledge_v2_inbound(),
+        'shhexxchollos' => comercial_knowledge_v2_shhexxchollos(),
+    );
+}
+
+function comercial_knowledge_v2_shhexxchollos(): array {
+    return array(
+        'product_line' => 'Shhexxchollos',
+        'common' => array(
+            'tone' => 'Cercano, breve y natural, como recomendar algo útil a una amiga.',
+            'global_rules' => array(
+                'No mencionar precios, porcentajes ni descuentos inventados.',
+                'No mezclar otros negocios ni revelar que eres IA.',
+                'Recomendar entre amigas sin presión ni spam.',
+            ),
+        ),
+        'SALUDO_INICIAL' => array(
+            'hook' => 'Recomendación de chollos para compartir entre amigas',
+            'opening_guidance' => array(
+                'Hablar en primera persona como una amiga que ha descubierto y probado la web.',
+                'Transmitir que contiene chollos diarios de productos eróticos útiles para el trabajo.',
+                'Mencionar que revisar las últimas ofertas permite ahorrar dinero.',
+                'Incluir https://shhexxchollos.com directamente en la recomendación.',
+            ),
+        ),
+        'DESCUBRIMIENTO' => array(
+            'pitch' => 'Shhexxchollos reúne chollos y oportunidades para descubrir y compartir entre amigas.',
+            'qualifying_questions' => array('¿Quieres que te cuente cómo funciona?', '¿Te apetece echarle un vistazo?'),
+        ),
+        'PRESENTACION' => array(
+            'pricing' => '',
+            'features' => 'Web de chollos y oportunidades: https://shhexxchollos.com',
+            'next_steps' => array('Échale un vistazo y compártela si conoces a alguien a quien le pueda servir.'),
+        ),
+        'MANEJO_OBJECIONES' => array('no_me_interesa' => 'Sin problema, te lo dejo por si algún día te apetece echarle un vistazo.'),
+        'CIERRE' => array('escalation' => 'Perfecto, échale un vistazo y si te encaja me dices.'),
     );
 }
 
@@ -59,17 +94,18 @@ function comercial_knowledge_v2_plaza(): array {
                 'Nunca coletillas infantiles: guapa, cariño, reina.',
                 'Nunca autoreferencia: no digas "soy del equipo", "somos X", "nuestro equipo".',
                 'Nunca ofrecer visita a la casa. Ofrecer fotos de las habitaciones en su lugar.',
+                'No mencionar precios ni porcentajes en SALUDO_INICIAL; solo bajo demanda.',
             ),
         ),
 
         'SALUDO_INICIAL' => array(
             'hook' => 'Hueco libre en Casa Burriana — alta demanda por vacaciones',
-            'openers' => array(
-                'TENEMOS HUECO LIBRE YA 🔥 Casa grande y tranquila en Burriana, con limpieza diaria, wifi, todo incluido. Se ha ido mucha gente de vacaciones y hay muchísimo curro ahora. ¿Te cuento?',
-                'Hueco libre en Burriana 🙌 Casa grande, limpia, todo incluido. Ahora mismo hay mucha demanda porque varias chicas se fueron de vacaciones. ¿Te interesa que te cuente?',
-                'Buscamos compi para Casa Burriana 🏠 Casa grande, tranquila, con limpieza diaria y wifi. Hay hueco ya y mucho curro ahora. ¿Te cuento sin compromiso?',
-                '¿Buscas sitio? En Casa Burriana tenemos plaza libre ahora mismo. Casa grande, limpia, bien ubicada. Mucha demanda estos días. ¿Te cuento cómo funciona?',
-                'Plaza libre en Burriana — zona tranquila, casa grande, todo incluido. Mucho curro ahora que varias chicas están de vacaciones. ¿Te interesa?',
+            'opening_guidance' => array(
+                'Comunicar que hay disponibilidad en Casa Burriana.',
+                'Transmitir que es una casa cómoda, tranquila y discreta.',
+                'Mencionar limpieza diaria y buen ambiente solo cuando encaje.',
+                'Explicar que existe movimiento o demanda sin fabricar urgencia.',
+                'No mencionar reparto ni precio en esta fase.',
             ),
         ),
         'DESCUBRIMIENTO' => array(
@@ -83,7 +119,7 @@ function comercial_knowledge_v2_plaza(): array {
             ),
         ),
         'PRESENTACION' => array(
-            'pricing' => 'Plaza compartida: 60/40. Alquiler habitación privada: precio económico (consultar).',
+            'pricing' => 'Plaza compartida: 50/50. Alquiler habitación privada: entre 150€ y 170€ por semana.',
             'features' => 'Limpieza diaria, wifi, smartTV, sábanas y toallas, buen ambiente.',
             'next_steps' => array(
                 'Te paso fotos de las habitaciones y vas viendo sin compromiso.',
@@ -114,7 +150,7 @@ function comercial_knowledge_v2_lamami(): array {
     return array(
         'product_line' => 'LaMami',
         'common' => array(
-            'tone' => 'Cercano, profesional y entusiasta. Como quien recomienda algo bueno a una amiga. Sin ser empalagosa. Frases cortas.',
+            'tone' => 'Cercano y natural, como hablar con una amiga por WhatsApp. Poco formal, frases cortas y sin presión.',
             'global_rules' => array(
                 'Máximo 1 emoji por mensaje.',
                 'Nunca revelar que eres IA.',
@@ -122,17 +158,17 @@ function comercial_knowledge_v2_lamami(): array {
                 'Nunca negociar precios: 29€ y 10€/30min son fijos.',
                 'Nunca prometer resultados garantizados (número de clientes).',
                 'Nunca autoreferencia: no digas "soy del equipo", "somos X".',
+                'No mencionar precios ni condiciones económicas en SALUDO_INICIAL; solo bajo demanda.',
             ),
         ),
 
         'SALUDO_INICIAL' => array(
             'hook' => 'Publicista digital a resultados — tú solo abres la puerta',
-            'openers' => array(
-                'Te consigo clientes extra sin que hagas nada 🔥 Yo publico, gestiono los mensajes y te aviso cuando hay cliente. Tú solo confirmas y abres la puerta. ¿Te cuento cómo funciona?',
-                '¿Quieres sumar clientes sin esfuerzo? Yo me encargo de todo: publicar, contestar, filtrar. Tú solo abres la puerta cuando te aviso. ¿Te interesa?',
-                'Nuevo concepto de publicista digital 📱 Tú solo confirmas disponibilidad y abres la puerta. Sin cuotas fijas, solo pagas si llega cliente. ¿Te cuento?',
-                'Publicista a resultados 🙌 Alta única 29€, sin permanencia. Solo pagas comisión cuando realmente tienes cliente. ¿Quieres que te explique?',
-                'Oye, he pensado en ti. Tengo un sistema nuevo de publicista donde tú no haces nada: yo publico y filtro, tú solo abres la puerta. ¿Te interesa?',
+            'opening_guidance' => array(
+                'Presentar LaMami como una forma sencilla de conseguir clientes extra.',
+                'Transmitir que se ocupa de publicar, gestionar mensajes y avisar cuando hay cliente.',
+                'Dejar claro que la profesional solo confirma disponibilidad y atiende.',
+                'No mencionar precios ni condiciones económicas en esta fase.',
             ),
         ),
         'DESCUBRIMIENTO' => array(
@@ -145,7 +181,7 @@ function comercial_knowledge_v2_lamami(): array {
             ),
         ),
         'PRESENTACION' => array(
-            'pricing' => 'Alta única: 29€ (para siempre). Comisión: 10€ por cada 30min de servicio (1h = 20€). Sin cuotas mensuales. Sin permanencia.',
+            'pricing' => 'Alta única: 29€ para siempre. Comisión: 10€ por 30 minutos o 20€ por 1 hora. Sin cuotas mensuales ni permanencia. Informar solo bajo demanda.',
             'features' => 'Publicación en portales, gestión de mensajes 24/7, filtro de clientes, avisos cuando hay visita.',
             'next_steps' => array(
                 'Si te interesa, te paso los datos que necesito (nombre, ciudad, disponibilidad) y te explico el siguiente paso.',
@@ -187,17 +223,18 @@ function comercial_knowledge_v2_casawasap(): array {
                 'Nunca inventar funcionalidades que no existen.',
                 'Mencionar siempre los 10 días gratis y la demo si es relevante.',
                 'Nunca autoreferencia: no digas "soy del equipo", "somos X".',
+                'No mencionar precio en SALUDO_INICIAL; explicar funciones de gestión WhatsApp de forma directa.',
             ),
         ),
 
         'SALUDO_INICIAL' => array(
             'hook' => 'Asistente IA 24/7 que contesta WhatsApp y cierra visitas mientras duermes',
-            'openers' => array(
-                '¿Cuántos clientes pierdes mientras duermes? 😴 Tengo un asistente IA que contesta WhatsApp 24/7, publica estados y te avisa solo cuando hay visita. 10 días gratis de prueba. ¿Te cuento?',
-                'Imagina despertarte y tener 5 visitas confirmadas sin haber respondido un solo mensaje 🔥 CasaWasap contesta 24/7 con tono natural. 10 días gratis sin tarjeta. ¿Te interesa?',
-                '94% de mensajes contestados al instante 📊 Así funciona CasaWasap: contesta WhatsApp, publica estados, filtra clientes. Tú solo ves las visitas confirmadas. ¿Quieres probarlo 10 días gratis?',
-                'CasaWasap: el asistente que contesta WhatsApp por ti 24/7. Tono natural, el cliente no nota que es IA. 10 días gratis, sin tarjeta. ¿Te lo explico?',
-                "¿Te han escrito 15 tíos mientras dormías y no has contestado a ninguno? Con CasaWasap los tienes a todos respondidos al despertar. {$weekly}/sem, 10 días gratis. ¿Hablamos?",
+            'opening_guidance' => array(
+                'Explicar directamente que CasaWasap lleva de forma profesional el WhatsApp de la casa.',
+                'Transmitir que responde con un estilo natural parecido al de una persona.',
+                'Explicar que reduce el trabajo diario y permite configurar el tono.',
+                'Mencionar como extras selectivos aprendizaje, estados, seguimiento, avisos o estadísticas.',
+                'No mencionar precio ni usar preguntas retóricas en esta fase.',
             ),
         ),
         'DESCUBRIMIENTO' => array(
@@ -253,12 +290,11 @@ function comercial_knowledge_v2_publicista(): array {
 
         'SALUDO_INICIAL' => array(
             'hook' => 'Ingresos pasivos — tú presentas, nosotros cerramos y das soporte',
-            'openers' => array(
-                '¿Te imaginas cobrar cada mes sin hacer nada más que una presentación? 💰 Busco colaboradores que conozcan dueñas de casas. Tú presentas, yo cierro y doy soporte 24/7. Tú cobras comisión recurrente. ¿Te interesa?',
-                'Ingresos pasivos sin inversión: presentas una casa de citas para que use CasaWasap, nosotros la activamos y tú cobras comisión cada mes. Sin herramientas, sin soporte. ¿Hablamos?',
-                'Oye, tengo un modelo de negocio para ti: conoces dueñas de casas → nos las presentas → cobras comisión recurrente cada mes. Cero inversión, cero soporte. ¿Te cuento?',
-                'Buscamos colaboradores 📢 Si conoces dueñas de casas de citas, esto te interesa. Tú solo presentas, nosotros hacemos todo lo demás. Cobras por cada casa activa. ¿Quieres saber más?',
-                'Gana dinero sin inversión: presenta casas para CasaWasap, nosotros cerramos y damos soporte. Tú cobras comisión recurrente cada mes. La casa tiene 10 días gratis (se vende solo). ¿Te interesa?',
+            'opening_guidance' => array(
+                'Dirigirse a posibles colaboradores que conozcan dueñas de casas.',
+                'Explicar que solo presentan el contacto y el equipo gestiona activación y soporte.',
+                'Transmitir que existe comisión por activación y continuidad, sin cifras no confirmadas.',
+                'No hablar como si Publicista fuera el producto CasaWasap para la dueña.',
             ),
         ),
         'DESCUBRIMIENTO' => array(
@@ -304,7 +340,7 @@ function comercial_knowledge_v2_publiscort(): array {
                 'Máximo 1 emoji por mensaje.',
                 'Nunca revelar que eres IA.',
                 'Nunca mencionar otros negocios (Plaza, LaMami, CasaWasap, Publicista).',
-                'Nunca negociar el precio: 50€/semana es fijo.',
+                'Nunca negociar el precio: 40€/semana es fijo.',
                 'Sé breve y directo. No te extiendas demasiado.',
                 'Nunca prometer resultados exactos (número de clientes).',
                 'Nunca autoreferencia: no digas "soy del equipo", "somos X".',
@@ -312,13 +348,12 @@ function comercial_knowledge_v2_publiscort(): array {
         ),
 
         'SALUDO_INICIAL' => array(
-            'hook' => 'Publicista profesional: 3 portales con tráfico real, 50€/semana',
-            'openers' => array(
-                'Publicista profesional 📱 Publico en Destacamos, Mundosex y Nuevapasion con estrategia de visibilidad: anuncios TOP y formatos de pago para que destaques. 50€/semana, sin permanencia. ¿Te interesa?',
-                '¿Quieres más visibilidad en portales con tráfico real? Publico en Destacamos, Mundosex y Nuevapasion. Anuncios TOP para que destaques entre miles de perfiles. 50€/sem. ¿Hablamos?',
-                'Visibilidad real en 3 portales 🔥 Destacamos, Mundosex y Nuevapasion. Estrategia de anuncios TOP. 50€/semana, sin permanencia. ¿Te cuento el plan?',
-                'Publicista profesional: maximizo tu visibilidad en los 3 portales principales. Estrategia enfocada en resultados. 50€/semana, precio cerrado. ¿Te interesa que te explique?',
-                'Destaca entre miles de perfiles 📊 Publicación profesional en Destacamos, Mundosex y Nuevapasion. Anuncios TOP, renovación semanal. 50€/sem. ¿Quieres más info?',
+            'hook' => 'Publicista profesional: 3 portales con tráfico real, 40€/semana',
+            'opening_guidance' => array(
+                'Presentar la gestión profesional de anuncios y visibilidad.',
+                'Mencionar los portales y formatos destacados solo de forma natural.',
+                'Transmitir una estrategia de presencia semanal sin garantizar resultados concretos.',
+                'No mencionar precio en esta fase.',
             ),
         ),
         'DESCUBRIMIENTO' => array(
@@ -331,7 +366,7 @@ function comercial_knowledge_v2_publiscort(): array {
             ),
         ),
         'PRESENTACION' => array(
-            'pricing' => '50€ por semana. Precio cerrado, sin sorpresas. Sin permanencia.',
+            'pricing' => '40€ por semana. Precio cerrado, sin sorpresas. Sin permanencia.',
             'features' => 'Publicación en 3 portales principales, gestión de anuncios, renovación semanal, estrategia de visibilidad.',
             'next_steps' => array(
                 'Si te interesa, te pido unos datos básicos de tu perfil y en 1-2 días lo dejamos todo listo.',
@@ -339,10 +374,10 @@ function comercial_knowledge_v2_publiscort(): array {
             ),
         ),
         'MANEJO_OBJECIONES' => array(
-            'caro' => '50€/semana por estar en 3 portales con estrategia profesional. Si te trae 1 solo cliente ya lo tienes pagado.',
+            'caro' => '40€/semana por estar en 3 portales con estrategia profesional. Si te trae 1 solo cliente ya lo tienes pagado.',
             'ya_publico_yo' => 'Claro, pero nosotros combinamos anuncios TOP + formatos de pago que maximizan la visibilidad. Es un extra, no un reemplazo.',
             'no_se_si_funciona' => 'Trabajamos con portales de tráfico real. Sin permanencia: pruebas una semana y decides.',
-            'precio_muy_alto' => 'Son 50€ por estar en 3 portales con gestión profesional incluida. Sin permanencia.',
+            'precio_muy_alto' => 'Son 40€ por estar en 3 portales con gestión profesional incluida. Sin permanencia.',
         ),
         'CIERRE' => array(
             'escalation' => 'Perfecto, te paso con mi compañero que te explica el plan exacto para tu perfil y te activa todo. Es rápido. ¡Gracias!',

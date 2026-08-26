@@ -172,10 +172,13 @@ function comercial_hardcoded_process_slugs() {
 }
 
 function comercial_process_has_hardcoded_templates($slug) {
-    return in_array(trim((string)$slug), comercial_hardcoded_process_slugs(), true);
+    return false;
 }
 
 function comercial_default_process_templates($slug, $field = 'message_templates') {
+    // Los mensajes comerciales se generan con LLM; no repoblar pools fijos.
+    return array();
+
     $slug = trim((string)$slug);
     $field = trim((string)$field);
 
@@ -199,9 +202,9 @@ function comercial_default_process_templates($slug, $field = 'message_templates'
                 );
             case 'publiscort':
                 return array(
-                    "¡Perfecto! 🙌\nPubliscort es servicio de publicista profesional con alta efectividad: te posicionamos en portales con tráfico real (Destacamos, Mundosex y Nuevapasion), combinando anuncios TOP y formatos de pago para que no te pierdas entre miles de perfiles.\n\n💶 Coste: 50€ por semana.\nSi quieres, te explico en 3 pasos cómo lo montamos para tu caso.",
-                    "Genial 😊\nPara que lo tengas claro: en Publiscort trabajamos con estrategia de visibilidad real en Destacamos, Mundosex y Nuevapasion. Mezclamos publicaciones destacadas + anuncios de pago para mantenerte arriba y generar más contactos útiles.\n\n💶 Son 50€/semana.\nSi te va bien, te paso ahora qué necesitamos para arrancar.",
-                    "Te cuento rápido 👇\nPubliscort = publicista profesional + enfoque en resultados. Publicamos en Destacamos, Mundosex y Nuevapasion, usando anuncios TOP y opciones de pago para maximizar alcance cada semana.\n\n💶 Tarifa cerrada: 50€ / semana.\n¿Quieres que te pase el formato exacto de trabajo y tiempos de arranque?"
+                    "¡Perfecto! 🙌\nPubliscort es servicio de publicista profesional con alta efectividad: te posicionamos en portales con tráfico real (Destacamos, Mundosex y Nuevapasion), combinando anuncios TOP y formatos de pago para que no te pierdas entre miles de perfiles.\n\n💶 Coste: 40€ por semana.\nSi quieres, te explico en 3 pasos cómo lo montamos para tu caso.",
+                    "Genial 😊\nPara que lo tengas claro: en Publiscort trabajamos con estrategia de visibilidad real en Destacamos, Mundosex y Nuevapasion. Mezclamos publicaciones destacadas + anuncios de pago para mantenerte arriba y generar más contactos útiles.\n\n💶 Son 40€/semana.\nSi te va bien, te paso ahora qué necesitamos para arrancar.",
+                    "Te cuento rápido 👇\nPubliscort = publicista profesional + enfoque en resultados. Publicamos en Destacamos, Mundosex y Nuevapasion, usando anuncios TOP y opciones de pago para maximizar alcance cada semana.\n\n💶 Tarifa cerrada: 40€ / semana.\n¿Quieres que te pase el formato exacto de trabajo y tiempos de arranque?"
                 );
         }
         return array();
@@ -265,10 +268,10 @@ function comercial_default_process_templates($slug, $field = 'message_templates'
             );
         case 'publiscort':
             return array(
-                "Hola 👋 Soy de Publiscort.\nSomos publicista profesional con alta efectividad y te damos visibilidad en portales clave: Destacamos, Mundosex y Nuevapasion.\n\nTrabajamos con anuncios TOP + formatos de pago para colocarte arriba y generar más contactos de calidad.\n\n💶 Coste: 50€ por semana.\nSi te interesa, te explico cómo empezar en 1 minuto.",
-                "Buenas 😊 Te escribo de Publiscort.\nNos dedicamos a publicar de forma profesional para que tengas más alcance real: Destacamos, Mundosex y Nuevapasion, con estrategia de anuncios destacados y de pago.\n\nLa idea es simple: mayor visibilidad + más mensajes útiles.\n💶 Precio cerrado: 50€/semana.\n¿Quieres que te pase el plan exacto para tu perfil?",
-                "¡Hola! 👋 Publiscort por aquí.\nSi quieres que te lleven la publi con enfoque serio y efectivo, te puede encajar: publicamos en Destacamos, Mundosex y Nuevapasion, usando posiciones TOP y opciones premium de pago.\n\n💶 Son 50€ por semana.\nSi te va bien, te paso ahora qué datos necesitamos para activarlo.",
-                "Hola 😊\nSoy publicista de Publiscort.\nTe ayudamos a destacar en portales de anuncios (Destacamos, Mundosex y Nuevapasion) combinando campañas TOP y anuncios de pago para aumentar visibilidad semanal.\n\n💶 Tarifa: 50€/semana.\n¿Te interesa que te lo explique rápido y sin compromiso?"
+                "Hola 👋 Soy de Publiscort.\nSomos publicista profesional con alta efectividad y te damos visibilidad en portales clave: Destacamos, Mundosex y Nuevapasion.\n\nTrabajamos con anuncios TOP + formatos de pago para colocarte arriba y generar más contactos de calidad.\n\n💶 Coste: 40€ por semana.\nSi te interesa, te explico cómo empezar en 1 minuto.",
+                "Buenas 😊 Te escribo de Publiscort.\nNos dedicamos a publicar de forma profesional para que tengas más alcance real: Destacamos, Mundosex y Nuevapasion, con estrategia de anuncios destacados y de pago.\n\nLa idea es simple: mayor visibilidad + más mensajes útiles.\n💶 Precio cerrado: 40€/semana.\n¿Quieres que te pase el plan exacto para tu perfil?",
+                "¡Hola! 👋 Publiscort por aquí.\nSi quieres que te lleven la publi con enfoque serio y efectivo, te puede encajar: publicamos en Destacamos, Mundosex y Nuevapasion, usando posiciones TOP y opciones premium de pago.\n\n💶 Son 40€ por semana.\nSi te va bien, te paso ahora qué datos necesitamos para activarlo.",
+                "Hola 😊\nSoy publicista de Publiscort.\nTe ayudamos a destacar en portales de anuncios (Destacamos, Mundosex y Nuevapasion) combinando campañas TOP y anuncios de pago para aumentar visibilidad semanal.\n\n💶 Tarifa: 40€/semana.\n¿Te interesa que te lo explique rápido y sin compromiso?"
             );
     }
 
@@ -276,6 +279,9 @@ function comercial_default_process_templates($slug, $field = 'message_templates'
 }
 
 function comercial_legacy_process_templates($slug, $field = 'message_templates') {
+    // API legacy mantenida para instalaciones antiguas; nunca sirve contenido.
+    return array();
+
     $slug = trim((string)$slug);
     $field = trim((string)$field);
 
@@ -500,7 +506,7 @@ function comercial_default_process_seed($slug) {
         'conversation_max_auto_turns' => 999, // AGENT V2: sin límite efectivo
         'escalation_score_threshold' => 70,     // AGENT V2: threshold más sensible (era 78)
         'ia_learning_enabled' => 1,
-        'ia_opener_enabled' => 0,               // opener LLM personalizado (OFF por defecto)
+        'ia_opener_enabled' => 1,               // todas las aperturas pasan por el LLM
         'auto_notify_operator' => 1,
         'auto_followup' => 1,
         'auto_create_lead' => 0,
@@ -552,6 +558,8 @@ function comercial_default_process_seed($slug) {
 
     if ($slug === 'publiscort') {
         $base['nombre'] = 'Publiscort';
+        $base['enabled'] = 1;
+        $base['daily_target_percent'] = 25;
         $base['source_type'] = 'mysql_recent';
         $base['source_mysql_query'] = "SELECT id, telefono, updatedsamp, nombre_comercial FROM f_clientes WHERE baja = 0 ORDER BY updatedsamp DESC LIMIT 300";
         $base['window_start_hour'] = 10;
@@ -568,6 +576,7 @@ function comercial_default_process_seed($slug) {
 
     if ($slug === 'publicista') {
         $base['nombre'] = 'Publicista';
+        $base['daily_target_percent'] = 0;
         $base['source_type'] = 'jsonl_queue';
         $base['source_queue_files'] = comercial_default_queue_files('publicista');
         $base['min_interval_seconds'] = 3300;
@@ -805,7 +814,8 @@ function comercial_get_processes() {
     foreach ($requiredSlugs as $requiredSlug) {
         if (!isset($existingBySlug[$requiredSlug])) {
             $seed = comercial_default_process_seed($requiredSlug);
-            $seed['enabled'] = 0; // guardrail explícito de migración
+            // Shhexxchollos nace desactivado; Publiscort debe reactivarse.
+            $seed['enabled'] = $requiredSlug === 'shhexxchollos' ? 0 : 1;
             $out[] = comercial_normalize_process($seed);
         }
     }
@@ -949,6 +959,13 @@ function comercial_normalize_process($row) {
     $out['auto_create_lead'] = !empty($out['auto_create_lead']) ? 1 : 0;
     $out['priority'] = (int)$out['priority'];
     $out['daily_target_percent'] = max(0, (float)$out['daily_target_percent']);
+    if ((string)$out['slug'] === 'publiscort') {
+        $out['enabled'] = 1;
+        $out['daily_target_percent'] = 25;
+    } elseif ((string)$out['slug'] === 'publicista') {
+        // Solo afecta la prospección saliente; las respuestas entrantes siguen activas.
+        $out['daily_target_percent'] = 0;
+    }
     $out['daily_target_absolute'] = 0;
     $out['window_start_hour'] = max(0, min(23, (int)$out['window_start_hour']));
     $out['window_end_hour'] = max(0, min(23, (int)$out['window_end_hour']));
@@ -1434,13 +1451,8 @@ function comercial_templates_match_legacy($slug, $field, $value) {
 }
 
 function comercial_process_message_pool($process, $field) {
-    $process = is_array($process) ? $process : array();
-    $slug = trim((string)($process['slug'] ?? ''));
-    $pool = comercial_normalize_template_blocks(isset($process[$field]) ? $process[$field] : array());
-    if (empty($pool)) {
-        $pool = comercial_normalize_template_blocks(comercial_default_process_templates($slug, $field));
-    }
-    return $pool;
+    // Las aperturas y respuestas comerciales se generan exclusivamente con LLM.
+    return array();
 }
 
 function comercial_hardcoded_min_message_length($slug, $field) {
@@ -2600,8 +2612,12 @@ function comercial_build_contextual_followup_prompt($thread, $processSlug, $obje
 }
 
 function comercial_ai_generate_contextual_followup($thread, $processSlug, $objective) {
-    // Delegar al nuevo agente LLM
-    return comercial_ai_legacy_generate_contextual_followup($thread, $processSlug, $objective);
+    $thread = comercial_normalize_thread((array)$thread);
+    return comercial_agent_process($thread, (string)$processSlug, 'reply', array(
+        'inbound_text' => (string)($thread['last_inbound_text'] ?? ''),
+        'phase' => (string)($thread['conversation_phase'] ?? 'DESCUBRIMIENTO'),
+        'objective' => (string)$objective,
+    ));
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2776,18 +2792,6 @@ function comercial_agent_generate_reply_wrapper($thread, $processSlug, $text) {
                 ));
                 $reply = $criticResult['rewritten'];
             }
-            // Crítico falló → fallback determinista
-            elseif (function_exists('comercial_agent_critic_fallback')) {
-                $fallback = comercial_agent_critic_fallback($processSlug, $phase);
-                if ($fallback !== '') {
-                    comercial_event_append('critic_fallback_used', array(
-                        'thread_id' => (string)$thread['id'],
-                        'phase' => $phase,
-                        'original_score' => $criticResult['score'],
-                    ));
-                    $reply = $fallback;
-                }
-            }
         }
 
         // 3. Guard determinista anti-agresividad (backstop final: también aplica
@@ -2807,10 +2811,12 @@ function comercial_agent_generate_reply_wrapper($thread, $processSlug, $text) {
         return comercial_plaza_inject_room_photos($processSlug, $reply, $text);
     }
 
-    // Fallback: usar el viejo sistema si el agente falla
-    $process = comercial_get_process($processSlug);
-    if (!$process) $process = comercial_generic_inbound_process();
-    return comercial_plaza_inject_room_photos($processSlug, comercial_pick_followup_or_improvise($thread, $process, $text), $text);
+    comercial_event_append('reply_llm_failed', array(
+        'thread_id' => (string)($thread['id'] ?? ''),
+        'process_slug' => $processSlug,
+        'error_code' => 'empty_or_unavailable_response',
+    ));
+    return '';
 }
 
 function comercial_ai_legacy_generate_contextual_followup($thread, $processSlug, $objective) {
@@ -5583,7 +5589,7 @@ function comercial_ai_generate_followup_variants($thread, $process, $inboundText
         "INSTRUCCIONES:\n" .
         "- Reescribe el mensaje base aplicando la estrategia indicada.\n" .
         "- Adapta el tono a lo que dijo el cliente. Sé coherente con la conversación.\n" .
-        "- CONSERVA INTACTOS: precios (ej: 29€, 50€/semana), URLs (ej: https://lamami.online), porcentajes (ej: 60/40), condiciones económicas y CTAs (ej: 'responde INFO'). NO los cambies, NO los parafrasees, NO los omitas.\n" .
+        "- CONSERVA INTACTOS: precios (ej: 29€, 40€/semana), URLs (ej: https://lamami.online), porcentajes (ej: 50/50), condiciones económicas y CTAs (ej: 'responde INFO'). NO los cambies, NO los parafrasees, NO los omitas.\n" .
         "- Añade un CTA suave que invite a responder (no presiones agresivamente).\n" .
         "- Usa español natural y profesional.\n" .
         "- Usa máximo 1 emoji si procede.\n" .
@@ -5689,6 +5695,9 @@ function comercial_ai_output_preserves_key_info($original, $aiOutput) {
  * Siempre devuelve string (puede ser vacío si todo falla).
  */
 function comercial_pick_followup_or_improvise($thread, $process, $inboundText = '') {
+    // Los seguimientos salen exclusivamente por comercial_agent_process().
+    return '';
+
     $pool = comercial_process_message_pool($process, 'followup_templates');
     $turnCount = (int)($thread['auto_turn_count'] ?? 0);
     $lastBotText = trim((string)($thread['last_bot_reply_text'] ?? ''));
@@ -5783,11 +5792,6 @@ function comercial_pick_followup_or_improvise($thread, $process, $inboundText = 
     $ai = comercial_ai_generate_contextual_followup($thread, (string)($thread['process_slug'] ?? ''), $objective);
     if (!empty($ai['ok']) && trim((string)($ai['text'] ?? '')) !== '') {
         return trim((string)$ai['text']);
-    }
-
-    // Último recurso: devolver un template aleatorio aunque se repita
-    if (!empty($pool)) {
-        return $pool[array_rand($pool)];
     }
 
     return '';
@@ -6716,29 +6720,32 @@ function comercial_run_tick($forceProcessId = '') {
         }
 
         $targetPhone = (string)$candidate['target_phone'];
-        $message = comercial_pick_message($process, 'message_templates');
-        if (trim($message) === '') {
-            $message = 'Hola 👋';
-        }
-
-        // ── Opener LLM personalizado (solo si el proceso lo tiene habilitado) ──
-        // Fallback seguro: si el LLM falla o devuelve vacío, se usa la plantilla.
-        if (!empty($process['ia_opener_enabled'])) {
-            $openerThread = comercial_normalize_thread(array(
-                'process_id' => (string)$process['id'],
+        // Todas las aperturas son LLM. Si falla, no se envía una frase fija:
+        // el candidato queda para otro intento y el evento solo guarda un código.
+        $openerThread = comercial_normalize_thread(array(
+            'process_id' => (string)$process['id'],
+            'process_slug' => (string)$process['slug'],
+            'target_phone' => $targetPhone,
+            'conversation_phase' => 'SALUDO_INICIAL',
+        ));
+        $ai = comercial_agent_process($openerThread, (string)$process['slug'], 'opener', array());
+        if (empty($ai['ok']) || trim((string)($ai['text'] ?? '')) === '') {
+            comercial_event_append('opener_llm_failed', array(
                 'process_slug' => (string)$process['slug'],
-                'target_phone' => $targetPhone,
-                'conversation_phase' => 'SALUDO_INICIAL',
+                'error_code' => preg_replace('/[^a-z0-9_.:-]/i', '_', (string)($ai['error'] ?? 'empty_response')),
             ));
-            $ai = comercial_agent_process($openerThread, (string)$process['slug'], 'opener', array());
-            if (!empty($ai['ok']) && trim((string)($ai['text'] ?? '')) !== '') {
-                $message = trim((string)$ai['text']);
-                comercial_event_append('opener_llm_generated', array(
-                    'process_slug' => (string)$process['slug'],
-                    'target_phone' => $targetPhone,
-                ));
-            }
+            $process['last_error'] = 'opener_llm_failed';
+            $process['last_result'] = 'skip';
+            $process = comercial_schedule_next_run($process, comercial_get_line_state((string)($orderedLines[0]['id'] ?? '')));
+            comercial_upsert_process($process);
+            $results[] = array('process' => $process['nombre'], 'ok' => false, 'reason' => 'opener_llm_failed');
+            continue;
         }
+        $message = trim((string)$ai['text']);
+        comercial_event_append('opener_llm_generated', array(
+            'process_slug' => (string)$process['slug'],
+            'target_phone' => $targetPhone,
+        ));
 
         $send = comercial_send_process_message_with_fallback($process, $targetPhone, $message);
         $line = (array)($send['line'] ?? $orderedLines[0]);
@@ -6805,10 +6812,21 @@ function comercial_send_test_probe() {
     }
 
     $targetPhone = comercial_test_probe_phone();
-    $message = comercial_pick_message($process, 'message_templates');
-    if (trim((string)$message) === '') {
-        $message = 'Hola 👋';
+    $openerThread = comercial_normalize_thread(array(
+        'process_id' => (string)$process['id'],
+        'process_slug' => (string)$process['slug'],
+        'target_phone' => $targetPhone,
+        'conversation_phase' => 'SALUDO_INICIAL',
+    ));
+    $ai = comercial_agent_process($openerThread, (string)$process['slug'], 'opener', array());
+    if (empty($ai['ok']) || trim((string)($ai['text'] ?? '')) === '') {
+        comercial_event_append('test_probe_opener_llm_failed', array(
+            'process_slug' => (string)$process['slug'],
+            'error_code' => preg_replace('/[^a-z0-9_.:-]/i', '_', (string)($ai['error'] ?? 'empty_response')),
+        ));
+        return array('ok' => false, 'error' => 'No se pudo generar la apertura de prueba.');
     }
+    $message = trim((string)$ai['text']);
 
     $processMeta = $process;
     $processMeta['test_probe'] = 1;
