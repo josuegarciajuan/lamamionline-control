@@ -14,6 +14,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/EvolutionApi.php';
+require_once __DIR__ . '/config.php';
 
 if (!function_exists('whatsapp_media_fetch_bytes')) {
     /**
@@ -79,6 +80,46 @@ if (!function_exists('whatsapp_transcribe_media')) {
         }
         @file_put_contents($tmp, $bytes);
         $evo = new EvolutionApi();
+        $text = $evo->transcribeAudio($tmp, $model);
+        @unlink($tmp);
+        if ($text === null || trim($text) === '') {
+            return null;
+        }
+        return trim($text);
+    }
+}
+
+if (!function_exists('whatsapp_transcribe_media_message')) {
+    /**
+     * Transcribe un audio RECIBIDO (media cifrada en CDN) descifrándolo primero
+     * con Evolution (getBase64FromMediaMessage) y luego con faster-whisper.
+     *
+     * @param array<string,mixed> $message registro completo del mensaje (key/message)
+     * @param string $instance instancia Evolution
+     */
+    function whatsapp_transcribe_media_message(array $message, string $instance, string $model = 'small'): ?string
+    {
+        if ($instance === '') {
+            return null;
+        }
+        $cfg = evolution_config();
+        if ($cfg['api_key'] === '') {
+            return null;
+        }
+        $evo = new EvolutionApi($cfg['host'], $cfg['api_key'], $instance, 45);
+        $media = $evo->getMediaBase64($message);
+        if ($media === null) {
+            return null;
+        }
+        $bytes = base64_decode((string) ($media['base64'] ?? ''), true);
+        if ($bytes === false || $bytes === '') {
+            return null;
+        }
+        $tmp = tempnam(sys_get_temp_dir(), 'evo_audio_');
+        if ($tmp === false) {
+            return null;
+        }
+        @file_put_contents($tmp, $bytes);
         $text = $evo->transcribeAudio($tmp, $model);
         @unlink($tmp);
         if ($text === null || trim($text) === '') {

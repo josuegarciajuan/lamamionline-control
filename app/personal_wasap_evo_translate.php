@@ -57,9 +57,13 @@ if (!function_exists('personal_wasap_evo_translate')) {
         $text = personal_wasap_evo_text($message);
         $media = EvolutionApi::mediaUrlFromMessage($message);
 
-        // Transcripción de audio (faster-whisper) — solo media de Evolution (MinIO)
+        // Transcripción de audio (faster-whisper). Media de MinIO o cifrada (CDN)
+        // descifrada vía Evolution.
         if ($media !== null && ($media['type'] ?? '') === 'audio') {
             $trans = whatsapp_transcribe_media($media);
+            if ($trans === null && $instance !== '') {
+                $trans = whatsapp_transcribe_media_message($msg, $instance);
+            }
             if ($trans !== null) {
                 $media['transcription'] = $trans;
             }
