@@ -1,9 +1,9 @@
 /* LaMami Lite — Service Worker (network-first para todo, cache solo como fallback) */
-const CACHE = 'lamami-lite-v12';
+const CACHE = 'lamami-lite-v13';
 
 const PRECACHE = [
   '/control/assets/lite.css?v=1785145047',
-  '/control/assets/app.js?v=1785250626',
+  '/control/assets/app.js?v=1785492066',
   '/control/manifest-lite.json?v=1784940661',
   '/control/icon-192.png',
   '/control/icon-512.png',

@@ -62,36 +62,24 @@ function render_global_ui($page = '', $lite = false) {
     ?>
     <?php else: ?>
     <?php
-    // ── Bottom Navigation Bar (mobile only) — 8 items ──
+    // ── Bottom Navigation Bar (mobile only) — 9 secciones ──
+    $currentTab = $_GET['tab'] ?? '';
     $tabs = [
-        ['type' => 'link',  'page' => 'dashboard', 'icon' => '📊', 'label' => 'Dash',  'active' => in_array($page, ['dashboard'])],
-        ['type' => 'link',  'page' => 'bot-casa',   'icon' => '🏚', 'label' => 'Bot',   'active' => in_array($page, ['bot-casa'])],
-        ['type' => 'link',  'page' => 'jostal',     'icon' => '🏠', 'label' => 'Jost',  'active' => in_array($page, ['jostal'])],
-        ['type' => 'drop',  'id'   => 'dropCtrl',   'icon' => '📈', 'label' => 'Ctrl',  'active' => in_array($page, ['informes','gastos']),
+        ['type' => 'link',  'page' => 'dashboard', 'icon' => '📊', 'label' => 'Dash',   'active' => in_array($page, ['dashboard'])],
+        ['type' => 'link',  'page' => 'jostal',    'icon' => '🏠', 'label' => 'Jost',   'active' => in_array($page, ['jostal'])],
+        ['type' => 'drop',  'id'   => 'dropInf',   'icon' => '📈', 'label' => 'Inf',    'active' => in_array($page, ['informes','gastos']),
             'links' => [
-                ['page' => 'dashboard', 'label' => 'Dashboard'],
                 ['page' => 'informes', 'label' => 'Informes'],
-                ['page' => 'gastos', 'label' => 'Gastos'],
+                ['page' => 'gastos',   'label' => 'Gastos'],
             ]],
-        ['type' => 'drop',  'id'   => 'dropNeg',    'icon' => '💰', 'label' => 'Neg',   'active' => in_array($page, ['lamami','interesadas','clientas','lamamibot','casawasap']),
+        ['type' => 'drop',  'id'   => 'dropCom',   'icon' => '💬', 'label' => 'Com',    'active' => in_array($page, ['comercial','publicista']),
             'links' => [
-                ['page' => 'lamami', 'label' => 'LaMami'],
-                ['page' => 'jostal', 'label' => 'Jostal'],
-                ['page' => 'casawasap', 'label' => 'Casawasap'],
-            ]],
-        ['type' => 'drop',  'id'   => 'dropCom',    'icon' => '💬', 'label' => 'Com',   'active' => in_array($page, ['comercial','publicista','avisos','bots']),
-            'links' => [
-                ['page' => 'comercial', 'label' => 'Comercial'],
+                ['page' => 'comercial',  'label' => 'Comercial'],
                 ['page' => 'publicista', 'label' => 'Publicista'],
-                ['page' => 'avisos', 'label' => 'Avisos'],
-                ['page' => 'bots', 'label' => 'Bots'],
             ]],
-        ['type' => 'drop',  'id'   => 'dropSis',    'icon' => '⚙️', 'label' => 'Sis',   'active' => in_array($page, ['josue']),
-            'links' => [
-                ['page' => 'bot-casa', 'label' => 'Bot Casa'],
-                ['page' => 'josue', 'label' => 'Josué'],
-            ]],
-        ['type' => 'link',  'page' => 'logout',     'icon' => '🚪', 'label' => 'Salir', 'active' => false],
+        ['type' => 'link',  'page' => 'avisos',    'icon' => '🔔', 'label' => 'Recordatorio', 'active' => in_array($page, ['avisos'])],
+        ['type' => 'link',  'url'  => 'index.php?page=josue&tab=eurekas', 'icon' => '💡', 'label' => 'Eureka', 'active' => ($page === 'josue' && $currentTab === 'eurekas')],
+        ['type' => 'link',  'page' => 'josue',     'icon' => '🚀', 'label' => 'Josué', 'active' => ($page === 'josue' && $currentTab !== 'eurekas')],
     ];
     ?>
     <?php endif; ?>

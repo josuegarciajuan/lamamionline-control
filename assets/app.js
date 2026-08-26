@@ -3410,7 +3410,7 @@ window.KittPlayer = {
         setupReminderPolling();
 
         // ── Dropdown popover toggles (MOBILE-REDESIGN: replaces Más sheet) ──
-        var dropIds = ['dropCtrl', 'dropNeg', 'dropCom', 'dropSis', 'liteMas'];
+        var dropIds = ['dropInf', 'dropCom', 'liteMas'];
         var activePop = null;
 
         function closeAllPops() {
