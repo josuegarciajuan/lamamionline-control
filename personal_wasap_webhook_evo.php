@@ -18,75 +18,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/app/evolution/transport.php';
-require_once __DIR__ . '/app/evolution/config.php';
-require_once __DIR__ . '/app/evolution/transcribe.php';
-require_once __DIR__ . '/app/personal_wasap_ingest.php';
-
-/**
- * Traduce un mensaje de Evolution al formato de wasap_ingest_message().
- * @param array<string,mixed> $msg
- * @return array<string,mixed>|null
- */
-function personal_wasap_evo_translate(array $msg): ?array
-{
-    $key = $msg['key'] ?? [];
-    $remoteJid = (string)($key['remoteJid'] ?? '');
-    $fromMe = (bool)($key['fromMe'] ?? false);
-    $messageId = (string)($key['id'] ?? '');
-    $message = $msg['message'] ?? [];
-    if (!is_array($message)) $message = [];
-    $pushName = (string)($msg['pushName'] ?? '');
-
-    if ($remoteJid === '') {
-        return null;
-    }
-    $isGroup = str_contains($remoteJid, '@g.us');
-    $peerPhone = wasap_ingest_digits($remoteJid);
-    if ($peerPhone === '') {
-        return null;
-    }
-
-    $text = personal_wasap_evo_text($message);
-    $media = EvolutionApi::mediaUrlFromMessage($message);
-
-    // Transcripción de audio (faster-whisper) — solo media de Evolution (MinIO)
-    if ($media !== null && ($media['type'] ?? '') === 'audio') {
-        $trans = whatsapp_transcribe_media($media);
-        if ($trans !== null) {
-            $media['transcription'] = $trans;
-        }
-    }
-
-    $direction = $fromMe ? 'out' : 'in';
-    $chatId = $peerPhone . ($isGroup ? '@g.us' : '@c.us');
-
-    return [
-        'chatId' => $chatId,
-        'peerPhone' => $peerPhone,
-        'direction' => $direction,
-        'fromMe' => $fromMe,
-        'messageId' => $messageId,
-        'text' => $text,
-        'pushName' => $pushName,
-        'isGroup' => $isGroup,
-        'media' => $media,
-    ];
-}
-
-/** @param array<string,mixed> $message */
-function personal_wasap_evo_text(array $message): string
-{
-    foreach (['conversation'] as $k) {
-        if (isset($message[$k]) && is_string($message[$k])) return $message[$k];
-    }
-    foreach (['extendedTextMessage', 'buttonResponseMessage', 'listResponseMessage'] as $k) {
-        if (isset($message[$k]) && is_array($message[$k])) {
-            $t = $message[$k]['text'] ?? $message[$k]['selectedButtonText'] ?? $message[$k]['title'] ?? '';
-            if (is_string($t) && $t !== '') return $t;
-        }
-    }
-    return '';
-}
+require_once __DIR__ . '/app/personal_wasap_evo_translate.php';
 
 function personal_wasap_webhook_evo_handle(): void
 {

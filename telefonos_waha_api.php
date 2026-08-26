@@ -141,6 +141,13 @@ function telefonos_waha_dispatch_inner(): void
         if ($action === 'evo_status') {
             $r = $client->getStatus();
             $state = strtoupper((string)($r['data']['state'] ?? ''));
+            // Self-heal del webhook: si está conectado pero no tiene webhook, re-configurar
+            if ($r['ok'] && $state === 'OPEN') {
+                $wh = $client->getWebhook();
+                if (!$wh['ok'] || empty($wh['data']['url'] ?? '')) {
+                    evolution_ensure_webhook($row);
+                }
+            }
             $label = match ($state) {
                 'OPEN' => 'Conectado',
                 'CONNECTING' => 'Esperando QR / conectando',
@@ -167,17 +174,8 @@ function telefonos_waha_dispatch_inner(): void
         }
 
         if ($action === 'evo_qr') {
-            // Asegurar que la instancia existe
-            $st = $client->connectionState();
-            if (!$st['ok']) {
-                $client->createInstance($client->instanceName(), true);
-                usleep(1500000);
-                // Configurar el webhook receptor de Evolution si la línea lo tiene definido
-                $evoWebhook = evolution_webhook_url_for_row($row);
-                if ($evoWebhook !== '') {
-                    $client->setWebhook($evoWebhook);
-                }
-            }
+            // Asegurar instancia + webhook (idempotente)
+            evolution_ensure_webhook($row);
             // Reintentar hasta que el QR esté disponible (instancias nuevas tardan unos segundos)
             $lastError = 'No se pudo obtener el QR de Evolution';
             for ($attempt = 1; $attempt <= 5; $attempt++) {
@@ -196,6 +194,8 @@ function telefonos_waha_dispatch_inner(): void
 
         if ($action === 'evo_restart') {
             $r = $client->restart();
+            // Re-configurar webhook tras el restart (evita olvidos)
+            evolution_ensure_webhook($row);
             telefonos_waha_json(['ok' => $r['ok'], 'http_status' => $r['ok'] ? 200 : 502, 'message' => $r['ok'] ? 'Evolution reiniciado' : ($r['error'] ?? 'Error'), 'instance' => $client->instanceName()], $r['ok'] ? 200 : 502);
             return;
         }

@@ -15,6 +15,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/app/bootstrap.php';
+require_once __DIR__ . '/app/personal_wasap_evo_translate.php';
 
 // Lightweight auth: allow whitelisted IPs + logged-in sessions
 // For logged-out users (e.g., first page load before login), allow with a simple token
@@ -68,6 +69,35 @@ function wasap_personal_line_row(): ?array {
         }
     }
     return null;
+}
+
+/**
+ * Captura los "salientes nativos" (mensajes enviados desde el móvil primario) de
+ * Evolution, que el webhook no emite. Sondea findMessages(fromMe=true) recientes
+ * y los persiste. Devuelve cuántos se ingresaron.
+ */
+function wasap_sync_evolution_outbound(): int {
+    if (wasap_personal_transport() !== 'evolution') return 0;
+    $row = wasap_personal_line_row();
+    if (!is_array($row)) return 0;
+    $evo = evolution_client_for_row($row);
+    // findMessages ignora where/take en esta versión: devuelve ~50 registros recientes
+    // mezclados. Escaneamos todos y filtramos en PHP por fromMe=true y ventana reciente.
+    $since = time() - 900; // últimos 15 minutos
+    $res = $evo->findMessages([], 200, 0, ['messageTimestamp' => 'desc']);
+    $records = $res['data']['messages']['records'] ?? [];
+    $count = 0;
+    foreach ($records as $m) {
+        if (!is_array($m)) continue;
+        if (empty($m['key']['fromMe'])) continue;
+        $ts = (int) ($m['messageTimestamp'] ?? 0);
+        if ($ts > 0 && $ts < $since) continue; // antiguo: saltar
+        $ingest = personal_wasap_evo_translate($m);
+        if ($ingest === null) continue;
+        wasap_ingest_message($ingest);
+        $count++;
+    }
+    return $count;
 }
 
 // ── Debug logging ──
@@ -286,6 +316,7 @@ switch ($action) {
 
     // ── Lista de chats ──
     case 'chats':
+        wasap_sync_evolution_outbound();
         $store = wasap_store_read();
         $chats = [];
         foreach ($store['chats'] as $chatId => $chat) {
@@ -310,6 +341,7 @@ switch ($action) {
 
     // ── Mensajes de un chat ──
     case 'messages':
+        wasap_sync_evolution_outbound();
         $chatId = trim((string)($_GET['chat_id'] ?? ''));
         if ($chatId === '') {
             echo json_encode(['ok' => false, 'error' => 'chat_id required']);

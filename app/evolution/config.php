@@ -93,7 +93,44 @@ if (!function_exists('evolution_webhook_url_for_row')) {
         if ($uso === 'personal') {
             return 'http://100.76.30.118/control/personal_wasap_webhook_evo.php';
         }
-        // bot casa / comercial: se configuran en fases posteriores
-        return '';
+        if ($uso === 'bot casa') {
+            return 'http://100.76.30.118/control/bot-casa/public/webhook_evo.php';
+        }
+        // comercial / resto
+        return 'http://100.76.30.118/comercial_webhook_evo.php';
+    }
+}
+
+if (!function_exists('evolution_ensure_webhook')) {
+    /**
+     * Garantiza que la instancia Evolution de una línea exista y tenga su webhook
+     * configurado. Idempotente; se llama desde QR, restart y health (self-heal)
+     * para que ningún webhook quede en el olvido.
+     *
+     * @param array<string,mixed>|null $row
+     * @return array<string,mixed>
+     */
+    function evolution_ensure_webhook(?array $row): array
+    {
+        $row = is_array($row) ? $row : [];
+        $url = evolution_webhook_url_for_row($row);
+        if ($url === '') {
+            return ['ok' => true, 'note' => 'sin webhook definido para este uso'];
+        }
+        $client = evolution_client_for_row($row);
+        // Asegurar instancia
+        $st = $client->connectionState();
+        if (!$st['ok']) {
+            $client->createInstance($client->instanceName(), true);
+            usleep(1200000);
+        }
+        $r = $client->setWebhook($url);
+        return [
+            'ok' => $r['ok'],
+            'instance' => $client->instanceName(),
+            'url' => $url,
+            'http_code' => $r['http_code'] ?? 0,
+            'error' => $r['error'] ?? null,
+        ];
     }
 }
