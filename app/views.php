@@ -8943,7 +8943,7 @@ if (!empty($sendtaxsState)) {
                 ), JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS);
                 echo '<tr data-filter-text="' . e($searchText) . '" data-telefono="' . e($telefonoEditData) . '">';
                 echo '<td>' . e($row['nombre'] ?? '') . '</td>';
-                echo '<td>' . e($row['tfono'] ?? '') . '</td>';
+                echo '<td>' . e($row['tfono'] ?? '') . '<br><button type="button" class="btn-secondary-mini twa-action-button twa-identify-btn" data-identify-id="' . e($row['id'] ?? '') . '" title="Identificar" aria-label="Identificar">?</button> <span class="twa-action-result muted" aria-live="polite" data-identify-result="' . e($row['id'] ?? '') . '"></span></td>';
                 echo '<td>' . e($row['uso'] ?? '') . '</td>';
                 $activeTransport = whatsapp_transport_normalize($row['transport'] ?? 'waha');
                 echo '<td><span class="badge transport-badge transport-badge-' . ($activeTransport === 'evolution' ? 'evo' : 'waha') . '" title="Transporte activo para la mensajería">' . ($activeTransport === 'evolution' ? '⚡ Evolution' : 'WAHA') . '</span></td>';
@@ -9329,6 +9329,16 @@ if (!empty($sendtaxsState)) {
                 if (!id) return;
                 if (action === "restart") restartAndRescan(id);
                 if (action === "qr") showQr(id);
+            });
+            // Identificar (botón bajo el número de teléfono)
+            var telefonosRows2 = document.getElementById("telefonosRows");
+            if (telefonosRows2) telefonosRows2.addEventListener("click", function(event){
+                var ibtn = event.target.closest ? event.target.closest(".twa-identify-btn") : null;
+                if (!ibtn) return;
+                var iid = ibtn.getAttribute("data-identify-id") || "";
+                if (!iid) return;
+                var ires = document.querySelector('[data-identify-result="' + iid + '"]');
+                identify(iid, ibtn, ires);
             });
             document.getElementById("twaQrModalBg").addEventListener("click", closeQr);
             document.getElementById("twaQrCloseTop").addEventListener("click", closeQr);
