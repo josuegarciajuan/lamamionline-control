@@ -45,6 +45,11 @@ final class NativeOutboundSync
         $chatId = trim($senderLid) !== '' ? trim($senderLid) : $this->phoneChatId($phone);
         if ($chatId === '') return ['ok' => true, 'synced' => 0, 'paused' => false];
 
+        // ── Transporte Evolution: sondeo de salientes vía findMessages ──
+        if (strtolower(trim((string) ($line['transport'] ?? 'waha'))) === 'evolution') {
+            return $this->syncEvolution($userId, $line, $threadId, $phone, $senderLid);
+        }
+
         $server = (string) $this->config->get('waha.base_ip', '100.117.92.74');
         $apiKey = (string) $this->config->get('waha.api_key', '');
         $session = (string) $this->config->get('waha.session', 'default');
@@ -101,6 +106,69 @@ final class NativeOutboundSync
 
         $paused = $synced > 0 && $this->pauseThread($threadId);
         return ['ok' => true, 'synced' => $synced, 'paused' => $paused, 'chat_id' => $chatId];
+    }
+
+    /**
+     * Sync de salientes nativos para líneas en Evolution (findMessages fromMe=true).
+     * @param array<string, mixed> $line
+     * @return array{ok: bool, synced: int, paused: bool}
+     */
+    private function syncEvolution(int $userId, array $line, string $threadId, string $phone, string $senderLid = ''): array
+    {
+        $evoFile = dirname(__DIR__, 2) . '/data/evolution_config.json';
+        if (!is_file($evoFile)) {
+            return ['ok' => true, 'synced' => 0, 'paused' => false];
+        }
+        $cfg = json_decode((string) file_get_contents($evoFile), true);
+        if (!is_array($cfg) || empty($cfg['api_key']) || empty($cfg['host'])) {
+            return ['ok' => true, 'synced' => 0, 'paused' => false];
+        }
+        require_once dirname(__DIR__, 2) . '/app/evolution/EvolutionApi.php';
+        $evo = new \EvolutionApi((string) $cfg['host'], (string) $cfg['api_key'], (string) ($line['evo_instance'] ?? ''), 15);
+
+        $since = time() - 900;
+        $res = $evo->findMessages([], 100, 0, ['messageTimestamp' => 'desc']);
+        $records = $res['data']['messages']['records'] ?? [];
+        $phoneDigits = preg_replace('/[^0-9]/', '', $phone);
+        $knownIds = $this->knownMessageIds();
+        $synced = 0;
+        foreach ($records as $m) {
+            if (!is_array($m)) continue;
+            if (empty($m['key']['fromMe'])) continue;
+            $ts = (int) ($m['messageTimestamp'] ?? 0);
+            if ($ts > 0 && $ts < $since) continue;
+            $remoteJid = (string) ($m['key']['remoteJid'] ?? '');
+            $remoteDigits = preg_replace('/[^0-9]/', '', explode('@', $remoteJid)[0]);
+            if ($senderLid !== '' && $remoteJid !== $senderLid) continue;
+            if ($phoneDigits !== '' && $remoteDigits !== $phoneDigits) continue;
+
+            $msgId = (string) ($m['key']['id'] ?? '');
+            $msgArr = $m['message'] ?? [];
+            $msgArr = is_array($msgArr) ? $msgArr : [];
+            $text = '';
+            if (isset($msgArr['conversation']) && is_string($msgArr['conversation'])) $text = $msgArr['conversation'];
+            elseif (isset($msgArr['extendedTextMessage']['text']) && is_string($msgArr['extendedTextMessage']['text'])) $text = $msgArr['extendedTextMessage']['text'];
+            $text = trim($text);
+            if ($msgId === '' || $text === '' || isset($knownIds[$msgId])) continue;
+
+            $this->memory->appendMessage(
+                $threadId,
+                $phone,
+                '',
+                $text,
+                [
+                    'waha_message_id' => $msgId,
+                    'sender_lid' => $remoteJid,
+                    'from_me' => true,
+                    'ts' => gmdate('Y-m-d\TH:i:s\Z', (int) ($m['messageTimestamp'] ?? time())),
+                ],
+            );
+            $knownIds[$msgId] = true;
+            $synced++;
+        }
+
+        $paused = $synced > 0 && $this->pauseThread($threadId);
+        return ['ok' => true, 'synced' => $synced, 'paused' => $paused];
     }
 
     private function phoneChatId(string $phone): string

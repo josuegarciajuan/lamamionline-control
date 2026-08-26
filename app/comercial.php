@@ -2700,6 +2700,27 @@ if (!defined('COMERCIAL_PHOTO_LINK_SLEEP_SEC')) {
 }
 
 /**
+ * ¿El texto es (solo) una URL de imagen? (compartir.site / extensión / image-proxy)
+ */
+function comercial_string_is_image_url(string $text): bool {
+    $text = trim((string)$text);
+    if ($text === '') return false;
+    if (preg_match('#^https?://compartir\.site/[a-zA-Z0-9_-]+/?$#i', $text)) return true;
+    if (preg_match('#^https?://[^\s]+\.(jpe?g|png|webp|gif)(\?[^\s]*)?$#i', $text)) return true;
+    return str_contains($text, '/api/image-proxy.php');
+}
+
+/**
+ * Convierte un shortlink compartir.site a la URL directa de la imagen.
+ */
+function comercial_direct_image_url(string $url): string {
+    if (preg_match('#^https?://compartir\.site/([a-zA-Z0-9_-]+)/?$#i', $url, $m)) {
+        return 'https://compartir.site/' . $m[1] . '/' . $m[1] . '.jpg';
+    }
+    return $url;
+}
+
+/**
  * Separa el texto de las URLs de imagen para enviar cada enlace en un mensaje
  * individual (mismo algoritmo que bot-casa / ImageSplitter):
  *   - Primer mensaje: solo texto (sin URLs de imagen).
@@ -6063,29 +6084,56 @@ function comercial_send_text_via_line($line, $targetPhone, $text, $process = nul
         return array('ok' => false, 'http_code' => 0, 'error' => 'Datos insuficientes para enviar', 'startTyping' => null, 'sendText' => null, 'stopTyping' => null);
     }
 
-    $preDelay = comercial_random_between((int)$settings['typing_pre_min_sec'], (int)$settings['typing_pre_max_sec']);
-    $typingDelay = comercial_calc_typing_delay($text, $settings);
+    // ── Transporte Evolution: si la línea opera por Evolution, enviar nativo ──
+    if (whatsapp_transport_for($line) === 'evolution') {
+        $evo = evolution_client_for_row($line);
+        $targetDigits = comercial_only_digits($targetPhone);
+        $start = null;
+        $stop = null;
+        if (comercial_string_is_image_url($text)) {
+            // Foto nativa (1 por mensaje) con la URL directa de la imagen
+            $send = $evo->sendMedia($targetDigits, EvolutionApi::MEDIA_IMAGE, comercial_direct_image_url($text), null, null, 0);
+        } else {
+            $jid = $evo->toJid($targetDigits);
+            $evo->markChatAsRead($jid);
+            $evo->startTyping($jid, 700);
+            $send = $evo->sendText($targetDigits, $text);
+            $evo->stopTyping($jid);
+        }
+        $okSend = !empty($send['ok']);
+        $httpCode = (int)($send['http_code'] ?? 0);
+        $responseBody = '';
+        $responseBodyExcerpt = '';
+        $sendError = trim((string)($send['error'] ?? ''));
+        if (!$okSend && $sendError === '') {
+            $sendError = 'Evolution sendText failed';
+        }
+    } else {
+        $preDelay = comercial_random_between((int)$settings['typing_pre_min_sec'], (int)$settings['typing_pre_max_sec']);
+        $typingDelay = comercial_calc_typing_delay($text, $settings);
 
-    sleep($preDelay);
-    $typingPayload = array('session' => (string)$settings['waha_session'], 'chatId' => $chatId);
-    $start = comercial_waha_post_json($settings, $port, 'api/startTyping', $typingPayload);
-    sleep($typingDelay);
-    $sendPayload = array('session' => (string)$settings['waha_session'], 'chatId' => $chatId, 'text' => (string)$text);
-    $send = comercial_waha_post_json($settings, $port, 'api/sendText', $sendPayload);
-    $stop = comercial_waha_post_json($settings, $port, 'api/stopTyping', $typingPayload);
+        sleep($preDelay);
+        $typingPayload = array('session' => (string)$settings['waha_session'], 'chatId' => $chatId);
+        $start = comercial_waha_post_json($settings, $port, 'api/startTyping', $typingPayload);
+        sleep($typingDelay);
+        $sendPayload = array('session' => (string)$settings['waha_session'], 'chatId' => $chatId, 'text' => (string)$text);
+        $send = comercial_waha_post_json($settings, $port, 'api/sendText', $sendPayload);
+        $stop = comercial_waha_post_json($settings, $port, 'api/stopTyping', $typingPayload);
 
-    $okSend = !empty($send['ok']) && (int)$send['http_code'] >= 200 && (int)$send['http_code'] < 300;
-    $responseBody = is_string($send['body'] ?? null) ? trim((string)$send['body']) : '';
-    $responseBodyExcerpt = $responseBody !== '' ? substr($responseBody, 0, 600) : '';
-    $sendError = trim((string)($send['error'] ?? ''));
-    if (!$okSend && $sendError === '' && $responseBodyExcerpt !== '') {
-        $sendError = 'HTTP ' . (int)$send['http_code'] . ' · ' . $responseBodyExcerpt;
+        $okSend = !empty($send['ok']) && (int)$send['http_code'] >= 200 && (int)$send['http_code'] < 300;
+        $httpCode = (int)$send['http_code'];
+        $responseBody = is_string($send['body'] ?? null) ? trim((string)$send['body']) : '';
+        $responseBodyExcerpt = $responseBody !== '' ? substr($responseBody, 0, 600) : '';
+        $sendError = trim((string)($send['error'] ?? ''));
+        if (!$okSend && $sendError === '' && $responseBodyExcerpt !== '') {
+            $sendError = 'HTTP ' . (int)$send['http_code'] . ' · ' . $responseBodyExcerpt;
+        }
+        if (!$okSend && $sendError === '') {
+            $sendError = 'WAHA sendText failed';
+        }
     }
-    if (!$okSend && $sendError === '') {
-        $sendError = 'WAHA sendText failed';
-    }
 
-    comercial_register_line_attempt($lineId, $okSend, (int)$send['http_code'], $okSend ? '' : $sendError);
+    comercial_register_line_attempt($lineId, $okSend, $httpCode, $okSend ? '' : $sendError);
 
     $eventPayload = array(
         'process_id' => (string)($process['id'] ?? ''),
@@ -6536,6 +6584,65 @@ function comercial_schedule_next_run($process, $lineState = null) {
  * que detectamos las respuestas nativas leyendo GET /api/messages por chat.
  * Devuelve el número de respuestas nativas detectadas (y registradas).
  */
+/**
+ * Sondeo de salientes nativos para líneas en Evolution (findMessages fromMe=true).
+ * @param array<string,mixed> $thread
+ * @param array<string,mixed> $line
+ */
+function comercial_sync_native_replies_evolution($thread, $line) {
+    $thread = comercial_normalize_thread($thread);
+    $targetDigits = comercial_only_digits((string)($thread['target_phone'] ?? ''));
+    $senderLid = trim((string)($thread['sender_lid'] ?? ''));
+    if ($targetDigits === '' && $senderLid === '') return 0;
+
+    $evo = evolution_client_for_row($line);
+    $since = time() - 900;
+    $res = $evo->findMessages([], 100, 0, ['messageTimestamp' => 'desc']);
+    $records = $res['data']['messages']['records'] ?? [];
+    $detected = 0;
+    foreach ($records as $m) {
+        if (!is_array($m)) continue;
+        if (empty($m['key']['fromMe'])) continue; // solo salientes
+        $ts = (int) ($m['messageTimestamp'] ?? 0);
+        if ($ts > 0 && $ts < $since) continue;
+        $remoteJid = (string) ($m['key']['remoteJid'] ?? '');
+        if ($remoteJid === '') continue;
+        // Coincidir por LID o por dígitos del remoto
+        $remoteDigits = preg_replace('/[^0-9]/', '', explode('@', $remoteJid)[0]);
+        if ($senderLid !== '' && $remoteJid !== $senderLid) continue;
+        if ($targetDigits !== '' && $remoteDigits !== $targetDigits) continue;
+
+        $msgId = trim((string) ($m['key']['id'] ?? ''));
+        $msgArr = $m['message'] ?? [];
+        $msgArr = is_array($msgArr) ? $msgArr : [];
+        $body = '';
+        if (isset($msgArr['conversation']) && is_string($msgArr['conversation'])) $body = $msgArr['conversation'];
+        elseif (isset($msgArr['extendedTextMessage']['text']) && is_string($msgArr['extendedTextMessage']['text'])) $body = $msgArr['extendedTextMessage']['text'];
+        $body = trim($body);
+        if ($msgId === '' || $body === '') continue;
+        if (!comercial_webhook_claim_message($msgId)) continue; // ya procesado
+
+        $thread['human_taken'] = 1;
+        $thread['inbox_paused'] = 1;
+        $thread['last_human_reply_at'] = now_datetime();
+        $thread['last_outbound_text'] = $body;
+        $thread['updated_at'] = now_datetime();
+        comercial_thread_request_cancel((string) ($thread['id'] ?? ''));
+        comercial_event_append('manual_outbound_sent', array(
+            'thread_id' => (string) ($thread['id'] ?? ''),
+            'target_phone' => (string) ($thread['target_phone'] ?? ''),
+            'text' => $body,
+            'source' => 'native_wa_evo',
+        ));
+        $detected++;
+    }
+
+    if ($detected > 0) {
+        comercial_upsert_thread($thread);
+    }
+    return $detected;
+}
+
 function comercial_sync_native_replies_for_thread($thread, $shortTimeoutSec = 2) {
     $thread = comercial_normalize_thread($thread);
     $lineId = trim((string)($thread['line_id'] ?? ''));
@@ -6543,6 +6650,11 @@ function comercial_sync_native_replies_for_thread($thread, $shortTimeoutSec = 2)
     if ($lineId === '' || !isset($lines[$lineId])) return 0;
     $port = trim((string)($lines[$lineId]['waha_port'] ?? ''));
     if ($port === '') return 0;
+
+    // ── Transporte Evolution: sondeo de salientes vía findMessages ──
+    if (whatsapp_transport_for($lines[$lineId]) === 'evolution') {
+        return comercial_sync_native_replies_evolution($thread, $lines[$lineId]);
+    }
 
     // chatId: preferir el LID oculto; si no lo tenemos, usar el teléfono @c.us.
     $chatId = trim((string)($thread['sender_lid'] ?? ''));
