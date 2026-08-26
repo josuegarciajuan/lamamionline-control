@@ -8896,6 +8896,15 @@ if (!empty($sendtaxsState)) {
         echo '<button type="button" class="btn-primary" id="btnNuevoTelefono">+ Nuevo teléfono</button>';
         echo '</div>';
 
+        echo '<style>
+        .transport-badge{display:inline-block;padding:2px 9px;border-radius:11px;font-size:11px;font-weight:600;color:#fff;white-space:nowrap}
+        .transport-badge-waha{background:#25D366}
+        .transport-badge-evo{background:#8f00ff}
+        .transport-line{display:flex;align-items:center;gap:6px;padding:3px 0;flex-wrap:wrap}
+        .transport-line + .transport-line{border-top:1px solid rgba(128,128,128,.2);margin-top:4px;padding-top:6px}
+        .transport-line-label{font-size:11px;font-weight:700;color:var(--muted);min-width:64px;letter-spacing:.3px}
+        </style>';
+
         echo '<section class="panel">';
         echo '<h2>Listado teléfonos</h2>';
         if (empty($telefonos)) {
@@ -8904,7 +8913,7 @@ if (!empty($sendtaxsState)) {
             $telefonos = sort_desc_by_key($telefonos, 'created_at');
             render_live_filter('#telefonosRows tr[data-filter-text]', 'Buscar teléfono...');
             echo '<div class="table-wrap"><table><thead><tr>';
-            echo '<th>Nombre</th><th>Tfono</th><th>Uso</th><th>WAHA Port</th><th>WAHA</th><th>Salud WAHA</th><th>Notas</th><th>Destacamos</th><th>Acciones</th>';
+            echo '<th>Nombre</th><th>Tfono</th><th>Uso</th><th>Transporte</th><th>WAHA Port</th><th>WAHA</th><th>Salud</th><th>Notas</th><th>Destacamos</th><th>Acciones</th>';
             echo '</tr></thead><tbody id="telefonosRows">';
             foreach ($telefonos as $row) {
                 $dest = $anunciosIndex[$row['destacamos_id'] ?? ''] ?? null;
@@ -8936,24 +8945,24 @@ if (!empty($sendtaxsState)) {
                 echo '<td>' . e($row['nombre'] ?? '') . '</td>';
                 echo '<td>' . e($row['tfono'] ?? '') . '</td>';
                 echo '<td>' . e($row['uso'] ?? '') . '</td>';
+                $activeTransport = whatsapp_transport_normalize($row['transport'] ?? 'waha');
+                echo '<td><span class="badge transport-badge transport-badge-' . ($activeTransport === 'evolution' ? 'evo' : 'waha') . '" title="Transporte activo para la mensajería">' . ($activeTransport === 'evolution' ? '⚡ Evolution' : 'WAHA') . '</span></td>';
                 echo '<td>' . e($row['waha_port'] ?? '') . '</td>';
                 echo '<td>' . e($row['waha'] ?? '') . '</td>';
                 $wahaPort = trim($row['waha_port'] ?? '');
                 $wahaSession = trim($row['waha'] ?? '');
                 echo '<td class="td-waha-salud">';
+                echo '<div class="transport-line">';
+                echo '<span class="transport-line-label">WAHA</span>';
                 echo '<span id="waha-salud-' . e($row['id'] ?? '') . '" class="waha-indicator" aria-label="Estado WAHA: sin comprobar"><span class="waha-status-dot is-unknown" aria-hidden="true"></span>Sin comprobar</span>';
                 if ($wahaPort !== '') {
-                    echo '<div class="waha-line-actions" id="waha-actions-' . e($row['id'] ?? '') . '" data-telefono-id="' . e($row['id'] ?? '') . '">';
-                    echo '<button type="button" class="btn-secondary-mini twa-action-button" data-action="identify" title="Identificar" aria-label="Identificar">?</button>';
-                    echo '<span class="twa-action-result muted" aria-live="polite"></span>';
-                    echo '</div>';
+                    echo '<div class="waha-line-actions" id="waha-actions-' . e($row['id'] ?? '') . '" data-telefono-id="' . e($row['id'] ?? '') . '"></div>';
                 }
-                echo '<div class="evo-line-block" style="margin-top:6px;border-top:1px solid rgba(128,128,128,.25);padding-top:6px;">';
-                echo '<span id="evo-salud-' . e($row['id'] ?? '') . '" class="waha-indicator" aria-label="Estado Evolution: sin comprobar"><span class="waha-status-dot is-unknown" aria-hidden="true"></span>Evo: sin comprobar</span>';
-                echo '<div class="waha-line-actions" id="evo-actions-' . e($row['id'] ?? '') . '" data-evo-id="' . e($row['id'] ?? '') . '">';
-                echo '<button type="button" class="btn-secondary-mini twa-action-button" data-action="evo-qr" title="Vincular QR Evolution" aria-label="Vincular QR Evolution">📱</button>';
-                echo '<button type="button" class="btn-secondary-mini twa-action-button" data-action="evo-restart" title="Reescanear Evolution" aria-label="Reescanear Evolution">↻</button>';
                 echo '</div>';
+                echo '<div class="transport-line">';
+                echo '<span class="transport-line-label">Evolution</span>';
+                echo '<span id="evo-salud-' . e($row['id'] ?? '') . '" class="waha-indicator" aria-label="Estado Evolution: sin comprobar"><span class="waha-status-dot is-unknown" aria-hidden="true"></span>Sin comprobar</span>';
+                echo '<div class="waha-line-actions" id="evo-actions-' . e($row['id'] ?? '') . '" data-evo-id="' . e($row['id'] ?? '') . '"></div>';
                 echo '</div>';
                 echo '</td>';
                 echo '<td>' . e($row['notas'] ?? '') . '</td>';
@@ -9137,12 +9146,6 @@ if (!empty($sendtaxsState)) {
                 } else if (connected) {
                     element.appendChild(actionButton("restart", "↻", "Reescanear", "btn-secondary-mini"));
                 }
-                element.appendChild(actionButton("identify", "?", "Identificar", "btn-secondary-mini"));
-                var result = document.createElement("span");
-                result.className = "twa-action-result muted";
-                result.setAttribute("aria-live", "polite");
-                result.textContent = identifyResult[id] || "";
-                element.appendChild(result);
             }
 
             function checkLine(id) {
@@ -9324,7 +9327,6 @@ if (!empty($sendtaxsState)) {
                 var id = actions.getAttribute("data-telefono-id") || "";
                 var action = button.getAttribute("data-action");
                 if (!id) return;
-                if (action === "identify") identify(id, button, actions.querySelector(".twa-action-result"));
                 if (action === "restart") restartAndRescan(id);
                 if (action === "qr") showQr(id);
             });
@@ -9399,13 +9401,36 @@ if (!empty($sendtaxsState)) {
                 element.appendChild(dot);
                 element.appendChild(document.createTextNode(text + instText));
             }
+            function evoButton(action, icon, title, className) {
+                var b = document.createElement("button");
+                b.type = "button";
+                b.className = className + " twa-action-button";
+                b.setAttribute("data-action", action);
+                b.setAttribute("title", title);
+                b.setAttribute("aria-label", title);
+                b.textContent = icon;
+                return b;
+            }
+            function evoRenderActions(element, id, status) {
+                if (!element) return;
+                while (element.firstChild) element.removeChild(element.firstChild);
+                status = (status || "").toUpperCase();
+                if (status === "OPEN") {
+                    element.appendChild(evoButton("evo-restart", "↻", "Reescanear Evolution", "btn-secondary-mini"));
+                } else {
+                    element.appendChild(evoButton("evo-qr", "📱", "Vincular QR Evolution", "btn-secondary-mini"));
+                }
+            }
             function evoCheckLine(id) {
                 var health = document.getElementById("evo-salud-" + id);
+                var actions = document.getElementById("evo-actions-" + id);
                 var url = apiBase + "?action=evo_status&telefono_id=" + encodeURIComponent(id) + "&_=" + Date.now();
                 evoJson(url, undefined, 12000).then(function(data){
                     evoRender(health, data.status, data.status_label || data.status, data.instance || "");
+                    evoRenderActions(actions, id, data.status);
                 }).catch(function(error){
                     evoRender(health, "FAILED", error.message || "Error Evolution", "");
+                    evoRenderActions(actions, id, "FAILED");
                 });
             }
             function evoCheckAll() {
