@@ -10219,10 +10219,11 @@ if (!empty($sendtaxsState)) {
                     var media = m.media;
                     if (!media) return "";
                     var src = "";
+                    var tk = "&token=wasap_personal_2026";
                     if (media.instance && m.id) {
-                        src = "/control/media_proxy.php?instance=" + encodeURIComponent(media.instance) + "&msg_id=" + encodeURIComponent(m.id) + "&type=" + encodeURIComponent(media.type || "");
+                        src = "/control/media_proxy.php?instance=" + encodeURIComponent(media.instance) + "&msg_id=" + encodeURIComponent(m.id) + "&type=" + encodeURIComponent(media.type || "") + tk;
                     } else if (media.url) {
-                        src = "/control/media_proxy.php?url=" + encodeURIComponent(media.url) + "&type=" + encodeURIComponent(media.type || "");
+                        src = "/control/media_proxy.php?url=" + encodeURIComponent(media.url) + "&type=" + encodeURIComponent(media.type || "") + tk;
                     }
                     if (!src) return "";
                     if (media.type === "image") {

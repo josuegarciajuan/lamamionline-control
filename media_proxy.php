@@ -17,7 +17,11 @@ declare(strict_types=1);
 require_once __DIR__ . '/app/bootstrap.php';
 
 // El navegador manda la cookie de sesión; exigimos sesión iniciada.
-if (!is_logged_in()) {
+// También se acepta el token del chat personal (wasap_personal_2026) para
+// servir media en el panel personal sin depender de la sesión.
+$token = trim((string) ($_GET['token'] ?? ''));
+$tokenValid = ($token !== '' && $token === 'wasap_personal_2026');
+if (!is_logged_in() && !$tokenValid) {
     http_response_code(403);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['ok' => false, 'error' => 'unauthorized']);
@@ -25,12 +29,6 @@ if (!is_logged_in()) {
 }
 
 $url = (string) ($_GET['url'] ?? '');
-if ($url === '') {
-    http_response_code(400);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['ok' => false, 'error' => 'url required']);
-    exit;
-}
 
 $type = strtolower(trim((string) ($_GET['type'] ?? '')));
 $allowedType = in_array($type, ['image', 'audio', 'video', 'document'], true) ? $type : '';
