@@ -2463,6 +2463,71 @@ function comercial_thread_history_page($thread, $limit = 80, $before = '', $even
     );
 }
 
+/**
+ * Revisión barata del estado local del inbox comercial.
+ *
+ * Hash de mtime+tamaño del JSONL de eventos y del JSON de hilos, más el mtime
+ * de los ficheros de settings y de estado de líneas. El stat SIEMPRE se
+ * refresca (clearstatcache) para que los bucles de long-poll vean los cambios
+ * en cuanto ocurren, aunque PHP haya cacheado stat de una iteración previa.
+ *
+ * @param string $eventsPath  Ruta del JSONL de eventos ('' = por defecto).
+ * @param string $threadsPath Ruta del JSON de hilos ('' = por defecto).
+ * @return string
+ */
+function comercial_inbox_revision($eventsPath = '', $threadsPath = '') {
+    clearstatcache(true);
+    $eventsPath = trim((string)$eventsPath);
+    if ($eventsPath === '') $eventsPath = DATA_PATH . '/comercial_events.jsonl';
+    $threadsPath = trim((string)$threadsPath);
+    if ($threadsPath === '') $threadsPath = DATA_PATH . '/comercial_threads.json';
+    $parts = array();
+    foreach (array($eventsPath, $threadsPath) as $path) {
+        $mtime = @filemtime($path);
+        $size = @filesize($path);
+        $parts[] = $path;
+        $parts[] = ($mtime === false) ? 'm' : (string)$mtime;
+        $parts[] = ($size === false) ? 's' : (string)$size;
+    }
+    foreach (array(DATA_PATH . '/comercial_settings.json', DATA_PATH . '/comercial_line_state.json') as $path) {
+        $mtime = @filemtime($path);
+        $parts[] = $path . '=' . (($mtime === false) ? '0' : (string)$mtime);
+    }
+    return hash('sha256', implode('|', $parts));
+}
+
+/**
+ * Long-poll del estado local: espera hasta que la revisión cambie o se agote
+ * el timeout. Usa microtime() para el deadline (no time()) y duerme ~250 ms
+ * entre comprobaciones. Si connection_aborted() devuelve verdadero, sale con
+ * ['changed' => false, 'revision' => ..., 'aborted' => true].
+ *
+ * @param string $sinceRev    Revisión conocida por el cliente ('' = responder ya).
+ * @param int    $timeoutSec  Timeout en segundos (mínimo 1).
+ * @return array{changed: bool, revision: string, aborted?: bool}
+ */
+function comercial_poll_wait_for_change($sinceRev, $timeoutSec = 25, $eventsPath = '', $threadsPath = '') {
+    $sinceRev = trim((string)$sinceRev);
+    $timeoutSec = max(1, (int)$timeoutSec);
+    if ($sinceRev === '') {
+        return array('changed' => true, 'revision' => comercial_inbox_revision($eventsPath, $threadsPath));
+    }
+    $deadline = microtime(true) + $timeoutSec;
+    while (true) {
+        if (connection_aborted()) {
+            return array('changed' => false, 'revision' => comercial_inbox_revision($eventsPath, $threadsPath), 'aborted' => true);
+        }
+        $revision = comercial_inbox_revision($eventsPath, $threadsPath);
+        if (!hash_equals($sinceRev, $revision)) {
+            return array('changed' => true, 'revision' => $revision);
+        }
+        if (microtime(true) >= $deadline) {
+            return array('changed' => false, 'revision' => $revision);
+        }
+        usleep(250000);
+    }
+}
+
 function comercial_ai_memory_limit() {
     return 180;
 }
@@ -6545,77 +6610,154 @@ function comercial_manual_send_job_enqueue($threadId, $text, $clientMessageId, $
         return array('ok' => true, 'job' => $job, 'duplicate' => false);
     });
     if (!is_array($result)) return array('ok' => false, 'error' => 'No se pudo bloquear la cola manual');
-    return !empty($result['job']) ? (array)$result['job'] : $result;
+    if (empty($result['job'])) return $result;
+    $enqueuedJob = (array)$result['job'];
+    // El flag duplicate llega hasta el caller: un trabajo nuevo (duplicate=false)
+    // se procesa en la misma request; un re-enqueue (duplicate=true) no se
+    // reprocesa — los reintentos solo vienen por el flag retry explícito.
+    $enqueuedJob['duplicate'] = !empty($result['duplicate']);
+    return $enqueuedJob;
 }
 
-/** Procesa como máximo un envío manual por tick para no bloquear el cron. */
-function comercial_process_manual_send_queue() {
-    $file = comercial_manual_send_jobs_file();
+/**
+ * Procesa un trabajo de envío manual (claim → envío → finalización).
+ *
+ * Flujo reutilizable y owner-safe, extraído de la cola del tick para que el
+ * endpoint POST ?action=send pueda procesar al instante:
+ *
+ *  - Claim: bajo lock verifica la elegibilidad del trabajo almacenado
+ *    (pending; processing con lease vencido = recuperación de crash; failed
+ *    solo si $job['retry'] está marcado = retry explícito de la UI) y toma
+ *    posesión con status 'processing', claim_owner aleatorio y lease según
+ *    comercial_manual_send_queue_lease_seconds(). Un lease vigente de OTRO
+ *    owner rechaza el trabajo y lo deja byte a byte intacto.
+ *  - Envío: resuelve el hilo desde thread_id, pide la cancelación de la
+ *    automatización y envía vía comercial_send_thread_message con
+ *    human_taken=true (evento manual_outbound_sent).
+ *  - Finalización: bajo lock y solo con claim propio, attempts+1, libera
+ *    claim/lease y deja el trabajo TERMINAL: 'sent' (+sent_at) o 'failed'
+ *    (+last_error). failed es terminal: el tick NO lo reintenta; solo un
+ *    retry explícito del usuario puede reactivarlo.
+ *
+ * @param array  $job  Trabajo conocido por el caller (id + claim_owner si
+ *                     viene de un claim previo; retry para reabrir failed).
+ * @param string $file Fichero de cola ('' = por defecto).
+ * @return array{ok: bool, status: string, job_id: string, job?: array, error?: string}
+ */
+function comercial_manual_send_job_process(array $job, $file = '') {
+    $jobId = trim((string)($job['id'] ?? ''));
+    if ($jobId === '') {
+        return array('ok' => false, 'error' => 'Trabajo sin id', 'status' => 'invalid', 'job_id' => '');
+    }
+    $file = trim((string)$file);
+    if ($file === '') $file = comercial_manual_send_jobs_file();
     $leaseDurationSec = comercial_manual_send_queue_lease_seconds();
-    $job = storage_json_with_lock($file, function () use ($file, $leaseDurationSec) {
-        $stored = storage_json_read_locked_strict($file);
-        if (empty($stored['ok'])) return null;
-        $jobs = array_values((array)($stored['data'] ?? array()));
-        $now = time();
-        foreach ($jobs as $index => $candidate) {
-            if (!is_array($candidate) || (string)($candidate['status'] ?? '') === 'sent') continue;
-            if ((string)($candidate['status'] ?? '') === 'processing') {
-                $leaseExpiresAt = strtotime((string)($candidate['lease_expires_at'] ?? ''));
-                // Las entradas previas al token no guardaban su vencimiento.
-                // Recuperarlas con el mismo presupuesto que un claim nuevo evita
-                // que un envío WAHA aún en curso se reclame por segunda vez.
-                if ($leaseExpiresAt === false) {
-                    $legacyLeaseStartedAt = strtotime((string)($candidate['updated_at'] ?? ''));
-                    if ($legacyLeaseStartedAt === false) {
-                        $legacyLeaseStartedAt = strtotime((string)($candidate['available_at'] ?? ''));
-                    }
-                    if ($legacyLeaseStartedAt !== false) $leaseExpiresAt = $legacyLeaseStartedAt + $leaseDurationSec;
-                }
-                if ($leaseExpiresAt !== false && $leaseExpiresAt > $now) continue;
-                if ($leaseExpiresAt === false) continue;
-            }
-            $available = strtotime((string)($candidate['available_at'] ?? ''));
-            if ((string)($candidate['status'] ?? '') !== 'processing' && $available !== false && $available > $now) continue;
-            try {
-                $claimOwner = bin2hex(random_bytes(16));
-            } catch (Throwable $e) {
-                $claimOwner = hash('sha256', uniqid('manual-send-', true));
-            }
-            $jobs[$index]['status'] = 'processing';
-            $jobs[$index]['claim_owner'] = $claimOwner;
-            $jobs[$index]['lease_expires_at'] = date('Y-m-d H:i:s', $now + $leaseDurationSec);
-            $jobs[$index]['updated_at'] = now_datetime();
-            if (!storage_json_write_locked($file, $jobs)) return null;
-            storage_invalidate_cache($file);
-            return $jobs[$index];
-        }
-        return null;
-    });
-    if (!is_array($job) || trim((string)($job['id'] ?? '')) === '') return array('processed' => false);
 
+    // ── Claim (bajo lock): verificar elegibilidad y tomar posesión ──
+    $claimed = storage_json_with_lock($file, function () use ($file, $job, $jobId, $leaseDurationSec) {
+        $stored = storage_json_read_locked_strict($file);
+        if (empty($stored['ok'])) return array('ok' => false, 'error' => (string)($stored['error'] ?? 'No se pudo leer la cola manual'));
+        $jobs = array_values((array)($stored['data'] ?? array()));
+        $index = null;
+        $current = null;
+        foreach ($jobs as $i => $candidate) {
+            if (!is_array($candidate)) continue;
+            if ((string)($candidate['id'] ?? '') === $jobId) { $index = $i; $current = $candidate; break; }
+        }
+        if ($current === null) {
+            return array('ok' => false, 'error' => 'Trabajo no encontrado en la cola', 'status' => 'missing');
+        }
+        $status = (string)($current['status'] ?? '');
+        $now = time();
+        $eligible = false;
+        $rejectReason = '';
+        if ($status === 'pending') {
+            $eligible = true;
+        } elseif ($status === 'processing') {
+            $leaseExpiresAt = strtotime((string)($current['lease_expires_at'] ?? ''));
+            // Entradas previas al token sin vencimiento: mismo presupuesto que
+            // un claim nuevo para no reclamar un envío WAHA aún en curso.
+            if ($leaseExpiresAt === false) {
+                $legacyLeaseStartedAt = strtotime((string)($current['updated_at'] ?? ''));
+                if ($legacyLeaseStartedAt === false) {
+                    $legacyLeaseStartedAt = strtotime((string)($current['available_at'] ?? ''));
+                }
+                if ($legacyLeaseStartedAt !== false) $leaseExpiresAt = $legacyLeaseStartedAt + $leaseDurationSec;
+            }
+            if ($leaseExpiresAt !== false && $leaseExpiresAt > $now) {
+                $callerOwner = trim((string)($job['claim_owner'] ?? ''));
+                $storedOwner = trim((string)($current['claim_owner'] ?? ''));
+                if ($callerOwner === '' || !hash_equals($storedOwner, $callerOwner)) {
+                    // Lease vigente de otro owner: rechazar sin tocar la fila.
+                    $rejectReason = 'El trabajo está siendo procesado por otro propietario';
+                } else {
+                    $eligible = true; // claim propio vigente (re-entrante)
+                }
+            } else {
+                $eligible = true; // lease vencido → recuperación de crash
+            }
+        } elseif ($status === 'failed' && !empty($job['retry'])) {
+            $eligible = true; // retry explícito del usuario
+        }
+        if ($rejectReason !== '') {
+            return array('ok' => false, 'error' => $rejectReason, 'status' => $status);
+        }
+        if (!$eligible) {
+            // Terminado sin retry (sent|failed) o estado desconocido: no reprocesar.
+            return array('ok' => false, 'error' => 'El trabajo no es elegible para procesarse', 'status' => $status);
+        }
+        try {
+            $claimOwner = bin2hex(random_bytes(16));
+        } catch (Throwable $e) {
+            $claimOwner = hash('sha256', uniqid('manual-send-', true));
+        }
+        $jobs[$index]['status'] = 'processing';
+        $jobs[$index]['claim_owner'] = $claimOwner;
+        $jobs[$index]['lease_expires_at'] = date('Y-m-d H:i:s', $now + $leaseDurationSec);
+        $jobs[$index]['updated_at'] = now_datetime();
+        if (!storage_json_write_locked($file, $jobs)) {
+            return array('ok' => false, 'error' => 'No se pudo guardar el claim en la cola manual');
+        }
+        storage_invalidate_cache($file);
+        return array('ok' => true, 'job' => $jobs[$index]);
+    });
+
+    if (!is_array($claimed) || empty($claimed['job'])) {
+        if (is_array($claimed) && !empty($claimed['error'])) {
+            $claimed['job_id'] = $jobId;
+            return $claimed;
+        }
+        return array('ok' => false, 'error' => 'No se pudo bloquear la cola manual', 'status' => 'lock', 'job_id' => $jobId);
+    }
+    $claimedJob = (array)$claimed['job'];
+    $claimedOwner = (string)($claimedJob['claim_owner'] ?? '');
+
+    // ── Envío (fuera del lock: el proveedor puede tardar en responder) ──
     $thread = null;
     foreach (comercial_get_threads() as $candidate) {
-        if ((string)($candidate['id'] ?? '') === (string)$job['thread_id']) {
+        if ((string)($candidate['id'] ?? '') === (string)$claimedJob['thread_id']) {
             $thread = $candidate;
             break;
         }
     }
     if ($thread) {
-        comercial_thread_request_cancel((string)$job['thread_id']);
-        $send = comercial_send_thread_message($thread, (string)$job['text'], array('human_taken' => true, 'event_type' => 'manual_outbound_sent'));
+        comercial_thread_request_cancel((string)$claimedJob['thread_id']);
+        $send = comercial_send_thread_message($thread, (string)$claimedJob['text'], array('human_taken' => true, 'event_type' => 'manual_outbound_sent'));
     } else {
         $send = array('ok' => false, 'error' => 'Hilo no encontrado');
     }
 
-    $final = storage_json_with_lock($file, function () use ($file, $job, $send) {
+    // ── Finalización owner-only (bajo lock) ──
+    $final = storage_json_with_lock($file, function () use ($file, $jobId, $claimedOwner, $send) {
         $stored = storage_json_read_locked_strict($file);
-        if (empty($stored['ok'])) return false;
+        if (empty($stored['ok'])) return array('ok' => false, 'error' => (string)($stored['error'] ?? 'No se pudo releer la cola manual'));
         $jobs = array_values((array)($stored['data'] ?? array()));
         foreach ($jobs as $index => $candidate) {
-            if (!is_array($candidate) || (string)($candidate['id'] ?? '') !== (string)$job['id']) continue;
+            if (!is_array($candidate) || (string)($candidate['id'] ?? '') !== $jobId) continue;
             if ((string)($candidate['status'] ?? '') !== 'processing'
-                || !hash_equals((string)($candidate['claim_owner'] ?? ''), (string)($job['claim_owner'] ?? ''))) {
-                return false;
+                || !hash_equals((string)($candidate['claim_owner'] ?? ''), $claimedOwner)) {
+                // El claim ya no es nuestro (otro proceso lo recuperó): no tocar.
+                return array('ok' => false, 'error' => 'El claim del trabajo ya no pertenece a este proceso');
             }
             $jobs[$index]['attempts'] = (int)($candidate['attempts'] ?? 0) + 1;
             $jobs[$index]['updated_at'] = now_datetime();
@@ -6626,15 +6768,116 @@ function comercial_process_manual_send_queue() {
                 $jobs[$index]['sent_at'] = now_datetime();
                 $jobs[$index]['last_error'] = '';
             } else {
-                $jobs[$index]['status'] = 'pending';
+                // failed es TERMINAL: el tick no lo reintenta; solo un retry
+                // explícito del usuario (flag retry) puede reabrirlo.
+                $jobs[$index]['status'] = 'failed';
+                $jobs[$index]['sent_at'] = '';
                 $jobs[$index]['last_error'] = trim((string)($send['error'] ?? 'Envío manual fallido'));
-                $jobs[$index]['available_at'] = date('Y-m-d H:i:s', time() + 15);
             }
-            return storage_json_write_locked($file, $jobs);
+            if (!storage_json_write_locked($file, $jobs)) {
+                return array('ok' => false, 'error' => 'No se pudo guardar la finalización en la cola manual');
+            }
+            storage_invalidate_cache($file);
+            return array('ok' => true, 'job' => $jobs[$index]);
         }
-        return false;
+        return array('ok' => false, 'error' => 'Trabajo no encontrado al finalizar');
     });
-    return array('processed' => true, 'ok' => !empty($send['ok']) && !empty($final), 'job_id' => (string)$job['id']);
+
+    if (!is_array($final) || empty($final['job'])) {
+        return array(
+            'ok' => false,
+            'error' => is_array($final) ? (string)($final['error'] ?? 'Finalización fallida') : 'Finalización fallida',
+            'job_id' => $jobId,
+            'status' => (string)($claimedJob['status'] ?? 'processing'),
+        );
+    }
+    $finalJob = (array)$final['job'];
+    return array(
+        'ok' => !empty($send['ok']),
+        'status' => (string)($finalJob['status'] ?? 'failed'),
+        'job_id' => $jobId,
+        'job' => $finalJob,
+    );
+}
+
+/**
+ * Procesa los trabajos pendientes de la cola de envíos manuales.
+ *
+ * $limit = 0 procesa TODA la cola en un tick (0 = todos); con $limit > 0 solo
+ * procesa ese número máximo de trabajos. Los trabajos terminados (sent|failed)
+ * no se reintentan: únicamente un retry explícito del usuario (flag retry)
+ * puede volver a ponerlos en cola. Recupera los trabajos processing con lease
+ * vencido (crash recovery) y respeta los leases vigentes de otros owners.
+ *
+ * @see function comercial_process_manual_send_queue() — contrato histórico
+ * @param int $limit Máximo de trabajos por tick (0 = todos).
+ * @return array{processed: int, ok: bool, job_ids: array<int,string>, job_id: string}
+ */
+function comercial_process_manual_send_queue($limit = 0) {
+    $file = comercial_manual_send_jobs_file();
+    $leaseDurationSec = comercial_manual_send_queue_lease_seconds();
+    $limit = max(0, (int)$limit);
+    $processed = 0;
+    $successCount = 0;
+    $jobIds = array();
+
+    while ($limit === 0 || $processed < $limit) {
+        $job = storage_json_with_lock($file, function () use ($file, $leaseDurationSec) {
+            $stored = storage_json_read_locked_strict($file);
+            if (empty($stored['ok'])) return null;
+            $jobs = array_values((array)($stored['data'] ?? array()));
+            $now = time();
+            foreach ($jobs as $index => $candidate) {
+                if (!is_array($candidate)) continue;
+                $candidateStatus = (string)($candidate['status'] ?? '');
+                // Terminados: sent y failed son estados finales, sin auto-retry.
+                if ($candidateStatus === 'sent' || $candidateStatus === 'failed') continue;
+                if ((string)($candidate['status'] ?? '') === 'processing') {
+                    $leaseExpiresAt = strtotime((string)($candidate['lease_expires_at'] ?? ''));
+                    // Las entradas previas al token no guardaban su vencimiento.
+                    // Recuperarlas con el mismo presupuesto que un claim nuevo evita
+                    // que un envío WAHA aún en curso se reclame por segunda vez.
+                    if ($leaseExpiresAt === false) {
+                        $legacyLeaseStartedAt = strtotime((string)($candidate['updated_at'] ?? ''));
+                        if ($legacyLeaseStartedAt === false) {
+                            $legacyLeaseStartedAt = strtotime((string)($candidate['available_at'] ?? ''));
+                        }
+                        if ($legacyLeaseStartedAt !== false) $leaseExpiresAt = $legacyLeaseStartedAt + $leaseDurationSec;
+                    }
+                    if ($leaseExpiresAt !== false && $leaseExpiresAt > $now) continue;
+                    if ($leaseExpiresAt === false) continue;
+                }
+                $available = strtotime((string)($candidate['available_at'] ?? ''));
+                if ($candidateStatus !== 'processing' && $available !== false && $available > $now) continue;
+                try {
+                    $claimOwner = bin2hex(random_bytes(16));
+                } catch (Throwable $e) {
+                    $claimOwner = hash('sha256', uniqid('manual-send-', true));
+                }
+                $jobs[$index]['status'] = 'processing';
+                $jobs[$index]['claim_owner'] = $claimOwner;
+                $jobs[$index]['lease_expires_at'] = date('Y-m-d H:i:s', $now + $leaseDurationSec);
+                $jobs[$index]['updated_at'] = now_datetime();
+                if (!storage_json_write_locked($file, $jobs)) return null;
+                storage_invalidate_cache($file);
+                return $jobs[$index];
+            }
+            return null;
+        });
+        if (!is_array($job) || trim((string)($job['id'] ?? '')) === '') break;
+
+        $processed++;
+        $jobIds[] = (string)$job['id'];
+        $result = comercial_manual_send_job_process($job, $file);
+        if (!empty($result['ok'])) $successCount++;
+    }
+
+    return array(
+        'processed' => $processed,
+        'ok' => $successCount > 0,
+        'job_ids' => $jobIds,
+        'job_id' => $processed > 0 ? (string)$jobIds[$processed - 1] : '',
+    );
 }
 
 function comercial_register_line_attempt($lineId, $ok, $httpCode, $errorText = '') {
