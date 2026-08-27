@@ -4512,7 +4512,12 @@ function comercial_send_intervention_notification_to_owner($thread, $inboundText
     }
     $conversationSummary = !empty($summaryLines) ? implode("\n", array_slice($summaryLines, -6)) : '(sin historial)';
 
-    $ownerPhone = '654464023';
+    // Dual-send: primary (654464023) recibe el texto original; secondary (641993776)
+    // recibe el mismo aviso parafraseado por LLM, ~15-25s después (antiban).
+    $ownerPhones = function_exists('avisos_owner_notification_phones')
+        ? avisos_owner_notification_phones()
+        : array('primary' => '654464023', 'secondary' => array('641993776'));
+
     $msg = "🚨 *INTERVENCIÓN INMEDIATA — CONTESTA YA*\n\n";
     $msg .= "Solo falta cerrar el trato, te necesito en esta conversación.\n\n";
     $msg .= "📱 *Línea:* " . ($linePhone !== '' ? $linePhone : 'desconocida') . "\n";
@@ -4521,10 +4526,25 @@ function comercial_send_intervention_notification_to_owner($thread, $inboundText
     $msg .= "💬 *Último mensaje:* " . (comercial_mb_strlen_safe($inboundText) > 100 ? comercial_mb_substr_safe($inboundText, 0, 100) . '...' : $inboundText) . "\n\n";
     $msg .= "*Conversación:*\n" . $conversationSummary;
 
-    $sent = comercial_send_hot_notification_whatsapp($ownerPhone, $msg);
+    $sent = comercial_send_hot_notification_whatsapp($ownerPhones['primary'], $msg);
 
-    // Persistir clave de dedupe solo tras el envío (para permitir reintento si falla).
-    if ($sent) {
+    // Enviar también al secondary (parafraseado, con espera antiban entre envíos).
+    $secondarySent = true;
+    foreach ((array)($ownerPhones['secondary'] ?? array()) as $secondaryPhone) {
+        $secondaryPhone = trim((string)$secondaryPhone);
+        if ($secondaryPhone === '') continue;
+        if (!empty($sent)) {
+            sleep(rand(15, 25));
+        }
+        $secondaryMsg = function_exists('avisos_llm_paraphrase') ? avisos_llm_paraphrase($msg) : $msg;
+        $secondarySend = comercial_send_hot_notification_whatsapp($secondaryPhone, $secondaryMsg);
+        if (empty($secondarySend)) {
+            $secondarySent = false;
+        }
+    }
+
+    // Persistir clave de dedupe solo tras algún envío (permite reintento si fallan todos).
+    if ($sent || $secondarySent) {
         $thread['automation_notified_key'] = $decisionKey;
         comercial_upsert_thread($thread);
     }
@@ -4535,8 +4555,9 @@ function comercial_send_intervention_notification_to_owner($thread, $inboundText
         'type' => 'human_intervention',
         'decision_key' => $decisionKey,
         'sent_ok' => $sent,
+        'secondary_sent_ok' => $secondarySent,
     ));
-    return $sent;
+    return $sent || $secondarySent;
 }
 
 function comercial_generate_hot_suggestions($thread, $processSlug, $inboundText) {
