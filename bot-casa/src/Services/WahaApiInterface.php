@@ -10,6 +10,7 @@ namespace WasapBot\Services;
 interface WahaApiInterface
 {
     public function sendText(string $baseUrl, string $chatId, string $text, string $session): bool;
+    public function sendQuick(string $baseUrl, string $chatId, string $text, string $session): bool;
     public function sendSeen(string $baseUrl, string $chatId, string $session): bool;
     public function startTyping(string $baseUrl, string $chatId, string $session): bool;
     public function stopTyping(string $baseUrl, string $chatId, string $session): bool;

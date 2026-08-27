@@ -91,7 +91,7 @@ final class WahaManager implements LineProvisioningWahaInterface
             curl_close($ch);
 
             if ($httpCode === 200 && $response !== false) {
-                $data = json_decode($response, true);
+                $data = json_decode((string) $response, true);
                 if (is_array($data) && !empty($data['data'])) {
                     return ['ok' => true, 'qr_base64' => (string) $data['data']];
                 }
@@ -129,7 +129,7 @@ final class WahaManager implements LineProvisioningWahaInterface
         if ($httpCode !== 200 || $response === false) {
             return ['ok' => false, 'status' => 'down', 'error' => "HTTP {$httpCode}"];
         }
-        $data = json_decode($response, true);
+        $data = json_decode((string) $response, true);
         if (!is_array($data)) return ['ok' => true, 'status' => 'unknown'];
 
         $status = (string) ($data['status'] ?? 'unknown');
@@ -179,7 +179,7 @@ final class WahaManager implements LineProvisioningWahaInterface
 
         $result = ['ok' => $httpCode >= 200 && $httpCode < 300, 'http_code' => $httpCode];
         if ($response !== false && $response !== '') {
-            $body = @json_decode($response, true);
+            $body = @json_decode((string) $response, true);
             if (is_array($body) && isset($body['error'])) {
                 $result['error'] = (string) $body['error'];
             }
@@ -224,7 +224,7 @@ final class WahaManager implements LineProvisioningWahaInterface
         ]);
         $resp = curl_exec($ch);
         curl_close($ch);
-        $data = @json_decode($resp, true);
+        $data = @json_decode((string) $resp, true);
         return is_array($data) ? $data : ['ok' => false, 'error' => 'Invalid response'];
     }
 
@@ -241,7 +241,7 @@ final class WahaManager implements LineProvisioningWahaInterface
         ]);
         $resp = curl_exec($ch);
         curl_close($ch);
-        $data = @json_decode($resp, true);
+        $data = @json_decode((string) $resp, true);
         return is_array($data) ? $data : ['ok' => false, 'error' => 'Invalid response: ' . substr((string)$resp, 0, 200)];
     }
 }

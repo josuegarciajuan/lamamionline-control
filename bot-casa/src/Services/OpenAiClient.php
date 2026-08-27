@@ -33,7 +33,7 @@ final class OpenAiClient implements OpenAiClientInterface
      * @return array Parsed JSON from the assistant response.
      *               Falls back to ['user_visible_reply' => rawContent] on parse failure.
      */
-    public function chat(string $systemPrompt, string $userMessage, array $context = [], string $model = null, array $history = []): array
+    public function chat(string $systemPrompt, string $userMessage, array $context = [], ?string $model = null, array $history = []): array
     {
         $model    ??= $this->config->get('openai.chat_model', 'gpt-5.1');
         $chatUrl    = $this->config->get('openai.chat_url', 'https://api.openai.com/v1/chat/completions');

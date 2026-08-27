@@ -240,8 +240,7 @@ final class ClientProfileService
             $phone = substr($phone, 0, -4);
         }
         // Only keep digits and leading +
-        $phone = preg_replace('/[^0-9+]/', '', $phone);
-        return $phone;
+        return (string) preg_replace('/[^0-9+]/', '', $phone);
     }
 
     private function loadIntoCache(): void

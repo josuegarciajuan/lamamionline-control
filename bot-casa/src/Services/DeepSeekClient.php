@@ -36,7 +36,7 @@ final class DeepSeekClient implements OpenAiClientInterface
      * @param array       $history      Previous conversation turns [{role, content}, ...] for multi-turn memory.
      * @return array Parsed JSON from the assistant response.
      */
-    public function chat(string $systemPrompt, string $userMessage, array $context = [], string $model = null, array $history = []): array
+    public function chat(string $systemPrompt, string $userMessage, array $context = [], ?string $model = null, array $history = []): array
     {
         $model       ??= $this->config->get('deepseek.chat_model', 'deepseek-v4-pro');
         $chatUrl       = $this->config->get('deepseek.chat_url', 'https://api.deepseek.com/chat/completions');

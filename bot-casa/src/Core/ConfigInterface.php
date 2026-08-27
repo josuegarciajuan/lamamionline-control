@@ -21,4 +21,9 @@ interface ConfigInterface
     public function save(): void;
     public function all(): array;
     public function reload(): void;
+
+    /**
+     * Returns the base config directory (the directory containing config.dist.json).
+     */
+    public function getConfigDir(): string;
 }

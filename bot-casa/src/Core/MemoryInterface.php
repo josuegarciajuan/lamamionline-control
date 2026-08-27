@@ -12,13 +12,17 @@ use Psr\Log\LoggerInterface;
  */
 interface MemoryInterface
 {
+    /** @return array<int, array<string, mixed>> */
     public function read(): array;
+    /** @param array<string, mixed> $record */
     public function append(array $record): void;
     public function deleteByThreadId(string $threadId): int;
     public function deleteByLineIndex(int $index): bool;
+    /** @return array<int, array<string, mixed>> */
     public function getLines(): array;
     public function countMessages(): int;
     public function getLastBotReply(): string;
+    /** @return list<string> */
     public function getRecentBotRepliesNorm(int $limit): array;
     public function hasGreeted(string $threadId): bool;
     public function clear(): void;

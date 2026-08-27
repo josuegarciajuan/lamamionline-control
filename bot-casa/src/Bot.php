@@ -938,13 +938,13 @@ final class Bot implements BotInterface
         $responseScorer = new \WasapBot\SideEffects\ResponseScorer($config, $logger, $sessionMemory);
 
         // ── Pipeline: Input gates ────────────────────────────────────
-        $pauseGate = new \WasapBot\Pipeline\PauseGate($config, $logger);
+        $pauseGate = new \WasapBot\Pipeline\PauseGate($config);
         $inputGates = [
-            new \WasapBot\Pipeline\BotModeGate($config, $logger),
-            new \WasapBot\Pipeline\RoutingGate($config, $logger),
-            new \WasapBot\Pipeline\DedupGate($config, $logger),
-            new \WasapBot\Pipeline\Coalescer($config, $logger),
-            new \WasapBot\Pipeline\MessageExtractor($config, $logger),
+            new \WasapBot\Pipeline\BotModeGate($config),
+            new \WasapBot\Pipeline\RoutingGate($config),
+            new \WasapBot\Pipeline\DedupGate($config),
+            new \WasapBot\Pipeline\Coalescer($config),
+            new \WasapBot\Pipeline\MessageExtractor($config),
             $pauseGate,
             new \WasapBot\Pipeline\InflightGate($config),
         ];
@@ -953,11 +953,11 @@ final class Bot implements BotInterface
         $processors = [
             new \WasapBot\Pipeline\ContextAssembler($config, $logger, $memory, $sessionMemory),
             new \WasapBot\Pipeline\IntentRouter($config, $logger),
-            new \WasapBot\Pipeline\ToneBuilder($config, $logger),
-            new \WasapBot\Pipeline\ResponseNormalizer($config, $logger),
-            new \WasapBot\Pipeline\CatalogFormatter($config, $logger),
-            new \WasapBot\Pipeline\DedupeReply($config, $logger),
-            new \WasapBot\Pipeline\ImageSplitter($config, $logger),
+            new \WasapBot\Pipeline\ToneBuilder($config),
+            new \WasapBot\Pipeline\ResponseNormalizer(),
+            new \WasapBot\Pipeline\CatalogFormatter($config),
+            new \WasapBot\Pipeline\DedupeReply($config),
+            new \WasapBot\Pipeline\ImageSplitter($config),
         ];
 
         // ── Side effects ─────────────────────────────────────────────

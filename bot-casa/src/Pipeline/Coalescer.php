@@ -218,6 +218,7 @@ final readonly class Coalescer implements PipelineStageInterface
     /**
      * Extract sender phone number from the context.
      */
+    /** @param array<string, mixed> $ctx */
     private function extractFromPhone(array $ctx): string
     {
         $body = $ctx['body'] ?? null;
@@ -255,6 +256,7 @@ final readonly class Coalescer implements PipelineStageInterface
      * so that concurrent messages from the same sender to DIFFERENT
      * WhatsApp lines are NOT incorrectly grouped together.
      */
+    /** @param array<string, mixed> $ctx */
     private function extractLineKey(array $ctx): string
     {
         // ── Prefer line_last9 from RoutingGate (already parsed) ───────
@@ -294,6 +296,7 @@ final readonly class Coalescer implements PipelineStageInterface
     /**
      * Extract message identifier from the context.
      */
+    /** @param array<string, mixed> $ctx */
     private function extractMessageId(array $ctx): string
     {
         $body = $ctx['body'] ?? null;
@@ -319,6 +322,7 @@ final readonly class Coalescer implements PipelineStageInterface
     /**
      * Extract message text from the context for buffering.
      */
+    /** @param array<string, mixed> $ctx */
     private function extractText(array $ctx): string
     {
         // Use coalesced text if already available from previous stages

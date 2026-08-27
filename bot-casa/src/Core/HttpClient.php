@@ -39,6 +39,9 @@ final class HttpClient implements HttpClientInterface
     public function get(string $url, array $headers = [], int $timeoutSec = 10): array
     {
         $ch = $this->initHandle($url, $timeoutSec);
+        if ($ch === false) {
+            return [0, '', $this->lastError];
+        }
         curl_setopt($ch, CURLOPT_HTTPGET, true);
 
         if ($headers !== []) {
@@ -65,6 +68,9 @@ final class HttpClient implements HttpClientInterface
         int $timeoutSec = 10,
     ): array {
         $ch = $this->initHandle($url, $timeoutSec);
+        if ($ch === false) {
+            return [0, '', $this->lastError];
+        }
         curl_setopt($ch, CURLOPT_POST, true);
 
         $json = json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
