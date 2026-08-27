@@ -48,6 +48,7 @@ function comercial_knowledge_v2_shhexxchollos(): array {
     return array(
         'product_line' => 'Shhexxchollos',
         'common' => array(
+            'official_url' => 'https://shhexxchollos.com',
             'tone' => 'Cercano, breve y natural, como recomendar algo útil a una amiga.',
             'global_rules' => array(
                 'No mencionar precios, porcentajes ni descuentos inventados.',
@@ -86,6 +87,7 @@ function comercial_knowledge_v2_plaza(): array {
     return array(
         'product_line' => 'Plaza',
         'common' => array(
+            'official_url' => '',
             'tone' => 'Cercano, directo. Como hablar con una compañera. NADA formalismos. Frases cortas.',
             'global_rules' => array(
                 'Máximo 1 emoji por mensaje.',
@@ -151,6 +153,7 @@ function comercial_knowledge_v2_lamami(): array {
     return array(
         'product_line' => 'LaMami',
         'common' => array(
+            'official_url' => 'https://lamami.online',
             'tone' => 'Cercano y natural, como hablar con una amiga por WhatsApp. Poco formal, frases cortas y sin presión. Explica con paciencia y claridad: el concepto es nuevo y hay que desmenuzarlo para que lo entiendan y se fíen.',
             'contexto_negocio' => array(
                 'A quién va dirigido: profesionales independientes (escorts) que se anuncian en portales y reciben clientes en su local o a domicilio.',
@@ -235,6 +238,7 @@ function comercial_knowledge_v2_casawasap(): array {
     return array(
         'product_line' => 'CasaWasap',
         'common' => array(
+            'official_url' => 'https://casawasap.com',
             'tone' => 'Formal pero cercano, como un mensaje escrito a mano por una persona real que conoce el negocio. Nada de plantillas, spam ni coletillas. Frases claras y concretas.',
             'contexto_negocio' => array(
                 'A quién va dirigido: casas de citas (propietario de casa pequeña o persona contratada) con chicas anunciadas en portales y que esperan clientes que llegan por el WhatsApp.',
