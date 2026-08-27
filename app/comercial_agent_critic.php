@@ -151,7 +151,10 @@ REGLAS:
 - {$questionRule}
 - Responder SOLO a lo que preguntó el prospecto, no añadir info no pedida
 - Sin autoreferencia ("soy", "somos", "nuestro equipo", "nuestro servicio")
-- Prohibido tono agresivo o presión en el cierre: "¿Te activo hoy mismo?", "¿Te activo ya?", "¿Empezamos?", "te lo dejo funcionando hoy", "hoy mismo", urgencia fabricada o pedir activar/empezar sin que el prospecto haya mostrado intención clara. Si el prospecto solo pidió información, termina con un CTA suave ("si te convence, me dices", "¿quieres que te explique algo más?")
+- Prohibido tono agresivo o presión en el cierre, urgencia fabricada o pedir activar/empezar sin que el prospecto haya mostrado intención clara
+- Prohibido usar los signos de apertura ¿ y ¡
+- Prohibido cerrar con "quieres que te explique algo más", "te ayudo en algo más" o equivalentes. Si solo pidió información, responde bien y termina en el dato útil, una opción concreta o el siguiente paso natural
+- Tono cercano, breve y con picardía suave basada en un detalle real. Nunca condescendiente, sarcástico, misterioso ni manipulador
 
 Mensaje a evaluar:
 "{$text}"

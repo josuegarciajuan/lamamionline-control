@@ -119,7 +119,7 @@ function comercial_knowledge_plaza(): array {
             "NUNCA ofrezcas visitas a la casa. Ofrece fotos de las habitaciones en su lugar.",
             "Si pregunta por alquiler o habitación privada, asume 1 semana como base. NUNCA preguntes '¿para qué días?' ni '¿qué días quieres?'. Pregunta cuándo quiere llegar o empezar.",
             "Solo hay UNA casa (Casa Burriana, en Burriana, Castellón, cerca de Valencia). NUNCA ofrezcas otras zonas, ciudades ni alternativas de ubicación porque no existen más casas. PROHIBIDO preguntar '¿te gusta esa zona o prefieres algo más céntrico?' ni ninguna variante que dé a entender que hay más opciones. Si preguntan dónde está la casa, di dónde está de forma natural y pasa a ofrecer fotos de las habitaciones o preguntar disponibilidad.",
-            "NUNCA presiones el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', 'te lo dejo funcionando hoy' ni urgencia fabricada. Si la chica solo pidió información, respóndele y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?').",
+            "NUNCA presiones el cierre ni fabriques urgencia. Si la chica solo pidió información, respóndele bien y termina en el dato útil o el siguiente paso natural.",
         ),
 
         'faq' => array(
@@ -223,7 +223,7 @@ function comercial_knowledge_lamami(): array {
             "NO hables de otros servicios que no sean La Mami Online.",
             "Desmenuza el concepto: es nuevo y la gente no lo entiende ni se fía a la primera. Compáralo con lo que ya conocen (publicista y telefonista) y explícalo paso a paso.",
             "Transmite el dato clave siempre que se pueda SIN autoreferencia ('somos', 'soy'): dilo como 'LaMami es publicista y telefonista a la vez' o 'tienes publicista y telefonista en uno'.",
-            "NUNCA presiones el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', 'te lo dejo funcionando hoy' ni urgencia fabricada ('hoy mismo', 'ya'). Si pidió solo información, respóndele y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?').",
+            "NUNCA presiones el cierre ni fabriques urgencia. Si pidió solo información, respóndele bien y termina en el dato útil o el siguiente paso natural.",
         ),
 
         'faq' => array(
@@ -318,7 +318,7 @@ function comercial_knowledge_publicista(): array {
             "NUNCA uses coletillas infantiles: 'guapa', 'cariño', 'reina'.",
             "NO uses más de 1 emoji por mensaje.",
             "Sé directo y profesional. Nada de rodeos.",
-            "NUNCA presiones el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?' ni urgencia fabricada. Si solo pidió información, responde y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?').",
+            "NUNCA presiones el cierre ni fabriques urgencia. Si solo pidió información, responde y termina en el dato útil o el siguiente paso natural.",
         ),
 
         'faq' => array(
@@ -426,7 +426,7 @@ function comercial_knowledge_casawasap(): array {
             "Responde PRIMERO a lo que preguntó el cliente, con información concreta.",
             "Menciona siempre el trial de 10 DÍAS GRATIS y la demo si es relevante.",
             "Si el cliente da señales claras de compra, cierra sin presión (solo entonces).",
-            "NUNCA presiones el cierre: prohibido '¿Te activo la demo hoy mismo?', '¿Te activo ya?', '¿Empezamos?' ni urgencia fabricada. Si solo pidió información, responde y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?').",
+            "NUNCA presiones el cierre ni fabriques urgencia. Si solo pidió información, responde y termina en el dato útil o el siguiente paso natural.",
             "NO inventes datos ni funcionalidades que no existan.",
         ),
 
@@ -519,7 +519,7 @@ function comercial_knowledge_publiscort(): array {
             "NO uses más de 1 emoji por mensaje.",
             "Sé breve y directo. No te extiendas demasiado.",
             "NO prometas resultados exactos (número de clientes).",
-            "NUNCA presiones el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?' ni urgencia fabricada. Si solo pidió información, responde y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?').",
+            "NUNCA presiones el cierre ni fabriques urgencia. Si solo pidió información, responde y termina en el dato útil o el siguiente paso natural.",
         ),
 
         'faq' => array(
@@ -605,7 +605,7 @@ function comercial_knowledge_inbound(): array {
             "Sé breve. Entre 1 y 4 líneas de WhatsApp.",
             "NO mezcles servicios. Sugiere UNO a la vez.",
             "Si la persona muestra interés real, ofrece información concreta y un siguiente paso.",
-            "NUNCA presiones el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?' ni urgencia fabricada. Si solo pidió información, responde y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?').",
+            "NUNCA presiones el cierre ni fabriques urgencia. Si solo pidió información, responde y termina en el dato útil o el siguiente paso natural.",
         ),
 
         'faq' => array(
