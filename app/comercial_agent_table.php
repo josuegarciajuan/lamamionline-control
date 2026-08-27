@@ -133,16 +133,16 @@ function render_comercial_agent_table($threads, $linesIndexed = array()) {
             </div>
             <div class="agent-quick-filters">
                 <button type="button" class="agent-filter-btn is-active" data-filter="pending">
-                    🔴 Pendientes <span class="badge"><?= (int)$countPending ?></span>
-                </button>
-                <button type="button" class="agent-filter-btn" data-filter="all">
-                    📋 Todos <span class="badge"><?= (int)$countAll ?></span>
+                    <span class="agent-filter-emoji">🔴</span> Pendientes <span class="badge"><?= (int)$countPending ?></span>
                 </button>
                 <button type="button" class="agent-filter-btn" data-filter="done">
-                    ✅ Atendidos <span class="badge"><?= (int)$countDone ?></span>
+                    <span class="agent-filter-emoji">✅</span> Atendidos <span class="badge"><?= (int)$countDone ?></span>
+                </button>
+                <button type="button" class="agent-filter-btn" data-filter="all">
+                    <span class="agent-filter-emoji">📋</span> Todos <span class="badge"><?= (int)$countAll ?></span>
                 </button>
                 <button type="button" class="agent-filter-btn" data-filter="discarded">
-                    🗑 Descartados <span class="badge"><?= (int)$countDiscarded ?></span>
+                    <span class="agent-filter-emoji">🗑</span> Descartados <span class="badge"><?= (int)$countDiscarded ?></span>
                 </button>
             </div>
             <button type="button" class="agent-fullscreen-btn" id="agentFullscreenBtn" title="Abrir a pantalla completa">

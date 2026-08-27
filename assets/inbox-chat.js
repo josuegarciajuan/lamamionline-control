@@ -111,6 +111,9 @@
     }
 
     // ── Agent Cards — init event listeners ──
+    // Filtro activo elegido por el usuario (persiste entre re-renders del panel)
+    var _agentActiveFilter = null;
+
     function initAgentTable() {
         var grid = document.querySelector('.agent-cards-grid');
         if (!grid) return;
@@ -141,6 +144,13 @@
         var panel = document.querySelector('.inbox-agent-view .agent-table-panel');
         if (!panel) return;
 
+        // Restore last filter chosen in this sesión (si no, se usa el del servidor: pendientes)
+        if (_agentActiveFilter) {
+            panel.querySelectorAll('.agent-filter-btn').forEach(function(b){
+                b.classList.toggle('is-active', b.getAttribute('data-filter') === _agentActiveFilter);
+            });
+        }
+
         panel.querySelectorAll('.agent-filter-btn').forEach(function(btn){
             if (btn._inboxBound) return;
             btn._inboxBound = true;
@@ -148,30 +158,40 @@
                 e.preventDefault();
                 var filter = btn.getAttribute('data-filter');
                 if (!filter) return;
+                _agentActiveFilter = filter;
 
                 // Update active state
                 panel.querySelectorAll('.agent-filter-btn').forEach(function(b){ b.classList.remove('is-active'); });
                 btn.classList.add('is-active');
 
-                // Filter cards
-                var cards = panel.querySelectorAll('.agent-card, .agent-empty');
-                cards.forEach(function(card){
-                    if (card.classList.contains('agent-empty')) {
-                        card.style.display = (filter === 'all' || filter === 'pending') ? '' : 'none';
-                        return;
-                    }
-                    var status = card.getAttribute('data-agent-status');
-                    if (filter === 'all') { card.style.display = ''; }
-                    else if (filter === 'pending') { card.style.display = status === 'pending' ? '' : 'none'; }
-                    else if (filter === 'done') { card.style.display = status === 'done' ? '' : 'none'; }
-                    else if (filter === 'discarded') { card.style.display = status === 'discarded' ? '' : 'none'; }
-                });
-
-                updateCardBadges(panel);
+                applyAgentFilter(panel);
             });
         });
 
-        // Initial badge update
+        // Aplicar el filtro activo al entrar (por defecto: solo pendientes)
+        applyAgentFilter(panel);
+    }
+
+    // Filtra las tarjetas del panel según el botón .is-active y actualiza contadores
+    function applyAgentFilter(panel) {
+        if (!panel) return;
+        var active = panel.querySelector('.agent-filter-btn.is-active');
+        var filter = active ? active.getAttribute('data-filter') : (_agentActiveFilter || 'pending');
+        if (!filter) return;
+
+        var cards = panel.querySelectorAll('.agent-card, .agent-empty');
+        cards.forEach(function(card){
+            if (card.classList.contains('agent-empty')) {
+                card.style.display = (filter === 'all' || filter === 'pending') ? '' : 'none';
+                return;
+            }
+            var status = card.getAttribute('data-agent-status');
+            if (filter === 'all') { card.style.display = ''; }
+            else if (filter === 'pending') { card.style.display = status === 'pending' ? '' : 'none'; }
+            else if (filter === 'done') { card.style.display = status === 'done' ? '' : 'none'; }
+            else if (filter === 'discarded') { card.style.display = status === 'discarded' ? '' : 'none'; }
+        });
+
         updateCardBadges(panel);
     }
 
@@ -264,7 +284,7 @@
                                     showToast('Próximamente disponible', 'info');
                                 });
                             }
-                            updateCardBadges(btn.closest('.inbox-agent-grid'));
+                            applyAgentFilter(btn.closest('.agent-table-panel'));
                         }
                     } else {
                         btn.textContent = '✅ Atender';
@@ -339,7 +359,7 @@
                             }
                             btn.remove();
                             attachCardListeners(grid);
-                            updateCardBadges(grid.closest('.agent-table-panel'));
+                            applyAgentFilter(grid.closest('.agent-table-panel'));
                         }
                         showToast('Descartado ✓', 'ok');
                     } else {
