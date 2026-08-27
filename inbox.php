@@ -38,7 +38,7 @@ $openOn = !empty($settings['opener_enabled']);
 // ── Versiones para cache busters ──
 $_chatCssV = is_file(__DIR__ . '/assets/inbox-chat.css') ? filemtime(__DIR__ . '/assets/inbox-chat.css') : time();
 $_chatJsV  = is_file(__DIR__ . '/assets/inbox-chat.js')  ? filemtime(__DIR__ . '/assets/inbox-chat.js')  : time();
-$_forceV   = '20260827_01'; // chat ligero, polling único e historial incremental
+$_forceV   = '20260827_02'; // chat ligero, long-poll en tiempo real y envío optimista
 
 ?><!doctype html>
 <html lang="es">
@@ -145,6 +145,9 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
             <span class="inbox-switch__track"></span>
         </label>
     </div>
+
+    <!-- Instalación PWA: visible solo si el navegador dispara beforeinstallprompt -->
+    <button class="inbox-install-btn" id="inboxInstallBtn" onclick="InboxChat.installApp()" title="Instalar la app" aria-label="Instalar la app">⬇️ Instalar</button>
 
     <!-- Agenda button -->
     <button class="inbox-agenda-btn" id="inboxAgendaBtn" onclick="InboxChat.openAgenda()" title="Agenda comercial">
@@ -371,48 +374,28 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
 
 <script>
 // ── Init view ──
+// Se ejecuta ANTES que inbox-chat.js cargue: la vista activa queda fijada
+// antes de que el módulo lea window.InboxChatInitialView.
 window.InboxChatInitialView = <?= json_encode($view) ?>;
 
-// ── Global toggle handler (para switches) ──
-InboxChat.toggleGlobal = function(type, checkbox) {
-    if (!checkbox) return;
-    var wasChecked = checkbox.checked;
-    checkbox.disabled = true;
-
-    fetch('inbox_api.php?action=toggle_' + type + '&_=' + Date.now(), {
-        method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'action=toggle_' + type,
-        credentials: 'same-origin'
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-        if (d.ok) {
-            checkbox.checked = d.enabled;
-            updateSwitchState(type, d.enabled);
-            InboxChat.loadLines();
-        } else {
-            checkbox.checked = wasChecked;
+// ── Service Worker (PWA instalable) ──
+// Registro network-first (sw.js) al terminar de cargar; nunca bloquea el
+// primer pintado. El toggle global (Respuestas/Inicio) vive ahora en
+// inbox-chat.js (window.InboxChat.toggleGlobal): aquí ya no se asigna para
+// no ejecutar código contra un objeto que aún no existe.
+window.addEventListener('load', function(){
+    try {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(function(e){
+                console.warn('[inbox] SW: registro fallido', e);
+            });
         }
-    })
-    .catch(function(){
-        checkbox.checked = wasChecked;
-    })
-    .finally(function(){ checkbox.disabled = false; });
-};
-
-function updateSwitchState(type, enabled) {
-    if (type === 'replies') {
-        var el = document.getElementById('inboxToggleReplies');
-        var st = el ? el.querySelector('.inbox-switch__state') : null;
-        if (st) st.textContent = enabled ? 'ON' : 'OFF';
+    } catch (e) {
+        console.warn('[inbox] SW: no soportado', e);
     }
-    if (type === 'opener') {
-        // Inicio switch no tiene texto ON/OFF, solo track
-    }
-}
+});
 </script>
-<script src="assets/inbox-chat.js?v=<?= $_chatJsV ?>-<?= $_forceV ?>"></script>
+<script src="assets/inbox-chat.js?v=<?= $_chatJsV ?>-<?= $_forceV ?>" defer></script>
 
 </body>
 </html>

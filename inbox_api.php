@@ -180,6 +180,14 @@ function inbox_paginate_items(array $items, int $limit, string $beforeTs, string
 // vía ?action=line_threads. Con `search` devuelve lista plana filtrada.
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'lines') {
+    // Realtime: si el cliente ya conoce la revisión actual, responder sin
+    // parsear el estado pesado (comercial_get_threads queda sin ejecutar).
+    $sinceRev = trim((string)($_GET['since'] ?? ''));
+    $currentRev = function_exists('comercial_inbox_revision') ? comercial_inbox_revision() : '';
+    if ($sinceRev !== '' && $currentRev !== '' && hash_equals($currentRev, $sinceRev)) {
+        inbox_api_json_ok(['unchanged' => true, 'revision' => $currentRev]);
+    }
+
     $allThreads = comercial_get_threads();
     $allLines = comercial_list_lines();
     $linesIndexed = comercial_list_lines_indexed();
@@ -269,7 +277,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'lines') {
     inbox_api_json_ok([
         'lines'    => $result,
         'pending'  => $pending,
+        'revision' => $currentRev,
         'settings' => function_exists('inbox_get_settings') ? inbox_get_settings() : ['replies_enabled' => true, 'opener_enabled' => true],
+    ]);
+}
+
+// ── GET ?action=poll&since=<rev>&timeout=25 ──
+// Long-poll del estado local: responde en cuanto la revisión cambia o al
+// agotar el timeout. No retiene el lock de sesión durante la espera y acota
+// el poll a un slot por cliente (429 si el tope de concurrentes se alcanza).
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'poll') {
+    if (function_exists('session_write_close')) session_write_close();
+    $sinceRev = trim((string)($_GET['since'] ?? ''));
+    $timeout = max(1, min(25, (int)($_GET['timeout'] ?? 25)));
+    if (function_exists('set_time_limit')) set_time_limit(max(30, $timeout + 5));
+    header('X-Accel-Buffering: no');
+    // Un slot por cliente: evita que un mismo key agote los workers PHP-FPM
+    // abriendo varios long-polls simultáneos.
+    $slotKey = (string)(session_id() ?: (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+    if (!function_exists('comercial_poll_acquire_slot') || !comercial_poll_acquire_slot($slotKey, 25)) {
+        http_response_code(429); // lo reafirma inbox_api_json_err()
+        inbox_api_json_err('Demasiadas conexiones de poll activas', 429);
+    }
+    // Libera el slot en TODAS las salidas (éxito, error o abandono), también
+    // en el exit() de inbox_api_json_ok().
+    register_shutdown_function(function () use ($slotKey) {
+        if (function_exists('comercial_poll_release_slot')) comercial_poll_release_slot($slotKey);
+    });
+    $poll = function_exists('comercial_poll_wait_for_change')
+        ? comercial_poll_wait_for_change($sinceRev, $timeout, '', '', true)
+        : ['changed' => true, 'revision' => function_exists('comercial_inbox_revision') ? comercial_inbox_revision() : ''];
+    inbox_api_json_ok([
+        'changed' => !empty($poll['changed']),
+        'revision' => (string)($poll['revision'] ?? ''),
     ]);
 }
 
@@ -315,6 +356,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'thread') {
     if (!$thread) inbox_api_json_err('Hilo no encontrado', 404);
 
     $thread = comercial_normalize_thread($thread);
+
+    // Sincronización nativa OPTATIVA y acotada: el cliente la pide ~cada 20 s
+    // para el hilo abierto (sync_native=1). El refresco visual normal sigue
+    // siendo local y no hace llamadas remotas.
+    if (!empty($_GET['sync_native']) && function_exists('comercial_sync_native_replies_for_thread')) {
+        try {
+            $nativeDetected = comercial_sync_native_replies_for_thread($thread);
+            if ($nativeDetected > 0) {
+                foreach (comercial_get_threads() as $t) {
+                    if ((string)($t['id'] ?? '') === $threadId) { $thread = comercial_normalize_thread($t); break; }
+                }
+            }
+        } catch (Throwable $e) {
+            // No romper la carga del hilo por un fallo de polling WAHA
+        }
+    }
 
     $linesIndexed = comercial_list_lines_indexed();
     $lineName = isset($linesIndexed[(string)($thread['line_id'] ?? '')]) ? trim((string)($linesIndexed[(string)$thread['line_id']]['nombre'] ?? '')) : '';
@@ -474,7 +531,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'send') {
     if (function_exists('comercial_thread_request_cancel')) {
         comercial_thread_request_cancel($threadId);
     }
-    inbox_api_json_ok(['thread_id' => $threadId, 'job_id' => (string)$job['id'], 'client_message_id' => $clientMessageId, 'queued' => true]);
+
+    // Procesamiento inmediato: un trabajo NUEVO (no duplicado) o un retry
+    // explícito (retry=1 sobre un trabajo fallido/pendiente) se envía en esta
+    // misma request. Los re-envíos idempotentes por client_message_id NO se
+    // reprocesan aquí: lo hace el tick.
+    $status = 'pending';
+    $isNew = empty($job['duplicate']);
+    $retryRequested = (int)($_POST['retry'] ?? 0) === 1;
+    if (($isNew || $retryRequested) && function_exists('comercial_manual_send_job_process')) {
+        if ($retryRequested) $job['retry'] = 1;
+        $proc = comercial_manual_send_job_process($job);
+        if (is_array($proc) && isset($proc['status'])) {
+            $procStatus = (string)$proc['status'];
+            $status = ($procStatus === 'sent' || $procStatus === 'failed') ? $procStatus : 'pending';
+        }
+    }
+
+    inbox_api_json_ok([
+        'thread_id' => $threadId,
+        'job_id' => (string)$job['id'],
+        'client_message_id' => $clientMessageId,
+        'queued' => true,
+        'status' => $status,
+    ]);
 }
 
 // ── POST action=toggle_thread ──
