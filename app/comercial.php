@@ -1652,8 +1652,8 @@ function comercial_line_failure_counts_as_ban($httpCode, $errorText = '') {
     }
 
     // Transitorio: la sesión está arrancando, esperando QR o parada (reinicio de
-    // WAHA). El body de WAHA incluye "status":"STARTING"|"SCAN_QR_CODE"|"STOPPED".
-    if (preg_match('/"status"\s*:\s*"(STARTING|SCAN_QR_CODE|SCAN_QR|STOPPED)"/i', $errorText)) {
+    // WAHA). El body de WAHA incluye "status":"STARTING"|"SCAN_QR_CODE"|"STOPPED"|"FAILED".
+    if (preg_match('/"status"\s*:\s*"(STARTING|SCAN_QR_CODE|SCAN_QR|STOPPED|FAILED)"/i', $errorText)) {
         return false;
     }
     if (stripos($errorText, 'Session status is not as expected') !== false) {
@@ -2249,16 +2249,45 @@ function comercial_save_webhook_log_rows($rows) {
 
 function comercial_events_recent($limit = 80) {
     $path = DATA_PATH . '/comercial_events.jsonl';
-    if (!file_exists($path)) return array();
-    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if (!$lines) return array();
-    $lines = array_slice($lines, -1 * max(1, (int)$limit));
-    $out = array();
-    foreach (array_reverse($lines) as $line) {
-        $row = json_decode($line, true);
-        if (is_array($row)) $out[] = $row;
+    return array_reverse(comercial_read_jsonl_tail($path, $limit));
+}
+
+/** Lee los últimos N objetos válidos de un JSONL sin cargar el archivo completo. */
+function comercial_read_jsonl_tail($path, $limit = 80) {
+    $limit = max(1, (int)$limit);
+    if (!is_file($path) || !is_readable($path)) return array();
+    $handle = @fopen($path, 'rb');
+    if (!$handle) return array();
+    $rows = array();
+    $buffer = '';
+    $position = @filesize($path);
+    if ($position === false || $position <= 0) {
+        fclose($handle);
+        return array();
     }
-    return $out;
+    try {
+        while ($position > 0 && count($rows) < $limit) {
+            $read = min(8192, $position);
+            $position -= $read;
+            if (@fseek($handle, $position, SEEK_SET) !== 0) break;
+            $chunk = @fread($handle, $read);
+            if (!is_string($chunk) || $chunk === '') break;
+            $buffer = $chunk . $buffer;
+            $lines = explode("\n", $buffer);
+            $buffer = array_shift($lines);
+            for ($i = count($lines) - 1; $i >= 0 && count($rows) < $limit; $i--) {
+                $row = json_decode(trim($lines[$i]), true);
+                if (is_array($row)) array_unshift($rows, $row);
+            }
+        }
+        if ($position === 0 && count($rows) < $limit) {
+            $row = json_decode(trim($buffer), true);
+            if (is_array($row)) array_unshift($rows, $row);
+        }
+    } finally {
+        fclose($handle);
+    }
+    return $rows;
 }
 
 function comercial_thread_event_matches($thread, $event) {
@@ -2293,8 +2322,12 @@ function comercial_thread_event_matches($thread, $event) {
 }
 
 function comercial_thread_history($thread, $limit = 1500) {
+    return comercial_thread_history_from_events($thread, array_reverse(comercial_events_recent($limit)));
+}
+
+/** @param array<int,array<string,mixed>> $events */
+function comercial_thread_history_from_events($thread, array $events) {
     $thread = comercial_normalize_thread($thread);
-    $events = array_reverse(comercial_events_recent($limit));
     $history = array();
     $historyIndex = array();
 
@@ -2401,6 +2434,26 @@ function comercial_thread_history($thread, $limit = 1500) {
     }
 
     return $history;
+}
+
+/** Página local del historial de inbox; no consulta proveedores remotos. */
+function comercial_thread_history_page($thread, $limit = 80, $before = '', $eventsPath = '') {
+    $thread = comercial_normalize_thread($thread);
+    $limit = max(1, min(200, (int)$limit));
+    $eventsPath = trim((string)$eventsPath);
+    if ($eventsPath === '') $eventsPath = DATA_PATH . '/comercial_events.jsonl';
+    $history = comercial_thread_history_from_events($thread, array_reverse(comercial_read_jsonl_tail($eventsPath, 2000)));
+    $offset = ctype_digit((string)$before) ? max(0, (int)$before) : 0;
+    $total = count($history);
+    $start = max(0, $total - $offset - $limit);
+    $messages = array_slice($history, $start, min($limit, $total - $start));
+    $hasMore = $start > 0;
+    return array(
+        'messages' => $messages,
+        'revision' => hash('sha256', implode('|', array((string)($thread['id'] ?? ''), (string)@filemtime($eventsPath), (string)@filesize($eventsPath), (string)($thread['updated_at'] ?? '')))),
+        'before' => $hasMore ? (string)($offset + count($messages)) : null,
+        'has_more' => $hasMore,
+    );
 }
 
 function comercial_ai_memory_limit() {
@@ -5883,10 +5936,12 @@ function comercial_waha_request_json($settings, $port, $method, $path, $payload 
         'Accept: application/json',
         'X-Api-Key: ' . (string)$settings['waha_api_key'],
     );
+    // Un worker no puede retener indefinidamente su lease por un proveedor lento.
+    $timeoutSec = max(1, min(60, (int)($settings['curl_timeout_sec'] ?? 30)));
     $options = array(
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => (int)$settings['curl_timeout_sec'],
-        CURLOPT_CONNECTTIMEOUT => min(4, max(1, (int)$settings['curl_timeout_sec'])),
+        CURLOPT_TIMEOUT => $timeoutSec,
+        CURLOPT_CONNECTTIMEOUT => min(4, $timeoutSec),
         CURLOPT_FOLLOWLOCATION => false,
         CURLOPT_MAXREDIRS => 0,
     );
@@ -6292,6 +6347,181 @@ function comercial_send_thread_message($thread, $text, $options = array()) {
     $send['ok'] = true; // al menos un mensaje se envió correctamente
     $send['thread'] = $thread;
     return $send;
+}
+
+function comercial_manual_send_jobs_file() {
+    return 'comercial_manual_send_jobs.json';
+}
+
+function comercial_manual_send_request_fingerprint($threadId, $text, $actor = '') {
+    return hash('sha256', json_encode(array(
+        'thread_id' => trim((string)$threadId),
+        'text' => trim((string)$text),
+        'actor' => trim((string)$actor),
+    ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+}
+
+function comercial_manual_send_client_message_id_is_valid($clientMessageId) {
+    return preg_match('/\A[a-zA-Z0-9][a-zA-Z0-9_.:-]{7,127}\z/', (string)$clientMessageId) === 1;
+}
+
+/**
+ * Máximo acotado del envío WAHA manual: pre-typing + startTyping + typing +
+ * sendText + stopTyping. Los tres requests usan curl_timeout_sec; dejamos un
+ * timeout extra como margen para planificación y cierre de la respuesta.
+ */
+function comercial_manual_send_queue_lease_seconds($settings = null) {
+    if (!is_array($settings)) $settings = comercial_get_settings();
+    $requestTimeoutSec = max(1, min(60, (int)($settings['curl_timeout_sec'] ?? 30)));
+    $preTypingMaxSec = max(0, (int)($settings['typing_pre_max_sec'] ?? 0));
+    $typingMaxSec = max(0, (int)($settings['typing_max_sec'] ?? 0))
+        + max(0, (int)($settings['typing_jitter_sec'] ?? 0));
+    $marginSec = $requestTimeoutSec;
+    return $preTypingMaxSec + $typingMaxSec + (3 * $requestTimeoutSec) + $marginSec;
+}
+
+/**
+ * Persiste una intención de envío manual. client_message_id es la llave de
+ * idempotencia: reintentos del navegador nunca crean un segundo envío.
+ */
+function comercial_manual_send_job_enqueue($threadId, $text, $clientMessageId, $file = '', $actor = '') {
+    $threadId = trim((string)$threadId);
+    $text = trim((string)$text);
+    $clientMessageId = trim((string)$clientMessageId);
+    $actor = trim((string)$actor);
+    if ($threadId === '' || $text === '' || !comercial_manual_send_client_message_id_is_valid($clientMessageId)) {
+        return array('ok' => false, 'error' => 'Datos de envío manual incompletos');
+    }
+    $fingerprint = comercial_manual_send_request_fingerprint($threadId, $text, $actor);
+    $file = trim((string)$file);
+    if ($file === '') $file = comercial_manual_send_jobs_file();
+    $result = storage_json_with_lock($file, function () use ($file, $threadId, $text, $clientMessageId, $actor, $fingerprint) {
+        $stored = storage_json_read_locked_strict($file);
+        if (empty($stored['ok'])) return array('ok' => false, 'error' => (string)($stored['error'] ?? 'No se pudo leer la cola manual'));
+        $jobs = array_values((array)($stored['data'] ?? array()));
+        foreach ($jobs as $job) {
+            if (is_array($job) && (string)($job['client_message_id'] ?? '') === $clientMessageId) {
+                $storedFingerprint = trim((string)($job['request_fingerprint'] ?? ''));
+                if ($storedFingerprint === '') {
+                    $storedFingerprint = comercial_manual_send_request_fingerprint($job['thread_id'] ?? '', $job['text'] ?? '', $job['actor'] ?? '');
+                }
+                if (!hash_equals($storedFingerprint, $fingerprint)) {
+                    return array('ok' => false, 'conflict' => true, 'error' => 'client_message_id no coincide con la intención original');
+                }
+                return array('ok' => true, 'job' => $job, 'duplicate' => true);
+            }
+        }
+        $job = array(
+            'id' => generate_id('commanual'),
+            'thread_id' => $threadId,
+            'text' => $text,
+            'client_message_id' => $clientMessageId,
+            'actor' => $actor,
+            'request_fingerprint' => $fingerprint,
+            'status' => 'pending',
+            'attempts' => 0,
+            'available_at' => now_datetime(),
+            'created_at' => now_datetime(),
+            'updated_at' => now_datetime(),
+            'sent_at' => '',
+            'last_error' => '',
+        );
+        $jobs[] = $job;
+        if (!storage_json_write_locked($file, $jobs)) return array('ok' => false, 'error' => 'No se pudo guardar la cola manual');
+        storage_invalidate_cache($file);
+        return array('ok' => true, 'job' => $job, 'duplicate' => false);
+    });
+    if (!is_array($result)) return array('ok' => false, 'error' => 'No se pudo bloquear la cola manual');
+    return !empty($result['job']) ? (array)$result['job'] : $result;
+}
+
+/** Procesa como máximo un envío manual por tick para no bloquear el cron. */
+function comercial_process_manual_send_queue() {
+    $file = comercial_manual_send_jobs_file();
+    $leaseDurationSec = comercial_manual_send_queue_lease_seconds();
+    $job = storage_json_with_lock($file, function () use ($file, $leaseDurationSec) {
+        $stored = storage_json_read_locked_strict($file);
+        if (empty($stored['ok'])) return null;
+        $jobs = array_values((array)($stored['data'] ?? array()));
+        $now = time();
+        foreach ($jobs as $index => $candidate) {
+            if (!is_array($candidate) || (string)($candidate['status'] ?? '') === 'sent') continue;
+            if ((string)($candidate['status'] ?? '') === 'processing') {
+                $leaseExpiresAt = strtotime((string)($candidate['lease_expires_at'] ?? ''));
+                // Las entradas previas al token no guardaban su vencimiento.
+                // Recuperarlas con el mismo presupuesto que un claim nuevo evita
+                // que un envío WAHA aún en curso se reclame por segunda vez.
+                if ($leaseExpiresAt === false) {
+                    $legacyLeaseStartedAt = strtotime((string)($candidate['updated_at'] ?? ''));
+                    if ($legacyLeaseStartedAt === false) {
+                        $legacyLeaseStartedAt = strtotime((string)($candidate['available_at'] ?? ''));
+                    }
+                    if ($legacyLeaseStartedAt !== false) $leaseExpiresAt = $legacyLeaseStartedAt + $leaseDurationSec;
+                }
+                if ($leaseExpiresAt !== false && $leaseExpiresAt > $now) continue;
+                if ($leaseExpiresAt === false) continue;
+            }
+            $available = strtotime((string)($candidate['available_at'] ?? ''));
+            if ((string)($candidate['status'] ?? '') !== 'processing' && $available !== false && $available > $now) continue;
+            try {
+                $claimOwner = bin2hex(random_bytes(16));
+            } catch (Throwable $e) {
+                $claimOwner = hash('sha256', uniqid('manual-send-', true));
+            }
+            $jobs[$index]['status'] = 'processing';
+            $jobs[$index]['claim_owner'] = $claimOwner;
+            $jobs[$index]['lease_expires_at'] = date('Y-m-d H:i:s', $now + $leaseDurationSec);
+            $jobs[$index]['updated_at'] = now_datetime();
+            if (!storage_json_write_locked($file, $jobs)) return null;
+            storage_invalidate_cache($file);
+            return $jobs[$index];
+        }
+        return null;
+    });
+    if (!is_array($job) || trim((string)($job['id'] ?? '')) === '') return array('processed' => false);
+
+    $thread = null;
+    foreach (comercial_get_threads() as $candidate) {
+        if ((string)($candidate['id'] ?? '') === (string)$job['thread_id']) {
+            $thread = $candidate;
+            break;
+        }
+    }
+    if ($thread) {
+        comercial_thread_request_cancel((string)$job['thread_id']);
+        $send = comercial_send_thread_message($thread, (string)$job['text'], array('human_taken' => true, 'event_type' => 'manual_outbound_sent'));
+    } else {
+        $send = array('ok' => false, 'error' => 'Hilo no encontrado');
+    }
+
+    $final = storage_json_with_lock($file, function () use ($file, $job, $send) {
+        $stored = storage_json_read_locked_strict($file);
+        if (empty($stored['ok'])) return false;
+        $jobs = array_values((array)($stored['data'] ?? array()));
+        foreach ($jobs as $index => $candidate) {
+            if (!is_array($candidate) || (string)($candidate['id'] ?? '') !== (string)$job['id']) continue;
+            if ((string)($candidate['status'] ?? '') !== 'processing'
+                || !hash_equals((string)($candidate['claim_owner'] ?? ''), (string)($job['claim_owner'] ?? ''))) {
+                return false;
+            }
+            $jobs[$index]['attempts'] = (int)($candidate['attempts'] ?? 0) + 1;
+            $jobs[$index]['updated_at'] = now_datetime();
+            $jobs[$index]['claim_owner'] = '';
+            $jobs[$index]['lease_expires_at'] = '';
+            if (!empty($send['ok'])) {
+                $jobs[$index]['status'] = 'sent';
+                $jobs[$index]['sent_at'] = now_datetime();
+                $jobs[$index]['last_error'] = '';
+            } else {
+                $jobs[$index]['status'] = 'pending';
+                $jobs[$index]['last_error'] = trim((string)($send['error'] ?? 'Envío manual fallido'));
+                $jobs[$index]['available_at'] = date('Y-m-d H:i:s', time() + 15);
+            }
+            return storage_json_write_locked($file, $jobs);
+        }
+        return false;
+    });
+    return array('processed' => true, 'ok' => !empty($send['ok']) && !empty($final), 'job_id' => (string)$job['id']);
 }
 
 function comercial_register_line_attempt($lineId, $ok, $httpCode, $errorText = '') {
@@ -6773,6 +7003,11 @@ function comercial_poll_native_replies($maxThreads = 40) {
 function comercial_run_tick($forceProcessId = '') {
     $results = array();
     comercial_refresh_lines_health(false);
+
+    $manualQueue = comercial_process_manual_send_queue();
+    if (!empty($manualQueue['processed'])) {
+        $results[] = array('process' => '__manual_send_queue__', 'ok' => !empty($manualQueue['ok']), 'job_id' => (string)($manualQueue['job_id'] ?? ''));
+    }
 
     // ── COM-BALANCE-F3: reset de contadores diarios al cambiar de día ──
     comercial_reset_daily_counts_if_new_day();
@@ -7259,7 +7494,8 @@ function comercial_inbound_media_info(array $payload): ?array
         foreach (['audioMessage' => 'audio', 'imageMessage' => 'image', 'videoMessage' => 'video', 'documentMessage' => 'document'] as $k => $type) {
             if (isset($message[$k]) && is_array($message[$k])) {
                 $m = $message[$k];
-                return ['type' => $type, 'url' => $m['url'] ?? null, 'mimetype' => $m['mimetype'] ?? null, 'fileName' => $m['fileName'] ?? null];
+                $url = comercial_safe_media_url($m['url'] ?? null);
+                return ['type' => $type, 'url' => $url, 'url_source' => $url === null ? 'none' : 'evolution_authenticated', 'mimetype' => $m['mimetype'] ?? null, 'fileName' => $m['fileName'] ?? null, 'caption' => is_string($m['caption'] ?? null) ? $m['caption'] : '', 'instance' => trim((string)($payload['instance'] ?? $payload['instance_name'] ?? '')), 'message_id' => trim((string)($payload['message_id'] ?? $payload['id'] ?? ''))];
             }
         }
     }
@@ -7269,9 +7505,20 @@ function comercial_inbound_media_info(array $payload): ?array
         $url = $media['url'] ?? $media['URL'] ?? $media['link'] ?? null;
         $type = strtolower((string)($media['mimetype'] ?? ''));
         $kind = str_contains($type, 'audio') ? 'audio' : (str_contains($type, 'image') ? 'image' : 'media');
-        return ['type' => $kind, 'url' => is_string($url) ? $url : null, 'mimetype' => $type, 'fileName' => null];
+        $url = comercial_safe_media_url($url);
+        return ['type' => $kind, 'url' => $url, 'url_source' => $url === null ? 'none' : 'public', 'mimetype' => $type, 'fileName' => null, 'caption' => ''];
     }
     return null;
+}
+
+/** Solo URLs HTTP(S) absolutas sin credenciales, controles ni comillas llegan al cliente. */
+function comercial_safe_media_url($url): ?string
+{
+    if (!is_string($url) || $url === '' || preg_match('/[\x00-\x20"\'\\\\]/', $url)) return null;
+    $parts = @parse_url($url);
+    if (!is_array($parts) || !isset($parts['scheme'], $parts['host']) || isset($parts['user']) || isset($parts['pass'])) return null;
+    if (!in_array(strtolower((string)$parts['scheme']), array('http', 'https'), true)) return null;
+    return $url;
 }
 
 function comercial_handle_inbound_message($payload) {
@@ -8062,6 +8309,19 @@ function render_comercial_page() {
     $tabs = comercial_page_tabs();
     if (!isset($tabs[$tab])) $tab = 'resumen';
 
+    if ($tab === 'chat') {
+        page_header('Comercial', 'Motor unificado de envíos, seguimiento y conversión');
+        echo '<div class="subtabs">';
+        foreach ($tabs as $slug => $label) {
+            echo '<a class="subtab ' . ($tab === $slug ? 'active' : '') . '" href="' . e(comercial_page_url($slug)) . '">' . e($label) . '</a>';
+        }
+        echo '</div>';
+        echo '<section class="panel comercial-chat-embed" style="padding:0;overflow:hidden;">';
+        echo '<iframe id="comercial-chat-iframe" src="/control/inbox.php?tab=inbox" title="Chat comercial" loading="eager" style="display:block;width:100%;height:max(560px, calc(100vh - 190px));min-height:560px;border:0;overflow:hidden;"></iframe>';
+        echo '</section>';
+        return;
+    }
+
     $processes = comercial_get_processes();
     $selectedProcessId = trim((string)request_get('edit', ''));
     if ($selectedProcessId === '' && !empty($processes)) $selectedProcessId = (string)$processes[0]['id'];
@@ -8144,13 +8404,6 @@ function render_comercial_page() {
             echo '</tr>';
         }
         echo '</tbody></table></div>';
-        echo '</section>';
-        return;
-    }
-
-    if ($tab === 'chat') {
-        echo '<section class="panel comercial-chat-embed" style="padding:0;overflow:hidden;">';
-        echo '<iframe id="comercial-chat-iframe" src="/control/inbox.php?tab=inbox" title="Chat comercial" loading="eager" style="display:block;width:100%;height:max(560px, calc(100vh - 190px));min-height:560px;border:0;overflow:hidden;"></iframe>';
         echo '</section>';
         return;
     }

@@ -259,10 +259,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'lines') {
         return strcmp((string)($b['line_last_ts'] ?? ''), (string)($a['line_last_ts'] ?? ''));
     });
 
+    $pending = 0;
+    foreach ($allThreads as $thread) {
+        $stage = trim((string)($thread['stage'] ?? ''));
+        if ($stage === 'discarded' || $stage === 'qualified' || $stage === 'very_hot' || !empty($thread['human_taken'])) continue;
+        $pending++;
+    }
+
     inbox_api_json_ok([
         'lines'    => $result,
+        'pending'  => $pending,
         'settings' => function_exists('inbox_get_settings') ? inbox_get_settings() : ['replies_enabled' => true, 'opener_enabled' => true],
     ]);
+}
+
+// ── GET ?action=agent ──
+// La bandeja es deliberadamente perezosa: el chat no construye su HTML oculto.
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'agent') {
+    require_once __DIR__ . '/app/comercial_agent_table.php';
+    $threads = comercial_filter_agent_threads(comercial_get_threads());
+    ob_start();
+    render_comercial_agent_table($threads, comercial_list_lines_indexed());
+    $html = ob_get_clean();
+    inbox_api_json_ok(['html' => $html ?: '<div class="agent-empty"><strong>Sin datos</strong>No hay hilos comerciales.</div>']);
 }
 
 // ── GET ?action=line_threads&line_id=X ──
@@ -297,32 +316,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'thread') {
 
     $thread = comercial_normalize_thread($thread);
 
-    // ── Respuestas nativas en tiempo real ──
-    // GOWS no dispara el webhook message.any para salientes, así que consultamos
-    // el historial de WAHA para detectar si el humano respondió desde WhatsApp
-    // nativo y reflejarlo (human_taken/paused) sin recargar la app manualmente.
-    if (function_exists('comercial_sync_native_replies_for_thread')) {
-        try {
-            $nativeDetected = comercial_sync_native_replies_for_thread($thread);
-            if ($nativeDetected > 0) {
-                foreach (comercial_get_threads() as $t) {
-                    if ((string)($t['id'] ?? '') === $threadId) { $thread = comercial_normalize_thread($t); break; }
-                }
-            }
-        } catch (Throwable $e) {
-            // No romper la carga del hilo por un fallo de polling WAHA
-        }
-    }
-
     $linesIndexed = comercial_list_lines_indexed();
     $lineName = isset($linesIndexed[(string)($thread['line_id'] ?? '')]) ? trim((string)($linesIndexed[(string)$thread['line_id']]['nombre'] ?? '')) : '';
 
-    // Reconstruir timeline desde eventos
+    // Timeline exclusivamente local: el polling remoto de salientes queda en tick.
     $messages = [];
-    $history = [];
-    if (function_exists('comercial_thread_history')) {
-        $history = comercial_thread_history($thread);
+    $historyPage = array('messages' => array(), 'revision' => '', 'before' => null, 'has_more' => false);
+    if (function_exists('comercial_thread_history_page')) {
+        $historyPage = comercial_thread_history_page($thread, max(1, min(200, (int)($_GET['limit'] ?? 80))), trim((string)($_GET['before'] ?? '')));
+        $history = (array)($historyPage['messages'] ?? array());
     } else {
+        $history = [];
+    }
+    if (empty($history) && function_exists('comercial_thread_history')) {
+        $history = comercial_thread_history($thread);
+    }
+    if (empty($history)) {
         // Fallback: usar last_inbound/last_outbound
         $lastIn = trim((string)($thread['last_inbound_text'] ?? ''));
         $lastOut = trim((string)($thread['last_outbound_text'] ?? ''));
@@ -362,6 +371,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'thread') {
         ];
     }
 
+    $unchanged = trim((string)($_GET['revision'] ?? '')) !== ''
+        && trim((string)($_GET['revision'] ?? '')) === (string)($historyPage['revision'] ?? '')
+        && trim((string)($_GET['before'] ?? '')) === '';
+
     inbox_api_json_ok([
         'thread' => [
             'id'            => $threadId,
@@ -377,7 +390,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'thread') {
             'next_bot_action_at' => trim((string)($thread['next_bot_action_at'] ?? '')),
             'agenda_entry'  => $agendaData,
         ],
-        'messages' => $messages,
+        'messages' => $unchanged ? [] : $messages,
+        'revision' => (string)($historyPage['revision'] ?? ''),
+        'before' => $historyPage['before'] ?? null,
+        'has_more' => !empty($historyPage['has_more']),
+        'unchanged' => $unchanged,
     ]);
 }
 
@@ -444,25 +461,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'send') {
     }
     if (!$thread) inbox_api_json_err('Hilo no encontrado', 404);
 
-    // El humano interviene desde la app: cancelar cualquier respuesta automática
-    // en vuelo y marcar la conversación como parada (human_taken + inbox_paused
-    // los aplica comercial_send_thread_message con human_taken=true).
+    $clientMessageId = trim((string)($_POST['client_message_id'] ?? ''));
+    if (!comercial_manual_send_client_message_id_is_valid($clientMessageId)) inbox_api_json_err('client_message_id no válido');
+
+    // Validar y deduplicar la intención antes de cualquier efecto en el hilo.
+    $job = comercial_manual_send_job_enqueue($threadId, $text, $clientMessageId);
+    if (empty($job['id'])) {
+        inbox_api_json_err((string)($job['error'] ?? 'No se pudo encolar el envío'), !empty($job['conflict']) ? 409 : 500);
+    }
+
+    // La intención ya es durable; ahora sí se cancela la automatización.
     if (function_exists('comercial_thread_request_cancel')) {
         comercial_thread_request_cancel($threadId);
     }
-
-    $send = comercial_send_thread_message($thread, $text, [
-        'human_taken' => true,
-        'event_type'  => 'manual_outbound_sent',
-    ]);
-
-    if (!empty($send['ok'])) {
-        $threadAfter = comercial_normalize_thread((array)($send['thread'] ?? $thread));
-        comercial_upsert_thread($threadAfter);
-        inbox_api_json_ok(['thread_id' => $threadId, 'sent_at' => now_datetime()]);
-    } else {
-        inbox_api_json_err((string)($send['error'] ?? 'Error al enviar'), 502);
-    }
+    inbox_api_json_ok(['thread_id' => $threadId, 'job_id' => (string)$job['id'], 'client_message_id' => $clientMessageId, 'queued' => true]);
 }
 
 // ── POST action=toggle_thread ──
