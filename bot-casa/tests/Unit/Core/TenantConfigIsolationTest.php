@@ -111,7 +111,7 @@ final class TenantConfigIsolationTest extends TestCase
         self::assertArrayNotHasKey('files', $saved);
         self::assertSame([], $saved['telegram']['chat_ids'] ?? null);
         self::assertSame(['tenant-phone'], $saved['telegram']['whatsapp_phones'] ?? null);
-        self::assertSame('', $saved['urls']['google_maps_location'] ?? null);
+        self::assertSame('https://copied.example/maps', $saved['urls']['google_maps_location'] ?? null);
         self::assertSame($dist['prompt']['sections']['tarifas'], $saved['prompt']['sections']['tarifas']);
         self::assertSame('TENANT CUSTOM SERVICES', $saved['prompt']['sections']['servicios']);
 

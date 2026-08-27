@@ -36,12 +36,12 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Auto-authenticate as admin for open access
-if (empty($_SESSION['user_id'])) {
-    $_SESSION['user_id'] = 1;
-    $_SESSION['role'] = 'admin';
-    $_SESSION['username'] = 'admin';
-}
+// Auto-authenticate as admin for open access — the operator chat always runs as
+// the owner (user 1), regardless of any leftover client session (e.g. a previous
+// login as a client user would otherwise empty the lines/conversations list).
+$_SESSION['user_id'] = 1;
+$_SESSION['role'] = 'admin';
+$_SESSION['username'] = 'admin';
 
 $userId = (int) ($_SESSION['user_id'] ?? 0);
 
