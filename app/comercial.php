@@ -4417,7 +4417,11 @@ function comercial_send_hot_summary_to_owner($thread, $inboundText, $messageId =
     $suggestions = comercial_generate_hot_suggestions($thread, $processSlug, $inboundText);
 
     // Construir mensaje
-    $ownerPhone = '654464023'; // teléfono del dueño
+    // Dual-send: primary (654464023) recibe el texto original; secondary (641993776)
+    // recibe el mismo aviso parafraseado por LLM, ~15-25s después (antiban).
+    $ownerPhones = function_exists('avisos_owner_notification_phones')
+        ? avisos_owner_notification_phones()
+        : array('primary' => '654464023', 'secondary' => array('641993776'));
 
     $msg = "🔥 *CONVERSACIÓN MUY CALIENTE*\n\n";
     $lineInfo = $linePhone;
@@ -4434,7 +4438,22 @@ function comercial_send_hot_summary_to_owner($thread, $inboundText, $messageId =
     $msg .= "*Sugerencias para seguirla:*\n" . $suggestions;
 
     // Enviar por WhatsApp al dueño usando una línea comercial disponible
-    $sent = comercial_send_hot_notification_whatsapp($ownerPhone, $msg);
+    $sent = comercial_send_hot_notification_whatsapp($ownerPhones['primary'], $msg);
+
+    // Enviar también al secondary (parafraseado, con espera antiban entre envíos)
+    $secondarySent = true;
+    foreach ((array)($ownerPhones['secondary'] ?? array()) as $secondaryPhone) {
+        $secondaryPhone = trim((string)$secondaryPhone);
+        if ($secondaryPhone === '') continue;
+        if (!empty($sent)) {
+            sleep(rand(15, 25));
+        }
+        $secondaryMsg = function_exists('avisos_llm_paraphrase') ? avisos_llm_paraphrase($msg) : $msg;
+        $secondarySend = comercial_send_hot_notification_whatsapp($secondaryPhone, $secondaryMsg);
+        if (empty($secondarySend)) {
+            $secondarySent = false;
+        }
+    }
 
     // Marcar el hilo como notificado
     $thread['hot_notified_at'] = now_datetime();
@@ -4443,11 +4462,13 @@ function comercial_send_hot_summary_to_owner($thread, $inboundText, $messageId =
     comercial_event_append('hot_summary_sent_to_owner', array(
         'thread_id' => $threadId,
         'target_phone' => $phone,
-        'owner_phone' => $ownerPhone,
+        'owner_phone' => $ownerPhones['primary'],
+        'secondary_phones' => array_values((array)($ownerPhones['secondary'] ?? array())),
         'sent_ok' => $sent,
+        'secondary_sent_ok' => $secondarySent,
     ));
 
-    return $sent;
+    return $sent || $secondarySent;
 }
 
 function comercial_generate_hot_suggestions($thread, $processSlug, $inboundText) {
