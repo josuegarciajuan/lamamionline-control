@@ -380,8 +380,11 @@ function comercial_knowledge_casawasap(): array {
         )),
 
         'product' => implode("\n", array(
-            "CasaWasap es un asistente con IA que contesta el WhatsApp de la casa 24/7.",
+            "CasaWasap es un producto NUEVO: un asistente con IA que contesta el WhatsApp de la casa 24/7 como una persona real.",
             "Habla con tono natural. El cliente NO sabe que es un bot.",
+            "Quita el trabajo repetitivo de responder siempre lo mismo (tarifas, chicas, servicios, ubicación) y de estar pendiente del móvil a todas horas.",
+            "El dueño puede ver lo que dice e intervenir cuando quiera, o dejarlo todo en manos del bot.",
+            "Va muy bien: responde mejor que una persona y consigue más clientes.",
             "Solo avisa a la dueña cuando hay visita confirmada.",
             "Funcionalidades:",
             "- Respuestas 24/7 con IA (tono natural, como una persona real)",
@@ -391,6 +394,7 @@ function comercial_knowledge_casawasap(): array {
             "- Recordatorios de ETA (tiempo de llegada del cliente)",
             "- Anti-regateo (negocia por ti)",
             "- Memoria de clientes recurrentes (fidelización)",
+            "Web: https://casawasap.com",
             "Demo pública: https://demo.casawasap.com (chatea como si fueras cliente, sin registro)",
             "Resultados reales: +30% visitas recuperadas, 94% mensajes contestados al instante",
             "Onboarding: 3 pasos, 5 minutos, sin instalar nada.",
@@ -429,7 +433,7 @@ function comercial_knowledge_casawasap(): array {
         ),
 
         'objections' => array(
-            'Es caro'                                      => "{$weekly}/semana. Con 1 solo cliente que te traiga, ya lo tienes pagado. Y tienes 10 días gratis para comprobarlo sin riesgo.",
+            'Es caro'                                      => "{$weekly}/semana no es caro para tu negocio: por cada cliente que te consiga ganas de media 25-50€ y esperas entre 30 y 60 clientes al día por chica. Con 1 solo cliente que te traiga al día ya lo tienes pagado. Y tienes 10 días gratis para comprobarlo sin riesgo.",
             'Ya tengo a alguien que contesta'              => 'Claro, pero ¿contesta a las 4am? ¿Los fines de semana? CasaWasap no duerme. Y es un extra, no un reemplazo.',
             'No confío en una IA'                          => 'Entra en demo.casawasap.com y chatea tú misma. Es tono natural, la gente no nota la diferencia. Pruébalo 10 días gratis y decides.',
             'Mis clientes quieren hablar conmigo'          => 'CasaWasap solo contesta lo básico y te avisa cuando hay visita confirmada. Tú sigues hablando con quien quieras. Es un filtro, no un muro.',
@@ -455,14 +459,15 @@ function comercial_knowledge_casawasap(): array {
             'Insulta o es agresivo',
         ),
 
-        'tone' => "Cercano, cálido y directo. Tono de conversación de WhatsApp entre personas que se conocen. Transmite confianza en el producto sin ser arrogante. NUNCA coletillas infantiles. Máximo 1 emoji por mensaje. Responde primero a lo que preguntan, luego añade valor. Sin lenguaje corporativo ('estamos para ayudarte', 'cualquier consulta').",
+        'tone' => "Formal pero cercano, como un mensaje escrito a mano por una persona real que conoce el negocio. Nada de plantillas, spam ni coletillas. Transmite confianza en el producto sin ser arrogante. Máximo 1 emoji por mensaje. Responde primero a lo que preguntan, luego añade valor. Sin lenguaje corporativo ('estamos para ayudarte', 'cualquier consulta').",
 
         'opening_styles' => array(
-            'Pregunta provocativa: "¿Cuántos clientes pierdes mientras duermes?"',
-            'Dato de impacto: "94% de mensajes respondidos"',
-            'Escenario relatable: "¿Te has despertado con 15 mensajes sin responder?"',
-            'Invitación a demo: "Entra y chatea como si fueras cliente"',
-            'Propuesta de valor directa: "10 días gratis, sin tarjeta"',
+            'Mensaje escrito a mano: formal pero humano, sin parecer plantilla ni spam',
+            'Producto nuevo que contesta el WhatsApp de la casa 24/7 como una persona real',
+            'Beneficio claro: te quita el trabajo repetitivo de responder siempre lo mismo',
+            'Urgencia con psicología humana: cada WhatsApp sin contestar a tiempo es un cliente que se va',
+            'Incluir SIEMPRE el enlace https://casawasap.com en el primer mensaje',
+            'Explicación concreta y completa del producto antes de cualquier oferta',
         ),
 
         'escalation_message' => "Perfecto, te paso con mi compañero que te activa la prueba de 10 días gratis en tu número y te explica el onboarding. Es súper rápido, 5 minutos. ¡Hablamos!",

@@ -231,6 +231,13 @@ function comercial_agent_build_phase_prompt(string $processSlug, string $mode, s
         $sections[] = "═══ REGLAS OBLIGATORIAS ═══\n" . implode("\n", array_map(function($r) { return '- ' . $r; }, $globalRules));
     }
 
+    // Contexto de negocio (si el proceso lo define): ayuda al LLM a entender el nicho
+    // y usar argumentos reales (económicos, de urgencia) en cualquier fase.
+    $businessContext = $common['contexto_negocio'] ?? array();
+    if (!empty($businessContext)) {
+        $sections[] = "═══ CONTEXTO DEL NEGOCIO (ÚSALO COMO ESTRATEGIA CUANDO ENCAJE) ═══\n" . implode("\n", array_map(function($c) { return '- ' . $c; }, $businessContext));
+    }
+
     $inboundText = trim((string)($opts['inbound_text'] ?? ''));
 
     // ── Contenido fase-específico ──
