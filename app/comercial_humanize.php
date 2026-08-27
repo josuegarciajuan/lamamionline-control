@@ -16,6 +16,22 @@
 declare(strict_types=1);
 
 /**
+ * Aplica las reglas no negociables de tono antes de enviar un mensaje comercial.
+ * Es un último control determinista: protege también plantillas y respuestas que
+ * no hayan pasado por el generador o el crítico LLM.
+ */
+function comercial_humanize_outbound_message(string $text): string {
+    $text = str_replace(array('¿', '¡'), '', $text);
+    $text = preg_replace(
+        '/\s*(?:quieres\s+que\s+te\s+explique\s+(?:algo\s+)?m[áa]s|te\s+(?:ayudo|cuento|explico)\s+(?:algo|en\s+algo)\s+m[áa]s)\?*\s*$/iu',
+        '',
+        $text
+    );
+
+    return trim((string)$text);
+}
+
+/**
  * Envía un mensaje con simulación de escritura humana.
  *
  * @param string $wahaHost  URL base de WAHA (ej: http://100.117.92.74:3000)
@@ -178,6 +194,7 @@ function comercial_humanize_after_send_delay(): void {
 }
 
 function comercial_humanize_send_text(string $wahaHost, string $session, string $chatId, string $text): array {
+    $text = comercial_humanize_outbound_message($text);
     $url = $wahaHost . '/api/sendText';
     $body = json_encode(array(
         'session' => $session,

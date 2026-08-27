@@ -225,8 +225,10 @@ function comercial_agent_build_system_prompt(string $processSlug, string $mode, 
             . "- Entre 1 y {$maxLines} líneas.\n"
             . "- NUNCA coletillas infantiles (guapa, cariño, reina, Holaaa).\n"
             . "- Varía la estructura de tus mensajes, no uses siempre el mismo patrón.\n"
-            . "- NUNCA presiones ni fuerces el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', 'te lo dejo funcionando hoy', urgencia fabricada ('hoy mismo', 'ya').\n"
-            . "- Si el cliente pidió SOLO información, dásela y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?'). No pidas activar/empezar sin que haya mostrado intención clara.";
+            . "- NUNCA uses los signos de apertura ¿ ni ¡.\n"
+            . "- NUNCA presiones ni fuerces el cierre ni fabriques urgencia.\n"
+            . "- Si el cliente pidió SOLO información, dásela y termina en el dato útil. NUNCA cierres con 'quieres que te explique algo más', 'te ayudo en algo más' ni equivalentes. No pidas activar/empezar sin que haya mostrado intención clara.\n"
+            . "- Responde primero a su duda, con lenguaje cercano y breve. Despierta interés solo con un detalle real y útil; no ocultes precios, condiciones o límites cuando los pida.";
     }
 
     // ── Sección 7: Señales de lead ──
@@ -285,7 +287,12 @@ function comercial_agent_build_phase_prompt(string $processSlug, string $mode, s
     // Reglas globales
     $globalRules = $common['global_rules'] ?? array();
     if (!empty($globalRules)) {
-        $sections[] = "═══ REGLAS OBLIGATORIAS ═══\n" . implode("\n", array_map(function($r) { return '- ' . $r; }, $globalRules));
+        $sections[] = "═══ REGLAS OBLIGATORIAS ═══\n"
+        . "- NUNCA uses los signos de apertura ¿ ni ¡.\n"
+        . "- Responde primero a la duda concreta, breve, cercana y sin condescendencia.\n"
+        . "- No cierres con 'quieres que te explique algo más', 'te ayudo en algo más' ni equivalentes. Termina en el dato útil, una opción concreta o el siguiente paso natural.\n"
+        . "- Dosifica solo detalles secundarios: si te piden precio, condiciones o límites, dales la información completa y real.\n"
+        . implode("\n", array_map(function($r) { return '- ' . $r; }, $globalRules));
     }
 
     // Contexto de negocio (si el proceso lo define): ayuda al LLM a entender el nicho
@@ -335,7 +342,7 @@ function comercial_agent_build_phase_prompt(string $processSlug, string $mode, s
             if (!empty($nextSteps)) {
                 $sections[] = "═══ SIGUIENTE PASO ═══\n" . implode("\n", array_map(function($s) { return '- ' . $s; }, array_slice($nextSteps, 0, 2)));
             }
-            $sections[] = "═══ REGLAS DE ESTA FASE ═══\n- Máximo 5 líneas.\n- Precio + 1 beneficio clave + siguiente paso.\n- NUNCA responder objeciones que no hayan hecho.\n- NUNCA 'si no te gusta...', 'sin compromiso'.\n- NUNCA presiones el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', urgencia fabricada.\n- Si el cliente pidió SOLO información, cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?').\n- Terminar con una pregunta abierta sin presión.";
+            $sections[] = "═══ REGLAS DE ESTA FASE ═══\n- Máximo 5 líneas.\n- Precio + 1 beneficio clave + siguiente paso.\n- NUNCA responder objeciones que no hayan hecho.\n- NUNCA 'si no te gusta...', 'sin compromiso'.\n- NUNCA presiones el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', urgencia fabricada.\n- Si el cliente pidió SOLO información, responde y termina en el dato útil, sin invitarle a pedir una explicación genérica.\n- Si hace falta avanzar, usa una pregunta concreta y sin presión.";
             $casawasapPricing = function_exists('comercial_casawasap_pricing') ? comercial_casawasap_pricing() : ['weekly_price' => 50.0, 'extra_line_price' => 10.0];
             $sections[] = "═══ EJEMPLO MALO ═══\n\"" . number_format($casawasapPricing['weekly_price'], 0, ',', '.') . "€/semana. También tenemos líneas extra a " . number_format($casawasapPricing['extra_line_price'], 0, ',', '.') . "€, dashboard de estadísticas, recordatorios ETA, anti-regateo, publicación de estados, memoria de clientes recurrentes...\" → SOLTÓ TODAS LAS FEATURES EN VEZ DE IR PASO A PASO.";
             $sections[] = "═══ EJEMPLO MALO ═══\n\"...Alta única 29€ y luego 10€ por cada 30 min de cliente que te llegue. ¿Te activo hoy mismo?\" → CIERRE AGRESIVO CON PRESIÓN: el cliente solo pidió información y se le pide activar ya. Sustitúyelo por un CTA suave sin urgencia.";
@@ -389,7 +396,7 @@ function comercial_agent_build_phase_prompt(string $processSlug, string $mode, s
 
     // Tono
     $tone = $common['tone'] ?? 'Natural, WhatsApp real, frases cortas. NADA formalismos.';
-    $sections[] = "═══ TONO ═══\n{$tone}\n- Sin markdown, sin listas, sin formato especial.\n- Varía la estructura de tus mensajes, no uses siempre el mismo patrón.\n- NUNCA presiones ni fuerces el cierre (prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', urgencia fabricada).\n- Si el cliente pidió solo información, cierra con un CTA suave: 'si te convence, me dices' o '¿quieres que te explique algo más?'.";
+    $sections[] = "═══ TONO ═══\n{$tone}\n- Sin markdown, sin listas, sin formato especial.\n- Varía la estructura de tus mensajes, no uses siempre el mismo patrón.\n- NUNCA uses los signos de apertura ¿ ni ¡.\n- NUNCA presiones ni fuerces el cierre (prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', urgencia fabricada).\n- Si el cliente pidió solo información, responde de forma suficiente y termina en el dato útil, nunca con una invitación genérica a explicar más.\n- Picardía suave: un detalle concreto, real y útil que dé ganas de seguir; nunca sarcasmo, promesas inventadas ni misterio vacío.";
 
     // ── Ejemplos humanos relevantes (selección por keyword + fase) ──
     $examples = comercial_ai_memory_relevant_examples($processSlug, $inboundText, $phase, 3);
@@ -457,11 +464,11 @@ function comercial_agent_generate_opener(array $thread, string $processSlug, str
         "- NO uses frases genéricas de telemarketing.\n" .
         "- NO empieces siempre con 'Hola'. Varía el saludo.\n" .
         "- Sé breve (máximo {$maxOpenerLines} líneas de WhatsApp).\n" .
-         "- Incluye una invitación suave a responder, sin pregunta retórica.\n" .
+         "- Incluye una invitación suave y concreta a responder, sin pregunta retórica ni cierre genérico.\n" .
         "- NO preguntes '¿cómo estás?' de forma genérica.\n" .
          "- Usa la información de la sección LO QUE VENDES con naturalidad.\n" .
          "- No menciones precios ni porcentajes en la apertura, aunque estén en la base; solo bajo demanda.\n" .
-         "- Evita los signos iniciales ¿ y ¡.\n" .
+         "- PROHIBIDO usar los signos de apertura ¿ y ¡.\n" .
         "- RESPONDE ÚNICAMENTE con el texto del mensaje. Nada más.";
 
     // reasoning_effort low: el opener de campaña no es hot-path (se envía por cron),
@@ -540,10 +547,11 @@ function comercial_agent_generate_reply(array $thread, string $processSlug, stri
         "- NO insistas más de 2 veces sobre el mismo punto.\n" .
         "- NO inventes datos, precios ni URLs.\n" .
         "- NO uses el mismo patrón de respuesta que los mensajes anteriores tuyos.\n" .
-        "- Evita los signos iniciales ¿ y ¡; escribe con puntuación natural de WhatsApp.\n" .
+        "- PROHIBIDO usar los signos de apertura ¿ y ¡; escribe con puntuación natural de WhatsApp.\n" .
         "- Evita preguntas retóricas y no encadenes preguntas innecesarias.\n" .
         "- NUNCA presiones ni fuerces el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', 'te lo dejo funcionando hoy', urgencia fabricada ('hoy mismo', 'ya').\n" .
-        "- Si el cliente pidió SOLO información, responde esa información y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?'). No pidas activar/empezar sin intención clara de compra.\n" .
+        "- Si el cliente pidió SOLO información, responde esa información y termina en el dato útil. PROHIBIDO cerrar con 'quieres que te explique algo más', 'te ayudo en algo más' o equivalentes. No pidas activar/empezar sin intención clara de compra.\n" .
+        "- Tono cercano y escueto, con picardía suave basada en un detalle real. No seas condescendiente, no ocultes información relevante pedida y no uses misterio artificial.\n" .
         "- RESPONDE ÚNICAMENTE con el texto del mensaje. Nada más.";
 
     // reasoning_effort medium: reduce latencia en el hot-path real-time del reply

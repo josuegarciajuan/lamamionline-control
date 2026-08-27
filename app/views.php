@@ -7928,7 +7928,7 @@ function configm_field_meta() {
         ),
         'whatsapp_target_phones' => array(
             'label' => 'Teléfonos destino de avisos',
-            'help' => 'Números que recibirán los avisos. Puedes poner uno por línea.'
+            'help' => 'Números que recibirán los avisos, uno por línea. El primero (654464023) recibe el mensaje original; el resto reciben la misma información parafraseada por IA y con ~15-25s de espera entre envíos (antiban).'
         ),
         'alerts_noise_profile' => array(
             'label' => 'Perfil de ruido de avisos',

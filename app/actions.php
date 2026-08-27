@@ -3177,10 +3177,24 @@ function action_jostal_send_deuda_wasap() {
     $nombre = trim((string)($clienta['nombre'] ?? ''));
     $texto = jostal_texto_deuda($nombre, $data, $desde, $hasta, $fuente);
 
-    $result = comercial_send_text_via_line($line, $targetDigits, $texto, array('slug' => 'jostal_deuda'));
+    $process = array('slug' => 'jostal_deuda');
+    $result = comercial_send_text_via_line($line, $targetDigits, $texto, $process);
+
+    // Cuando el destino es "personal" (654464023), el informe también llega al
+    // secondary (641993776) parafraseado por LLM y con ~15-25s de espera (antiban).
+    $secondaryResult = null;
+    if ($destinoTipo === 'personal' && !empty($result['ok'])) {
+        sleep(rand(15, 25));
+        $secondaryText = function_exists('avisos_llm_paraphrase') ? avisos_llm_paraphrase($texto) : $texto;
+        $secondaryResult = comercial_send_text_via_line($line, '641993776', $secondaryText, $process);
+    }
 
     if (!empty($result['ok'])) {
-        set_flash('ok', 'Informe enviado por WhatsApp (dulce) a ' . $targetDigits . '.', 'celebrate');
+        $flashMsg = 'Informe enviado por WhatsApp (dulce) a ' . $targetDigits . '.';
+        if ($secondaryResult !== null) {
+            $flashMsg .= ' Copia a 641993776: ' . (!empty($secondaryResult['ok']) ? 'enviada.' : 'falló (' . trim((string)($secondaryResult['error'] ?? 'desconocido')) . ').');
+        }
+        set_flash('ok', $flashMsg, 'celebrate');
     } else {
         set_flash('error', 'Error al enviar: ' . trim((string)($result['error'] ?? 'desconocido')));
     }

@@ -227,8 +227,9 @@ TU ANÁLISIS DEBE RESPONDER:
    IMPORTANTE: prioriza CIERRES SUAVES, sin presión. NUNCA recomiendes frases tipo
    "¿Te activo ya?", "¿Te activo hoy mismo?", "¿Empezamos?", "te lo dejo funcionando hoy",
    urgencia fabricada ("hoy mismo", "última oportunidad" falsa) ni pedir activar/empezar
-   cuando el cliente solo pidió información. En ese caso, el bot debe dar la información y
-   cerrar con un CTA suave ("si te convence, me dices", "¿quieres que te explique algo más?").
+    cuando el cliente solo pidió información. En ese caso, el bot debe dar la información y
+    terminar en el dato útil, una opción concreta o el siguiente paso natural. NUNCA recomiendes
+    "quieres que te explique algo más", "te ayudo en algo más" ni equivalentes, ni uses ¿ o ¡.
 
 6. ANÁLISIS DE ESTILO HUMANO:
    En las respuestas del operador humano, analiza:
