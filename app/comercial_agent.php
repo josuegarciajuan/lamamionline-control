@@ -164,13 +164,14 @@ function comercial_agent_build_system_prompt(string $processSlug, string $mode, 
 
     // ── Sección 6: Tono ──
     if (!empty($kb['tone'])) {
+        $maxLines = (int)($kb['max_lines'] ?? 4);
         $sections[] = "═══ TONO Y ESTILO ═══\n" . trim($kb['tone']) . "\n"
             . "- Habla como una persona real por WhatsApp: frases cortas y cálidas, tuteo natural.\n"
             . "- PROHIBIDO lenguaje corporativo o de atención al cliente: 'Entiendo que...', 'podemos coordinar', 'Siempre hay rotación', 'es bueno tener el contacto', 'avísame', 'quedamos', 'me alegra que preguntes', 'buena pregunta'.\n"
             . "- Máximo 1 emoji por mensaje.\n"
             . "- Sin markdown, sin listas, sin formato especial.\n"
             . "- Natural, como un WhatsApp real.\n"
-            . "- Entre 1 y 4 líneas.\n"
+            . "- Entre 1 y {$maxLines} líneas.\n"
             . "- NUNCA coletillas infantiles (guapa, cariño, reina, Holaaa).\n"
             . "- Varía la estructura de tus mensajes, no uses siempre el mismo patrón.\n"
             . "- NUNCA presiones ni fuerces el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', 'te lo dejo funcionando hoy', urgencia fabricada ('hoy mismo', 'ya').\n"
@@ -247,7 +248,8 @@ function comercial_agent_build_phase_prompt(string $processSlug, string $mode, s
             if (!empty($openingGuidance)) {
                 $sections[] = "═══ IDEAS PARA LA APERTURA ═══\n- " . implode("\n- ", $openingGuidance);
             }
-             $sections[] = "═══ REGLAS DE ESTA FASE ═══\n- Máximo 4 líneas.\n- Un solo tema.\n- Ir directo al producto, sin presentación ni 'hola'.\n- NUNCA 'somos del equipo', 'soy X', autoreferencia.\n- NUNCA precio ni porcentajes. Solo bajo demanda.\n- No usar preguntas retóricas ni encadenar preguntas.\n- Terminar con una invitación natural a responder.\n- 1 emoji máximo.";
+            $maxLines = (int)($kb['max_lines'] ?? 4);
+            $sections[] = "═══ REGLAS DE ESTA FASE ═══\n- Máximo {$maxLines} líneas.\n- Un solo tema.\n- Ir directo al producto, sin presentación ni 'hola'.\n- NUNCA 'somos del equipo', 'soy X', autoreferencia.\n- NUNCA precio ni porcentajes. Solo bajo demanda.\n- No usar preguntas retóricas ni encadenar preguntas.\n- Terminar con una invitación natural a responder.\n- 1 emoji máximo.";
             $sections[] = "═══ EJEMPLO MALO ═══\n\"Hola, soy de Casa Burriana. Ofrecemos habitaciones y plazas con wifi, smartTV, limpieza diaria, sábanas incluidas. Dos modalidades: plaza 60/40 y alquiler...\" → DEMASIADO LARGO, autoreferencia, suelta todo de golpe.";
             break;
 
@@ -379,6 +381,17 @@ function comercial_agent_generate_opener(array $thread, string $processSlug, str
     $styles = $kb['opening_styles'] ?? array('Presentación natural y cercana');
     $styleNote = "\n\n═══ ESTILOS DE APERTURA SUGERIDOS ═══\nElige UNO de estos enfoques (o combina sutilmente) para tu mensaje. NO los uses como plantilla, solo como inspiración:\n- " . implode("\n- ", $styles);
 
+    // ── Máx. líneas configurables por negocio (LaMami desmenuza el concepto) ──
+    $maxOpenerLines = 4;
+    if (function_exists('comercial_knowledge_v2_get')) {
+        $openerKb = comercial_knowledge_v2_get($processSlug, 'SALUDO_INICIAL');
+        if (isset($openerKb['max_lines']) && (int)$openerKb['max_lines'] > 0) {
+            $maxOpenerLines = (int)$openerKb['max_lines'];
+        }
+    } elseif (isset($kb['max_lines']) && (int)$kb['max_lines'] > 0) {
+        $maxOpenerLines = (int)$kb['max_lines'];
+    }
+
     $prompt = $systemPrompt . $antiRepeatNote . $styleNote . "\n\n" .
         "═══ TAREA ═══\n" .
         "Genera UN mensaje de apertura para iniciar una conversación de WhatsApp.\n" .
@@ -387,7 +400,7 @@ function comercial_agent_generate_opener(array $thread, string $processSlug, str
         "- Sé NATURAL. Parece que una persona real escribe, no un guion de ventas.\n" .
         "- NO uses frases genéricas de telemarketing.\n" .
         "- NO empieces siempre con 'Hola'. Varía el saludo.\n" .
-        "- Sé breve (máximo 4 líneas de WhatsApp).\n" .
+        "- Sé breve (máximo {$maxOpenerLines} líneas de WhatsApp).\n" .
          "- Incluye una invitación suave a responder, sin pregunta retórica.\n" .
         "- NO preguntes '¿cómo estás?' de forma genérica.\n" .
          "- Usa la información de la sección LO QUE VENDES con naturalidad.\n" .

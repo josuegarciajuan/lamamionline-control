@@ -2031,7 +2031,7 @@ function comercial_state_machine_determine_phase(array $thread, array $process, 
 /**
  * Devuelve las reglas de formato para una fase (usado por el crítico).
  */
-function comercial_state_machine_phase_rules(string $phase): array {
+function comercial_state_machine_phase_rules(string $phase, string $processSlug = ''): array {
     $rules = [
         'SALUDO_INICIAL'     => ['max_lines' => 4, 'end_with_question' => true],
         'DESCUBRIMIENTO'     => ['max_lines' => 5, 'end_with_question' => true],
@@ -2040,7 +2040,25 @@ function comercial_state_machine_phase_rules(string $phase): array {
         'CIERRE'             => ['max_lines' => 4, 'end_with_question' => false],
         'DESCARTADO'         => ['max_lines' => 0, 'end_with_question' => false],
     ];
-    return $rules[$phase] ?? ['max_lines' => 5, 'end_with_question' => true];
+    $base = $rules[$phase] ?? ['max_lines' => 5, 'end_with_question' => true];
+    // Override por negocio: si la KB define max_lines para esta fase (ej: LaMami
+    // desmenuza el concepto en SALUDO_INICIAL), el crítico lo respeta.
+    if ($processSlug !== '') {
+        if (function_exists('comercial_knowledge_v2_get')) {
+            $kbPhase = comercial_knowledge_v2_get($processSlug, $phase);
+            if (isset($kbPhase['max_lines']) && (int)$kbPhase['max_lines'] > 0) {
+                $base['max_lines'] = (int)$kbPhase['max_lines'];
+            }
+        }
+        // KB v1 (sin fases): max_lines aplica solo a la apertura, no a objeciones/cierre.
+        if ($phase === 'SALUDO_INICIAL') {
+            $kb = comercial_knowledge_get($processSlug);
+            if (isset($kb['max_lines']) && (int)$kb['max_lines'] > 0) {
+                $base['max_lines'] = (int)$kb['max_lines'];
+            }
+        }
+    }
+    return $base;
 }
 
 function comercial_thread_apply_stage($thread, $stage) {
@@ -2808,7 +2826,7 @@ function comercial_agent_generate_reply_wrapper($thread, $processSlug, $text) {
 
         // 2. Critic (DeepSeek) — solo si está disponible
         if (function_exists('comercial_agent_critic_evaluate')) {
-            $phaseRules = comercial_state_machine_phase_rules($phase);
+            $phaseRules = comercial_state_machine_phase_rules($phase, (string)$processSlug);
             $criticResult = comercial_agent_critic_evaluate($reply, $phase, $phaseRules);
 
             // Crítico pasó → usar texto original
