@@ -1925,6 +1925,13 @@ function comercial_normalize_thread($row) {
         'hot_notified_at' => '',
         'last_human_reply_at' => '',
         'conversation_phase' => '',
+        'automation_state' => '',
+        'automation_state_reason' => '',
+        'automation_state_changed_at' => '',
+        'automation_paused_at' => '',
+        'automation_paused_by' => '',
+        'automation_notified_key' => '',
+        'automation_decision_id' => '',
         'ai_semantic_interest' => false,
         'ai_semantic_score' => 0,
         'ai_semantic_reasoning' => '',
@@ -2997,13 +3004,14 @@ function comercial_decision_score_confidence($thread, $classification, $text) {
  * qualified_reply_sent_at está vacío (primer turno: auto_turn_count=0 < maxTurns siempre).
  */
 function comercial_can_send_auto_followup($thread, $maxTurns = 999) {
-    $sentAt = trim((string)($thread['qualified_reply_sent_at'] ?? ''));
-    // Si todavía quedan turnos automáticos, permitir el seguimiento inmediatamente
-    if ((int)($thread['auto_turn_count'] ?? 0) < (int)$maxTurns) return true;
-    // Nunca se ha respondido → permitir el primer turno (auto_turn_count = 0 < maxTurns ya lo cubre)
-    if ($sentAt === '') return true;
-    // Turnos agotados → solo reenganchar tras 2h de silencio
-    return strtotime($sentAt) < (time() - 7200);
+    // AGENT V3: el número de turnos ya NO limita la conversación. La decisión de
+    // seguir hablando (o no) la toma el LLM según el estado y las guardas.
+    // Solo bloquean: baja explícita, estado terminal persistido o intervención humana.
+    $thread = is_array($thread) ? $thread : array();
+    if (!empty($thread['human_taken']) || !empty($thread['inbox_paused'])) return false;
+    $persisted = trim((string)($thread['automation_state'] ?? ''));
+    if (comercial_automation_is_terminal_state($persisted)) return false;
+    return true;
 }
 
 function comercial_decide_inbound_action($thread, $process, $classification, $text) {
@@ -4469,6 +4477,66 @@ function comercial_send_hot_summary_to_owner($thread, $inboundText, $messageId =
     ));
 
     return $sent || $secondarySent;
+}
+
+/**
+ * Notificación PRIORITARIA e idempotente para "intervención inmediata".
+ * Solo se envía una vez por hilo+decisión (dedupe por clave de transición).
+ * Texto orientado a la acción: "contesta ya, solo falta cerrar".
+ */
+function comercial_send_intervention_notification_to_owner($thread, $inboundText, $messageId = '', $decisionKey = '') {
+    $thread = comercial_normalize_thread($thread);
+    $threadId = (string)($thread['id'] ?? '');
+    if ($threadId === '') return false;
+
+    // Dedupe estable por transición: un mismo evento no reavisa.
+    if ($decisionKey === '') {
+        $decisionKey = comercial_automation_notification_key($threadId, 'human_intervention', $messageId);
+    }
+    $seenKey = trim((string)($thread['automation_notified_key'] ?? ''));
+    if ($seenKey !== '' && $seenKey === $decisionKey) {
+        return false; // ya notificado para esta transición
+    }
+
+    $phone = (string)($thread['target_phone'] ?? '');
+    $processSlug = trim((string)($thread['process_slug'] ?? 'inbound'));
+    $linePhone = trim((string)($thread['line_phone'] ?? ''));
+    $history = comercial_thread_history($thread, 20);
+    $summaryLines = array();
+    foreach ($history as $entry) {
+        $dir = (string)($entry['direction'] ?? '') === 'in' ? '📥' : '📤';
+        $txt = trim((string)($entry['text'] ?? ''));
+        if ($txt !== '') {
+            $summaryLines[] = $dir . ' ' . comercial_mb_substr_safe($txt, 0, 120);
+        }
+    }
+    $conversationSummary = !empty($summaryLines) ? implode("\n", array_slice($summaryLines, -6)) : '(sin historial)';
+
+    $ownerPhone = '654464023';
+    $msg = "🚨 *INTERVENCIÓN INMEDIATA — CONTESTA YA*\n\n";
+    $msg .= "Solo falta cerrar el trato, te necesito en esta conversación.\n\n";
+    $msg .= "📱 *Línea:* " . ($linePhone !== '' ? $linePhone : 'desconocida') . "\n";
+    $msg .= "📞 *Cliente:* " . $phone . "\n";
+    $msg .= "🏷️ *Proceso:* " . $processSlug . "\n";
+    $msg .= "💬 *Último mensaje:* " . (comercial_mb_strlen_safe($inboundText) > 100 ? comercial_mb_substr_safe($inboundText, 0, 100) . '...' : $inboundText) . "\n\n";
+    $msg .= "*Conversación:*\n" . $conversationSummary;
+
+    $sent = comercial_send_hot_notification_whatsapp($ownerPhone, $msg);
+
+    // Persistir clave de dedupe solo tras el envío (para permitir reintento si falla).
+    if ($sent) {
+        $thread['automation_notified_key'] = $decisionKey;
+        comercial_upsert_thread($thread);
+    }
+    comercial_event_append('automation_notification_sent', array(
+        'thread_id' => $threadId,
+        'process_slug' => $processSlug,
+        'target_phone' => $phone,
+        'type' => 'human_intervention',
+        'decision_key' => $decisionKey,
+        'sent_ok' => $sent,
+    ));
+    return $sent;
 }
 
 function comercial_generate_hot_suggestions($thread, $processSlug, $inboundText) {
@@ -7798,6 +7866,46 @@ function comercial_handle_inbound_message($payload) {
         $decision = comercial_decide_inbound_action($thread, $process, $classification, $text);
     }
 
+    // ── AGENT V3: contrato común de decisión. El LLM sugiere; el servidor resuelve.
+    // Se calcula SIEMPRE (también si el LLM falla) y se persiste automation_state.
+    if (!empty($classifyResult['ok'])) {
+        $rawDecision = array(
+            'state' => comercial_agent_map_classify_to_state($classifyResult, $decision),
+            'confidence' => (float)($classifyResult['lead_score'] ?? 0) / 100,
+            'lead_score' => (int)($classifyResult['lead_score'] ?? 0),
+            'intent' => (string)($classifyResult['intent'] ?? ''),
+            'reason' => trim((string)($classifyResult['reasoning'] ?? '')),
+        );
+        $normDecision = comercial_normalize_agent_decision($rawDecision);
+    } else {
+        $normDecision = array('ok' => false, 'state' => 'continue', 'reply_allowed' => false, 'pause_bot' => false, 'error' => 'classify_failed');
+    }
+    $automation = comercial_resolve_automation_decision($thread, $normDecision);
+    // Persistir estado de automatización (para guardas y UI).
+    $prevAutomation = trim((string)($thread['automation_state'] ?? ''));
+    if ($automation['state'] !== $prevAutomation) {
+        $thread['automation_state'] = $automation['state'];
+        $thread['automation_state_reason'] = trim((string)($automation['reason'] ?? ''));
+        $thread['automation_state_changed_at'] = now_datetime();
+        if (!empty($automation['pause_bot'])) {
+            $thread['automation_paused_at'] = now_datetime();
+            $thread['automation_paused_by'] = trim((string)($automation['guard'] ?? 'decision'));
+            // La intervención inmediata pausa el bot de forma dura y persistente.
+            if ($automation['state'] === 'human_intervention' && empty($thread['human_taken']) && empty($thread['inbox_paused'])) {
+                $thread['inbox_paused'] = 1;
+            }
+        }
+        comercial_event_append('automation_state_changed', array(
+            'thread_id' => $thread['id'],
+            'process_slug' => $thread['process_slug'],
+            'from' => $prevAutomation,
+            'to' => $automation['state'],
+            'reason' => trim((string)($automation['reason'] ?? '')),
+            'target_phone' => (string)$thread['target_phone'],
+        ));
+    }
+    $thread['automation_decision_id'] = comercial_automation_notification_key((string)$thread['id'], $automation['state'], $messageId);
+
     // ── AGENT V2: normalizar intent LLM → vocabulario legacy del handler ──
     // Sin esto, intents calientes (asking_price, negotiating, interested, etc.)
     // caían al fall-through 'saved' y el bot dejaba de hablar.
@@ -7905,7 +8013,7 @@ function comercial_handle_inbound_message($payload) {
         $shouldReply = ($classification === 'asking_info')
             || ($decisionAction === 'auto_reply_second_turn')
             || ($decisionAction === 'continue');
-        if ($autoFollowup && $shouldReply && !$inCooldown && comercial_can_send_auto_followup($thread, $maxTurnsGc) && (int)$thread['auto_turn_count'] < $maxTurnsGc) {
+        if ($autoFollowup && $shouldReply && !$inCooldown && comercial_can_send_auto_followup($thread, $maxTurnsGc)) {
             // Usar LLM agent para generar respuesta contextual
             $followup = comercial_agent_generate_reply_wrapper($thread, $processSlug, $text);
             $lastBotText = trim((string)($thread['last_bot_reply_text'] ?? ''));
@@ -7987,7 +8095,7 @@ function comercial_handle_inbound_message($payload) {
         }
         $settings = comercial_get_settings();
         $maxTurns = max(1, (int)($process['conversation_max_auto_turns'] ?? $settings['conversation_max_auto_turns'] ?? 2));
-        if (($decision['action'] ?? '') === 'auto_reply_second_turn' && $autoFollowup && !$inCooldown && comercial_can_send_auto_followup($thread, $maxTurns) && (int)$thread['auto_turn_count'] < $maxTurns) {
+        if (($decision['action'] ?? '') === 'auto_reply_second_turn' && $autoFollowup && !$inCooldown && comercial_can_send_auto_followup($thread, $maxTurns)) {
             // Usar LLM agent para generar respuesta contextual
             $followup = comercial_agent_generate_reply_wrapper($thread, $processSlug, $text);
             $replied = false;
@@ -8025,8 +8133,8 @@ function comercial_handle_inbound_message($payload) {
                 'test_key' => trim((string)($thread['test_key'] ?? '')),
             );
         }
-        // Fallback: can_send_auto_followup no aplica pero quedan turnos y no hay cooldown
-        if (($decision['action'] ?? '') === 'auto_reply_second_turn' && $autoFollowup && !$inCooldown && (int)$thread['auto_turn_count'] < $maxTurns) {
+        // Fallback: se responde si el bot puede seguir y no hay cooldown.
+        if (($decision['action'] ?? '') === 'auto_reply_second_turn' && $autoFollowup && !$inCooldown && comercial_can_send_auto_followup($thread, $maxTurns)) {
             $fallbackMsg = comercial_agent_generate_reply_wrapper($thread, $processSlug, $text);
             if ($fallbackMsg !== '') {
                 $lastBotText = trim((string)($thread['last_bot_reply_text'] ?? ''));
@@ -8062,7 +8170,9 @@ function comercial_handle_inbound_message($payload) {
         $aiSecondTurnError = '';
         // AGENT V2: enviar respuesta y notificar al dueño aunque el LLM haya
         // decidido escalar (interested/ready_to_buy) — no silenciar al bot.
-        if (comercial_decision_allows_ai_second_turn($thread, $classification, $process)) {
+        // AGENT V3: si la decisión pausa el bot (intervención inmediata), NO
+        // auto-respondemos; solo avisamos para que el humano cierre.
+        if (empty($automation['pause_bot']) && comercial_decision_allows_ai_second_turn($thread, $classification, $process)) {
             $objective = 'responder segunda vuelta, mantener interés y mover a cierre o llamada';
             $ai = comercial_ai_generate_contextual_followup($thread, (string)($thread['process_slug'] ?? ''), $objective);
             if (!empty($ai['ok']) && trim((string)($ai['text'] ?? '')) !== '') {
@@ -8089,6 +8199,24 @@ function comercial_handle_inbound_message($payload) {
         $thread = comercial_thread_apply_stage($thread, 'very_hot');
         comercial_upsert_thread($thread);
 
+        // ── AGENT V3: notificación según estado ──
+        if (!empty($automation['pause_bot'])) {
+            // Intervención inmediata: aviso crítico, sin auto-reply.
+            $hotNotified = comercial_send_intervention_notification_to_owner($thread, $text, $messageId, (string)($thread['automation_decision_id'] ?? ''));
+            return array(
+                'ok' => true,
+                'thread_id' => $thread['id'],
+                'classification' => $classification,
+                'intent_reason' => $intentReason,
+                'action' => 'human_intervention_notified',
+                'followup_error' => $aiSecondTurnError,
+                'hot_notified' => $hotNotified,
+                'target_phone' => (string)$thread['target_phone'],
+                'test_probe' => comercial_thread_is_test_probe($thread) ? 1 : 0,
+                'test_key' => trim((string)($thread['test_key'] ?? '')),
+            );
+        }
+
         // ── Fix #3: notificación directa al dueño en vez de avisos del sistema ──
         $hotNotified = comercial_send_hot_summary_to_owner($thread, $text, $messageId);
 
@@ -8111,7 +8239,7 @@ function comercial_handle_inbound_message($payload) {
         $qualifiedReplySent = false;
         $followupError = '';
         $maxTurnsQ = max(1, (int)($process['conversation_max_auto_turns'] ?? comercial_get_settings()['conversation_max_auto_turns'] ?? 2));
-        if ($autoFollowup && !$inCooldown && comercial_can_send_auto_followup($thread, $maxTurnsQ) && (int)$thread['auto_turn_count'] < $maxTurnsQ) {
+        if ($autoFollowup && !$inCooldown && comercial_can_send_auto_followup($thread, $maxTurnsQ)) {
             // Usar LLM agent para generar respuesta contextual
             $followup = comercial_agent_generate_reply_wrapper($thread, $processSlug, $text);
             if ($followup !== '') {
