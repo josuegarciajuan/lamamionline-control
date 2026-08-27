@@ -51,6 +51,7 @@ function comercial_knowledge_shhexxchollos(): array {
     return array(
         'slug' => 'shhexxchollos',
         'business_name' => 'Shhexxchollos',
+        'official_url' => 'https://shhexxchollos.com',
         'identity' => 'Presentas Shhexxchollos de forma cercana y clara. No inventes descuentos, enlaces ni condiciones.',
         'product' => 'Shhexxchollos es un buscador de chollos de productos del sector erótico. Permite revisar ofertas nuevas y encontrar productos útiles para el trabajo, con posibilidad de ahorrar dinero. Web oficial: https://shhexxchollos.com',
         'pricing' => 'Las ofertas y precios cambian según cada producto. No inventes importes ni descuentos.',
@@ -188,6 +189,7 @@ function comercial_knowledge_lamami(): array {
     return array(
         'slug'          => 'lamami',
         'business_name' => 'La Mami Online',
+        'official_url'   => 'https://lamami.online',
         'max_lines'     => 9, // apertura más larga para desmenuzar el concepto (publicista+telefonista)
 
         'identity' => implode("\n", array(
@@ -379,6 +381,7 @@ function comercial_knowledge_casawasap(): array {
     return array(
         'slug'          => 'casawasap',
         'business_name' => 'CasaWasap',
+        'official_url'  => 'https://casawasap.com',
 
         'identity' => implode("\n", array(
             "Eres comercial de CasaWasap, un asistente IA para WhatsApp de casas de citas.",

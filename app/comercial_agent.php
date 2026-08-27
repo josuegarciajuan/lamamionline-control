@@ -19,6 +19,52 @@
 
 declare(strict_types=1);
 
+/** Devuelve la URL oficial configurada para un proceso comercial. */
+function comercial_official_url_for_slug(string $processSlug): string {
+    $slug = trim($processSlug);
+    $kb = function_exists('comercial_knowledge_get') ? comercial_knowledge_get($slug) : array();
+    $url = trim((string)($kb['official_url'] ?? ''));
+    if ($url !== '') return $url;
+    if (function_exists('comercial_knowledge_v2_get')) {
+        $v2 = comercial_knowledge_v2_get($slug, 'common');
+        return trim((string)($v2['official_url'] ?? ''));
+    }
+    return '';
+}
+
+/** Comprueba si un dominio oficial ya aparece en cualquier entrada del historial. */
+function comercial_official_url_was_shared(array $history, string $officialUrl): bool {
+    $host = (string)parse_url(trim($officialUrl), PHP_URL_HOST);
+    if ($host === '') return false;
+    foreach ($history as $entry) {
+        $text = is_array($entry) ? trim((string)($entry['text'] ?? '')) : trim((string)$entry);
+        if ($text !== '' && preg_match('/(?<![a-z0-9-])(?:https?:\/\/)?(?:www\.)?' . preg_quote($host, '/') . '(?=[:\/\s?&#.,!)]|$)/iu', $text) === 1) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/** Añade una mención breve a la web si el opener del LLM la omitió. */
+function comercial_ensure_official_url_in_opener(string $text, string $officialUrl): string {
+    $text = trim($text);
+    $officialUrl = trim($officialUrl);
+    if ($text === '' || $officialUrl === '' || comercial_official_url_was_shared(array(array('text' => $text)), $officialUrl)) {
+        return $text;
+    }
+    return rtrim($text, " \t\r\n") . " Si te apetece, puedes verlo en " . $officialUrl . ".";
+}
+
+/** Genera la política contextual que se inyecta en replies/follow-ups. */
+function comercial_reply_url_guidance(string $officialUrl, bool $alreadyShared, string $inboundText): string {
+    if ($officialUrl === '' || $alreadyShared) return '';
+    $lower = function_exists('mb_strtolower') ? mb_strtolower($inboundText, 'UTF-8') : strtolower($inboundText);
+    if (preg_match('/\b(no me interesa|no gracias|para ya|deja de escribirme|no quiero recibir|denuncia|polic[ií]a|estafa|fraude)\b/ui', $lower) === 1) {
+        return '';
+    }
+    return "La web oficial aún no aparece en el historial: {$officialUrl}. Inclúyela solo si responde al tema o facilita el siguiente paso; si el cliente hace una pregunta incompatible, rechaza el contacto o sonaría a spam, no la menciones.";
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  FUNCIÓN PRINCIPAL
 // ═══════════════════════════════════════════════════════════════
@@ -108,6 +154,11 @@ function comercial_agent_build_system_prompt(string $processSlug, string $mode, 
     // ── Sección 1: Identidad ──
     $sections = array();
     $sections[] = trim($kb['identity'] ?? '');
+
+    $officialUrl = comercial_official_url_for_slug($processSlug);
+    if ($officialUrl !== '') {
+        $sections[] = "═══ URL OFICIAL ═══\n{$officialUrl}\nMenciónala de forma natural cuando aporte valor. No la repitas si ya aparece en el historial y no la fuerces ante preguntas incompatibles o rechazo.";
+    }
 
     // ── Sección 2: Producto y precios ──
     if (!empty($kb['product'])) {
@@ -222,6 +273,11 @@ function comercial_agent_build_phase_prompt(string $processSlug, string $mode, s
     $common = comercial_knowledge_v2_get($processSlug, 'common');
     $sections = array();
 
+    $officialUrl = comercial_official_url_for_slug($processSlug);
+    if ($officialUrl !== '') {
+        $sections[] = "═══ POLÍTICA DE URL OFICIAL ═══\nURL oficial: {$officialUrl}\nEn aperturas debe aparecer. En replies/follow-ups solo menciónala si encaja y no consta ya en el historial; nunca la fuerces si la pregunta es incompatible o sonaría a spam.";
+    }
+
     // Identidad (sin autoreferencia, directo al producto)
     $pl = $kb['product_line'] ?? $processSlug;
     $sections[] = "Vendes el servicio de {$pl}. NO digas 'somos del equipo', 'soy X', 'nuestro servicio es'. Ve directo al tema.";
@@ -262,7 +318,7 @@ function comercial_agent_build_phase_prompt(string $processSlug, string $mode, s
             if (!empty($questions)) {
                 $sections[] = "═══ PREGUNTAS PARA CUALIFICAR ═══\n" . implode("\n", array_map(function($q) { return '- ' . $q; }, $questions));
             }
-            $sections[] = "═══ REGLAS DE ESTA FASE ═══\n- Máximo 5 líneas.\n- Responder SOLO a lo que preguntó el prospecto.\n- NUNCA precio ni web ni demo.\n- 1 pregunta cualificadora al final.\n- Si preguntó algo concreto, responde ESO y nada más.";
+            $sections[] = "═══ REGLAS DE ESTA FASE ═══\n- Máximo 5 líneas.\n- Responder SOLO a lo que preguntó el prospecto.\n- No introducir web o demo por rutina: solo si responde al tema y no se ha compartido ya.\n- 1 pregunta cualificadora al final.\n- Si preguntó algo concreto, responde ESO y nada más.";
             $sections[] = "═══ EJEMPLO MALO ═══\n\"La Mami Online es un nuevo concepto de publicista digital. Te conseguimos clientes extra. Alta única 29€. Pagas 10€/30min cuando llega cliente. Sin cuotas. Sin permanencia. Web lamami.online.\" → SOLTÓ PRECIO Y WEB DEMASIADO PRONTO, CERO PREGUNTAS.";
             break;
 
@@ -410,7 +466,14 @@ function comercial_agent_generate_opener(array $thread, string $processSlug, str
 
     // reasoning_effort low: el opener de campaña no es hot-path (se envía por cron),
     // así que primamos rapidez para no ralentizar el tick.
-    return comercial_agent_call_llm($prompt, $model, $cfg, 400, 'low');
+    $result = comercial_agent_call_llm($prompt, $model, $cfg, 400, 'low');
+    if (!empty($result['ok'])) {
+        $result['text'] = comercial_ensure_official_url_in_opener(
+            (string)($result['text'] ?? ''),
+            comercial_official_url_for_slug($processSlug)
+        );
+    }
+    return $result;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -452,8 +515,15 @@ function comercial_agent_generate_reply(array $thread, string $processSlug, stri
     }
 
     $turnCount = (int)($thread['auto_turn_count'] ?? 0) + 1;
+    $officialUrl = comercial_official_url_for_slug($processSlug);
+    $urlGuidance = comercial_reply_url_guidance(
+        $officialUrl,
+        comercial_official_url_was_shared($history, $officialUrl),
+        $inboundText
+    );
+    $urlGuidanceNote = $urlGuidance !== '' ? "\n\n═══ URL OFICIAL Y CONTEXTO ═══\n{$urlGuidance}" : '';
 
-    $prompt = $systemPrompt . $classificationNote . $greetingOnlyNote . "\n\n" .
+    $prompt = $systemPrompt . $classificationNote . $greetingOnlyNote . $urlGuidanceNote . "\n\n" .
         "═══ CONVERSACIÓN (turno " . $turnCount . ") ═══\n" .
         (empty($historyLines) ? "(inicio de conversación)" : implode("\n", $historyLines)) . "\n\n" .
         "═══ ÚLTIMO MENSAJE DEL CLIENTE ═══\n" .
