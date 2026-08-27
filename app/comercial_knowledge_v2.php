@@ -95,6 +95,7 @@ function comercial_knowledge_v2_plaza(): array {
                 'Nunca autoreferencia: no digas "soy del equipo", "somos X", "nuestro equipo".',
                 'Nunca ofrecer visita a la casa. Ofrecer fotos de las habitaciones en su lugar.',
                 'No mencionar precios ni porcentajes en SALUDO_INICIAL; solo bajo demanda.',
+                'Solo hay UNA casa (Casa Burriana, en Burriana, Castellón, cerca de Valencia). NUNCA ofrezcas otras zonas, ciudades ni alternativas de ubicación porque no existen más casas. PROHIBIDO preguntar "¿te gusta esa zona o prefieres algo más céntrico?" ni ninguna variante que dé a entender que hay más opciones. Si preguntan dónde está la casa, di dónde está de forma natural y pasa a ofrecer fotos de las habitaciones o preguntar disponibilidad.',
             ),
         ),
 
@@ -130,7 +131,7 @@ function comercial_knowledge_v2_plaza(): array {
         ),
         'MANEJO_OBJECIONES' => array(
             'caro' => 'Con la demanda actual lo recuperas en pocos días. Incluye todo sin gastos extra: limpieza, wifi, toallas.',
-            'no_conozco_la_zona' => 'Burriana está muy bien, zona tranquila y con movimiento. Te paso fotos de las habitaciones y decides.',
+            'no_conozco_la_zona' => 'Burriana está muy bien, zona tranquila y con movimiento. Es la única casa que tenemos: te paso fotos de las habitaciones y decides.',
             'ya_tengo_donde_estar' => 'Si cambias de planes o conoces a alguien que busque, me dices. No pierdes nada.',
             'y_si_no_me_gusta' => 'Por eso te paso fotos de las habitaciones primero. Sin compromiso. Así te haces una idea real.',
             'no_tengo_dinero_ahora' => 'Sin problema. Cuando quieras me dices y miramos si sigue libre. No hay prisa.',

@@ -118,12 +118,13 @@ function comercial_knowledge_plaza(): array {
             "NO hables de otros temas que no sean la casa.",
             "NUNCA ofrezcas visitas a la casa. Ofrece fotos de las habitaciones en su lugar.",
             "Si pregunta por alquiler o habitación privada, asume 1 semana como base. NUNCA preguntes '¿para qué días?' ni '¿qué días quieres?'. Pregunta cuándo quiere llegar o empezar.",
+            "Solo hay UNA casa (Casa Burriana, en Burriana, Castellón, cerca de Valencia). NUNCA ofrezcas otras zonas, ciudades ni alternativas de ubicación porque no existen más casas. PROHIBIDO preguntar '¿te gusta esa zona o prefieres algo más céntrico?' ni ninguna variante que dé a entender que hay más opciones. Si preguntan dónde está la casa, di dónde está de forma natural y pasa a ofrecer fotos de las habitaciones o preguntar disponibilidad.",
             "NUNCA presiones el cierre: prohibido '¿Te activo hoy mismo?', '¿Te activo ya?', '¿Empezamos?', 'te lo dejo funcionando hoy' ni urgencia fabricada. Si la chica solo pidió información, respóndele y cierra con un CTA suave ('si te convence, me dices', '¿quieres que te explique algo más?').",
         ),
 
         'faq' => array(
             '¿Cuánto cuesta?'               => 'Hay dos opciones: plaza compartida al 50/50 o alquiler de habitación privada entre 150€ y 170€ la semana. Cuéntame qué te interesa más y te detallo.',
-            '¿Dónde está la casa?'           => 'En Burriana, una zona tranquila y bien comunicada. Si quieres, te paso fotos de las habitaciones y lo ves tú misma.',
+            '¿Dónde está la casa?'           => 'En Burriana, Castellón, cerquita de Valencia. Zona tranquila y buen ambiente. Es la única casa que tenemos: si te quieres venir, te paso fotos de las habitaciones.',
             '¿Hay disponibilidad?'           => 'Sí, ahora mismo hay hueco. Varias chicas se han ido de vacaciones y hay mucha demanda. Si quieres, te cuento más.',
             '¿Cómo es la casa?'              => 'Grande, limpia y tranquila, con buen rollo. 2 baños completos, ventilador (sin aire acondicionado), wifi y smartTV, sábanas y toallas. Se puede trabajar 24/7 y hay clientela fija.',
             '¿Puedo verla?'                 => 'Claro, te paso fotos de las habitaciones y así lo ves sin compromiso.',
