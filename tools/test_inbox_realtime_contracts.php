@@ -4,7 +4,7 @@
  *
  * Uso: php tools/test_inbox_realtime_contracts.php
  *
- * Define el contrato de cuatro helpers del inbox que hoy no existen o no
+ * Define el contrato de seis helpers del inbox que hoy no existen o no
  * cumplen el contrato en app/comercial.php:
  *
  *   1. comercial_inbox_revision($eventsPath = '', $threadsPath = ''): string
@@ -12,8 +12,10 @@
  *        line-state. Acepta rutas de fixture opcionales para aislar el test
  *        (mismo patrón de inyección que comercial_thread_history_page).
  *   2. comercial_poll_wait_for_change($sinceRev, $timeoutSec = 25,
- *      $eventsPath = '', $threadsPath = ''): array
- *      — long-poll: ['changed' => bool, 'revision' => string].
+ *      $eventsPath = '', $threadsPath = '', $flushOutput = false): array
+ *      — long-poll: ['changed' => bool, 'revision' => string]. El 5º parámetro
+ *        $flushOutput permite flushear la salida antes de la espera sin alterar
+ *        el comportamiento de cambio/timeout.
  *   3. comercial_manual_send_job_process(array $job, $file = ''): array
  *      — procesa un trabajo de envío manual (respeta lease/owner), envía vía
  *        comercial_send_thread_message o marca el fallo, y finaliza a
@@ -21,6 +23,14 @@
  *   4. comercial_process_manual_send_queue(int $limit = 0)
  *      — debe procesar TODOS los trabajos pendientes elegibles (0 = todos),
  *        no solo uno por tick.
+ *   5. comercial_poll_acquire_slot(string $key, int $ttlSec = 25): bool
+ *      — tope de long-polls concurrentes (agotamiento de recursos): un slot
+ *        por key; devuelve false si el slot sigue en uso, true si es nuevo o
+ *        si el mtime del fichero del slot es más viejo que el ttl (expira).
+ *      El directorio de slots se deriva de DATA_PATH.
+ *   6. comercial_poll_release_slot(string $key): void
+ *      — libera el slot de poll para que el mismo key se pueda re-adquirir de
+ *        inmediato.
  *
  * FASE ROJA: cada contrato debe fallar hoy — o porque la función no existe
  * ("Call to undefined function") o porque el comportamiento actual no cumple
@@ -186,6 +196,7 @@ $queueFiles = array($queuePrefix . '-job.json', $queuePrefix . '-double.json', $
 $queueFileJob = $queueFiles[0];
 $queueFileDouble = $queueFiles[1];
 $fixtureThreadIds = array();
+$slotKeys = array();
 $revBase = '';
 
 try {
@@ -243,8 +254,9 @@ try {
             array('name' => 'timeoutSec', 'default' => 25),
             array('name' => 'eventsPath', 'default' => ''),
             array('name' => 'threadsPath', 'default' => ''),
+            array('name' => 'flushOutput', 'default' => false),
         )),
-        'comercial_poll_wait_for_change() declara sinceRev, timeoutSec=25 y rutas de fixture'
+        'comercial_poll_wait_for_change() declara sinceRev, timeoutSec=25, rutas de fixture y flushOutput=false'
     ) && $pass;
 
     inbox_realtime_run_behavior('comercial_poll_wait_for_change(): detecta el cambio a mitad de la espera', function () use ($eventsPath, $threadsPath, &$pass, &$revBase) {
@@ -277,6 +289,36 @@ try {
         $pass = inbox_realtime_assert(($res['changed'] ?? null) === false, 'sin cambios dentro del timeout el poll informa changed=false') && $pass;
         $pass = inbox_realtime_assert((string)($res['revision'] ?? '') === $revCurrent, 'el poll devuelve la revisión actual sin cambios') && $pass;
         $pass = inbox_realtime_assert($elapsed >= 0.9 && $elapsed < 10, 'el poll espera de verdad ~1 s (timeoutSec=1) antes de devolver false') && $pass;
+    }, $pass);
+
+    inbox_realtime_run_behavior('comercial_poll_wait_for_change(): con flushOutput=true detecta el cambio a mitad de la espera', function () use ($eventsPath, $threadsPath, &$pass, &$revBase) {
+        $sinceRev = $revBase !== '' ? $revBase : comercial_inbox_revision($eventsPath, $threadsPath);
+        // Mismo escenario que el contrato 2: el cambio llega mientras el poll
+        // espera, con el 5º parámetro flushOutput=true en CLI. La llamada debe
+        // seguir devolviendo el array {changed, revision} y ver el cambio.
+        exec(sprintf(
+            'sleep 0.3; php -r %s %s >/dev/null 2>&1 &',
+            escapeshellarg('touch($argv[1], time() + 60);'),
+            escapeshellarg($eventsPath)
+        ));
+        $start = microtime(true);
+        $res = comercial_poll_wait_for_change($sinceRev, 3, $eventsPath, $threadsPath, true);
+        $elapsed = microtime(true) - $start;
+        $pass = inbox_realtime_assert(is_array($res) && array_key_exists('changed', $res) && array_key_exists('revision', $res), 'con flushOutput=true el poll devuelve el array {changed, revision}') && $pass;
+        $pass = inbox_realtime_assert(($res['changed'] ?? null) === true, 'con flushOutput=true el poll informa changed=true cuando el mtime cambia durante la espera') && $pass;
+        $pass = inbox_realtime_assert(is_string($res['revision'] ?? '') && ($res['revision'] ?? '') !== $sinceRev, 'con flushOutput=true el poll devuelve la revisión nueva distinta de la previa') && $pass;
+        $pass = inbox_realtime_assert($elapsed < 2.0, 'con flushOutput=true el poll responde con prontitud (antes del timeout de 3 s)') && $pass;
+        $revBase = (string)($res['revision'] ?? $revBase);
+    }, $pass);
+
+    inbox_realtime_run_behavior('comercial_poll_wait_for_change(): con flushOutput=true agota el timeout sin cambios', function () use ($eventsPath, $threadsPath, &$pass, &$revBase) {
+        $revCurrent = $revBase !== '' ? $revBase : comercial_inbox_revision($eventsPath, $threadsPath);
+        $start = microtime(true);
+        $res = comercial_poll_wait_for_change($revCurrent, 1, $eventsPath, $threadsPath, true);
+        $elapsed = microtime(true) - $start;
+        $pass = inbox_realtime_assert(($res['changed'] ?? null) === false, 'con flushOutput=true y sin cambios el poll informa changed=false') && $pass;
+        $pass = inbox_realtime_assert((string)($res['revision'] ?? '') === $revCurrent, 'con flushOutput=true el poll devuelve la revisión actual sin cambios') && $pass;
+        $pass = inbox_realtime_assert($elapsed >= 0.9 && $elapsed < 10, 'con flushOutput=true el poll espera de verdad ~1 s (timeoutSec=1) antes de devolver false') && $pass;
     }, $pass);
 
     inbox_realtime_run_behavior('comercial_poll_wait_for_change(): rutas de fixture inexistentes sin fatal', function () use ($fixtureDir, &$pass) {
@@ -435,6 +477,77 @@ try {
         $pass = inbox_realtime_assert(count($matching) === 1 && (int)($matching[0]['attempts'] ?? -1) === 1, 'el trabajo se procesa una sola vez (attempts=1): sin doble envío') && $pass;
     }, $pass);
 
+    // ═══════════════════════════════════════════════════════════════════
+    // 6. Slots de long-poll: tope de clientes concurrentes
+    //    (comercial_poll_acquire_slot / comercial_poll_release_slot)
+    // ═══════════════════════════════════════════════════════════════════
+    // Protege al servidor del agotamiento de recursos (cada long-poll ocupa
+    // un worker/PHP-FPM): un slot por key, expira por mtime (ttl) y se libera
+    // explícitamente. Las claves de prueba son únicas; los ficheros de slot
+    // residen en un directorio derivado de DATA_PATH y se limpian al terminar
+    // (data/ del worktree es un scaffold aislado, nunca producción).
+    $pass = inbox_realtime_assert(
+        function_exists('comercial_poll_acquire_slot'),
+        'existe comercial_poll_acquire_slot() para limitar los long-polls concurrentes'
+    ) && $pass;
+    $pass = inbox_realtime_assert(
+        inbox_realtime_signature_matches('comercial_poll_acquire_slot', array(
+            array('name' => 'key'),
+            array('name' => 'ttlSec', 'default' => 25),
+        )),
+        'comercial_poll_acquire_slot() declara key + ttlSec=25'
+    ) && $pass;
+    $pass = inbox_realtime_assert(
+        function_exists('comercial_poll_release_slot'),
+        'existe comercial_poll_release_slot() para liberar el slot de poll'
+    ) && $pass;
+    $pass = inbox_realtime_assert(
+        inbox_realtime_signature_matches('comercial_poll_release_slot', array(
+            array('name' => 'key'),
+        )),
+        'comercial_poll_release_slot() declara key'
+    ) && $pass;
+
+    // El directorio de slots debe derivarse de DATA_PATH (no de rutas sueltas
+    // del servidor): comprobación estática sobre la fuente de app/comercial.php.
+    $comercialSrc = (string)file_get_contents(dirname(__DIR__) . '/app/comercial.php');
+    $acquireAt = strpos($comercialSrc, 'function comercial_poll_acquire_slot');
+    $pass = inbox_realtime_assert(
+        $acquireAt !== false && strpos($comercialSrc, 'DATA_PATH', (int)$acquireAt) !== false,
+        'comercial_poll_acquire_slot() deriva el directorio de slots de DATA_PATH'
+    ) && $pass;
+
+    inbox_realtime_run_behavior('comercial_poll_acquire_slot(): el segundo acquire con el mismo key (en uso) falla', function () use (&$pass, &$slotKeys) {
+        $key = 'slot-cap-' . substr(uniqid('', true), -8);
+        $slotKeys[] = $key;
+        $first = comercial_poll_acquire_slot($key);
+        $second = comercial_poll_acquire_slot($key);
+        $pass = inbox_realtime_assert($first === true, 'el primer acquire del slot devuelve true') && $pass;
+        $pass = inbox_realtime_assert($second === false, 'mientras el slot está en uso, un segundo acquire del mismo key devuelve false (cap)') && $pass;
+    }, $pass);
+
+    inbox_realtime_run_behavior('comercial_poll_acquire_slot(): un slot con mtime más viejo que el ttl se re-adquiere (expira)', function () use (&$pass, &$slotKeys) {
+        $key = 'slot-expire-' . substr(uniqid('', true), -8);
+        $slotKeys[] = $key;
+        $acquired = comercial_poll_acquire_slot($key, 1);
+        // ttl = 1 s: al dormir 2 s el fichero del slot queda con mtime más viejo
+        // que el ttl, exactamente el caso de expiración/reclaim por mtime.
+        sleep(2);
+        $reclaimed = comercial_poll_acquire_slot($key, 1);
+        $pass = inbox_realtime_assert($acquired === true, 'el primer acquire con ttl corto devuelve true') && $pass;
+        $pass = inbox_realtime_assert($reclaimed === true, 'pasado el ttl (mtime del slot más viejo que ttl) el mismo key vuelve a adquirirse') && $pass;
+    }, $pass);
+
+    inbox_realtime_run_behavior('comercial_poll_release_slot(): liberar permite re-adquirir de inmediato', function () use (&$pass, &$slotKeys) {
+        $key = 'slot-release-' . substr(uniqid('', true), -8);
+        $slotKeys[] = $key;
+        $first = comercial_poll_acquire_slot($key);
+        comercial_poll_release_slot($key);
+        $again = comercial_poll_acquire_slot($key);
+        $pass = inbox_realtime_assert($first === true, 'el primer acquire devuelve true') && $pass;
+        $pass = inbox_realtime_assert($again === true, 'tras release(), el mismo key se adquiere de inmediato otra vez') && $pass;
+    }, $pass);
+
     $status = $pass ? 'TODOS LOS TESTS OK' : 'FASE ROJA: HAY FALLOS ESPERADOS (comportamiento no implementado)';
     fwrite($pass ? STDOUT : STDERR, PHP_EOL . $status . PHP_EOL);
 } finally {
@@ -452,6 +565,35 @@ try {
     // hilos no se encuentran, pero por si el helper los crea antes del fallo).
     foreach ($fixtureThreadIds as $tid) {
         @unlink(DATA_PATH . '/comercial_thread_cancel/' . md5((string)$tid) . '.cancel');
+    }
+    // Limpieza de slots de poll: los helpers derivan el directorio de DATA_PATH,
+    // así que en este worktree los ficheros viven en el scaffold aislado, no en
+    // producción. Se libera cada key (si el helper ya existe) y se borran los
+    // ficheros residuales que contengan la clave de prueba.
+    foreach ($slotKeys as $slotKey) {
+        if (function_exists('comercial_poll_release_slot')) {
+            try {
+                comercial_poll_release_slot($slotKey);
+            } catch (Throwable $e) {
+                // el helper no está implementado: la limpieza por fichero cubre
+            }
+        }
+        $slotDirs = array(
+            DATA_PATH . '/comercial_poll_slots',
+            DATA_PATH . '/poll_slots',
+        );
+        foreach ($slotDirs as $slotDir) {
+            foreach (glob($slotDir . '/*') ?: array() as $slotFile) {
+                if (strpos((string)$slotFile, $slotKey) !== false) @unlink($slotFile);
+            }
+            @rmdir($slotDir);
+        }
+        // Variante plana: ficheros de slot directamente en DATA_PATH con el key.
+        foreach (glob(DATA_PATH . '/*') ?: array() as $dataFile) {
+            if (strpos((string)$dataFile, $slotKey) !== false && strpos((string)$dataFile, 'slot') !== false) {
+                @unlink($dataFile);
+            }
+        }
     }
 }
 

@@ -2502,11 +2502,21 @@ function comercial_inbox_revision($eventsPath = '', $threadsPath = '') {
  * entre comprobaciones. Si connection_aborted() devuelve verdadero, sale con
  * ['changed' => false, 'revision' => ..., 'aborted' => true].
  *
+ * Con $flushOutput=true cada iteración del bucle emite un espacio y flushea
+ * la salida (echo ' '; ob_flush(); flush()): sin ese flush, los buffers de
+ * salida acumulan el cuerpo de la respuesta y connection_aborted() no se
+ * dispara en conexiones abandonadas, reteniendo el worker PHP-FPM hasta el
+ * timeout. Flushear mantiene vivo el envío y libera el worker en cuanto el
+ * cliente desconecta.
+ *
  * @param string $sinceRev    Revisión conocida por el cliente ('' = responder ya).
  * @param int    $timeoutSec  Timeout en segundos (mínimo 1).
+ * @param string $eventsPath  Ruta del JSONL de eventos ('' = por defecto).
+ * @param string $threadsPath Ruta del JSON de hilos ('' = por defecto).
+ * @param bool   $flushOutput Si true, flushea la salida en cada iteración.
  * @return array{changed: bool, revision: string, aborted?: bool}
  */
-function comercial_poll_wait_for_change($sinceRev, $timeoutSec = 25, $eventsPath = '', $threadsPath = '') {
+function comercial_poll_wait_for_change($sinceRev, $timeoutSec = 25, $eventsPath = '', $threadsPath = '', $flushOutput = false) {
     $sinceRev = trim((string)$sinceRev);
     $timeoutSec = max(1, (int)$timeoutSec);
     if ($sinceRev === '') {
@@ -2514,6 +2524,11 @@ function comercial_poll_wait_for_change($sinceRev, $timeoutSec = 25, $eventsPath
     }
     $deadline = microtime(true) + $timeoutSec;
     while (true) {
+        if ($flushOutput) {
+            echo ' ';
+            @ob_flush();
+            @flush();
+        }
         if (connection_aborted()) {
             return array('changed' => false, 'revision' => comercial_inbox_revision($eventsPath, $threadsPath), 'aborted' => true);
         }
@@ -2526,6 +2541,56 @@ function comercial_poll_wait_for_change($sinceRev, $timeoutSec = 25, $eventsPath
         }
         usleep(250000);
     }
+}
+
+/**
+ * Tope de long-polls concurrentes: adquiere un slot por key (un cliente no
+ * puede tener varios polls activos simultáneos). El fichero del slot vive en
+ * DATA_PATH/comercial_poll_slots (hash del key, extensión .lock) y se crea de
+ * forma atómica con fopen(...,'x'). Si el slot ya existe pero su mtime es más
+ * viejo que el ttl, se considera expirado (cliente abandonado): se borra y se
+ * reintenta una vez. Nunca lanza errores fatales: ante cualquier fallo de
+ * ficheros devuelve false.
+ *
+ * @param string $key    Clave del cliente (session_id o IP).
+ * @param int    $ttlSec TTL del slot en segundos (mínimo 1, por defecto 25).
+ * @return bool true si se adquirió el slot, false si sigue en uso.
+ */
+function comercial_poll_acquire_slot(string $key, int $ttlSec = 25): bool {
+    $ttlSec = max(1, $ttlSec);
+    $slotDir = DATA_PATH . '/comercial_poll_slots';
+    if (!is_dir($slotDir)) {
+        @mkdir($slotDir, 0775, true);
+        if (!is_dir($slotDir)) return false;
+    }
+    $slotPath = $slotDir . '/' . hash('sha256', (string)$key) . '.lock';
+    for ($attempt = 0; $attempt < 2; $attempt++) {
+        $fh = @fopen($slotPath, 'x');
+        if ($fh !== false) {
+            @fwrite($fh, (string)time());
+            @fclose($fh);
+            return true;
+        }
+        clearstatcache(true, $slotPath);
+        $mtime = @filemtime($slotPath);
+        if ($mtime !== false && (time() - $mtime) > $ttlSec) {
+            @unlink($slotPath);
+            continue; // reintento único tras expirar el slot
+        }
+        return false;
+    }
+    return false;
+}
+
+/**
+ * Libera el slot de poll de un key para que se pueda re-adquirir de inmediato.
+ * No hace nada si el slot no existe. Nunca lanza errores fatales.
+ *
+ * @param string $key Clave del cliente (session_id o IP).
+ */
+function comercial_poll_release_slot(string $key): void {
+    $slotPath = DATA_PATH . '/comercial_poll_slots' . '/' . hash('sha256', (string)$key) . '.lock';
+    @unlink($slotPath);
 }
 
 function comercial_ai_memory_limit() {

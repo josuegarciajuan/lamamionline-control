@@ -110,5 +110,44 @@ $pass = inbox_security_assert(
     'un segundo tick a claim+121 s no puede reclamar un job processing mientras su primer envío sigue activo'
 ) && $pass;
 
+// ── Regresión del long-poll: agotamiento de recursos (slots) ──────────────
+// El handler GET ?action=poll sostiene la conexión hasta 25 s: si cada cliente
+// abre varios polls sin límite, los workers PHP-FPM se agotan. Contrato de
+// seguridad:
+//   1) el timeout del cliente se acota a un MÁXIMO de 25 s,
+//   2) antes de esperar se adquiere un slot de poll por cliente y, si no se
+//      puede adquirir (tope alcanzado), la respuesta es HTTP 429,
+//   3) session_write_close() se llama ANTES de entrar en el bucle de espera
+//      (nunca se retiene el lock de sesión durante un long-poll).
+// Comprobación estática sobre la fuente: buscamos los literales exactos.
+$apiSrc = (string)file_get_contents(dirname(__DIR__) . '/inbox_api.php');
+$pollAt = strpos($apiSrc, "\$action === 'poll'");
+$pollEnd = $pollAt === false ? false : strpos($apiSrc, "\$action === 'agent'", $pollAt);
+$pollRegion = ($pollAt === false || $pollEnd === false)
+    ? ''
+    : substr($apiSrc, $pollAt, $pollEnd - $pollAt);
+
+$pass = inbox_security_assert(
+    str_contains($pollRegion, 'min(25'),
+    'el handler ?action=poll acota el timeout del cliente a un máximo de 25 s (min(25))'
+) && $pass;
+
+$pass = inbox_security_assert(
+    str_contains($pollRegion, 'comercial_poll_acquire_slot('),
+    'el handler ?action=poll adquiere un slot de poll (comercial_poll_acquire_slot()) antes de esperar'
+) && $pass;
+
+$pass = inbox_security_assert(
+    str_contains($pollRegion, 'http_response_code(429)'),
+    'el handler ?action=poll responde 429 (http_response_code(429)) cuando no puede adquirir el slot'
+) && $pass;
+
+$pollCloseAt = strpos($pollRegion, 'session_write_close()');
+$pollWaitAt = strpos($pollRegion, 'comercial_poll_wait_for_change(');
+$pass = inbox_security_assert(
+    $pollCloseAt !== false && $pollWaitAt !== false && $pollCloseAt < $pollWaitAt,
+    'el handler ?action=poll cierra la sesión (session_write_close()) antes de entrar en el bucle de espera'
+) && $pass;
+
 fwrite($pass ? STDOUT : STDERR, PHP_EOL . ($pass ? 'TODOS LOS TESTS OK' : 'HAY FALLOS ESPERADOS') . PHP_EOL);
 exit($pass ? 0 : 1);

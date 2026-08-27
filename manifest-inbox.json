@@ -1,7 +1,8 @@
 {
   "name": "WasapCome",
   "short_name": "WasapCome",
-  "start_url": "/control/inbox.php",
+  "id": "/control/inbox.php?view=chat",
+  "start_url": "/control/inbox.php?view=chat",
   "scope": "/control/",
   "display": "standalone",
   "background_color": "#0b141a",
@@ -9,15 +10,15 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/control/assets/wa-icon.svg",
+      "src": "/control/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "/control/assets/wa-icon.svg",
+      "src": "/control/icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

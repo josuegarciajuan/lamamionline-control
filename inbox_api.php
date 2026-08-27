@@ -284,16 +284,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'lines') {
 
 // ── GET ?action=poll&since=<rev>&timeout=25 ──
 // Long-poll del estado local: responde en cuanto la revisión cambia o al
-// agotar el timeout. No retiene el lock de sesión durante la espera.
+// agotar el timeout. No retiene el lock de sesión durante la espera y acota
+// el poll a un slot por cliente (429 si el tope de concurrentes se alcanza).
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'poll') {
     if (function_exists('session_write_close')) session_write_close();
     $sinceRev = trim((string)($_GET['since'] ?? ''));
-    $timeout = max(1, min(60, (int)($_GET['timeout'] ?? 25)));
+    $timeout = max(1, min(25, (int)($_GET['timeout'] ?? 25)));
     if (function_exists('set_time_limit')) set_time_limit(max(30, $timeout + 5));
     header('X-Accel-Buffering: no');
+    // Un slot por cliente: evita que un mismo key agote los workers PHP-FPM
+    // abriendo varios long-polls simultáneos.
+    $slotKey = (string)(session_id() ?: (string)($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+    if (!function_exists('comercial_poll_acquire_slot') || !comercial_poll_acquire_slot($slotKey, 25)) {
+        http_response_code(429); // lo reafirma inbox_api_json_err()
+        inbox_api_json_err('Demasiadas conexiones de poll activas', 429);
+    }
+    // Libera el slot en TODAS las salidas (éxito, error o abandono), también
+    // en el exit() de inbox_api_json_ok().
+    register_shutdown_function(function () use ($slotKey) {
+        if (function_exists('comercial_poll_release_slot')) comercial_poll_release_slot($slotKey);
+    });
     $poll = function_exists('comercial_poll_wait_for_change')
-        ? comercial_poll_wait_for_change($sinceRev, $timeout)
+        ? comercial_poll_wait_for_change($sinceRev, $timeout, '', '', true)
         : ['changed' => true, 'revision' => function_exists('comercial_inbox_revision') ? comercial_inbox_revision() : ''];
     inbox_api_json_ok([
         'changed' => !empty($poll['changed']),

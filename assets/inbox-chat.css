@@ -881,3 +881,53 @@ body.inbox-agent-fs .inbox-agent-fs-close{display:block}
   background:rgba(99,102,241,.15);color:#a5b4fc;font-size:11px;font-weight:700;
   margin-right:4px;cursor:help;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   APP SHELL PWA — comportamiento de dispositivo nativo
+   (env(safe-area-inset-*) devuelve 0 fuera de notched devices:
+   en escritorio no hay cambio visual)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Sin pull-to-refresh ni scroll chaining en los contenedores de la app */
+html, body, .inbox-chat-shell, .inbox-agent-shell, .inbox-fullchat-overlay{overscroll-behavior-y:none}
+
+/* Safe-area: topbar fija (parte superior + laterales) */
+body .inbox-topbar{
+  padding-top:max(8px, env(safe-area-inset-top));
+  padding-left:max(16px, env(safe-area-inset-left));
+  padding-right:max(16px, env(safe-area-inset-right));
+}
+/* Safe-area: header del fullscreen chat */
+body .inbox-fullchat-header{
+  padding-top:max(10px, env(safe-area-inset-top));
+  padding-left:max(16px, env(safe-area-inset-left));
+  padding-right:max(16px, env(safe-area-inset-right));
+}
+/* Safe-area: composer fijo (inline) */
+.inbox-chat-input-area{
+  padding-top:max(8px, env(safe-area-inset-top));
+  padding-left:max(12px, env(safe-area-inset-left));
+  padding-right:max(12px, env(safe-area-inset-right));
+}
+/* Safe-area: composer fijo (fullscreen chat) */
+body .inbox-fullchat-input-area{
+  padding-top:max(8px, env(safe-area-inset-top));
+  padding-left:max(12px, env(safe-area-inset-left));
+  padding-right:max(12px, env(safe-area-inset-right));
+  padding-bottom:max(8px, env(safe-area-inset-bottom));
+}
+
+/* ── Botón de instalación PWA (oculto salvo beforeinstallprompt) ── */
+#inboxInstallBtn{display:none}
+#inboxInstallBtn.is-visible{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:6px 12px;border-radius:14px;
+  border:1px solid rgba(255,255,255,.25);
+  background:rgba(255,255,255,.08);color:#fff;
+  font-size:12px;font-weight:600;cursor:pointer;
+  white-space:nowrap;flex-shrink:0;
+  transition:background .15s, transform .1s;
+}
+#inboxInstallBtn.is-visible:hover{background:rgba(255,255,255,.16);color:#fff}
+#inboxInstallBtn.is-visible:active{transform:scale(.96)}
+#inboxInstallBtn.is-visible:focus-visible{outline:2px solid #fff;outline-offset:2px}

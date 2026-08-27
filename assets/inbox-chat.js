@@ -22,27 +22,77 @@
     var _fullChatHasMore = false;
     var _optimisticMessages = {}; // client_message_id -> local bubble
 
-    // Un único coordinador evita intervalos solapados. La cadencia se recupera
-    // tras un éxito y se limita tras errores para no castigar móviles lentos.
+    var _inboxRevision = ''; // última revisión conocida del estado local (long-poll)
+
+    // Un único coordinador encadena el tiempo real: un long-poll de estado
+    // (?action=poll&since=<rev>) que, cuando detecta cambios (d.changed),
+    // refresca líneas y el hilo abierto. No hay intervalos paralelos: la
+    // cadencia la marca el propio poll (~300 ms tras un cambio, ~400 ms sin
+    // cambios). Ante errores se aplica un backoff acotado (1s, 2s, 4s… máx
+    // 30s) que se resetea con cada éxito. En segundo plano (document.hidden)
+    // el bucle se pausa y se reanuda vía visibilitychange.
     var pollCoordinator = (function(){
-        var timer = null, inFlight = {}, failures = 0, baseDelay = 5000, maxDelay = 60000;
+        var timer = null, inFlight = {}, failures = 0, baseDelay = 1000, maxDelay = 30000;
+        var _lastNativeSyncAt = 0; // throttle del sync de respuestas nativas (~20s)
         function delay() { return Math.min(maxDelay, baseDelay * Math.pow(2, failures)); }
-        function schedule(wait) { if (timer) clearTimeout(timer); timer = setTimeout(run, wait); }
+        function schedule(wait) { if (timer) clearTimeout(timer); timer = setTimeout(realtimeLoop, wait); }
         function request(name, fn) {
             if (inFlight[name]) return Promise.resolve(null);
             inFlight[name] = true;
-            return fn().then(function(value){ failures = 0; return value; }, function(error){ failures = Math.min(4, failures + 1); throw error; })
+            return fn().then(function(value){ failures = 0; return value; }, function(error){ failures = Math.min(5, failures + 1); throw error; })
                 .finally(function(){ inFlight[name] = false; });
         }
-        function run() {
-            if (document.hidden) return;
-            var jobs = [];
-            if (currentView === 'chat') jobs.push(request('lines', loadLines));
-            if (fullChatThreadId) jobs.push(request('thread', refreshFullChat));
-            Promise.all(jobs).catch(function(){}).finally(function(){ if (!document.hidden) schedule(delay()); });
+        function realtimeLoop() {
+            if (document.hidden) return; // al volver a la pestaña, visibilitychange reanuda
+            request('poll', function(){
+                var url = api + '?action=poll&since=' + encodeURIComponent(_inboxRevision) + '&timeout=25&_=' + Date.now();
+                return fetch(url, {credentials:'same-origin'})
+                    .then(function(r){ return r.json(); })
+                    .then(function(d){
+                        if (!d || !d.ok) throw new Error('poll');
+                        _inboxRevision = d.revision || _inboxRevision;
+                        return d;
+                    });
+            }).then(function(d){
+                if (!d) { schedule(400); return; } // single-flight en curso: no encolar
+                if (!document.hidden) {
+                    if (d.changed) {
+                        if (currentView === 'chat') request('lines', function(){ return loadLines(_inboxRevision); }).catch(function(){});
+                        if (fullChatThreadId) request('thread', refreshFullChat).catch(function(){});
+                    }
+                    schedule(d.changed ? 300 : 400);
+                }
+                maybeSyncNative();
+            }, function(){
+                // Error de red/parseo: reintentar siempre con backoff acotado.
+                if (!document.hidden) schedule(delay());
+            });
         }
-        document.addEventListener('visibilitychange', function(){ if (!document.hidden) { failures = 0; run(); } });
-        return { start: function(){ schedule(0); }, poke: function(){ if (!document.hidden) run(); }, request: request };
+        // Sync opcional de respuestas nativas del hilo abierto (~cada 20 s).
+        // Es un disparador de estado: la respuesta se ignora. Si detecta
+        // respuestas nativas, la revisión cambia y el siguiente poll refresca
+        // el hilo abierto vía refreshFullChat.
+        function maybeSyncNative() {
+            if (!fullChatThreadId || document.hidden) return;
+            var now = Date.now();
+            if (now - _lastNativeSyncAt < 20000) return;
+            if (inFlight['nativeSync']) return;
+            _lastNativeSyncAt = now;
+            inFlight['nativeSync'] = true;
+            var url = api + '?action=thread&id=' + encodeURIComponent(fullChatThreadId) + '&sync_native=1&_=' + Date.now();
+            if (_fullChatRevision) url += '&revision=' + encodeURIComponent(_fullChatRevision);
+            fetch(url, {credentials:'same-origin'})
+                .then(function(r){ return r.json(); })
+                .catch(function(){ /* silencioso */ })
+                .finally(function(){ inFlight['nativeSync'] = false; });
+        }
+        function runNow() {
+            if (document.hidden) return;
+            if (inFlight['poll']) return; // ya hay un poll esperando en el servidor
+            realtimeLoop();
+        }
+        document.addEventListener('visibilitychange', function(){ if (!document.hidden) { failures = 0; runNow(); } });
+        return { start: function(){ runNow(); }, poke: function(){ runNow(); }, request: request, resetNativeSync: function(){ _lastNativeSyncAt = 0; } };
     })();
 
     // ── Sidebar: líneas agrupadas + lazy-load por línea ──
@@ -487,14 +537,19 @@
     }
 
     // ── Load lines (resumen de líneas agrupadas) ──
-    function loadLines() {
+    // `since` = revisión conocida: si el servidor responde unchanged, el estado
+    // local ya lo tenemos y se omite el re-render completo (ahorro de parseo).
+    function loadLines(since) {
         if (_searchMode) return Promise.resolve(); // en modo búsqueda no pisamos las líneas
-        return fetch(api + '?action=lines&_=' + Date.now(), {credentials:'same-origin'})
+        var url = api + '?action=lines&_=' + Date.now();
+        if (since) url += '&since=' + encodeURIComponent(since);
+        return fetch(url, {credentials:'same-origin'})
         .then(function(r){return r.json()})
         .then(function(d){
             if (!d.ok) throw new Error('lines');
+            if (d.unchanged) return d; // misma revisión: nada que renderizar
             var json = JSON.stringify(d.lines || []);
-            if (json === lastLinesJson) return;
+            if (json === lastLinesJson) return d;
             lastLinesJson = json;
             linesData = d.lines || [];
             _searchMode = false;
@@ -768,12 +823,26 @@
         }).catch(function(){});
     }
 
-    // ── Render messages ──
+    // Re-añade las burbujas optimistas vivas (no reconciliadas) de un hilo
+    // tras un re-render completo del contenedor.
+    function appendPendingOptimistic(area, threadId, containerId) {
+        if (!area) return;
+        Object.keys(_optimisticMessages).forEach(function(clientId){
+            var local = _optimisticMessages[clientId];
+            if (!local || local.threadId !== threadId) return;
+            if (local.containerId && local.containerId !== containerId) return;
+            area.insertAdjacentHTML('beforeend', optimisticBubbleHtml(clientId, local));
+        });
+    }
+
+    // ── Render messages (contenedor inline) ──
     function renderMessages(messages) {
         var area = document.getElementById('inboxMessages');
         if (!area) return;
         if (!messages.length) {
             area.innerHTML = '<div class="inbox-chat-placeholder"><div class="inbox-chat-placeholder-icon">💬</div><div>Sin mensajes aún</div></div>';
+            // Conservar burbujas optimistas del hilo (p.ej. primer mensaje en vuelo)
+            appendPendingOptimistic(area, selectedThreadId, 'inboxMessages');
             return;
         }
         var seen = {};
@@ -799,7 +868,7 @@
             var botTag = m.is_bot ? '<span class="msg-bot-tag">🤖 bot</span>' : '';
             var cont = (lastAuthor === dir) ? ' cont' : '';
             lastAuthor = dir;
-            h += '<div class="inbox-msg-bubble ' + dir + cont + '">';
+            h += '<div class="inbox-msg-bubble ' + dir + cont + '" data-message-key="' + escAttr(messageKey(m)) + '">';
             if (botTag) h += botTag;
             h += '<div class="msg-text">' + renderInboxMedia(m, dir) + '</div>';
             h += '<div class="msg-time">' + esc(time);
@@ -807,7 +876,11 @@
             h += '</div>';
             h += '</div>';
         }
+        // Reconciliación: retirar burbujas optimistas ya persistidas; las que
+        // siguen en vuelo se re-añaden tras el render.
+        reconcilePersistedOutbound(messages, selectedThreadId, area);
         area.innerHTML = h;
+        appendPendingOptimistic(area, selectedThreadId, 'inboxMessages');
         if (wasAtBottom) area.scrollTop = area.scrollHeight;
     }
 
@@ -846,6 +919,9 @@
         input.value = '';
         input.style.height = 'auto';
         var clientMessageId = newClientMessageId();
+        var containerId = 'inboxMessages';
+        addOptimisticMessage(selectedThreadId, text, clientMessageId, containerId);
+
         fetch(api + '?action=send&_=' + Date.now(), {
             method: 'POST',
             headers: {'Content-Type':'application/x-www-form-urlencoded'},
@@ -854,10 +930,22 @@
         })
         .then(function(r){return r.json()})
         .then(function(d){
-            if (!d.ok) { alert('Error: ' + (d.error || 'No se pudo enviar')); input.value = text; }
-            else { pollCoordinator.poke(); }
+            if (!d.ok || d.status === 'failed') {
+                // Fallo de API (incl. 409 conflicto) o envío terminal fallido:
+                // la burbuja queda con Reintentar y el texto NO se restaura.
+                markOptimisticFailed(clientMessageId, containerId);
+            } else {
+                if (d.status === 'sent') markOptimisticSent(clientMessageId, containerId);
+                else markOptimisticQueued(clientMessageId, containerId);
+                pollCoordinator.poke();
+            }
         })
-        .catch(function(){ alert('Error de red al enviar'); input.value = text; })
+        .catch(function(){
+            // Error duro de cliente (red/parseo): marcamos fallo y devolvemos
+            // el texto al input para que no se pierda.
+            markOptimisticFailed(clientMessageId, containerId);
+            if (input) { input.value = text; input.style.height = 'auto'; }
+        })
         .finally(function(){ if (btn) btn.disabled = false; if (input) input.focus(); });
     }
 
@@ -945,6 +1033,43 @@
         }
     }
 
+    // ── Toggle global (Respuestas / Inicio) ──
+    // Vive aquí (y no en un <script> inline) para poder usar `api`,
+    // `loadLines` y el poke del coordinador de tiempo real.
+    function updateSwitchState(type, enabled) {
+        if (type !== 'replies') return;
+        var el = document.getElementById('inboxToggleReplies');
+        var st = el ? el.querySelector('.inbox-switch__state') : null;
+        if (st) st.textContent = enabled ? 'ON' : 'OFF';
+    }
+    function toggleGlobal(type, checkbox) {
+        if (!checkbox) return;
+        var wasChecked = checkbox.checked;
+        checkbox.disabled = true;
+
+        fetch(api + '?action=toggle_' + type + '&_=' + Date.now(), {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'action=toggle_' + type,
+            credentials: 'same-origin'
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (d.ok) {
+                checkbox.checked = d.enabled;
+                updateSwitchState(type, d.enabled);
+                loadLines();
+                pollCoordinator.poke(); // refresh inmediato de líneas y badge
+            } else {
+                checkbox.checked = wasChecked;
+            }
+        })
+        .catch(function(){
+            checkbox.checked = wasChecked;
+        })
+        .finally(function(){ checkbox.disabled = false; });
+    }
+
     // ── Search filter ──
     function filterSidebar() {
         var q = (document.getElementById('inboxSearch')?.value || '').trim();
@@ -974,6 +1099,9 @@
         _fullChatRevision = '';
         _fullChatBefore = null;
         _fullChatHasMore = false;
+        // Al abrir un hilo, el próximo tick del coordinador lanza el sync de
+        // respuestas nativas de inmediato (throttle ~20s desde esta apertura).
+        pollCoordinator.resetNativeSync();
         var overlay = document.getElementById('inboxFullChat');
         var nameEl = document.getElementById('inboxFullChatName');
         var subEl = document.getElementById('inboxFullChatSub');
@@ -1153,7 +1281,7 @@
         input.value = '';
         input.style.height = 'auto';
         var clientMessageId = newClientMessageId();
-        addOptimisticMessage(fullChatThreadId, text, clientMessageId);
+        addOptimisticMessage(fullChatThreadId, text, clientMessageId, 'inboxFullChatMessages');
 
         fetch(api + '?action=send&_=' + Date.now(), {
             method: 'POST',
@@ -1163,10 +1291,14 @@
         })
         .then(function(r){ return r.json(); })
         .then(function(d){
-            if (!d.ok) { markOptimisticFailed(clientMessageId); }
-            else { markOptimisticQueued(clientMessageId); pollCoordinator.poke(); }
+            if (!d.ok || d.status === 'failed') { markOptimisticFailed(clientMessageId, 'inboxFullChatMessages'); }
+            else {
+                if (d.status === 'sent') markOptimisticSent(clientMessageId, 'inboxFullChatMessages');
+                else markOptimisticQueued(clientMessageId, 'inboxFullChatMessages');
+                pollCoordinator.poke();
+            }
         })
-        .catch(function(){ markOptimisticFailed(clientMessageId); })
+        .catch(function(){ markOptimisticFailed(clientMessageId, 'inboxFullChatMessages'); })
         .finally(function(){ if (btn) btn.disabled = false; if (input) input.focus(); });
     }
 
@@ -1179,6 +1311,7 @@
         if (!area) return;
         if (!messages.length) {
             area.innerHTML = '<div class="inbox-chat-placeholder"><div class="inbox-chat-placeholder-icon">💬</div><div>Sin mensajes aún</div></div>';
+            appendPendingOptimistic(area, fullChatThreadId, 'inboxFullChatMessages');
             return;
         }
         var seen = {};
@@ -1212,7 +1345,9 @@
             h += '</div>';
             h += '</div>';
         }
+        reconcilePersistedOutbound(messages, fullChatThreadId, area);
         area.innerHTML = h;
+        appendPendingOptimistic(area, fullChatThreadId, 'inboxFullChatMessages');
         if (wasAtBottom) area.scrollTop = area.scrollHeight;
     }
 
@@ -1223,25 +1358,14 @@
         var area = document.getElementById('inboxFullChatMessages');
         if (!area) return;
         var wasAtBottom = (area.scrollHeight - area.scrollTop - area.clientHeight) <= 80;
+        // Reconciliación: retirar la burbuja optimista cuando el saliente ya
+        // está persistido en el refresco incremental.
+        reconcilePersistedOutbound(messages, fullChatThreadId, area);
         var known = {};
         area.querySelectorAll('[data-message-key]').forEach(function(node){ known[node.getAttribute('data-message-key')] = true; });
         messages.forEach(function(m){
             var key = messageKey(m);
             if (known[key]) return;
-            var reconciled = false;
-            if (m.direction === 'out') {
-                Object.keys(_optimisticMessages).some(function(clientId){
-                    var local = _optimisticMessages[clientId];
-                    if (local.threadId === fullChatThreadId && local.text === m.text) {
-                        var localEl = area.querySelector('[data-client-message-id="' + escAttr(clientId) + '"]');
-                        if (localEl) localEl.remove();
-                        delete _optimisticMessages[clientId];
-                        reconciled = true;
-                        return true;
-                    }
-                    return false;
-                });
-            }
             var dir = m.direction === 'out' ? 'out' : 'in';
             area.insertAdjacentHTML('beforeend', '<div class="inbox-msg-bubble ' + dir + '" data-message-key="' + escAttr(key) + '"><div class="msg-text">' + renderInboxMedia(m, dir) + '</div><div class="msg-time">' + esc(formatTime(m.ts || '')) + (dir === 'out' ? '<span class="msg-checks">✓✓</span>' : '') + '</div></div>');
             known[key] = true;
@@ -1278,19 +1402,36 @@
     function newClientMessageId() {
         return 'cm_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
     }
-    function addOptimisticMessage(threadId, text, clientId) {
-        _optimisticMessages[clientId] = {threadId:threadId, text:text, status:'sending'};
-        var area = document.getElementById('inboxFullChatMessages');
+    // HTML de una burbuja optimista (se usa para insertarla y para re-añadirla
+    // tras un re-render del contenedor). El estado vive en _optimisticMessages.
+    function optimisticBubbleHtml(clientId, local) {
+        var h = '<div class="inbox-msg-bubble out inbox-msg-pending' + (local.status === 'failed' ? ' is-failed' : '') + '" data-client-message-id="' + escAttr(clientId) + '" data-message-key="opt-' + escAttr(clientId) + '">';
+        h += '<div class="msg-text">' + formatMessageBody(local.text) + '</div>';
+        h += '<div class="msg-time"><span class="msg-send-state">' + esc(local.label || (local.status === 'queued' ? 'En cola' : 'Enviando')) + '</span></div>';
+        if (local.status === 'failed') {
+            h += '<button type="button" class="msg-retry" onclick="InboxChat.retryMessage(\'' + escAttr(clientId) + '\')">Reintentar</button>';
+        }
+        h += '</div>';
+        return h;
+    }
+    function addOptimisticMessage(threadId, text, clientId, containerId) {
+        containerId = containerId || 'inboxFullChatMessages';
+        _optimisticMessages[clientId] = {threadId:threadId, text:text, status:'sending', label:'Enviando', containerId:containerId};
+        var area = document.getElementById(containerId);
         if (!area) return;
-        area.insertAdjacentHTML('beforeend', '<div class="inbox-msg-bubble out inbox-msg-pending" data-client-message-id="' + escAttr(clientId) + '"><div class="msg-text">' + formatMessageBody(text) + '</div><div class="msg-time"><span class="msg-send-state">Enviando</span></div></div>');
+        area.insertAdjacentHTML('beforeend', optimisticBubbleHtml(clientId, _optimisticMessages[clientId]));
         area.scrollTop = area.scrollHeight;
     }
-    function markOptimisticQueued(clientId) { setOptimisticStatus(clientId, 'queued', 'En cola'); }
-    function markOptimisticFailed(clientId) { setOptimisticStatus(clientId, 'failed', 'Falló, reintentar'); }
-    function setOptimisticStatus(clientId, status, label) {
-        if (!_optimisticMessages[clientId]) return;
-        _optimisticMessages[clientId].status = status;
-        var area = document.getElementById('inboxFullChatMessages');
+    function markOptimisticQueued(clientId, containerId) { setOptimisticStatus(clientId, 'queued', 'En cola', containerId); }
+    function markOptimisticSent(clientId, containerId) { setOptimisticStatus(clientId, 'queued', 'Enviado', containerId); }
+    function markOptimisticFailed(clientId, containerId) { setOptimisticStatus(clientId, 'failed', 'Falló, reintentar', containerId); }
+    function setOptimisticStatus(clientId, status, label, containerId) {
+        var local = _optimisticMessages[clientId];
+        if (!local) return;
+        local.status = status;
+        local.label = label;
+        containerId = containerId || local.containerId || 'inboxFullChatMessages';
+        var area = document.getElementById(containerId);
         var bubble = area && area.querySelector('[data-client-message-id="' + escAttr(clientId) + '"]');
         if (!bubble) return;
         bubble.classList.toggle('is-failed', status === 'failed');
@@ -1300,13 +1441,41 @@
             bubble.insertAdjacentHTML('beforeend', '<button type="button" class="msg-retry" onclick="InboxChat.retryMessage(\'' + escAttr(clientId) + '\')">Reintentar</button>');
         }
     }
+    // Reconciliación: cuando un refresco trae un saliente ya persistido (mismo
+    // texto + mismo hilo), se retira la burbuja optimista correspondiente. Se
+    // aplica tanto al inline (renderMessages) como al fullscreen
+    // (appendFullChatChanges / renderFullChatMessages).
+    function reconcilePersistedOutbound(messages, threadId, area) {
+        if (!area) return;
+        messages.forEach(function(m){
+            if (!m || m.direction !== 'out') return;
+            Object.keys(_optimisticMessages).forEach(function(clientId){
+                var local = _optimisticMessages[clientId];
+                if (!local || local.threadId !== threadId || local.text !== m.text) return;
+                var el = area.querySelector('[data-client-message-id="' + escAttr(clientId) + '"]');
+                if (el) el.remove();
+                delete _optimisticMessages[clientId];
+            });
+        });
+    }
+    // Reintenta el MISMO client_message_id con retry=1 (idempotente: el backend
+    // reabre el trabajo fallido sin duplicar el envío). Apunta al contenedor
+    // donde vive la burbuja fallida.
     function retryMessage(clientId) {
         var local = _optimisticMessages[clientId];
         if (!local || !local.threadId) return;
-        setOptimisticStatus(clientId, 'sending', 'Enviando');
-        fetch(api + '?action=send&_=' + Date.now(), {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'action=send&thread_id=' + encodeURIComponent(local.threadId) + '&text=' + encodeURIComponent(local.text) + '&client_message_id=' + encodeURIComponent(clientId), credentials:'same-origin'})
-            .then(function(r){ return r.json(); }).then(function(d){ if (d.ok) { markOptimisticQueued(clientId); pollCoordinator.poke(); } else markOptimisticFailed(clientId); })
-            .catch(function(){ markOptimisticFailed(clientId); });
+        var containerId = local.containerId || 'inboxFullChatMessages';
+        setOptimisticStatus(clientId, 'sending', 'Enviando', containerId);
+        fetch(api + '?action=send&_=' + Date.now(), {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'action=send&thread_id=' + encodeURIComponent(local.threadId) + '&text=' + encodeURIComponent(local.text) + '&client_message_id=' + encodeURIComponent(clientId) + '&retry=1', credentials:'same-origin'})
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+                if (d.ok && d.status !== 'failed') {
+                    if (d.status === 'sent') markOptimisticSent(clientId, containerId);
+                    else markOptimisticQueued(clientId, containerId);
+                    pollCoordinator.poke();
+                } else markOptimisticFailed(clientId, containerId);
+            })
+            .catch(function(){ markOptimisticFailed(clientId, containerId); });
     }
 
     // ── Helpers ──
@@ -2110,6 +2279,29 @@
         sendOne(0);
     }
 
+    // ── PWA: instalación (solo se muestra el botón si el navegador dispara
+    // beforeinstallprompt; Chrome Android cumple criterios PWA) ──
+    var _deferredInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', function(e){
+        e.preventDefault();
+        _deferredInstallPrompt = e;
+        var btn = document.getElementById('inboxInstallBtn');
+        if (btn) btn.classList.add('is-visible');
+    });
+    window.addEventListener('appinstalled', function(){
+        _deferredInstallPrompt = null;
+        var btn = document.getElementById('inboxInstallBtn');
+        if (btn) btn.classList.remove('is-visible');
+    });
+    function installApp() {
+        var e = _deferredInstallPrompt;
+        if (!e) return;
+        _deferredInstallPrompt = null;
+        var btn = document.getElementById('inboxInstallBtn');
+        if (btn) btn.classList.remove('is-visible');
+        try { e.prompt(); } catch (err) { /* prompt() puede no estar listo aún */ }
+    }
+
     // ── Expose ──
     window.InboxChat = {
         currentView: currentView,
@@ -2122,10 +2314,12 @@
         markAllRead: markAllRead,
         filterSidebar: filterSidebar,
         loadLines: loadLines,
+        toggleGlobal: toggleGlobal,
         openFullChat: openFullChat,
         closeFullChat: closeFullChat,
         sendFullChatMessage: sendFullChatMessage,
         retryMessage: retryMessage,
+        installApp: installApp,
         handleFullChatKey: handleFullChatKey,
         toggleFullChatPause: toggleFullChatPause,
         markRead: markRead,
