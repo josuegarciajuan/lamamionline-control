@@ -790,6 +790,73 @@ final class Bot implements BotInterface
         return $rootDir;
     }
 
+    /**
+     * Ensure a user's runtime config has routing.lines populated.
+     *
+     * RoutingGate reads routing.lines from config.local.json, while lines are
+     * managed per-user in data/users/{id}/lines.json. When the config's routing
+     * is empty (e.g. initialized from the dist template), seed it from the
+     * user's lines.json so the bot can process incoming messages. Admin
+     * (userId === 1) additionally falls back to the root config's routing.lines
+     * when no per-user lines.json exists (legacy/panel-managed casa lines).
+     *
+     * @param string                  $rootDir Project root (WASAPBOT_ROOT)
+     * @param int                     $userId  User ID (0 = legacy/default)
+     * @param ConfigInterface         $config  Runtime config to mutate
+     */
+    public static function seedRoutingLines(string $rootDir, int $userId, ConfigInterface $config): void
+    {
+        if ($userId < 1) {
+            return;
+        }
+
+        $routingLines = $config->get('routing.lines', []);
+        if (is_array($routingLines) && $routingLines !== []) {
+            return; // Already configured — do not overwrite tenant edits.
+        }
+
+        $injected = [];
+        $linesJsonPath = self::resolveUserDataPath($rootDir, $userId, 'lines.json');
+        if (file_exists($linesJsonPath)) {
+            $linesData = @json_decode((string) @file_get_contents($linesJsonPath), true);
+            if (is_array($linesData) && $linesData !== []) {
+                foreach ($linesData as $line) {
+                    if (!is_array($line)) {
+                        continue;
+                    }
+                    $injected[] = [
+                        'last9'       => (string) ($line['last9'] ?? ''),
+                        'port'        => (int) ($line['port'] ?? 0),
+                        'label'       => (string) ($line['label'] ?? ''),
+                        'enabled'     => true,
+                        'ai_provider' => (string) ($line['ai_provider'] ?? 'openai'),
+                        'ai_model'    => $line['ai_model'] ?? null,
+                    ];
+                }
+            }
+        }
+
+        // Admin (user 1): legacy/panel-managed lines live in the root config.
+        // Fall back to them when there is no per-user lines.json (or it is empty).
+        if ($injected === [] && $userId === 1) {
+            $rootConfig = new \WasapBot\Core\Config($rootDir);
+            $rootLines = $rootConfig->get('routing.lines', []);
+            if (is_array($rootLines)) {
+                $injected = $rootLines;
+            }
+        }
+
+        if ($injected !== []) {
+            $config->set('routing.lines', $injected);
+            // Persist so panel.php routing tab shows the lines too
+            try {
+                $config->save();
+            } catch (\Throwable) {
+                // Best-effort: in-memory set() is sufficient for the current request
+            }
+        }
+    }
+
     public static function bootstrap(string $rootDir, int $userId = 0): array
     {
         // ── Resolve config directory for this user ───────────────────
@@ -831,46 +898,14 @@ final class Bot implements BotInterface
             }
         }
 
-        // ── Inject lines.json into routing.lines for multi-user clients ──
-        // api/lines.php manages WAHA lines in data/users/{id}/lines.json,
-        // but RoutingGate reads from config.local.json → routing.lines.
-        // When routing.lines is empty (config initialized from dist template),
-        // auto-populate it from the user's lines.json so the bot can process
-        // incoming messages without manual routing configuration.
-        if ($userId > 1) {
-            $routingLines = $config->get('routing.lines', []);
-            if (!is_array($routingLines) || $routingLines === []) {
-                $linesJsonPath = self::resolveUserDataPath($rootDir, $userId, 'lines.json');
-                if (file_exists($linesJsonPath)) {
-                    $linesData = @json_decode((string) @file_get_contents($linesJsonPath), true);
-                    if (is_array($linesData) && $linesData !== []) {
-                        $injected = [];
-                        foreach ($linesData as $line) {
-                            if (!is_array($line)) {
-                                continue;
-                            }
-                            $injected[] = [
-                                'last9'       => (string) ($line['last9'] ?? ''),
-                                'port'        => (int) ($line['port'] ?? 0),
-                                'label'       => (string) ($line['label'] ?? ''),
-                                'enabled'     => true,
-                                'ai_provider' => (string) ($line['ai_provider'] ?? 'openai'),
-                                'ai_model'    => $line['ai_model'] ?? null,
-                            ];
-                        }
-                        if ($injected !== []) {
-                            $config->set('routing.lines', $injected);
-                            // Persist so panel.php routing tab shows the lines too
-                            try {
-                                $config->save();
-                            } catch (\Throwable) {
-                                // Best-effort: in-memory set() is sufficient for the current request
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // ── Ensure routing.lines is populated for the user's runtime ──
+        // api/lines.php manages WAHA lines in data/users/{id}/lines.json, but
+        // RoutingGate reads from config.local.json → routing.lines. When routing
+        // is empty (config initialized from dist template), seed it from the
+        // user's lines.json. Admin (user 1) additionally falls back to the root
+        // config's routing.lines when there is no per-user lines.json yet, so
+        // the owner's casa lines keep working.
+        self::seedRoutingLines($rootDir, $userId, $config);
 
         $logger = new \WasapBot\Core\FileLogger($config);
 
