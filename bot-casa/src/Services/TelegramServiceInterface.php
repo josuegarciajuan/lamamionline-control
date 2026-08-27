@@ -9,6 +9,7 @@ namespace WasapBot\Services;
  */
 interface TelegramServiceInterface
 {
+    /** @param array<string, mixed> $leadData */
     public function sendLeadAlert(array $leadData): void;
     public function sendMessage(string $chatId, string $text): bool;
 }

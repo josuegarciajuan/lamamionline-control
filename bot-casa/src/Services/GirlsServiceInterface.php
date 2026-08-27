@@ -19,7 +19,11 @@ interface GirlsServiceInterface
      */
     public function fetchAll(): array;
 
+    /**
+     * @return array<int, array{id: string, nombre: string, descripcion_corta: string, fotos: list<string>, activa: bool}>
+     */
     public function getRandomSample(int $count): array;
+    /** @param string $name @return array<string, mixed>|null */
     public function findByName(string $name): ?array;
     public function reload(): void;
 }

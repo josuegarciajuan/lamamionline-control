@@ -90,6 +90,7 @@ final class Config implements ConfigInterface
         $this->writeJsonAtomic($localPath, $json);
     }
 
+    /** @return array<string, mixed> */
     public function all(): array
     {
         return $this->data;
@@ -159,6 +160,7 @@ final class Config implements ConfigInterface
      * Tenant-local routing, notifications, prompts, URLs and file paths must
      * never be populated from the central local config.
      *
+     * @param array<string, mixed> $tenantData
      * @param array<string, mixed> $central
      * @return array<string, mixed>
      */
@@ -335,6 +337,7 @@ final class Config implements ConfigInterface
         }
     }
 
+    /** @param array<string, mixed> $data */
     private function getFromArray(array $data, string $path): mixed
     {
         foreach (explode('.', $path) as $key) {
@@ -344,6 +347,7 @@ final class Config implements ConfigInterface
         return $data;
     }
 
+    /** @param array<string, mixed> $data */
     private function setInArray(array &$data, string $path, mixed $value): void
     {
         $keys = explode('.', $path);

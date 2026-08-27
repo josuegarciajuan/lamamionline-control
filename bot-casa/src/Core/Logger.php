@@ -32,41 +32,49 @@ final class Logger implements LoggerInterface
     //  PSR-3 convenience methods
     // ──────────────────────────────────────────────
 
+    /** @param array<string, mixed> $context */
     public function emergency(string $message, array $context = []): void
     {
         $this->log('emergency', $message, $context);
     }
 
+    /** @param array<string, mixed> $context */
     public function alert(string $message, array $context = []): void
     {
         $this->log('alert', $message, $context);
     }
 
+    /** @param array<string, mixed> $context */
     public function critical(string $message, array $context = []): void
     {
         $this->log('critical', $message, $context);
     }
 
+    /** @param array<string, mixed> $context */
     public function error(string $message, array $context = []): void
     {
         $this->log('error', $message, $context);
     }
 
+    /** @param array<string, mixed> $context */
     public function warning(string $message, array $context = []): void
     {
         $this->log('warning', $message, $context);
     }
 
+    /** @param array<string, mixed> $context */
     public function notice(string $message, array $context = []): void
     {
         $this->log('notice', $message, $context);
     }
 
+    /** @param array<string, mixed> $context */
     public function info(string $message, array $context = []): void
     {
         $this->log('info', $message, $context);
     }
 
+    /** @param array<string, mixed> $context */
     public function debug(string $message, array $context = []): void
     {
         $this->log('debug', $message, $context);
@@ -76,11 +84,15 @@ final class Logger implements LoggerInterface
     //  Core log method
     // ──────────────────────────────────────────────
 
+    /** @param array<string, mixed> $context */
     public function log(string $level, string $message, array $context = []): void
     {
         $line = $this->formatLine($level, $message, $context);
         $stream = $this->chooseStream($level);
 
+        if ($stream === false) {
+            return; // Cannot obtain a writable stream — skip rather than fatal.
+        }
         fwrite($stream, $line);
         fflush($stream);
     }
@@ -91,6 +103,8 @@ final class Logger implements LoggerInterface
 
     /**
      * Builds the formatted log line including trailing newline.
+     *
+     * @param array<string, mixed> $context
      */
     private function formatLine(string $level, string $message, array $context): string
     {
@@ -112,7 +126,7 @@ final class Logger implements LoggerInterface
      * STDOUT/STDERR are not always available under PHP-FPM web context,
      * so we fall back to php://stderr and php://stdout respectively.
      *
-     * @return resource
+     * @return resource|false
      */
     private function chooseStream(string $level): mixed
     {

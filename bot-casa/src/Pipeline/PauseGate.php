@@ -22,7 +22,6 @@ final class PauseGate implements PipelineStageInterface
 
     public function __construct(
         private readonly ?\WasapBot\Core\ConfigInterface $config = null,
-        ?\WasapBot\Core\LoggerInterface $logger = null,
     ) {
         $rootDir = defined('WASAPBOT_ROOT') ? WASAPBOT_ROOT : dirname(__DIR__, 2);
         // Use per-user paused file when config provides it (multi-user isolation).
@@ -122,6 +121,8 @@ final class PauseGate implements PipelineStageInterface
 
     /**
      * Reads (and caches) the paused threads list from NDJSON.
+     *
+     * @return array<int, array<string, mixed>>
      */
     private function readPausedThreads(): array
     {

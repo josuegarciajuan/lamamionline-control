@@ -1,0 +1,8 @@
+includes:
+    - phpstan-baseline.neon
+
+parameters:
+    # EvolutionApi vive fuera de src/ (app/evolution/) y se carga con require_once
+    # en runtime (transporte Evolution). PHPStan debe escanearlo para resolver la clase.
+    scanDirectories:
+        - ../app/evolution

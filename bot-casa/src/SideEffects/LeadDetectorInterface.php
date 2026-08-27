@@ -16,11 +16,13 @@ interface LeadDetectorInterface
     public function isLead(array $openAiResponse): bool;
 
     /**
+     * @param array<string, mixed> $openAiResponse
      * @return float  0.0 to 1.0 confidence.
      */
     public function confidence(array $openAiResponse): float;
 
     /**
+     * @param array<string, mixed> $openAiResponse
      * @return int  ETA in minutes, 0 if not specified.
      */
     public function etaMinutes(array $openAiResponse): int;

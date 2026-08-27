@@ -62,7 +62,7 @@ final readonly class RoutingGate implements PipelineStageInterface
             );
             $receiverLast9 = $receiverDigits !== '' ? mb_substr($receiverDigits, -9) : '';
 
-            /** @var list<array{last9?: string, port?: int, enabled?: bool, label?: string}> $lines */
+            /** @var list<array{last9?: string, port?: int, enabled?: bool, label?: string, ai_provider?: string, ai_model?: mixed, transport?: string, evo_instance?: string}> $lines */
             $lines = (array) $this->config->get('routing.lines', []);
             $defaultEnabled = (bool) $this->config->get('routing.default_enabled_if_not_found', false);
 
@@ -304,6 +304,7 @@ final readonly class RoutingGate implements PipelineStageInterface
     /**
      * Extract sender phone from the context/payload.
      *
+     * @param array<string, mixed> $ctx
      * @param array<string, mixed> $body
      * @param array<string, mixed> $payload
      */

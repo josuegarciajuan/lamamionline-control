@@ -36,7 +36,7 @@ final class BlacklistService implements BlacklistServiceInterface
             return false;
         }
 
-        $phone = preg_replace('/[^0-9]/', '', $phone);
+        $phone = (string) preg_replace('/[^0-9]/', '', $phone);
         if ($phone === '' || $phone === '0') {
             return false;
         }

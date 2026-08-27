@@ -87,6 +87,7 @@ final readonly class DedupGate implements PipelineStageInterface
      *
      * Tries multiple known field paths used by WAHA payloads.
      */
+    /** @param array<string, mixed> $ctx */
     private function extractMessageId(array $ctx): string
     {
         /** @var array<string, mixed>|null $body */
