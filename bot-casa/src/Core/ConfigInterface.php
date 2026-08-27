@@ -19,6 +19,7 @@ interface ConfigInterface
     public function get(string $keyPath, mixed $default = null): mixed;
     public function set(string $keyPath, mixed $value): void;
     public function save(): void;
+    /** @return array<string, mixed> */
     public function all(): array;
     public function reload(): void;
 

@@ -374,6 +374,7 @@ final class Bot implements BotInterface
             // ── 9. Build tone directives (ToneBuilder) ───────────────
             if (isset($this->processors[2]) && $this->processors[2]->name() === 'ToneBuilder') {
                 $ctx = $this->processors[2]->process($ctx);
+                if ($ctx === null) return null;
             }
 
             // ── 10. Call AI chat completion (OpenAI or DeepSeek) ──────
@@ -425,6 +426,7 @@ final class Bot implements BotInterface
             // ── 11. Normalize response (ResponseNormalizer) ──────────
             if (isset($this->processors[3]) && $this->processors[3]->name() === 'ResponseNormalizer') {
                 $ctx = $this->processors[3]->process($ctx);
+                if ($ctx === null) return null;
             } elseif (!empty($openaiResponse['choices'])) {
                 $ctx['output_text'] = $openaiResponse['choices'][0]['message']['content'] ?? '';
             }
@@ -476,22 +478,22 @@ final class Bot implements BotInterface
                 $outputText = (string) ($ctx['output_text'] ?? '');
                 if ($outputText !== '') {
                     $original = $outputText;
-                    $outputText = preg_replace(
+                    $outputText = (string) preg_replace(
                         '/tod[ao]s?\s+compart[ei]n\s+casita\s+en\s+/iu',
                         '',
                         $outputText
                     );
-                    $outputText = preg_replace(
+                    $outputText = (string) preg_replace(
                         '/tod[ao]s?\s+est[áa]n?\s+en\s+la\s+misma\s+casa[^.]*\.?\s*/iu',
                         '',
                         $outputText
                     );
-                    $outputText = preg_replace(
+                    $outputText = (string) preg_replace(
                         '/compartimos\s+casa[^.]*\.?\s*/iu',
                         '',
                         $outputText
                     );
-                    $outputText = preg_replace(
+                    $outputText = (string) preg_replace(
                         '/estamos\s+tod[ao]s\s+en\s+el\s+mismo\s+piso[^.]*\.?\s*/iu',
                         '',
                         $outputText
@@ -554,7 +556,7 @@ final class Bot implements BotInterface
             if (($catalogCount >= 2 || $photoRejected) && $photoAction === 'catalog') {
                 // Force strip photo URLs and reset photo_action
                 $outputText = (string) ($ctx['output_text'] ?? '');
-                $cleaned = preg_replace(
+                $cleaned = (string) preg_replace(
                     '/(?:https?:\/\/)?compartir\.site\/[a-zA-Z0-9]+\/?\s*/i',
                     '',
                     $outputText
@@ -577,6 +579,7 @@ final class Bot implements BotInterface
 
             // ── 14d. Pre-send: check for messages that arrived during processing ──
             $ctx = $this->handleIncomingWhileProcessing($ctx, $inflightLockDir, $fromPhone);
+            if ($ctx === null) return $ctx;
             $messages = $ctx['splitted_messages'] ?? [$ctx['output_text'] ?? ''];
 
             // ── 15. Send via WAHA with humanization ──────────────────
@@ -857,6 +860,7 @@ final class Bot implements BotInterface
         }
     }
 
+    /** @return array<string, mixed> */
     public static function bootstrap(string $rootDir, int $userId = 0): array
     {
         // ── Resolve config directory for this user ───────────────────
@@ -1556,6 +1560,8 @@ final class Bot implements BotInterface
 
     /**
      * Cliente EvolutionApi (compartido con el CRM) para líneas en transport=evolution.
+     *
+     * @param array<string, mixed> $ctx
      */
     private function evoApiClient(array $ctx): ?\EvolutionApi
     {
@@ -1584,6 +1590,9 @@ final class Bot implements BotInterface
 
     /**
      * Envía un mensaje por Evolution (foto nativa, texto humano, audio rápido).
+     */
+    /**
+     * @param array<string, mixed> $ctx
      */
     private function sendMessageEvo(array $ctx, string $msgStr, bool $isFirst, bool $isAudioReply): bool
     {
@@ -1636,6 +1645,10 @@ final class Bot implements BotInterface
         return $url;
     }
 
+    /**
+     * @param array<string, mixed> $ctx
+     * @param list<array<string, mixed>> $messages
+     */
     private function sendMessages(array &$ctx, array $messages, string $lockDir = '', string $fromPhone = ''): void
     {        // ── Cancel + pause check: if user paused this thread, abort send ──
         $threadId = (string) ($ctx['thread_id'] ?? $ctx['__thread_id'] ?? '');
@@ -1757,6 +1770,7 @@ final class Bot implements BotInterface
 
                     // Re-run the full LLM pipeline with the coalesced input
                     $ctx = $this->handleIncomingWhileProcessing($ctx, $lockDir, $fromPhone);
+                    if ($ctx === null) return;
 
                     // Reload messages after re-processing and recurse
                     $newMessages = $ctx['splitted_messages'] ?? [$ctx['output_text'] ?? ''];
@@ -2084,9 +2098,9 @@ final class Bot implements BotInterface
                 );
                 if ($hasMapsUrl || $hasLocationWords) {
                     // Strip maps URL
-                    $cleanedText = preg_replace($mapsUrlPattern, '', $outputText);
+                    $cleanedText = (string) preg_replace($mapsUrlPattern, '', $outputText);
                     // Replace location-sending language with "choose girl first"
-                    $cleanedText = preg_replace(
+                    $cleanedText = (string) preg_replace(
                         '/(?:te\s*paso\s*(?:la\s*)?ubicaci[oó]n[^.]*\.?|te\s*paso\s*(?:el|la)\s*(?:maps?\b|mapa\b|gps\b|direcci[oó]n)[^.]*\.?|aqui\s*(?:va|tienes|esta)\s*(?:el|la)\s*(?:mapa|ubicaci[oó]n|direcci[oó]n|gps)[^.]*\.?|te\s*(?:mando|env[ií]o)\s*(?:la\s*)?(?:ubicaci[oó]n|direcci[oó]n|mapa|gps)[^.]*\.?|ubicaci[oó]n\s*exacta[^.]*\.?|punto\s*exacto[^.]*\.?)/iu',
                         '',
                         $cleanedText
@@ -2489,7 +2503,7 @@ final class Bot implements BotInterface
      * @param array<string, mixed> $ctx
      * @return array<string, mixed>
      */
-    private function handleIncomingWhileProcessing(array $ctx, string $lockDir, string $fromPhone): array
+    private function handleIncomingWhileProcessing(array $ctx, string $lockDir, string $fromPhone): ?array
     {
         // ── Escenario 1: bot parado globalmente ──
         if (!$this->isRunning()) {
@@ -2594,6 +2608,7 @@ final class Bot implements BotInterface
         // Step 9: re-run ToneBuilder
         if (isset($this->processors[2]) && $this->processors[2]->name() === 'ToneBuilder') {
             $ctx = $this->processors[2]->process($ctx);
+            if ($ctx === null) return null;
         }
 
         // Step 10: re-run LLM call with coalesced message
@@ -2642,6 +2657,7 @@ final class Bot implements BotInterface
         // Steps 11-14: re-run normalizers and formatters
         if (isset($this->processors[3]) && $this->processors[3]->name() === 'ResponseNormalizer') {
             $ctx = $this->processors[3]->process($ctx);
+            if ($ctx === null) return null;
         }
 
         // ── Fallback: if re-processing LLM returned empty ──

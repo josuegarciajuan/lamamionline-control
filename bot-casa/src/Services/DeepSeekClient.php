@@ -32,9 +32,10 @@ final class DeepSeekClient implements OpenAiClientInterface
      * @param string      $systemPrompt The system-level instruction prompt.
      * @param string      $userMessage  The user's message text.
      * @param array       $context      Additional context key-value pairs.
+     * @param array<string, mixed> $context   Extra context appended to the user message.
      * @param string|null $model        Override model; falls back to config deepseek.chat_model.
-     * @param array       $history      Previous conversation turns [{role, content}, ...] for multi-turn memory.
-     * @return array Parsed JSON from the assistant response.
+     * @param list<array{role: string, content: string}> $history Previous conversation turns.
+     * @return array<string, mixed> Parsed JSON from the assistant response.
      */
     public function chat(string $systemPrompt, string $userMessage, array $context = [], ?string $model = null, array $history = []): array
     {
@@ -319,6 +320,8 @@ final class DeepSeekClient implements OpenAiClientInterface
 
     /**
      * Parse choices[0].message.content from the API response.
+     *
+     * @return array<string, mixed>
      */
     private function parseChoicesContent(string $rawBody): array
     {

@@ -68,6 +68,7 @@ final class TelegramService implements TelegramServiceInterface
      *     ya_enviado?: list<string>
      * } $leadData
      */
+    /** @param array<string, mixed> $leadData */
     public function sendLeadAlert(array $leadData): void
     {
         if (!$this->alertEnabled) {

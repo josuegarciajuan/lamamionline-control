@@ -222,6 +222,7 @@ final class CatalogFormatter implements PipelineStageInterface
     /**
      * Format a girl entry returning ONE random photo URL (no name — WhatsApp preview shows it).
      */
+    /** @param array<string, mixed> $girl @param list<string> $sentUrls */
     private function formatGirlOneLine(array $girl, array $sentUrls = []): string
     {
         $name   = $girl['nombre'] ?? 'Chica';
@@ -252,6 +253,7 @@ final class CatalogFormatter implements PipelineStageInterface
      *
      * @return list<string>
      */
+    /** @param array<string, mixed> $girl @return list<string> */
     private function formatAllPhotos(array $girl): array
     {
         $photos = $girl['fotos'] ?? [];

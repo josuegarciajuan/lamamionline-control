@@ -67,7 +67,7 @@ final class UserManager
      *
      * @param bool $unlimited Si true, el usuario se crea sin restricciones monetarias (subscription_status = 'unlimited').
      *                         Si false (por defecto), se inicia trial de 10 días.
-     * @return array{ok: bool, user?: array, error?: string}
+     * @return array{ok: bool, user?: array<string, mixed>, error?: string}
      */
     public function createUser(string $username, string $password, string $role = 'user', string $name = '', bool $unlimited = false): array
     {
@@ -224,6 +224,7 @@ final class UserManager
     /**
      * Elimina un usuario (soft delete: active=false). No se puede eliminar al admin principal (id=1).
      */
+    /** @return array<string, mixed> */
     public function deleteUser(int $id): array
     {
         if ($id === 1) {
@@ -330,7 +331,7 @@ final class UserManager
         }
     }
 
-    /** @return array{users: list<array>, next_id: int} */
+    /** @return array<string, mixed> */
     private function loadUsers(): array
     {
         if ($this->cache !== null) {
@@ -394,7 +395,7 @@ final class UserManager
      * Crea el archivo users.json con el admin por defecto.
      * Solo se llama desde login.php en el primer acceso.
      *
-     * @return array{ok: bool, user?: array}
+     * @return array{ok: bool, user?: array<string, mixed>, error?: string}
      */
     public function seedDefaultAdmin(): array
     {

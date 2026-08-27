@@ -115,6 +115,7 @@ final class GirlsService implements GirlsServiceInterface
      *
      * @return GirlRecord|null
      */
+    /** @return array<string, mixed>|null */
     public function findByName(string $name): ?array
     {
         $all = $this->fetchAll();

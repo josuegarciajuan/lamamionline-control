@@ -122,6 +122,7 @@ final class PersonalityTracker
     //  Private helpers
     // ─────────────────────────────────────────────────────────────────
 
+    /** @return array<int, array<string, mixed>> */
     private function readLines(): array
     {
         if (!file_exists($this->trackingFile)) return [];
@@ -130,6 +131,7 @@ final class PersonalityTracker
         return array_filter(explode("\n", trim($content)), static fn(string $l) => trim($l) !== '');
     }
 
+    /** @param array<string, mixed> $record */
     private function append(array $record): void
     {
         $dir = dirname($this->trackingFile);

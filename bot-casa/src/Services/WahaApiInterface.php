@@ -17,6 +17,9 @@ interface WahaApiInterface
     public function sendImage(string $baseUrl, string $chatId, string $imageUrl, string $caption, string $session): bool;
 
     // Anti-ban: humanized send sequence with typing delays
+    /**
+     * @param array<string, mixed> $delayConfig
+     */
     public function sendHumanized(
         string $baseUrl,
         string $chatId,
