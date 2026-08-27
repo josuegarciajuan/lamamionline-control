@@ -261,6 +261,48 @@ function avisos_target_phones() {
     return $out;
 }
 
+/**
+ * Destinos de las notificaciones informativas al dueño.
+ * Devuelve ['primary' => teléfono, 'secondary' => [teléfonos]].
+ * - primary: 654464023 (si está configurado; si no, el primero de la lista).
+ * - secondary: el resto de whatsapp_target_phones + SIEMPRE 641993776 (dedup).
+ * El secondary recibe el mismo aviso parafraseado por LLM y con ~20s de espera
+ * para no levantar sospechas de spam/baneo en WhatsApp.
+ */
+function avisos_owner_notification_phones() {
+    $targets = avisos_target_phones();
+    $primary = '654464023';
+    $secondary = array();
+
+    if (empty($targets)) {
+        return array('primary' => $primary, 'secondary' => array('641993776'));
+    }
+
+    if (in_array($primary, $targets, true)) {
+        $rest = array_values(array_filter($targets, function ($p) use ($primary) {
+            return trim((string)$p) !== $primary;
+        }));
+    } else {
+        $primary = trim((string)array_shift($targets));
+        $rest = array_values($targets);
+    }
+    if ($primary === '') {
+        $primary = '654464023';
+    }
+
+    foreach ($rest as $p) {
+        $p = trim((string)$p);
+        if ($p === '' || $p === $primary) continue;
+        if (!in_array($p, $secondary, true)) $secondary[] = $p;
+    }
+
+    if (!in_array('641993776', $secondary, true) && '641993776' !== $primary) {
+        $secondary[] = '641993776';
+    }
+
+    return array('primary' => $primary, 'secondary' => array_values($secondary));
+}
+
 function aviso_pending_target_phones($aviso) {
     $allPhones = avisos_target_phones();
     if (empty($allPhones)) {
@@ -1468,6 +1510,70 @@ function aviso_safe_substr($text, $start, $length) {
     return substr($text, $start, $length);
 }
 
+/**
+ * Reescribe un texto de aviso con sinónimos (como si lo escribiera otra persona)
+ * conservando los datos clave. BEST-EFFORT: si el LLM falla, devuelve el original.
+ * Se usa para que el 2º destinatario (secondary) no reciba exactamente el mismo
+ * texto que el primero (antiban de WhatsApp).
+ */
+function avisos_llm_paraphrase($text) {
+    $text = trim((string)$text);
+    if ($text === '') {
+        return '';
+    }
+
+    $llmKey = function_exists('aviso_llm_api_key_for_deepseek') ? aviso_llm_api_key_for_deepseek() : '';
+    if ($llmKey === '') {
+        return $text;
+    }
+
+    $prompt = "Reescribe el siguiente aviso cambiando la redacción y usando sinónimos, "
+        . "como si lo hubiera escrito otra persona distinta.\n"
+        . "Reglas:\n"
+        . "- Conserva EXACTAMENTE los mismos datos: cifras, importes, nombres, teléfonos, fechas, enlaces y códigos.\n"
+        . "- Conserva los emojis relevantes (puedes añadir alguno si aporta naturalidad).\n"
+        . "- No cambies el significado ni la longitud aproximada.\n"
+        . "- Devuelve SOLO el texto reescrito, sin comillas, sin prefijos ni explicaciones.\n\n"
+        . "AVISO:\n" . $text;
+
+    $payload = array(
+        'model' => 'deepseek-v4-flash',
+        'messages' => array(array('role' => 'user', 'content' => $prompt)),
+        'temperature' => 0.7,
+        'max_tokens' => 2048,
+        'thinking' => array('type' => 'disabled'),
+    );
+
+    $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $ch = curl_init('https://api.deepseek.com/chat/completions');
+    curl_setopt_array($ch, array(
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $body,
+        CURLOPT_HTTPHEADER => array(
+            'Authorization: Bearer ' . $llmKey,
+            'Content-Type: application/json',
+        ),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 20,
+        CURLOPT_CONNECTTIMEOUT => 10,
+    ));
+    $raw = @curl_exec($ch);
+    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($raw === false || $httpCode < 200 || $httpCode >= 300) {
+        return $text;
+    }
+
+    $resp = json_decode((string)$raw, true);
+    $content = is_array($resp) ? trim((string)($resp['choices'][0]['message']['content'] ?? '')) : '';
+    if ($content === '') {
+        return $text;
+    }
+
+    return $content;
+}
+
 function aviso_send_whatsapp($aviso) {
     if (!aviso_whatsapp_allowed_for_aviso($aviso)) {
         return array(
@@ -1484,6 +1590,30 @@ function aviso_send_whatsapp($aviso) {
     $senderLines = avisos_comercial_sender_line_candidates();
     $senderLines = aviso_sender_line_candidates_for_aviso($aviso, $senderLines);
     $retryRounds = max(1, (int)avisos_sender_retry_rounds());
+
+    // Dual-send: el primary recibe el texto original y cada secondary recibe el
+    // mismo aviso parafraseado por LLM, con una espera de 15-25s entre destinatarios.
+    $ownerPhones = avisos_owner_notification_phones();
+    $secondaryByPhone = array_flip($ownerPhones['secondary']);
+    $paraphrasedText = null;
+
+    // El secondary garantizado (641993776) recibe el aviso aunque en la config
+    // solo esté el primary. No se reenvía si ya consta enviado con éxito.
+    if (trim((string)($aviso['whatsapp_last_result'] ?? '')) !== 'sent') {
+        foreach ($ownerPhones['secondary'] as $sp) {
+            if ($sp === '' || in_array($sp, $phones, true)) continue;
+            $alreadyOk = false;
+            foreach ((array)($aviso['whatsapp_last_log']['phones'] ?? array()) as $pRow) {
+                if (trim((string)($pRow['phone'] ?? '')) === $sp && !empty($pRow['ok'])) {
+                    $alreadyOk = true;
+                    break;
+                }
+            }
+            if (!$alreadyOk) {
+                $phones[] = $sp;
+            }
+        }
+    }
 
     $result = array(
         'ok' => false,
@@ -1531,15 +1661,30 @@ function aviso_send_whatsapp($aviso) {
     $usedLineIds = array();
 
     foreach ($phones as $phone) {
+        $phone = trim((string)$phone);
         $send = null;
         $successfulLine = null;
         $lineAttempts = array();
         $attemptCounter = 0;
 
+        $phoneText = $text;
+        if (isset($secondaryByPhone[$phone])) {
+            if ($paraphrasedText === null) {
+                $paraphrasedText = avisos_llm_paraphrase($text);
+            }
+            $phoneText = $paraphrasedText;
+        }
+
+        // Antiban: si en esta misma llamada ya se envió a otro destinatario,
+        // esperar un intervalo aleatorio de 15-25s antes del siguiente envío.
+        if (count($result['phones']) > 0) {
+            sleep(rand(15, 25));
+        }
+
         for ($round = 1; $round <= $retryRounds; $round++) {
             foreach ($senderLines as $senderLine) {
                 $attemptCounter++;
-                $send = comercial_send_text_via_line($senderLine, $phone, $text, $processMeta);
+                $send = comercial_send_text_via_line($senderLine, $phone, $phoneText, $processMeta);
                 $lineAttempt = array(
                     'line_id' => (string)($senderLine['id'] ?? ''),
                     'line_name' => (string)($senderLine['nombre'] ?? ''),
