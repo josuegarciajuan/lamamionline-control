@@ -3,7 +3,7 @@
  * Gestiona sidebar, chat, envío, polling, toggles y vista de agente.
  */
 (function(){
-    console.log('[inbox-chat] v20260729_3 cargado ✓');
+    console.log('[inbox-chat] v20260827_1 cargado ✓');
     var api = 'inbox_api.php';
     var selectedLineId = null;
     var selectedThreadId = null;
@@ -12,11 +12,38 @@
     var lastLinesJson = '';
     var pollingTimer = null;
     var linesData = [];
-    var currentView = 'chat'; // 'chat' | 'agent'
+    var currentView = window.InboxChatInitialView === 'agent' ? 'agent' : 'chat'; // 'chat' | 'agent'
     var fullChatThreadId = null;   // ID del hilo abierto en fullscreen
     var fullChatThreadData = null; // Datos del hilo fullscreen
     var _fullChatLastJson = '';    // dedup del refresco en tiempo real del fullchat
     var _readTimestamps = {};      // { threadId: Date.now() } — marca cuándo se leyó localmente
+    var _fullChatRevision = '';
+    var _fullChatBefore = null;
+    var _fullChatHasMore = false;
+    var _optimisticMessages = {}; // client_message_id -> local bubble
+
+    // Un único coordinador evita intervalos solapados. La cadencia se recupera
+    // tras un éxito y se limita tras errores para no castigar móviles lentos.
+    var pollCoordinator = (function(){
+        var timer = null, inFlight = {}, failures = 0, baseDelay = 5000, maxDelay = 60000;
+        function delay() { return Math.min(maxDelay, baseDelay * Math.pow(2, failures)); }
+        function schedule(wait) { if (timer) clearTimeout(timer); timer = setTimeout(run, wait); }
+        function request(name, fn) {
+            if (inFlight[name]) return Promise.resolve(null);
+            inFlight[name] = true;
+            return fn().then(function(value){ failures = 0; return value; }, function(error){ failures = Math.min(4, failures + 1); throw error; })
+                .finally(function(){ inFlight[name] = false; });
+        }
+        function run() {
+            if (document.hidden) return;
+            var jobs = [];
+            if (currentView === 'chat') jobs.push(request('lines', loadLines));
+            if (fullChatThreadId) jobs.push(request('thread', refreshFullChat));
+            Promise.all(jobs).catch(function(){}).finally(function(){ if (!document.hidden) schedule(delay()); });
+        }
+        document.addEventListener('visibilitychange', function(){ if (!document.hidden) { failures = 0; run(); } });
+        return { start: function(){ schedule(0); }, poke: function(){ if (!document.hidden) run(); }, request: request };
+    })();
 
     // ── Sidebar: líneas agrupadas + lazy-load por línea ──
     var _lineThreads = {};         // { lineId: { threads:[], hasMore, nextTs, nextId, loading, loaded, collapsed } }
@@ -27,19 +54,11 @@
     function init() {
         if (currentView === 'chat') {
             loadLines();
-            pollingTimer = setInterval(function(){
-                if (document.hidden) return;
-                if (currentView === 'chat') {
-                    loadLines();
-                    if (fullChatThreadId) refreshFullChat();
-                }
-            }, 5000);
+            pollCoordinator.start();
         } else if (currentView === 'agent') {
-            // Inicializar tabla de agente tras carga del DOM
-            setTimeout(function() { initAgentTable(); }, 200);
+            loadAgentPanel();
+            pollCoordinator.start();
         }
-        // Badge polling siempre activo
-        startBadgePolling();
     }
 
     // ── View switching ──
@@ -59,7 +78,7 @@
                 panelBtn.title = 'Ir al Chat de WhatsApp';
                 panelBtn.onclick = function(){ InboxChat.switchView('chat'); };
             }
-            initAgentTable();
+            loadAgentPanel();
             updatePanelBadge(_lastBadgeCount);
         } else {
             if (chatShell) chatShell.style.display = 'flex';
@@ -70,11 +89,25 @@
                 panelBtn.title = 'Ir al Panel de Agente';
                 panelBtn.onclick = function(){ InboxChat.switchView('agent'); };
             }
-            loadLines();
+            pollCoordinator.poke();
         }
 
         // Update URL without reload
         try { history.replaceState(null, '', '?view=' + view); } catch(e) {}
+    }
+
+    function loadAgentPanel() {
+        var view = document.getElementById('inboxAgentView');
+        if (!view || view.getAttribute('data-loaded') === '1') { initAgentTable(); return Promise.resolve(); }
+        return fetch(api + '?action=agent&_=' + Date.now(), {credentials:'same-origin'})
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+                if (!d.ok) throw new Error('agent');
+                view.innerHTML = d.html || '<div class="agent-empty">Sin datos</div>';
+                view.setAttribute('data-loaded', '1');
+                initAgentTable();
+            })
+            .catch(function(){ view.innerHTML = '<div class="inbox-empty">No se pudo cargar el panel</div>'; });
     }
 
     // ── Agent Cards — init event listeners ──
@@ -402,7 +435,7 @@
         }
     }
 
-    // Poll unread count every 5s for panel badge (lightweight endpoint)
+    // Legacy helpers retained for callers; the coordinator uses `lines` only.
     var _badgePollTimer = null;
 
     function startBadgePolling() {
@@ -435,11 +468,11 @@
 
     // ── Load lines (resumen de líneas agrupadas) ──
     function loadLines() {
-        if (_searchMode) return; // en modo búsqueda no pisamos las líneas
-        fetch(api + '?action=lines&_=' + Date.now(), {credentials:'same-origin'})
+        if (_searchMode) return Promise.resolve(); // en modo búsqueda no pisamos las líneas
+        return fetch(api + '?action=lines&_=' + Date.now(), {credentials:'same-origin'})
         .then(function(r){return r.json()})
         .then(function(d){
-            if (!d.ok) return;
+            if (!d.ok) throw new Error('lines');
             var json = JSON.stringify(d.lines || []);
             if (json === lastLinesJson) return;
             lastLinesJson = json;
@@ -447,7 +480,9 @@
             _searchMode = false;
             renderLines();
             if (d.settings) updateGlobalToggles(d.settings);
-        }).catch(function(){});
+            if (typeof d.pending === 'number') updatePanelBadge(d.pending);
+            return d;
+        });
     }
 
     // ── Estado por línea ──
@@ -790,16 +825,17 @@
         if (btn) btn.disabled = true;
         input.value = '';
         input.style.height = 'auto';
+        var clientMessageId = newClientMessageId();
         fetch(api + '?action=send&_=' + Date.now(), {
             method: 'POST',
             headers: {'Content-Type':'application/x-www-form-urlencoded'},
-            body: 'action=send&thread_id=' + encodeURIComponent(selectedThreadId) + '&text=' + encodeURIComponent(text),
+            body: 'action=send&thread_id=' + encodeURIComponent(selectedThreadId) + '&text=' + encodeURIComponent(text) + '&client_message_id=' + encodeURIComponent(clientMessageId),
             credentials: 'same-origin'
         })
         .then(function(r){return r.json()})
         .then(function(d){
             if (!d.ok) { alert('Error: ' + (d.error || 'No se pudo enviar')); input.value = text; }
-            else { loadMessages(true); loadLines(); }
+            else { pollCoordinator.poke(); }
         })
         .catch(function(){ alert('Error de red al enviar'); input.value = text; })
         .finally(function(){ if (btn) btn.disabled = false; if (input) input.focus(); });
@@ -915,6 +951,9 @@
     function openFullChat(threadId) {
         console.log('[inbox-chat] openFullChat(', threadId, ')');
         fullChatThreadId = threadId;
+        _fullChatRevision = '';
+        _fullChatBefore = null;
+        _fullChatHasMore = false;
         var overlay = document.getElementById('inboxFullChat');
         var nameEl = document.getElementById('inboxFullChatName');
         var subEl = document.getElementById('inboxFullChatSub');
@@ -964,24 +1003,30 @@
             renderFullChatMessages(d.messages || []);
             updateTypingIndicator(document.getElementById('inboxFullChatMessages'), d.thread);
             _fullChatLastJson = JSON.stringify(d.messages || []);
+            _fullChatRevision = d.revision || '';
+            _fullChatBefore = d.before || null;
+            _fullChatHasMore = !!d.has_more;
         })
         .catch(function(){
             if (msgEl) msgEl.innerHTML = '<div class="inbox-chat-placeholder"><div>Error al cargar</div></div>';
         });
     }
 
-    // Refresca el fullchat abierto en tiempo real (poll de 5s) SIN tocar el input
-    // ni forzar scroll. La detección de respuestas nativas la hace el backend en
-    // ?action=thread (comercial_sync_native_replies_for_thread).
+    // Refresca el fullchat desde cualquier vista. Solo anexa novedades, nunca
+    // reemplaza el timeline que el operador está leyendo.
     function refreshFullChat() {
-        if (!fullChatThreadId) return;
-        fetch(api + '?action=thread&id=' + encodeURIComponent(fullChatThreadId) + '&_=' + Date.now(), {credentials:'same-origin'})
+        if (!fullChatThreadId) return Promise.resolve();
+        var url = api + '?action=thread&id=' + encodeURIComponent(fullChatThreadId) + '&_=' + Date.now();
+        if (_fullChatRevision) url += '&revision=' + encodeURIComponent(_fullChatRevision);
+        return fetch(url, {credentials:'same-origin'})
         .then(function(r){ return r.json(); })
         .then(function(d){
-            if (!d.ok) return;
+            if (!d.ok) throw new Error('thread');
+            if (d.unchanged) return d;
             var json = JSON.stringify(d.messages || []);
-            if (json === _fullChatLastJson) return; // nada nuevo, evitar re-render/flicker
+            if (json === _fullChatLastJson) return d;
             _fullChatLastJson = json;
+            _fullChatRevision = d.revision || _fullChatRevision;
             fullChatThreadData = d;
             var msgEl = document.getElementById('inboxFullChatMessages');
             var subEl = document.getElementById('inboxFullChatSub');
@@ -995,10 +1040,11 @@
                 }
                 renderFullChatPause(t);
             }
-            renderFullChatMessages(d.messages || []);
+            appendFullChatChanges(d.messages || []);
             updateTypingIndicator(msgEl, d.thread);
+            return d;
         })
-        .catch(function(){});
+        ;
     }
 
     function closeFullChat() {
@@ -1010,6 +1056,7 @@
         fullChatThreadId = null;
         fullChatThreadData = null;
         _fullChatLastJson = '';
+        _fullChatRevision = '';
         document.body.style.overflow = '';
         // Resetear el highlight de la sidebar
         selectedThreadId = null;
@@ -1085,19 +1132,21 @@
         if (btn) btn.disabled = true;
         input.value = '';
         input.style.height = 'auto';
+        var clientMessageId = newClientMessageId();
+        addOptimisticMessage(fullChatThreadId, text, clientMessageId);
 
         fetch(api + '?action=send&_=' + Date.now(), {
             method: 'POST',
             headers: {'Content-Type':'application/x-www-form-urlencoded'},
-            body: 'action=send&thread_id=' + encodeURIComponent(fullChatThreadId) + '&text=' + encodeURIComponent(text),
+            body: 'action=send&thread_id=' + encodeURIComponent(fullChatThreadId) + '&text=' + encodeURIComponent(text) + '&client_message_id=' + encodeURIComponent(clientMessageId),
             credentials: 'same-origin'
         })
         .then(function(r){ return r.json(); })
         .then(function(d){
-            if (!d.ok) { alert('Error: ' + (d.error || 'No se pudo enviar')); input.value = text; }
-            else { openFullChat(fullChatThreadId); } // recargar mensajes
+            if (!d.ok) { markOptimisticFailed(clientMessageId); }
+            else { markOptimisticQueued(clientMessageId); pollCoordinator.poke(); }
         })
-        .catch(function(){ alert('Error de red al enviar'); input.value = text; })
+        .catch(function(){ markOptimisticFailed(clientMessageId); })
         .finally(function(){ if (btn) btn.disabled = false; if (input) input.focus(); });
     }
 
@@ -1135,7 +1184,7 @@
             var botTag = m.is_bot ? '<span class="msg-bot-tag">🤖 bot</span>' : '';
             var cont = (lastAuthor === dir) ? ' cont' : '';
             lastAuthor = dir;
-            h += '<div class="inbox-msg-bubble ' + dir + cont + '">';
+            h += '<div class="inbox-msg-bubble ' + dir + cont + '" data-message-key="' + escAttr(messageKey(m)) + '">';
             if (botTag) h += botTag;
             h += '<div class="msg-text">' + renderInboxMedia(m, dir) + '</div>';
             h += '<div class="msg-time">' + esc(time);
@@ -1145,6 +1194,99 @@
         }
         area.innerHTML = h;
         if (wasAtBottom) area.scrollTop = area.scrollHeight;
+    }
+
+    function messageKey(m) {
+        return [m.ts || '', m.direction || '', m.text || '', m.event || ''].join('|');
+    }
+    function appendFullChatChanges(messages) {
+        var area = document.getElementById('inboxFullChatMessages');
+        if (!area) return;
+        var wasAtBottom = (area.scrollHeight - area.scrollTop - area.clientHeight) <= 80;
+        var known = {};
+        area.querySelectorAll('[data-message-key]').forEach(function(node){ known[node.getAttribute('data-message-key')] = true; });
+        messages.forEach(function(m){
+            var key = messageKey(m);
+            if (known[key]) return;
+            var reconciled = false;
+            if (m.direction === 'out') {
+                Object.keys(_optimisticMessages).some(function(clientId){
+                    var local = _optimisticMessages[clientId];
+                    if (local.threadId === fullChatThreadId && local.text === m.text) {
+                        var localEl = area.querySelector('[data-client-message-id="' + escAttr(clientId) + '"]');
+                        if (localEl) localEl.remove();
+                        delete _optimisticMessages[clientId];
+                        reconciled = true;
+                        return true;
+                    }
+                    return false;
+                });
+            }
+            var dir = m.direction === 'out' ? 'out' : 'in';
+            area.insertAdjacentHTML('beforeend', '<div class="inbox-msg-bubble ' + dir + '" data-message-key="' + escAttr(key) + '"><div class="msg-text">' + renderInboxMedia(m, dir) + '</div><div class="msg-time">' + esc(formatTime(m.ts || '')) + (dir === 'out' ? '<span class="msg-checks">✓✓</span>' : '') + '</div></div>');
+            known[key] = true;
+        });
+        if (wasAtBottom) area.scrollTop = area.scrollHeight;
+    }
+    function loadFullChatOlder() {
+        if (!fullChatThreadId || !_fullChatHasMore || !_fullChatBefore) return;
+        var area = document.getElementById('inboxFullChatMessages');
+        if (!area || area.getAttribute('data-loading-history') === '1') return;
+        area.setAttribute('data-loading-history', '1');
+        var height = area.scrollHeight, top = area.scrollTop;
+        fetch(api + '?action=thread&id=' + encodeURIComponent(fullChatThreadId) + '&before=' + encodeURIComponent(_fullChatBefore) + '&_=' + Date.now(), {credentials:'same-origin'})
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+                if (!d.ok) throw new Error('history');
+                var fragment = document.createDocumentFragment();
+                (d.messages || []).forEach(function(m){
+                    var box = document.createElement('div');
+                    var dir = m.direction === 'out' ? 'out' : 'in';
+                    box.className = 'inbox-msg-bubble ' + dir;
+                    box.setAttribute('data-message-key', messageKey(m));
+                    box.innerHTML = '<div class="msg-text">' + renderInboxMedia(m, dir) + '</div><div class="msg-time">' + esc(formatTime(m.ts || '')) + '</div>';
+                    fragment.appendChild(box);
+                });
+                area.insertBefore(fragment, area.firstChild);
+                area.scrollTop = top + (area.scrollHeight - height);
+                _fullChatBefore = d.before || null;
+                _fullChatHasMore = !!d.has_more;
+            })
+            .catch(function(){ showToast('No se pudieron cargar mensajes anteriores', 'error'); })
+            .finally(function(){ area.removeAttribute('data-loading-history'); });
+    }
+    function newClientMessageId() {
+        return 'cm_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+    }
+    function addOptimisticMessage(threadId, text, clientId) {
+        _optimisticMessages[clientId] = {threadId:threadId, text:text, status:'sending'};
+        var area = document.getElementById('inboxFullChatMessages');
+        if (!area) return;
+        area.insertAdjacentHTML('beforeend', '<div class="inbox-msg-bubble out inbox-msg-pending" data-client-message-id="' + escAttr(clientId) + '"><div class="msg-text">' + formatMessageBody(text) + '</div><div class="msg-time"><span class="msg-send-state">Enviando</span></div></div>');
+        area.scrollTop = area.scrollHeight;
+    }
+    function markOptimisticQueued(clientId) { setOptimisticStatus(clientId, 'queued', 'En cola'); }
+    function markOptimisticFailed(clientId) { setOptimisticStatus(clientId, 'failed', 'Falló, reintentar'); }
+    function setOptimisticStatus(clientId, status, label) {
+        if (!_optimisticMessages[clientId]) return;
+        _optimisticMessages[clientId].status = status;
+        var area = document.getElementById('inboxFullChatMessages');
+        var bubble = area && area.querySelector('[data-client-message-id="' + escAttr(clientId) + '"]');
+        if (!bubble) return;
+        bubble.classList.toggle('is-failed', status === 'failed');
+        var state = bubble.querySelector('.msg-send-state');
+        if (state) state.textContent = label;
+        if (status === 'failed' && !bubble.querySelector('.msg-retry')) {
+            bubble.insertAdjacentHTML('beforeend', '<button type="button" class="msg-retry" onclick="InboxChat.retryMessage(\'' + escAttr(clientId) + '\')">Reintentar</button>');
+        }
+    }
+    function retryMessage(clientId) {
+        var local = _optimisticMessages[clientId];
+        if (!local || !local.threadId) return;
+        setOptimisticStatus(clientId, 'sending', 'Enviando');
+        fetch(api + '?action=send&_=' + Date.now(), {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'action=send&thread_id=' + encodeURIComponent(local.threadId) + '&text=' + encodeURIComponent(local.text) + '&client_message_id=' + encodeURIComponent(clientId), credentials:'same-origin'})
+            .then(function(r){ return r.json(); }).then(function(d){ if (d.ok) { markOptimisticQueued(clientId); pollCoordinator.poke(); } else markOptimisticFailed(clientId); })
+            .catch(function(){ markOptimisticFailed(clientId); });
     }
 
     // ── Helpers ──
@@ -1164,6 +1306,57 @@
         var m = String(text).match(/(https?:\/\/[^\s<>"']+)/gi);
         return m || [];
     }
+    function safeHttpUrl(value) {
+        var raw = String(value || '');
+        if (!raw || /[\x00-\x20"'\\]/.test(raw)) return '';
+        try {
+            var parsed = new URL(raw, window.location.href);
+            return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password ? parsed.href : '';
+        } catch (e) {
+            return '';
+        }
+    }
+    // Los binarios solo se cargan directamente desde nuestro origen o el CDN
+    // explícito de imágenes; el resto pasa por el proxy autenticado del servidor.
+    function safeDirectMediaUrl(value) {
+        var safe = safeHttpUrl(value);
+        if (!safe) return '';
+        var parsed = new URL(safe);
+        return parsed.origin === window.location.origin || parsed.hostname.toLowerCase() === 'compartir.site' ? safe : '';
+    }
+    function externalLinkHtml(url, imageUrl) {
+        var safeUrl = safeHttpUrl(url);
+        if (!safeUrl) return esc(url);
+        var link = document.createElement('a');
+        link.href = safeUrl;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.className = imageUrl ? '' : 'chat-link';
+        link.onclick = function(event) { event.stopPropagation(); };
+        if (imageUrl) {
+            var image = document.createElement('img');
+            image.className = 'chat-img';
+            image.src = imageUrl;
+            image.alt = 'foto';
+            image.loading = 'lazy';
+            link.appendChild(image);
+        } else {
+            link.textContent = safeUrl;
+        }
+        return link.outerHTML;
+    }
+    function mediaElementHtml(tag, src) {
+        var safe = safeDirectMediaUrl(src);
+        if (!safe) return '';
+        var element = document.createElement(tag);
+        element.src = safe;
+        if (tag === 'audio' || tag === 'video') element.controls = true;
+        element.style.cssText = tag === 'img'
+            ? 'max-width:200px;border-radius:8px;display:block;margin:4px 0'
+            : 'max-width:220px;border-radius:8px;display:block;margin:4px 0';
+        if (tag === 'img') element.alt = 'Imagen';
+        return element.outerHTML;
+    }
     function formatMessageBody(text) {
         var s = String(text || '');
         if (!s) return '';
@@ -1173,12 +1366,17 @@
         for (var i = 0; i < urls.length; i++) {
             var u = urls[i];
             var e = esc(u);
+            var src = safeDirectMediaUrl(directImageSrc(u));
             var linkHtml = isImageUrl(u)
-                ? '<a href="' + e + '" target="_blank" rel="noopener" onclick="event.stopPropagation()"><img class="chat-img" src="' + e + '" alt="foto" loading="lazy"></a>'
-                : '<a class="chat-link" href="' + e + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + e + '</a>';
+                ? externalLinkHtml(u, src)
+                : externalLinkHtml(u, '');
             out = out.split(e).join(linkHtml);
         }
         return out;
+    }
+    function directImageSrc(url) {
+        var match = String(url || '').match(/^(https?:\/\/compartir\.site\/([^\/?#]+))\/?(?:[?#].*)?$/i);
+        return match ? match[1] + '/' + match[2] + '.jpg' : url;
     }
 
     /**
@@ -1190,18 +1388,20 @@
         var body = m ? formatMessageBody(m.text || '') : '';
         if (media) {
             var proxy = '';
-            if (media.instance && m && m.id) {
-                proxy = '/control/media_proxy.php?instance=' + encodeURIComponent(media.instance) + '&msg_id=' + encodeURIComponent(m.id) + '&type=' + encodeURIComponent(media.type || '');
-            } else if (media.url) {
+            if (media.url_source === 'public' && /^https?:\/\//i.test(media.url || '')) {
+                proxy = safeDirectMediaUrl(media.url);
+            } else if (media.instance && (media.message_id || (m && m.id))) {
+                proxy = '/control/media_proxy.php?instance=' + encodeURIComponent(media.instance) + '&msg_id=' + encodeURIComponent(media.message_id || m.id) + '&type=' + encodeURIComponent(media.type || '');
+            } else if (media.url_source === 'evolution_authenticated' && media.url) {
                 proxy = '/control/media_proxy.php?url=' + encodeURIComponent(media.url) + '&type=' + encodeURIComponent(media.type || '');
             }
             if (proxy) {
                 if (media.type === 'audio') {
-                    body = '<audio controls style="max-width:220px;display:block;margin:4px 0" src="' + proxy + '"></audio>' + body;
+                    body = mediaElementHtml('audio', proxy) + body;
                 } else if (media.type === 'image') {
-                    body = '<img src="' + proxy + '" style="max-width:200px;border-radius:8px;display:block;margin:4px 0" alt="Imagen">' + body;
+                    body = mediaElementHtml('img', proxy) + body;
                 } else if (media.type === 'video') {
-                    body = '<video controls style="max-width:220px;border-radius:8px;display:block;margin:4px 0" src="' + proxy + '"></video>' + body;
+                    body = mediaElementHtml('video', proxy) + body;
                 }
             }
         }
@@ -1717,10 +1917,10 @@
     }
 
     function refreshAgentTable() {
-        // Forzar recarga de la tabla de agente (reload de la página en modo agent)
         if (currentView === 'agent') {
-            // Re-fetch via el endpoint y re-render
-            location.reload();
+            var view = document.getElementById('inboxAgentView');
+            if (view) view.removeAttribute('data-loaded');
+            loadAgentPanel();
         }
     }
 
@@ -1865,7 +2065,7 @@
         var sendOne = function(idx) {
             if (idx >= urls.length) return;
             var url = urls[idx];
-            var fd = 'action=send&thread_id=' + encodeURIComponent(threadId) + '&text=' + encodeURIComponent(url);
+                var fd = 'action=send&thread_id=' + encodeURIComponent(threadId) + '&text=' + encodeURIComponent(url) + '&client_message_id=' + encodeURIComponent(newClientMessageId());
             fetch(api + '?action=send&_=' + Date.now(), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -1905,6 +2105,7 @@
         openFullChat: openFullChat,
         closeFullChat: closeFullChat,
         sendFullChatMessage: sendFullChatMessage,
+        retryMessage: retryMessage,
         handleFullChatKey: handleFullChatKey,
         toggleFullChatPause: toggleFullChatPause,
         markRead: markRead,
@@ -1953,5 +2154,9 @@
                 }
             });
         }
+        var fullMessages = document.getElementById('inboxFullChatMessages');
+        if (fullMessages) fullMessages.addEventListener('scroll', function(){
+            if (fullMessages.scrollTop < 80) loadFullChatOlder();
+        });
     });
 })();

@@ -35,23 +35,10 @@ $settings = inbox_get_settings();
 $repOn  = !empty($settings['replies_enabled']);
 $openOn = !empty($settings['opener_enabled']);
 
-// ── Cargar datos de la bandeja SIEMPRE (necesario para cambio de vista via JS) ──
-$agentThreads = [];
-$agentLinesIndexed = [];
-$agentHtml = '';
-require_once __DIR__ . '/app/comercial_agent_table.php';
-$allThreads = function_exists('comercial_get_threads') ? comercial_get_threads() : [];
-$agentLinesIndexed = function_exists('comercial_list_lines_indexed') ? comercial_list_lines_indexed() : [];
-$agentThreads = function_exists('comercial_filter_agent_threads') ? comercial_filter_agent_threads($allThreads) : [];
-
-ob_start();
-render_comercial_agent_table($agentThreads, $agentLinesIndexed);
-$agentHtml = ob_get_clean();
-
 // ── Versiones para cache busters ──
 $_chatCssV = is_file(__DIR__ . '/assets/inbox-chat.css') ? filemtime(__DIR__ . '/assets/inbox-chat.css') : time();
 $_chatJsV  = is_file(__DIR__ . '/assets/inbox-chat.js')  ? filemtime(__DIR__ . '/assets/inbox-chat.js')  : time();
-$_forceV   = '20260821_01'; // sidebar por líneas (lazy-load por línea) + punto verde no-leídas + marcar todas leídas
+$_forceV   = '20260827_01'; // chat ligero, polling único e historial incremental
 
 ?><!doctype html>
 <html lang="es">
@@ -221,7 +208,7 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
 <!-- ── Vista Bandeja (Agente Comercial) ── -->
 <div class="inbox-agent-shell" id="inboxAgentShell" style="display:<?= $view === 'agent' ? 'flex' : 'none' ?>">
     <div class="inbox-agent-view" id="inboxAgentView">
-        <?= $agentHtml ?: '<div class="agent-empty"><strong>Sin datos</strong>No se pudieron cargar los hilos comerciales.</div>' ?>
+        <div class="inbox-loading">Cargando panel...</div>
     </div>
 </div>
 
@@ -382,10 +369,9 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
     </div>
 </div>
 
-<script src="assets/inbox-chat.js?v=<?= $_chatJsV ?>-<?= $_forceV ?>"></script>
 <script>
 // ── Init view ──
-InboxChat.currentView = <?= json_encode($view) ?>;
+window.InboxChatInitialView = <?= json_encode($view) ?>;
 
 // ── Global toggle handler (para switches) ──
 InboxChat.toggleGlobal = function(type, checkbox) {
@@ -426,6 +412,7 @@ function updateSwitchState(type, enabled) {
     }
 }
 </script>
+<script src="assets/inbox-chat.js?v=<?= $_chatJsV ?>-<?= $_forceV ?>"></script>
 
 </body>
 </html>

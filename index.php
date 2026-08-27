@@ -124,9 +124,9 @@ if ($lite) {
 
 // ── Anti-cache versiones automáticas (filemtime = cambiar al tocar el archivo) ──
 $_liteCssV  = filemtime(__DIR__ . '/assets/lite.css');
-$_appJsV    = filemtime(__DIR__ . '/assets/app.js');
+$_appJsV    = filemtime(__DIR__ . '/assets/app.js') . '-20260827_03';
 $_gpsRadarJsV = filemtime(__DIR__ . '/assets/gps-radar.js');
-$_styleCssV = filemtime(__DIR__ . '/assets/style.css');
+$_styleCssV = filemtime(__DIR__ . '/assets/style.css') . '-20260827_03';
 $_tokensCssV= filemtime(__DIR__ . '/assets/tokens.css');
 $_themeCssV = filemtime(__DIR__ . '/assets/theme.css');
 $_swV       = filemtime(__DIR__ . '/sw.js');

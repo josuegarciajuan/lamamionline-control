@@ -29,6 +29,8 @@ $pass = ban_assert(false, 422, 'HTTP 422 · {"error":"Session status is not as e
 $pass = ban_assert(false, 422, '{"error":"...","status":"SCAN_QR_CODE"}', 'HTTP 422 status SCAN_QR_CODE → no ban') && $pass;
 $pass = ban_assert(false, 422, '{"error":"...","status":"STOPPED"}', 'HTTP 422 status STOPPED → no ban') && $pass;
 $pass = ban_assert(false, 422, 'Session status is not as expected', '422 "Session status is not as expected" → no ban') && $pass;
+$pass = ban_assert(false, 422, '{"status":"FAILED","error":"Session FAILED"}', 'HTTP 422 status FAILED de WAHA → no ban') && $pass;
+$pass = ban_assert(false, 0, '{"status":"FAILED","error":"Session FAILED"}', 'HTTP 0 status FAILED de WAHA → no ban') && $pass;
 
 // ── SÍ es ban: reales ──────────────────────────────────────────────────────
 $pass = ban_assert(true, 401, 'Unauthorized', 'HTTP 401 → ban') && $pass;
