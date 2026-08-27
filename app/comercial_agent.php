@@ -865,3 +865,203 @@ function comercial_agent_decide_escalation(array $classification, array $thread,
         'reason' => 'continue_conversation',
     );
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  CONTRATO COMÚN DE DECISIÓN (AGENT V3)
+//  Sustituye el antiguo flujo "max_auto_turns + intent → handler".
+//  El LLM solo sugiere; el servidor valida y recalcula con guardas.
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Enum de estados de automatización del bot comercial.
+ * - continue              : seguir conversando, sin aviso.
+ * - lead_hot              : avisar al dueño pero permitir seguir respondiendo.
+ * - human_intervention    : aviso crítico + pausar el bot.
+ * - disqualified          : desinterés → despedida única y cerrar.
+ * - opted_out             : baja explícita → cero mensajes futuros.
+ */
+function comercial_automation_states(): array {
+    return array('continue', 'lead_hot', 'human_intervention', 'disqualified', 'opted_out');
+}
+
+function comercial_automation_is_terminal_state(string $state): bool {
+    return in_array($state, array('opted_out', 'disqualified'), true);
+}
+
+/**
+ * Normaliza y valida la decisión semántica devuelta por el LLM.
+ * El servidor recalcula reply_allowed / pause_bot a partir del estado:
+ * el modelo nunca decide directamente si puede enviar.
+ */
+function comercial_normalize_agent_decision(array $raw): array {
+    $states = comercial_automation_states();
+    $state = trim((string)($raw['state'] ?? 'continue'));
+    if (!in_array($state, $states, true)) {
+        return array('ok' => false, 'state' => 'continue', 'reply_allowed' => false, 'pause_bot' => false, 'error' => 'invalid_automation_state');
+    }
+    $confidence = max(0.0, min(1.0, (float)($raw['confidence'] ?? 0)));
+    $leadScore = max(0, min(100, (int)($raw['lead_score'] ?? 0)));
+    $intent = trim((string)($raw['intent'] ?? ''));
+    $reason = trim((string)($raw['reason'] ?? ''));
+
+    $replyAllowed = true;
+    $pauseBot = false;
+    $notificationRequired = false;
+    $notificationPriority = 'none';
+
+    if ($state === 'lead_hot') {
+        $replyAllowed = true;
+        $pauseBot = false;
+        $notificationRequired = true;
+        $notificationPriority = 'high';
+    } elseif ($state === 'human_intervention') {
+        $replyAllowed = false;
+        $pauseBot = true;
+        $notificationRequired = true;
+        $notificationPriority = 'critical';
+    } elseif ($state === 'disqualified') {
+        $replyAllowed = false;
+        $pauseBot = true;
+        $notificationRequired = false;
+    } elseif ($state === 'opted_out') {
+        $replyAllowed = false;
+        $pauseBot = true;
+        $notificationRequired = false;
+    }
+
+    return array(
+        'ok' => true,
+        'state' => $state,
+        'confidence' => $confidence,
+        'lead_score' => $leadScore,
+        'intent' => $intent,
+        'reason' => $reason,
+        'reply_allowed' => $replyAllowed,
+        'pause_bot' => $pauseBot,
+        'notification_required' => $notificationRequired,
+        'notification_priority' => $notificationPriority,
+        'legacy_stage' => $state === 'lead_hot' ? 'very_hot' : ($state === 'disqualified' ? 'discarded' : ($state === 'human_intervention' ? 'very_hot' : 'responded')),
+    );
+}
+
+/**
+ * Aplica las guardas server-side POR ENCIMA de lo que sugiera el LLM.
+ * Precedencia: intervención manual > baja explícita > pausa previa >
+ * estado terminal persistido > decisión del LLM.
+ */
+function comercial_resolve_automation_decision(array $thread, array $decision): array {
+    $thread = is_array($thread) ? $thread : array();
+    $decision = is_array($decision) ? $decision : array();
+
+    $manual = !empty($thread['human_taken']) || !empty($thread['inbox_paused']);
+    $persistedState = trim((string)($thread['automation_state'] ?? ''));
+
+    // 1. Intervención manual / pausa previa
+    if ($manual) {
+        return array(
+            'ok' => true,
+            'state' => 'human_intervention',
+            'reply_allowed' => false,
+            'pause_bot' => true,
+            'notification_required' => false,
+            'notification_priority' => 'none',
+            'reason' => 'manual_intervention',
+            'guard' => 'manual',
+        );
+    }
+    // 2. Baja explícita persistida
+    if ($persistedState === 'opted_out') {
+        return array(
+            'ok' => true,
+            'state' => 'opted_out',
+            'reply_allowed' => false,
+            'pause_bot' => true,
+            'notification_required' => false,
+            'notification_priority' => 'none',
+            'reason' => 'opted_out',
+            'guard' => 'opt_out',
+        );
+    }
+    // 3. Estado terminal persistido
+    if ($persistedState !== '' && comercial_automation_is_terminal_state($persistedState) && $persistedState !== 'disqualified') {
+        return array(
+            'ok' => true,
+            'state' => $persistedState,
+            'reply_allowed' => false,
+            'pause_bot' => true,
+            'notification_required' => false,
+            'notification_priority' => 'none',
+            'reason' => 'terminal_state',
+            'guard' => 'terminal',
+        );
+    }
+
+    // 4. Si el LLM no devolvió un contrato válido → no responder automáticamente
+    if (empty($decision['ok'])) {
+        return array(
+            'ok' => true,
+            'state' => 'continue',
+            'reply_allowed' => false,
+            'pause_bot' => false,
+            'notification_required' => false,
+            'notification_priority' => 'none',
+            'reason' => 'invalid_decision_safe_fallback',
+            'guard' => 'technical',
+        );
+    }
+
+    $state = (string)($decision['state'] ?? 'continue');
+    // Si ya hubo una intervención inmediata persistida, no reabrir solo por un mensaje.
+    if ($persistedState === 'human_intervention' && $state !== 'opted_out' && $state !== 'human_intervention') {
+        return array(
+            'ok' => true,
+            'state' => 'human_intervention',
+            'reply_allowed' => false,
+            'pause_bot' => true,
+            'notification_required' => false,
+            'notification_priority' => 'none',
+            'reason' => 'pending_human_intervention',
+            'guard' => 'persisted',
+        );
+    }
+
+    return $decision;
+}
+
+/**
+ * Clave estable de notificación por transición.
+ * thread_id + message_id + estado normalizado + tipo de aviso.
+ */
+function comercial_automation_notification_key(string $threadId, string $state, string $messageId = '', string $type = 'owner'): string {
+    $key = 'automation_notify|' . $threadId . '|' . $state . '|' . $type;
+    if ($messageId !== '') {
+        $key .= '|' . $messageId;
+    }
+    return $key;
+}
+
+/**
+ * Traduce el resultado de clasificación LLM + decisión legacy al estado común
+ * del contrato AGENT V3. Nunca es autoridad final: solo sugiere.
+ */
+function comercial_agent_map_classify_to_state(array $classify, array $decision): string {
+    $intent = (string)($classify['intent'] ?? '');
+    $nextAction = (string)($classify['next_action'] ?? '');
+    $leadScore = (int)($classify['lead_score'] ?? 0);
+    $action = (string)($decision['action'] ?? '');
+
+    // Escalado explícito o compra clara → intervención inmediata
+    if ($action === 'escalate_human' || $nextAction === 'escalate_to_human' || $intent === 'ready_to_buy') {
+        return 'human_intervention';
+    }
+    // Desinterés / no procede → descalificado
+    if ($intent === 'not_interested' || $nextAction === 'disqualify' || $action === 'disqualify') {
+        return 'disqualified';
+    }
+    // Interés real → caliente (avisa y sigue hablando)
+    if ($intent === 'interested' || $action === 'escalate_human' || $leadScore >= 78) {
+        return 'lead_hot';
+    }
+    // Cualquier otro caso → seguir conversando
+    return 'continue';
+}
