@@ -112,6 +112,7 @@ final class WahaApi implements WahaApiInterface
      * @param bool   $isBurst              True if user sent a rapid burst of messages.
      * @param bool   $isUrgent             True if user used urgent/impatient language.
      */
+    /** @param array<string, mixed> $delayConfig */
     public function sendHumanized(
         string $baseUrl,
         string $chatId,
@@ -292,6 +293,7 @@ final class WahaApi implements WahaApiInterface
      * @param array $patCfg  pattern_variation config section.
      * @return string  'standard', 'skip_read', or 'read_first'.
      */
+    /** @param array<string, mixed> $patCfg */
     private function choosePattern(array $patCfg): string
     {
         $enabled = (bool) ($patCfg['enabled'] ?? true);

@@ -94,6 +94,7 @@ final class FileLogger implements LoggerInterface
     //  Internals
     // ──────────────────────────────────────────────
 
+    /** @param array<string, mixed> $context */
     private function writeToFile(string $level, string $message, array $context): void
     {
         $dir = dirname($this->logFile);
@@ -124,6 +125,7 @@ final class FileLogger implements LoggerInterface
         }
     }
 
+    /** @param array<string, mixed> $context */
     private function formatLine(string $level, string $message, array $context): string
     {
         $timestamp  = date('Y-m-d H:i:s');

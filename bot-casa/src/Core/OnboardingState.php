@@ -100,6 +100,7 @@ final class OnboardingState
     }
 
     /** @param array<string, mixed> $state */
+    /** @param array<string, mixed> $state @return array{version: int, status: string, current_step: int, timestamps: array<string, ?string>, completed: bool, skipped: bool} */
     private function normalize(array $state): array
     {
         $status = (string) ($state['status'] ?? 'pending');
@@ -121,6 +122,7 @@ final class OnboardingState
         return $result;
     }
 
+    /** @return array{version: int, status: string, current_step: int, timestamps: array<string, ?string>, completed: bool, skipped: bool} */
     /** @return array{version: int, status: string, current_step: int, timestamps: array<string, ?string>, completed: bool, skipped: bool} */
     private function defaultState(): array
     {

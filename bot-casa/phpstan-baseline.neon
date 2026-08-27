@@ -1,32 +1,7 @@
 parameters:
 	ignoreErrors:
 		-
-			message: "#^Method WasapBot\\\\Bot\\:\\:bootstrap\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Bot.php
-
-		-
-			message: "#^Method WasapBot\\\\Bot\\:\\:evoApiClient\\(\\) has parameter \\$ctx with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Bot.php
-
-		-
-			message: "#^Method WasapBot\\\\Bot\\:\\:handleIncomingWhileProcessing\\(\\) should return array\\<string, mixed\\> but returns null\\.$#"
-			count: 1
-			path: src/Bot.php
-
-		-
-			message: "#^Method WasapBot\\\\Bot\\:\\:sendMessageEvo\\(\\) has parameter \\$ctx with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Bot.php
-
-		-
-			message: "#^Method WasapBot\\\\Bot\\:\\:sendMessages\\(\\) has parameter \\$ctx with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Bot.php
-
-		-
-			message: "#^Method WasapBot\\\\Bot\\:\\:sendMessages\\(\\) has parameter \\$messages with no value type specified in iterable type array\\.$#"
+			message: "#^Else branch is unreachable because previous condition is always true\\.$#"
 			count: 1
 			path: src/Bot.php
 
@@ -41,38 +16,18 @@ parameters:
 			path: src/Bot.php
 
 		-
-			message: "#^Parameter \\#1 \\$ctx of method WasapBot\\\\Bot\\:\\:buildChatHistory\\(\\) expects array\\<string, mixed\\>, array\\<string, mixed\\>\\|null given\\.$#"
-			count: 2
-			path: src/Bot.php
-
-		-
-			message: "#^Parameter \\#1 \\$ctx of method WasapBot\\\\Bot\\:\\:buildSystemPrompt\\(\\) expects array\\<string, mixed\\>, array\\<string, mixed\\>\\|null given\\.$#"
-			count: 2
-			path: src/Bot.php
-
-		-
 			message: "#^Parameter \\#1 \\$ctx of method WasapBot\\\\Bot\\:\\:injectLocationUrl\\(\\) expects array\\<string, mixed\\>, array\\<string, mixed\\>\\|null given\\.$#"
 			count: 1
 			path: src/Bot.php
 
 		-
 			message: "#^Parameter \\#1 \\$ctx of method WasapBot\\\\Pipeline\\\\PipelineStageInterface\\:\\:process\\(\\) expects array\\<string, mixed\\>, array\\<string, mixed\\>\\|null given\\.$#"
-			count: 3
+			count: 2
 			path: src/Bot.php
 
 		-
 			message: "#^Parameter \\#1 \\$string of function trim expects string, string\\|null given\\.$#"
 			count: 3
-			path: src/Bot.php
-
-		-
-			message: "#^Parameter \\#3 \\$context of method WasapBot\\\\Services\\\\OpenAiClientInterface\\:\\:chat\\(\\) expects array, array\\<string, mixed\\>\\|null given\\.$#"
-			count: 2
-			path: src/Bot.php
-
-		-
-			message: "#^Parameter \\#3 \\$subject of function preg_replace expects array\\|string, string\\|null given\\.$#"
-			count: 7
 			path: src/Bot.php
 
 		-
@@ -91,36 +46,6 @@ parameters:
 			path: src/Bot.php
 
 		-
-			message: "#^Method WasapBot\\\\Core\\\\ConfigInterface\\:\\:all\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/ConfigInterface.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\FileLogger\\:\\:formatLine\\(\\) has parameter \\$context with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/FileLogger.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\FileLogger\\:\\:writeToFile\\(\\) has parameter \\$context with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/FileLogger.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\HttpClientInterface\\:\\:get\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/HttpClientInterface.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\HttpClientInterface\\:\\:post\\(\\) has parameter \\$headers with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/HttpClientInterface.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\HttpClientInterface\\:\\:post\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/HttpClientInterface.php
-
-		-
 			message: "#^Return type \\(array\\<string\\>\\) of method WasapBot\\\\Core\\\\Memory\\:\\:getLines\\(\\) should be compatible with return type \\(array\\<int, array\\<string, mixed\\>\\>\\) of method WasapBot\\\\Core\\\\MemoryInterface\\:\\:getLines\\(\\)$#"
 			count: 1
 			path: src/Core/Memory.php
@@ -136,92 +61,7 @@ parameters:
 			path: src/Core/OnboardingState.php
 
 		-
-			message: "#^Else branch is unreachable because ternary operator condition is always true\\.$#"
-			count: 1
-			path: src/Core/UserManager.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\UserManager\\:\\:createUser\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/UserManager.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\UserManager\\:\\:deleteUser\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/UserManager.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\UserManager\\:\\:loadUsers\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/UserManager.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\UserManager\\:\\:loadUsers\\(\\) should return array\\{users\\: array\\<int, array\\>, next_id\\: int\\} but returns array\\<string, mixed\\>\\.$#"
-			count: 1
-			path: src/Core/UserManager.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\UserManager\\:\\:seedDefaultAdmin\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/UserManager.php
-
-		-
-			message: "#^Offset 'next_id' on array\\{users\\: array\\<int, array\\>, next_id\\: int\\} on left side of \\?\\? always exists and is not nullable\\.$#"
-			count: 1
-			path: src/Core/UserManager.php
-
-		-
-			message: "#^Offset 'users' on array\\{users\\: array\\<int, array\\>, next_id\\: int\\} on left side of \\?\\? always exists and is not nullable\\.$#"
-			count: 1
-			path: src/Core/UserManager.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\WahaManager\\:\\:__construct\\(\\) has parameter \\$config with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/WahaManager.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\WahaManager\\:\\:createInstance\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/WahaManager.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\WahaManager\\:\\:deleteInstance\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/WahaManager.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\WahaManager\\:\\:getStatus\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/WahaManager.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\WahaManager\\:\\:managerGet\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/WahaManager.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\WahaManager\\:\\:managerPost\\(\\) has parameter \\$fields with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/WahaManager.php
-
-		-
 			message: "#^Method WasapBot\\\\Core\\\\WahaManager\\:\\:managerPost\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/WahaManager.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\WahaManager\\:\\:resetInstance\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/WahaManager.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\WahaManager\\:\\:scanInstances\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/WahaManager.php
-
-		-
-			message: "#^Method WasapBot\\\\Core\\\\WahaManager\\:\\:startSession\\(\\) return type has no value type specified in iterable type array\\.$#"
 			count: 1
 			path: src/Core/WahaManager.php
 
@@ -236,17 +76,7 @@ parameters:
 			path: src/Core/WahaManager.php
 
 		-
-			message: "#^Method WasapBot\\\\Memory\\\\SessionMemoryInterface\\:\\:appendMessage\\(\\) has parameter \\$meta with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Memory/SessionMemoryInterface.php
-
-		-
-			message: "#^Method WasapBot\\\\Pipeline\\\\CatalogFormatter\\:\\:formatAllPhotos\\(\\) has parameter \\$girl with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Pipeline/CatalogFormatter.php
-
-		-
-			message: "#^Method WasapBot\\\\Pipeline\\\\CatalogFormatter\\:\\:formatGirlOneLine\\(\\) has parameter \\$girl with no value type specified in iterable type array\\.$#"
+			message: "#^Method WasapBot\\\\Pipeline\\\\CatalogFormatter\\:\\:formatAllPhotos\\(\\) return type has no value type specified in iterable type array\\.$#"
 			count: 1
 			path: src/Pipeline/CatalogFormatter.php
 
@@ -261,7 +91,7 @@ parameters:
 			path: src/Pipeline/CatalogFormatter.php
 
 		-
-			message: "#^Parameter \\#1 \\$girl of method WasapBot\\\\Pipeline\\\\CatalogFormatter\\:\\:formatAllPhotos\\(\\) expects array, array\\<string, mixed\\>\\|null given\\.$#"
+			message: "#^Parameter \\#1 \\$girl of method WasapBot\\\\Pipeline\\\\CatalogFormatter\\:\\:formatAllPhotos\\(\\) expects array\\<string, mixed\\>, array\\<string, mixed\\>\\|null given\\.$#"
 			count: 1
 			path: src/Pipeline/CatalogFormatter.php
 
@@ -291,22 +121,27 @@ parameters:
 			path: src/Pipeline/ContextAssembler.php
 
 		-
-			message: "#^Method WasapBot\\\\Pipeline\\\\ContextAssembler\\:\\:detectMapsSent\\(\\) has parameter \\$records with no value type specified in iterable type array\\.$#"
+			message: "#^Method WasapBot\\\\Pipeline\\\\ContextAssembler\\:\\:computeShownUnshown\\(\\) has parameter \\$activeGirls with no value type specified in iterable type array\\.$#"
 			count: 1
 			path: src/Pipeline/ContextAssembler.php
 
 		-
-			message: "#^Method WasapBot\\\\Pipeline\\\\ContextAssembler\\:\\:detectPhotosSentRecent\\(\\) has parameter \\$recent with no value type specified in iterable type array\\.$#"
+			message: "#^Method WasapBot\\\\Pipeline\\\\ContextAssembler\\:\\:computeShownUnshown\\(\\) has parameter \\$ctx with no value type specified in iterable type array\\.$#"
 			count: 1
 			path: src/Pipeline/ContextAssembler.php
 
 		-
-			message: "#^Method WasapBot\\\\Pipeline\\\\ContextAssembler\\:\\:detectTarifaElegida\\(\\) has parameter \\$recent with no value type specified in iterable type array\\.$#"
+			message: "#^Method WasapBot\\\\Pipeline\\\\ContextAssembler\\:\\:computeShownUnshown\\(\\) return type has no value type specified in iterable type array\\.$#"
 			count: 1
 			path: src/Pipeline/ContextAssembler.php
 
 		-
-			message: "#^Method WasapBot\\\\Pipeline\\\\ContextAssembler\\:\\:filterActiveGirls\\(\\) has parameter \\$girlsConfig with no value type specified in iterable type array\\.$#"
+			message: "#^Method WasapBot\\\\Pipeline\\\\ContextAssembler\\:\\:detectPendingQuestions\\(\\) has parameter \\$ctx with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Pipeline/ContextAssembler.php
+
+		-
+			message: "#^Method WasapBot\\\\Pipeline\\\\ContextAssembler\\:\\:detectPendingQuestions\\(\\) return type has no value type specified in iterable type array\\.$#"
 			count: 1
 			path: src/Pipeline/ContextAssembler.php
 
@@ -316,32 +151,7 @@ parameters:
 			path: src/Pipeline/ContextAssembler.php
 
 		-
-			message: "#^Method WasapBot\\\\Pipeline\\\\ContextAssembler\\:\\:hasWantsMoreInHistory\\(\\) has parameter \\$records with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Pipeline/ContextAssembler.php
-
-		-
-			message: "#^Method WasapBot\\\\Pipeline\\\\ContextAssembler\\:\\:lastBotReplyFromHistory\\(\\) has parameter \\$recent with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Pipeline/ContextAssembler.php
-
-		-
-			message: "#^Method WasapBot\\\\Pipeline\\\\ContextAssembler\\:\\:lastUserMeaningfulFromHistory\\(\\) has parameter \\$history with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Pipeline/ContextAssembler.php
-
-		-
-			message: "#^Method WasapBot\\\\Pipeline\\\\ContextAssembler\\:\\:lastUserMsgFromHistory\\(\\) has parameter \\$recent with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Pipeline/ContextAssembler.php
-
-		-
-			message: "#^Method WasapBot\\\\Pipeline\\\\ContextAssembler\\:\\:wantsMoreGirlsWasFulfilled\\(\\) has parameter \\$records with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Pipeline/ContextAssembler.php
-
-		-
-			message: "#^Method WasapBot\\\\Pipeline\\\\ContextAssembler\\:\\:yaEnviadoFromHistory\\(\\) has parameter \\$records with no value type specified in iterable type array\\.$#"
+			message: "#^Method WasapBot\\\\Pipeline\\\\ContextAssembler\\:\\:mergeContextFromOtherLines\\(\\) return type has no value type specified in iterable type array\\.$#"
 			count: 1
 			path: src/Pipeline/ContextAssembler.php
 
@@ -396,6 +206,51 @@ parameters:
 			path: src/Pipeline/ConversationStateMachine.php
 
 		-
+			message: "#^Method WasapBot\\\\Pipeline\\\\MessageExtractor\\:\\:detectAudio\\(\\) has parameter \\$msg with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Pipeline/MessageExtractor.php
+
+		-
+			message: "#^Method WasapBot\\\\Pipeline\\\\MessageExtractor\\:\\:detectAudio\\(\\) has parameter \\$payload with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Pipeline/MessageExtractor.php
+
+		-
+			message: "#^Method WasapBot\\\\Pipeline\\\\MessageExtractor\\:\\:detectImage\\(\\) has parameter \\$msg with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Pipeline/MessageExtractor.php
+
+		-
+			message: "#^Method WasapBot\\\\Pipeline\\\\MessageExtractor\\:\\:detectImage\\(\\) has parameter \\$payload with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Pipeline/MessageExtractor.php
+
+		-
+			message: "#^Method WasapBot\\\\Pipeline\\\\MessageExtractor\\:\\:detectLocation\\(\\) has parameter \\$msg with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Pipeline/MessageExtractor.php
+
+		-
+			message: "#^Method WasapBot\\\\Pipeline\\\\MessageExtractor\\:\\:detectLocation\\(\\) has parameter \\$payload with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Pipeline/MessageExtractor.php
+
+		-
+			message: "#^Method WasapBot\\\\Pipeline\\\\MessageExtractor\\:\\:resolveMessageObject\\(\\) has parameter \\$body with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Pipeline/MessageExtractor.php
+
+		-
+			message: "#^Method WasapBot\\\\Pipeline\\\\MessageExtractor\\:\\:resolveMessageObject\\(\\) has parameter \\$payload with no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Pipeline/MessageExtractor.php
+
+		-
+			message: "#^Method WasapBot\\\\Pipeline\\\\MessageExtractor\\:\\:resolveMessageObject\\(\\) return type has no value type specified in iterable type array\\.$#"
+			count: 1
+			path: src/Pipeline/MessageExtractor.php
+
+		-
 			message: "#^Negated boolean expression is always true\\.$#"
 			count: 1
 			path: src/Pipeline/MessageExtractor.php
@@ -426,32 +281,42 @@ parameters:
 			path: src/Services/BlacklistService.php
 
 		-
-			message: "#^Method WasapBot\\\\Services\\\\ClientProfileService\\:\\:computeDominantPattern\\(\\) has parameter \\$outcomes with no value type specified in iterable type array\\.$#"
+			message: "#^Method WasapBot\\\\Services\\\\ClientProfileService\\:\\:getAllProfiles\\(\\) should return array\\<string, mixed\\> but returns array\\<int, array\\>\\.$#"
 			count: 1
 			path: src/Services/ClientProfileService.php
 
 		-
-			message: "#^Method WasapBot\\\\Services\\\\ClientProfileService\\:\\:getAllProfiles\\(\\) return type has no value type specified in iterable type array\\.$#"
+			message: "#^Offset 'hostil' on array\\<int, array\\<string, mixed\\>\\> on left side of \\?\\? does not exist\\.$#"
 			count: 1
 			path: src/Services/ClientProfileService.php
 
 		-
-			message: "#^Method WasapBot\\\\Services\\\\ClientProfileService\\:\\:getProfile\\(\\) return type has no value type specified in iterable type array\\.$#"
+			message: "#^Offset 'indeterminado' on array\\<int, array\\<string, mixed\\>\\> on left side of \\?\\? does not exist\\.$#"
 			count: 1
 			path: src/Services/ClientProfileService.php
 
 		-
-			message: "#^Method WasapBot\\\\Services\\\\ClientProfileService\\:\\:persist\\(\\) has parameter \\$profile with no value type specified in iterable type array\\.$#"
+			message: "#^Offset 'lead_confirmado' on array\\<int, array\\<string, mixed\\>\\> on left side of \\?\\? does not exist\\.$#"
 			count: 1
 			path: src/Services/ClientProfileService.php
 
 		-
-			message: "#^Method WasapBot\\\\Services\\\\ClientProfileService\\:\\:syncFromOutcomes\\(\\) has parameter \\$newOutcomes with no value type specified in iterable type array\\.$#"
+			message: "#^Offset 'lead_ghosted' on array\\<int, array\\<string, mixed\\>\\> on left side of \\?\\? does not exist\\.$#"
 			count: 1
 			path: src/Services/ClientProfileService.php
 
 		-
-			message: "#^Method WasapBot\\\\Services\\\\ClientProfileService\\:\\:updateProfile\\(\\) has parameter \\$tags with no value type specified in iterable type array\\.$#"
+			message: "#^Offset 'lead_probable' on array\\<int, array\\<string, mixed\\>\\> on left side of \\?\\? does not exist\\.$#"
+			count: 1
+			path: src/Services/ClientProfileService.php
+
+		-
+			message: "#^Offset 'mareador' on array\\<int, array\\<string, mixed\\>\\> on left side of \\?\\? does not exist\\.$#"
+			count: 1
+			path: src/Services/ClientProfileService.php
+
+		-
+			message: "#^Offset 'muerta' on array\\<int, array\\<string, mixed\\>\\> on left side of \\?\\? does not exist\\.$#"
 			count: 1
 			path: src/Services/ClientProfileService.php
 
@@ -461,22 +326,12 @@ parameters:
 			path: src/Services/ClientProfileService.php
 
 		-
-			message: "#^Method WasapBot\\\\Services\\\\DeepSeekClient\\:\\:chat\\(\\) has parameter \\$context with no value type specified in iterable type array\\.$#"
+			message: "#^Unreachable statement \\- code above always terminates\\.$#"
 			count: 1
-			path: src/Services/DeepSeekClient.php
+			path: src/Services/ClientProfileService.php
 
 		-
-			message: "#^Method WasapBot\\\\Services\\\\DeepSeekClient\\:\\:chat\\(\\) has parameter \\$history with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Services/DeepSeekClient.php
-
-		-
-			message: "#^Method WasapBot\\\\Services\\\\DeepSeekClient\\:\\:chat\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Services/DeepSeekClient.php
-
-		-
-			message: "#^Method WasapBot\\\\Services\\\\DeepSeekClient\\:\\:parseChoicesContent\\(\\) return type has no value type specified in iterable type array\\.$#"
+			message: "#^Else branch is unreachable because ternary operator condition is always true\\.$#"
 			count: 1
 			path: src/Services/DeepSeekClient.php
 
@@ -486,14 +341,24 @@ parameters:
 			path: src/Services/DeepSeekClient.php
 
 		-
+			message: "#^Offset 'content' on array\\{role\\: string, content\\: string\\} on left side of \\?\\? always exists and is not nullable\\.$#"
+			count: 1
+			path: src/Services/DeepSeekClient.php
+
+		-
+			message: "#^Offset 'role' on array\\{role\\: string, content\\: string\\} on left side of \\?\\? always exists and is not nullable\\.$#"
+			count: 1
+			path: src/Services/DeepSeekClient.php
+
+		-
+			message: "#^Parameter \\#3 \\$headers of method WasapBot\\\\Core\\\\HttpClientInterface\\:\\:post\\(\\) expects array\\<string, mixed\\>, array\\<int, string\\> given\\.$#"
+			count: 2
+			path: src/Services/DeepSeekClient.php
+
+		-
 			message: "#^Parameter \\#2 \\$headers of method WasapBot\\\\Core\\\\HttpClientInterface\\:\\:get\\(\\) expects array\\<string, mixed\\>, array\\<int, string\\> given\\.$#"
 			count: 1
 			path: src/Services/GirlsService.php
-
-		-
-			message: "#^Method WasapBot\\\\Services\\\\GirlsServiceInterface\\:\\:findByName\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Services/GirlsServiceInterface.php
 
 		-
 			message: "#^Parameter \\#2 \\$headers of method WasapBot\\\\Core\\\\HttpClientInterface\\:\\:get\\(\\) expects array\\<string, mixed\\>, array\\<int, string\\> given\\.$#"
@@ -501,77 +366,22 @@ parameters:
 			path: src/Services/NativeOutboundSync.php
 
 		-
-			message: "#^Method WasapBot\\\\Services\\\\OpenAiClient\\:\\:chat\\(\\) has parameter \\$context with no value type specified in iterable type array\\.$#"
+			message: "#^Offset 'content' on array\\{role\\: string, content\\: string\\} on left side of \\?\\? always exists and is not nullable\\.$#"
 			count: 1
 			path: src/Services/OpenAiClient.php
 
 		-
-			message: "#^Method WasapBot\\\\Services\\\\OpenAiClient\\:\\:chat\\(\\) has parameter \\$history with no value type specified in iterable type array\\.$#"
+			message: "#^Offset 'role' on array\\{role\\: string, content\\: string\\} on left side of \\?\\? always exists and is not nullable\\.$#"
 			count: 1
 			path: src/Services/OpenAiClient.php
 
 		-
-			message: "#^Method WasapBot\\\\Services\\\\OpenAiClient\\:\\:chat\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Services/OpenAiClient.php
-
-		-
-			message: "#^Method WasapBot\\\\Services\\\\OpenAiClient\\:\\:parseChoicesContent\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Services/OpenAiClient.php
-
-		-
-			message: "#^Method WasapBot\\\\Services\\\\OpenAiClientInterface\\:\\:chat\\(\\) has parameter \\$context with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Services/OpenAiClientInterface.php
-
-		-
-			message: "#^Method WasapBot\\\\Services\\\\OpenAiClientInterface\\:\\:chat\\(\\) has parameter \\$history with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Services/OpenAiClientInterface.php
-
-		-
-			message: "#^Method WasapBot\\\\Services\\\\OpenAiClientInterface\\:\\:chat\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Services/OpenAiClientInterface.php
-
-		-
-			message: "#^Method WasapBot\\\\Services\\\\OpenAiClientInterface\\:\\:classifyTone\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Services/OpenAiClientInterface.php
-
-		-
-			message: "#^Method WasapBot\\\\Services\\\\OpenAiClientInterface\\:\\:getLastRawResponse\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Services/OpenAiClientInterface.php
-
-		-
-			message: "#^Offset 'lead_signals' on array\\{from_phone\\?\\: string, phone\\?\\: string, line_label\\?\\: string, line_last9\\?\\: string, lead_confidence\\?\\: float\\|string, confidence\\?\\: float\\|string, eta_minutes\\?\\: int\\|string, eta\\?\\: int\\|string, \\.\\.\\.\\} on left side of \\?\\? does not exist\\.$#"
-			count: 1
-			path: src/Services/TelegramService.php
-
-		-
-			message: "#^Offset 'line_notas' on array\\{from_phone\\?\\: string, phone\\?\\: string, line_label\\?\\: string, line_last9\\?\\: string, lead_confidence\\?\\: float\\|string, confidence\\?\\: float\\|string, eta_minutes\\?\\: int\\|string, eta\\?\\: int\\|string, \\.\\.\\.\\} on left side of \\?\\? does not exist\\.$#"
-			count: 1
-			path: src/Services/TelegramService.php
-
-		-
-			message: "#^Offset \\*NEVER\\* on array\\{eta_explicit\\: '⏱ ETA explícita', eta_implicit\\: '🗣 Intención de venir', coming_soon\\: '🏃 Viene ya', selected_girl\\: '👤 Chica elegida', maps_requested\\: '📍 Pidió ubicación', maps_sent\\: '🗺 Ubicación enviada', price_asked\\: '💶 Preguntó precios', urgent_tone\\: '⚡ Tono urgente', \\.\\.\\.\\} on left side of \\?\\? always exists and is not nullable\\.$#"
-			count: 1
-			path: src/Services/TelegramService.php
-
-		-
-			message: "#^Result of && is always false\\.$#"
+			message: "#^Parameter \\#3 \\$headers of method WasapBot\\\\Core\\\\HttpClientInterface\\:\\:post\\(\\) expects array\\<string, mixed\\>, array\\<int, string\\> given\\.$#"
 			count: 2
-			path: src/Services/TelegramService.php
+			path: src/Services/OpenAiClient.php
 
 		-
-			message: "#^Strict comparison using \\!\\=\\= between '' and '' will always evaluate to false\\.$#"
-			count: 1
-			path: src/Services/TelegramService.php
-
-		-
-			message: "#^Strict comparison using \\!\\=\\= between array\\{\\} and array\\{\\} will always evaluate to false\\.$#"
+			message: "#^Parameter \\#3 \\$headers of method WasapBot\\\\Core\\\\HttpClientInterface\\:\\:post\\(\\) expects array\\<string, mixed\\>, array\\<int, string\\> given\\.$#"
 			count: 1
 			path: src/Services/TelegramService.php
 
@@ -581,17 +391,7 @@ parameters:
 			path: src/Services/WahaApi.php
 
 		-
-			message: "#^Method WasapBot\\\\Services\\\\WahaApi\\:\\:choosePattern\\(\\) has parameter \\$patCfg with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Services/WahaApi.php
-
-		-
 			message: "#^Method WasapBot\\\\Services\\\\WahaApi\\:\\:resolveSession\\(\\) is unused\\.$#"
-			count: 1
-			path: src/Services/WahaApi.php
-
-		-
-			message: "#^Method WasapBot\\\\Services\\\\WahaApi\\:\\:sendHumanized\\(\\) has parameter \\$delayConfig with no value type specified in iterable type array\\.$#"
 			count: 1
 			path: src/Services/WahaApi.php
 
@@ -606,14 +406,14 @@ parameters:
 			path: src/Services/WahaApi.php
 
 		-
-			message: "#^Variable \\$urgentCfg in isset\\(\\) always exists and is not nullable\\.$#"
+			message: "#^Parameter \\#3 \\$headers of method WasapBot\\\\Core\\\\HttpClientInterface\\:\\:post\\(\\) expects array\\<string, mixed\\>, array\\<int, string\\> given\\.$#"
 			count: 1
 			path: src/Services/WahaApi.php
 
 		-
-			message: "#^Method WasapBot\\\\Services\\\\WahaApiInterface\\:\\:sendHumanized\\(\\) has parameter \\$delayConfig with no value type specified in iterable type array\\.$#"
+			message: "#^Variable \\$urgentCfg in isset\\(\\) always exists and is not nullable\\.$#"
 			count: 1
-			path: src/Services/WahaApiInterface.php
+			path: src/Services/WahaApi.php
 
 		-
 			message: "#^Constant WasapBot\\\\SideEffects\\\\LeadDetector\\:\\:HIGH_CONFIDENCE_THRESHOLD is unused\\.$#"
@@ -641,29 +441,14 @@ parameters:
 			path: src/SideEffects/PersonalityTracker.php
 
 		-
-			message: "#^Method WasapBot\\\\SideEffects\\\\PersonalityTracker\\:\\:append\\(\\) has parameter \\$record with no value type specified in iterable type array\\.$#"
+			message: "#^Method WasapBot\\\\SideEffects\\\\PersonalityTracker\\:\\:readLines\\(\\) should return array\\<int, array\\<string, mixed\\>\\> but returns array\\<int, string\\>\\.$#"
 			count: 1
 			path: src/SideEffects/PersonalityTracker.php
 
 		-
-			message: "#^Method WasapBot\\\\SideEffects\\\\PersonalityTracker\\:\\:readLines\\(\\) return type has no value type specified in iterable type array\\.$#"
+			message: "#^Parameter \\#1 \\$json of function json_decode expects string, array\\<string, mixed\\> given\\.$#"
 			count: 1
 			path: src/SideEffects/PersonalityTracker.php
-
-		-
-			message: "#^Method WasapBot\\\\SideEffects\\\\ResponseScorer\\:\\:appendRecord\\(\\) has parameter \\$record with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/SideEffects/ResponseScorer.php
-
-		-
-			message: "#^Method WasapBot\\\\SideEffects\\\\ResponseScorer\\:\\:isRepeatedQuestion\\(\\) has parameter \\$history with no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/SideEffects/ResponseScorer.php
-
-		-
-			message: "#^Parameter \\#3 \\$subject of function preg_replace expects array\\|string, string\\|null given\\.$#"
-			count: 1
-			path: src/SideEffects/ResponseScorer.php
 
 		-
 			message: "#^Property WasapBot\\\\SideEffects\\\\ResponseScorer\\:\\:\\$logger is never read, only written\\.$#"

@@ -408,6 +408,7 @@ final readonly class MessageExtractor implements PipelineStageInterface
      * @param array<string, mixed>|null $msg
      * @param array<string, mixed>    $payload
      */
+    /** @param array<string, mixed> $ctx @param array<string, mixed>|null $msg @param array<string, mixed> $payload */
     private function detectAudio(array $ctx, ?array $msg, array $payload): bool
     {
         try {
@@ -524,6 +525,7 @@ final readonly class MessageExtractor implements PipelineStageInterface
      * @param array<string, mixed>|null $msg
      * @param array<string, mixed>    $payload
      */
+    /** @param array<string, mixed> $ctx @param array<string, mixed>|null $msg @param array<string, mixed> $payload */
     private function detectImage(array $ctx, ?array $msg, array $payload): bool
     {
         try {
@@ -614,6 +616,7 @@ final readonly class MessageExtractor implements PipelineStageInterface
      * @param array<string, mixed>|null $msg
      * @param array<string, mixed>    $payload
      */
+    /** @param array<string, mixed> $ctx @param array<string, mixed>|null $msg @param array<string, mixed> $payload */
     private function detectLocation(array $ctx, ?array $msg, array $payload): bool
     {
         try {
@@ -679,6 +682,7 @@ final readonly class MessageExtractor implements PipelineStageInterface
      * @param array<string, mixed> $payload
      * @return array<string, mixed>|null
      */
+    /** @param array<string, mixed> $ctx @param array<string, mixed> $body @param array<string, mixed> $payload @return array<string, mixed>|null */
     private function resolveMessageObject(array $ctx, array $body, array $payload): ?array
     {
         // event=message + payload → the payload IS the message

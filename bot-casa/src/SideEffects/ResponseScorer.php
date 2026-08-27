@@ -45,6 +45,7 @@ final class ResponseScorer
      *
      * @param array<string, mixed> $ctx  Current pipeline context.
      */
+    /** @param array<string, mixed> $ctx */
     public function scorePreviousReply(array $ctx): void
     {
         $threadId = (string) ($ctx['thread_id'] ?? '');
@@ -154,6 +155,7 @@ final class ResponseScorer
      * Check if the current user message is essentially repeating
      * a question that was asked before the last bot reply.
      */
+    /** @param array<int, array<string, mixed>> $history */
     private function isRepeatedQuestion(string $currentMsg, array $history, int $lastBotIdx): bool
     {
         // Find the last user message before the bot replied
@@ -199,10 +201,11 @@ final class ResponseScorer
     {
         $t = mb_strtolower(trim($text), 'UTF-8');
         // Remove punctuation and extra spaces
-        $t = preg_replace('/[^\w\sáéíóúüñ]/u', '', $t);
+        $t = (string) preg_replace('/[^\w\sáéíóúüñ]/u', '', $t);
         return trim((string) preg_replace('/\s+/', ' ', $t));
     }
 
+    /** @param array<string, mixed> $record */
     private function appendRecord(array $record): void
     {
         $dir = dirname($this->scoresFile);

@@ -9,12 +9,15 @@ namespace WasapBot\Memory;
  */
 interface SessionMemoryInterface
 {
+    /**
+     * @param array<string, mixed> $meta
+     */
     public function appendMessage(
         string $threadId,
         string $phone,
         string $userMessage,
         string $botReply,
-        /** @param array<string, mixed> $meta */ array $meta = []
+        array $meta = []
     ): void;
 
     /** @return array<int, array<string, mixed>> */

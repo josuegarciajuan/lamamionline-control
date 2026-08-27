@@ -18,6 +18,7 @@ final class WahaManager implements LineProvisioningWahaInterface
     private string $managerBaseUrl;
     private string $webhookUrl;
 
+    /** @param array<string, mixed> $config */
     public function __construct(array $config = [])
     {
         $this->wahaServer    = (string) ($config['waha_server'] ?? '100.117.92.74');
@@ -31,6 +32,7 @@ final class WahaManager implements LineProvisioningWahaInterface
     // ─────────────────────────────────────────────────────────
 
     /** @return array */
+    /** @return array<string, mixed> */
     public function getStatus(): array
     {
         return $this->managerGet('status');
@@ -44,24 +46,28 @@ final class WahaManager implements LineProvisioningWahaInterface
     }
 
     /** @return array */
+    /** @return array<string, mixed> */
     public function createInstance(int $port = 0): array
     {
         return $this->managerPost('create', ['port' => $port > 0 ? $port : $this->getNextPort()]);
     }
 
     /** @return array */
+    /** @return array<string, mixed> */
     public function deleteInstance(int $port): array
     {
         return $this->managerPost('delete', ['port' => $port]);
     }
 
     /** @return array */
+    /** @return array<string, mixed> */
     public function resetInstance(int $port): array
     {
         return $this->managerPost('reset', ['port' => $port]);
     }
 
     /** @return array */
+    /** @return array<string, mixed> */
     public function startSession(int $port): array
     {
         return $this->managerPost('start_session', ['port' => $port]);
@@ -191,6 +197,7 @@ final class WahaManager implements LineProvisioningWahaInterface
     }
 
     /** @return array List of available WAHA ports with status */
+    /** @return array<int, array<string, mixed>> */
     public function scanInstances(): array
     {
         $status = $this->getStatus();
@@ -213,6 +220,7 @@ final class WahaManager implements LineProvisioningWahaInterface
     //  Internal HTTP helpers
     // ─────────────────────────────────────────────────────────
 
+    /** @return array<string, mixed> */
     private function managerGet(string $action): array
     {
         $url = "{$this->managerBaseUrl}/?action={$action}";
@@ -228,6 +236,7 @@ final class WahaManager implements LineProvisioningWahaInterface
         return is_array($data) ? $data : ['ok' => false, 'error' => 'Invalid response'];
     }
 
+    /** @param array<string, mixed> $fields @return array<string, mixed> */
     private function managerPost(string $action, array $fields): array
     {
         $url = "{$this->managerBaseUrl}/?action={$action}";

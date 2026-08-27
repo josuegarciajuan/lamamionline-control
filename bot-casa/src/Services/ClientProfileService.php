@@ -43,6 +43,7 @@ final class ClientProfileService
      *
      * Returns null if the phone has no prior conversations.
      */
+    /** @return array<string, mixed>|null */
     public function getProfile(string $phone): ?array
     {
         $phone = $this->normalizePhone($phone);
@@ -133,6 +134,7 @@ final class ClientProfileService
      * @param array  $tags         Pattern tags detected in this conversation
      * @param string $selectedGirl Last selected girl name (if any)
      */
+    /** @param array<string, mixed> $tags */
     public function updateProfile(string $phone, string $outcome, array $tags = [], string $selectedGirl = ''): void
     {
         $phone = $this->normalizePhone($phone);
@@ -198,6 +200,7 @@ final class ClientProfileService
      *
      * @param array $newOutcomes  Array of outcome records keyed by thread_id
      */
+    /** @param array<int, array<string, mixed>> $newOutcomes */
     public function syncFromOutcomes(array $newOutcomes): int
     {
         $updated = 0;
@@ -222,6 +225,7 @@ final class ClientProfileService
      *
      * @return list<array>
      */
+    /** @return array<string, mixed> */
     public function getAllProfiles(): array
     {
         $this->loadIntoCache();
@@ -263,6 +267,7 @@ final class ClientProfileService
         }
     }
 
+    /** @param array<string, mixed> $profile */
     private function persist(string $phone, array $profile): void
     {
         // Read all lines, update or append
@@ -298,6 +303,7 @@ final class ClientProfileService
     /**
      * Determine the dominant behavior pattern from outcome counts.
      */
+    /** @param array<int, array<string, mixed>> $outcomes */
     private function computeDominantPattern(array $outcomes): string
     {
         $mareador  = (int) ($outcomes['mareador'] ?? 0);

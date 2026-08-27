@@ -742,6 +742,7 @@ final class ContextAssembler implements PipelineStageInterface
     /**
      * ¿El historial ya tiene wants_more_girls=true?
      */
+    /** @param array<int, array<string, mixed>> $records */
     private function hasWantsMoreInHistory(array $records): bool
     {
         foreach ($records as $rec) {
@@ -764,6 +765,7 @@ final class ContextAssembler implements PipelineStageInterface
      * pero seq 639 "pues ella" y seq 640 "y las tarifas" no tienen fotos,
      * lo que antes reactivaba el flag en seq 641).
      */
+    /** @param array<int, array<string, mixed>> $records */
     private function wantsMoreGirlsWasFulfilled(array $records): bool
     {
         // 1. Encontrar el registro más reciente con wants_more_girls=true
@@ -796,6 +798,7 @@ final class ContextAssembler implements PipelineStageInterface
     // HELPERS — Last messages from history
     // ==================================================================
 
+    /** @param array<int, array<string, mixed>> $recent */
     private function lastBotReplyFromHistory(array $recent): ?string
     {
         for ($i = count($recent) - 1; $i >= 0; $i--) {
@@ -805,6 +808,7 @@ final class ContextAssembler implements PipelineStageInterface
         return null;
     }
 
+    /** @param array<int, array<string, mixed>> $recent */
     private function lastUserMsgFromHistory(array $recent): ?string
     {
         for ($i = count($recent) - 1; $i >= 0; $i--) {
@@ -814,6 +818,7 @@ final class ContextAssembler implements PipelineStageInterface
         return null;
     }
 
+    /** @param array<int, array<string, mixed>> $history */
     private function lastUserMeaningfulFromHistory(array $history): string
     {
         for ($i = count($history) - 1; $i >= 0; $i--) {
@@ -847,6 +852,7 @@ final class ContextAssembler implements PipelineStageInterface
         return 'otro';
     }
 
+    /** @param array<int, array<string, mixed>> $recent */
     private function detectTarifaElegida(array $recent): string
     {
         for ($i = count($recent) - 1; $i >= 0; $i--) {
@@ -933,6 +939,7 @@ final class ContextAssembler implements PipelineStageInterface
     // HELPERS — ya_enviado, maps_sent, photos_sent
     // ==================================================================
 
+    /** @param array<int, array<string, mixed>> $records @return list<string> */
     private function yaEnviadoFromHistory(array $records): array
     {
         $flags = [];
@@ -971,6 +978,7 @@ final class ContextAssembler implements PipelineStageInterface
         return array_values(array_unique($flags));
     }
 
+    /** @param array<int, array<string, mixed>> $records */
     private function detectMapsSent(array $records): bool
     {
         $re = '/(?:https?:\/\/)?(?:goo\.gl\/maps|maps\.app\.goo\.gl|google\.com\/maps|maps\.google\.com)/i';
@@ -982,6 +990,7 @@ final class ContextAssembler implements PipelineStageInterface
         return false;
     }
 
+    /** @param array<int, array<string, mixed>> $recent */
     private function detectPhotosSentRecent(array $recent, int $windowH): bool
     {
         foreach ($recent as $rec) {
@@ -1054,6 +1063,7 @@ final class ContextAssembler implements PipelineStageInterface
      * @param array<string, mixed> $ctx
      * @return list<string> Etiquetas de preguntas pendientes (ej: 'fotos', 'precios', 'ubicacion')
      */
+    /** @param array<int, array<string, mixed>> $history @param array<string, mixed> $ctx @return list<string> */
     private function detectPendingQuestions(array $history, array $ctx): array
     {
         $pending = [];
@@ -1168,6 +1178,7 @@ final class ContextAssembler implements PipelineStageInterface
      * @param list<array<string, mixed>> $activeGirls
      * @return array{0: list<string>, 1: list<array<string, mixed>>}
      */
+    /** @param array<int, array<string, mixed>> $history @param array<string, mixed> $ctx @param list<array<string, mixed>> $activeGirls @return array{shown: list<string>, unshown: list<string>} */
     private function computeShownUnshown(array $history, array $ctx, array $activeGirls): array
     {
         $shownNames = [];
@@ -1299,6 +1310,7 @@ final class ContextAssembler implements PipelineStageInterface
         return false;
     }
 
+    /** @param list<array<string, mixed>> $girlsConfig @return list<array<string, mixed>> */
     private function filterActiveGirls(array $girlsConfig): array
     {
         return array_values(array_filter($girlsConfig, function ($g) {
@@ -1461,6 +1473,7 @@ final class ContextAssembler implements PipelineStageInterface
      * @param  array<string, mixed> $ctx        Current context (reference)
      * @return array<string, mixed>|null        Updated ctx or null if no merge needed
      */
+    /** @param array<string, mixed> $ctx @return array<string, mixed>|null */
     private function mergeContextFromOtherLines(string $fromPhone, string $currentTid, array $ctx): ?array
     {
         if ($this->sessionMemory === null) return null;

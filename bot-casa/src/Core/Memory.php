@@ -59,6 +59,7 @@ final class Memory implements MemoryInterface
     //  MemoryInterface
     // ──────────────────────────────────────────────
 
+    /** @return array<int, array<string, mixed>> */
     public function read(): array
     {
         $fp = $this->openFile('rb');
@@ -78,6 +79,7 @@ final class Memory implements MemoryInterface
         }
     }
 
+    /** @param array<string, mixed> $record */
     public function append(array $record): void
     {
         $this->ensureDir();
