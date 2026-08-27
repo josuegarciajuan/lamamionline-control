@@ -6153,6 +6153,9 @@ function comercial_refresh_lines_health($force = false) {
 }
 
 function comercial_send_text_via_line($line, $targetPhone, $text, $process = null, $fast = false) {
+    if (function_exists('comercial_humanize_outbound_message')) {
+        $text = comercial_humanize_outbound_message((string)$text);
+    }
     $settings = comercial_get_settings();
     $lineId = (string)($line['id'] ?? '');
     $port = trim((string)($line['waha_port'] ?? ''));
