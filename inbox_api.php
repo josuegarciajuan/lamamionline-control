@@ -248,12 +248,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'lines') {
             }
         }
 
+        $lineState = is_array($line['comercial_state'] ?? null) ? $line['comercial_state'] : array();
+        $healthStatus = trim((string)($lineState['health_status'] ?? 'unknown'));
+        $lastHealthCheckAt = trim((string)($lineState['last_health_check_at'] ?? ''));
+        $lastHealthCheckTs = $lastHealthCheckAt !== '' ? strtotime($lastHealthCheckAt) : false;
+        if ($lastHealthCheckTs === false || ($lastHealthCheckTs + 300) < time()) {
+            $healthStatus = 'unknown';
+        }
+
         $result[] = [
             'line_id'           => $lid,
             'line_name'         => trim((string)($line['nombre'] ?? '')),
             'line_phone'        => comercial_only_digits((string)($line['tfono'] ?? '')),
             'waha_port'         => trim((string)($line['waha_port'] ?? '')),
-            'health_status'     => trim((string)(($line['comercial_state'] ?? array())['health_status'] ?? 'unknown')),
+            'health_status'     => $healthStatus,
             'thread_count'      => count($threads),
             'line_last_ts'      => $lineLastTs,
             'line_total_unread' => $lineUnread,

@@ -38,7 +38,7 @@ $openOn = !empty($settings['opener_enabled']);
 // ── Versiones para cache busters ──
 $_chatCssV = is_file(__DIR__ . '/assets/inbox-chat.css') ? filemtime(__DIR__ . '/assets/inbox-chat.css') : time();
 $_chatJsV  = is_file(__DIR__ . '/assets/inbox-chat.js')  ? filemtime(__DIR__ . '/assets/inbox-chat.js')  : time();
-$_forceV   = '20260828_01'; // controles compactos y estado de conexión de líneas
+$_forceV   = '20260828_02'; // salud fresca y barra superior equilibrada
 
 ?><!doctype html>
 <html lang="es">
@@ -64,11 +64,13 @@ html,body{height:100%;height:100vh;min-height:0;overflow:hidden;font-family:-app
 html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:manipulation}
 
 /* ── Top bar ── */
-.inbox-topbar{display:flex;align-items:center;gap:10px;padding:8px 16px;background:#075e54;border-bottom:1px solid rgba(0,0,0,.15);flex-shrink:0;min-height:50px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.inbox-topbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;padding:8px 16px;background:#075e54;border-bottom:1px solid rgba(0,0,0,.15);flex-shrink:0;min-height:50px;overflow-x:auto;scrollbar-width:none}
 .inbox-topbar::-webkit-scrollbar{display:none}
 
 /* ── Toggle switches (iOS style) ── */
 .inbox-toggles{display:flex;align-items:center;gap:14px}
+.inbox-topbar .inbox-toggles{justify-self:center}
+.inbox-topbar__right{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0}
 .inbox-switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;position:relative}
 .inbox-switch input{position:absolute;width:1px;height:1px;margin:-1px;opacity:0;clip:rect(0 0 0 0);clip-path:inset(50%)}
 .inbox-switch input:focus-visible + .inbox-switch__track{outline:2px solid #fff;outline-offset:2px}
@@ -126,6 +128,7 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
   .inbox-switch{gap:4px}
   .inbox-switch__state{min-width:20px;text-align:center}
   .inbox-panel-btn{padding:6px 10px}
+  .inbox-topbar__right{gap:5px}
 }
 </style>
 </head>
@@ -159,13 +162,15 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
         </label>
     </div>
 
-    <!-- Instalación PWA: visible solo si el navegador dispara beforeinstallprompt -->
-    <button class="inbox-install-btn" id="inboxInstallBtn" onclick="InboxChat.installApp()" title="Instalar la app" aria-label="Instalar la app">⬇️ Instalar</button>
+    <div class="inbox-topbar__right">
+        <!-- Instalación PWA: visible solo si el navegador dispara beforeinstallprompt -->
+        <button class="inbox-install-btn" id="inboxInstallBtn" onclick="InboxChat.installApp()" title="Instalar la app" aria-label="Instalar la app">⬇️ Instalar</button>
 
-    <!-- Agenda button -->
-    <button class="inbox-agenda-btn" id="inboxAgendaBtn" onclick="InboxChat.openAgenda()" title="Agenda comercial" aria-label="Abrir agenda comercial">
-        📅
-    </button>
+        <!-- Agenda button -->
+        <button class="inbox-agenda-btn" id="inboxAgendaBtn" onclick="InboxChat.openAgenda()" title="Agenda comercial" aria-label="Abrir agenda comercial">
+            ☎
+        </button>
+    </div>
 </div>
 
 <!-- ── Vista Chat ── -->
@@ -248,7 +253,7 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
 <div class="inbox-agenda-overlay" id="inboxAgendaOverlay" style="display:none">
     <div class="inbox-agenda-panel">
         <div class="inbox-agenda-header">
-            <span class="inbox-agenda-title">📅 Agenda Comercial</span>
+            <span class="inbox-agenda-title">☎ Agenda Comercial</span>
             <button class="inbox-agenda-close" onclick="InboxChat.closeAgenda()">✕</button>
         </div>
 
