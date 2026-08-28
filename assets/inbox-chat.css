@@ -537,6 +537,22 @@ body.inbox-agent-fs .inbox-agent-fs-close{display:block}
   .inbox-agent-fs-close{top:8px;right:8px;padding:8px 14px;font-size:13px}
 }
 
+/* Evita que títulos, controles y acciones se compriman hasta solaparse. */
+@media(max-width:640px){
+  .inbox-chat-header{flex-wrap:wrap;gap:8px;padding:8px 10px}
+  .inbox-chat-header-info{flex:1 1 140px}
+  .inbox-chat-header-actions{flex:1 1 100%;flex-wrap:wrap;justify-content:flex-end}
+
+  .agent-card-actions{flex-wrap:wrap}
+  .agent-card-btn{flex:1 1 calc(50% - 4px);min-width:0;white-space:normal;line-height:1.15}
+  .agent-card-btn-convert-lead{flex-basis:100%}
+}
+
+@media(min-width:641px) and (max-width:768px){
+  .inbox-agent-view .agent-quick-filters{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .inbox-agent-view .agent-filter-btn{flex:0 0 auto}
+}
+
 /* ═══════════════════════════════════════════════════════════════
    FULLSCREEN CHAT OVERLAY (desde la tabla de agente)
    ═══════════════════════════════════════════════════════════════ */

@@ -121,6 +121,11 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
   .inbox-panel-btn{padding:6px 14px;font-size:13px}
   .inbox-toggles{gap:8px}
 }
+@media(max-width:640px){
+  .inbox-topbar{flex-wrap:wrap;row-gap:6px}
+  .inbox-topbar-title{margin-right:0;flex:1 1 auto;min-width:0}
+  .inbox-toggles{margin-left:auto}
+}
 </style>
 </head>
 <body style="display:flex;flex-direction:column">
