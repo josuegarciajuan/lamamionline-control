@@ -81,7 +81,22 @@ $nullLogger = new class implements \WasapBot\Core\LoggerInterface {
 };
 
 $config = new \WasapBot\Core\Config(WASAPBOT_ROOT);
-$memory = new \WasapBot\Core\Memory($config, $nullLogger);
+
+// ── Memoria del usuario activo ────────────────────────────────────────
+// El admin (user 1) también lee su memoria per-user (data/users/{id}/)
+// cuando el directorio existe, alineado con el webhook y las APIs
+// (stats.php, aprendizaje.php). En modo legacy sin dir per-user se usa la
+// ruta del config raíz (public/data/session_memory.ndjson).
+$memoryConfig = $config;
+$_panelAdminUserId = (int) ($_SESSION['user_id'] ?? 0);
+if ($_panelAdminUserId > 0) {
+    $_panelUserDataDir = WASAPBOT_ROOT . '/data/users/' . $_panelAdminUserId;
+    if (is_dir($_panelUserDataDir)) {
+        $memoryConfig = new \WasapBot\Core\Config(WASAPBOT_ROOT);
+        $memoryConfig->set('files.session_memory', \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $_panelAdminUserId, 'session_memory.ndjson'));
+    }
+}
+$memory = new \WasapBot\Core\Memory($memoryConfig, $nullLogger);
 
 $modeFilePath = resolveConfigPath('bot.mode_file', 'data/.bot_mode');
 
@@ -212,6 +227,32 @@ function resolveConfigPath(string $configKey, string $defaultValue): string
         return $rawPath;
     }
     return WASAPBOT_ROOT . '/' . ltrim($rawPath, '/');
+}
+
+/**
+ * Resolve the active memory/leads path for the current session user.
+ * Uses the per-user data dir (data/users/{id}/) when it exists, otherwise
+ * falls back to the root config path (legacy admin layout).
+ *
+ * @param string $kind 'session_memory' | 'leads'
+ */
+function resolveActiveDataPath(string $kind): string
+{
+    $userId = (int) ($_SESSION['user_id'] ?? 0);
+    if ($userId > 0) {
+        $userDataDir = WASAPBOT_ROOT . '/data/users/' . $userId;
+        if (is_dir($userDataDir)) {
+            return \WasapBot\Bot::resolveUserDataPath(
+                WASAPBOT_ROOT,
+                $userId,
+                $kind === 'leads' ? 'leads.ndjson' : 'session_memory.ndjson'
+            );
+        }
+    }
+    return resolveConfigPath(
+        $kind === 'leads' ? 'files.leads' : 'files.session_memory',
+        $kind === 'leads' ? 'data/leads.ndjson' : 'data/session_memory.ndjson'
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -909,8 +950,8 @@ function readNdjson(string $filePath): array
  */
 function getBotStats(\WasapBot\Core\Config $config): array
 {
-    $leadsPath   = resolveConfigPath('files.leads', 'data/leads.ndjson');
-    $memoryPath  = resolveConfigPath('files.session_memory', 'data/session_memory.ndjson');
+    $leadsPath   = resolveActiveDataPath('leads');
+    $memoryPath  = resolveActiveDataPath('session_memory');
 
     $todayStr = (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Madrid')))->format('Y-m-d');
 
@@ -957,7 +998,7 @@ function getBotStats(\WasapBot\Core\Config $config): array
  */
 function getLeadsForDisplay(\WasapBot\Core\Config $config): array
 {
-    $leadsPath = resolveConfigPath('files.leads', 'data/leads.ndjson');
+    $leadsPath = resolveActiveDataPath('leads');
     $records   = readNdjson($leadsPath);
     // newest first
     usort($records, static function (array $a, array $b): int {
@@ -976,7 +1017,7 @@ function getThreadConversation(\WasapBot\Core\Config $config, string $threadId):
     if ($threadId === '') {
         return [];
     }
-    $memoryPath = resolveConfigPath('files.session_memory', 'data/session_memory.ndjson');
+    $memoryPath = resolveActiveDataPath('session_memory');
     if (!file_exists($memoryPath)) {
         return [];
     }

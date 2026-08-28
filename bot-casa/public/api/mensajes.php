@@ -255,7 +255,11 @@ try {
     // load the user's config (which has paths resolved by Bot::bootstrap)
     // and pass them through resolveUserDataPath for environment-independent resolution.
     // This ensures chat reads from the EXACT same file the webhook writes to.
-    if ($userId > 1) {
+    // Admin (user 1) is also routed to its per-user data dir (data/users/1/) when it
+    // exists, matching stats.php, aprendizaje.php and the webhook. In legacy mode
+    // (no per-user dir yet) we fall back to the root config so history stays visible.
+    $userDataDir = WASAPBOT_ROOT . '/data/users/' . $userId;
+    if ($userId > 1 || is_dir($userDataDir)) {
         $userConfigDir = \WasapBot\Bot::resolveUserConfigDir(WASAPBOT_ROOT, $userId);
         $userCfg = new \WasapBot\Core\Config($userConfigDir, WASAPBOT_ROOT);
         $memoryFile = \WasapBot\Bot::resolveUserDataPath(WASAPBOT_ROOT, $userId, (string) $userCfg->get('files.session_memory', 'data/session_memory.ndjson'));

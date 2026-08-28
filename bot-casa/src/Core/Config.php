@@ -330,10 +330,34 @@ final class Config implements ConfigInterface
         if (!is_dir($dir) && !@mkdir($dir, 0700, true) && !is_dir($dir)) {
             throw new \RuntimeException("Config: cannot create directory {$dir}");
         }
+
+        // Preserve owner/group/mode of an existing config file. Without this, a
+        // script running as a different user (e.g. root cron learn.php calling
+        // Config::save()) replaces the file with one owned by that user and mode
+        // 0600 (tempnam), making it unreadable for the web (php-fpm/www-data) and
+        // breaking config resolution (e.g. the admin chat reading session_memory).
+        $uid = null; $gid = null; $mode = null;
+        if (file_exists($path)) {
+            $st = @stat($path);
+            if (is_array($st)) {
+                $uid  = $st['uid'];
+                $gid  = $st['gid'];
+                $mode = $st['mode'] & 0777;
+            }
+        }
+
         $tmp = tempnam($dir, '.config-');
         if ($tmp === false || @file_put_contents($tmp, $json . "\n", LOCK_EX) === false || !@rename($tmp, $path)) {
             if ($tmp !== false) @unlink($tmp);
             throw new \RuntimeException("Config: cannot atomically write {$path}");
+        }
+
+        if ($mode !== null) {
+            @chmod($path, $mode);
+        }
+        if ($uid !== null && $gid !== null) {
+            @chown($path, $uid);
+            @chgrp($path, $gid);
         }
     }
 
