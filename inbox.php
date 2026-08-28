@@ -38,7 +38,7 @@ $openOn = !empty($settings['opener_enabled']);
 // ── Versiones para cache busters ──
 $_chatCssV = is_file(__DIR__ . '/assets/inbox-chat.css') ? filemtime(__DIR__ . '/assets/inbox-chat.css') : time();
 $_chatJsV  = is_file(__DIR__ . '/assets/inbox-chat.js')  ? filemtime(__DIR__ . '/assets/inbox-chat.js')  : time();
-$_forceV   = '20260827_02'; // chat ligero, long-poll en tiempo real y envío optimista
+$_forceV   = '20260828_01'; // controles compactos de la barra superior
 
 ?><!doctype html>
 <html lang="es">
@@ -64,14 +64,14 @@ html,body{height:100%;height:100vh;min-height:0;overflow:hidden;font-family:-app
 html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:manipulation}
 
 /* ── Top bar ── */
-.inbox-topbar{display:flex;align-items:center;gap:10px;padding:8px 16px;background:#075e54;border-bottom:1px solid rgba(0,0,0,.15);flex-shrink:0;min-height:50px}
-.inbox-topbar-title{font-weight:600;font-size:15px;color:#fff;margin-right:auto;letter-spacing:.01em;display:flex;align-items:center;gap:6px;flex-shrink:0}
-.inbox-topbar-title-icon{font-size:19px}
+.inbox-topbar{display:flex;align-items:center;gap:10px;padding:8px 16px;background:#075e54;border-bottom:1px solid rgba(0,0,0,.15);flex-shrink:0;min-height:50px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.inbox-topbar::-webkit-scrollbar{display:none}
 
 /* ── Toggle switches (iOS style) ── */
 .inbox-toggles{display:flex;align-items:center;gap:14px}
-.inbox-switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
-.inbox-switch input{display:none}
+.inbox-switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;position:relative}
+.inbox-switch input{position:absolute;width:1px;height:1px;margin:-1px;opacity:0;clip:rect(0 0 0 0);clip-path:inset(50%)}
+.inbox-switch input:focus-visible + .inbox-switch__track{outline:2px solid #fff;outline-offset:2px}
 .inbox-switch__label{font-size:12px;font-weight:600;color:rgba(255,255,255,.75);white-space:nowrap}
 .inbox-switch__track{width:42px;height:24px;background:rgba(255,255,255,.2);border-radius:12px;position:relative;transition:background .2s;flex-shrink:0}
 .inbox-switch__track::before{content:'';width:20px;height:20px;background:#fff;border-radius:50%;position:absolute;top:2px;left:2px;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
@@ -115,16 +115,17 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
 
 @media(max-width:768px){
   .inbox-topbar{padding:6px 10px;gap:6px;min-height:42px}
-  .inbox-topbar-title{font-size:13px}
   .inbox-switch__label{font-size:11px}
   .inbox-switch--small .inbox-switch__label{display:none}
   .inbox-panel-btn{padding:6px 14px;font-size:13px}
   .inbox-toggles{gap:8px}
 }
 @media(max-width:640px){
-  .inbox-topbar{flex-wrap:wrap;row-gap:6px}
-  .inbox-topbar-title{margin-right:0;flex:1 1 auto;min-width:0}
-  .inbox-toggles{margin-left:auto}
+  .inbox-topbar{gap:6px}
+  .inbox-toggles{gap:6px}
+  .inbox-switch{gap:4px}
+  .inbox-switch__state{min-width:20px;text-align:center}
+  .inbox-panel-btn{padding:6px 10px}
 }
 </style>
 </head>
@@ -132,21 +133,28 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
 
 <!-- Top bar -->
 <div class="inbox-topbar" id="inboxTopbar">
-    <span class="inbox-topbar-title">
-        <span class="inbox-topbar-title-icon">💬</span> Inbox
-    </span>
+    <!-- View toggle — primer control para cambiar entre Panel y Chat -->
+    <?php if ($view === 'agent'): ?>
+        <button class="inbox-panel-btn" id="inboxPanelBtn" onclick="InboxChat.switchView('chat')" title="Ir al Chat de WhatsApp" aria-label="Ir al Chat de WhatsApp">
+            💬 Chat
+        </button>
+    <?php else: ?>
+        <button class="inbox-panel-btn" id="inboxPanelBtn" onclick="InboxChat.switchView('agent')" title="Ir al Panel de Agente" aria-label="Ir al Panel de Agente">
+            📊 Panel
+        </button>
+    <?php endif; ?>
 
     <!-- Toggle switches (siempre visibles en ambas vistas) -->
     <div class="inbox-toggles" id="inboxToggles">
         <label class="inbox-switch" id="inboxToggleReplies" title="Activar/desactivar respuestas automáticas del bot">
-            <span class="inbox-switch__label">Respuesta</span>
-            <input type="checkbox" <?= $repOn ? 'checked' : '' ?> onchange="InboxChat.toggleGlobal('replies', this)">
+            <span class="inbox-switch__label" aria-hidden="true">🤖</span>
+            <input type="checkbox" aria-label="Activar o desactivar respuestas automáticas del bot" <?= $repOn ? 'checked' : '' ?> onchange="InboxChat.toggleGlobal('replies', this)">
             <span class="inbox-switch__track"></span>
-            <span class="inbox-switch__state"><?= $repOn ? 'ON' : 'OFF' ?></span>
+            <span class="inbox-switch__state" aria-live="polite"><?= $repOn ? '📣' : 'OFF' ?></span>
         </label>
         <label class="inbox-switch inbox-switch--small" id="inboxToggleOpener" title="Activar/desactivar mensajes de inicio">
             <span class="inbox-switch__label">Inicio</span>
-            <input type="checkbox" <?= $openOn ? 'checked' : '' ?> onchange="InboxChat.toggleGlobal('opener', this)">
+            <input type="checkbox" aria-label="Activar o desactivar mensajes de inicio" <?= $openOn ? 'checked' : '' ?> onchange="InboxChat.toggleGlobal('opener', this)">
             <span class="inbox-switch__track"></span>
         </label>
     </div>
@@ -155,20 +163,9 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
     <button class="inbox-install-btn" id="inboxInstallBtn" onclick="InboxChat.installApp()" title="Instalar la app" aria-label="Instalar la app">⬇️ Instalar</button>
 
     <!-- Agenda button -->
-    <button class="inbox-agenda-btn" id="inboxAgendaBtn" onclick="InboxChat.openAgenda()" title="Agenda comercial">
-        👤
+    <button class="inbox-agenda-btn" id="inboxAgendaBtn" onclick="InboxChat.openAgenda()" title="Agenda comercial" aria-label="Abrir agenda comercial">
+        📅
     </button>
-
-    <!-- View toggle — botón único y prominente -->
-    <?php if ($view === 'agent'): ?>
-        <button class="inbox-panel-btn" id="inboxPanelBtn" onclick="InboxChat.switchView('chat')" title="Ir al Chat de WhatsApp">
-            💬 Chat
-        </button>
-    <?php else: ?>
-        <button class="inbox-panel-btn" id="inboxPanelBtn" onclick="InboxChat.switchView('agent')" title="Ir al Panel de Agente">
-            📊 Panel
-        </button>
-    <?php endif; ?>
 </div>
 
 <!-- ── Vista Chat ── -->
@@ -251,7 +248,7 @@ html{font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;touch-action:m
 <div class="inbox-agenda-overlay" id="inboxAgendaOverlay" style="display:none">
     <div class="inbox-agenda-panel">
         <div class="inbox-agenda-header">
-            <span class="inbox-agenda-title">👤 Agenda Comercial</span>
+            <span class="inbox-agenda-title">📅 Agenda Comercial</span>
             <button class="inbox-agenda-close" onclick="InboxChat.closeAgenda()">✕</button>
         </div>
 

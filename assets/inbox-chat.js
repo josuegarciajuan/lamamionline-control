@@ -1021,7 +1021,7 @@
                 var cb = label.querySelector('input[type="checkbox"]');
                 if (cb) cb.checked = settings.replies_enabled;
                 var st = label.querySelector('.inbox-switch__state');
-                if (st) st.textContent = settings.replies_enabled ? 'ON' : 'OFF';
+                if (st) st.textContent = settings.replies_enabled ? '📣' : 'OFF';
             }
         }
         if (settings.opener_enabled !== undefined) {
@@ -1040,7 +1040,7 @@
         if (type !== 'replies') return;
         var el = document.getElementById('inboxToggleReplies');
         var st = el ? el.querySelector('.inbox-switch__state') : null;
-        if (st) st.textContent = enabled ? 'ON' : 'OFF';
+        if (st) st.textContent = enabled ? '📣' : 'OFF';
     }
     function toggleGlobal(type, checkbox) {
         if (!checkbox) return;
