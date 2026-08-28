@@ -40,5 +40,6 @@ $failed = comercial_evolution_health_from_response(array(
 ));
 assert_same_value('down', $failed['health_status'], 'Un error de Evolution debe marcar la línea como down.');
 assert_same_value('Evolution no responde', $failed['error'], 'Debe conservar el diagnóstico de Evolution.');
+assert_same_value(3600, comercial_line_health_interval_seconds(), 'La comprobación periódica de salud debe conservar el intervalo de una hora.');
 
 fwrite(STDOUT, "OK\n");
