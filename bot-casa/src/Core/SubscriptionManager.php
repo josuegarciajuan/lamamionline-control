@@ -274,6 +274,9 @@ final class SubscriptionManager
      */
     private function notifyPaymentWhatsApp(int $userId, float $amount): void
     {
+        if ((getenv('APP_ENV') ?: '') === 'test') {
+            return;
+        }
         try {
             $config = new Config(dirname(__DIR__, 2));
             $notifier = new \WasapBot\Payment\PaymentConfirmationNotifier($config, $this->userManager);
@@ -491,6 +494,9 @@ final class SubscriptionManager
      */
     private function notifyPaymentTelegram(array $user, float $amount, string $method): void
     {
+        if ((getenv('APP_ENV') ?: '') === 'test') {
+            return;
+        }
         try {
             $token = '7455622229:AAG7qFKsNS52Xn7WkWdxgshqriTZCVQedNE';
             $chatId = '6755848011';

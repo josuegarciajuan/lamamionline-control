@@ -8,6 +8,10 @@ declare(strict_types=1);
 
 define('WASAPBOT_ROOT', dirname(__DIR__));
 
+// Marca el entorno como test para que SubscriptionManager NO dispare
+// notificaciones reales (Telegram/WhatsApp) al registrar pagos de prueba.
+putenv('APP_ENV=test');
+
 $vendorAutoload = WASAPBOT_ROOT . '/vendor/autoload.php';
 if (file_exists($vendorAutoload)) {
     require_once $vendorAutoload;
