@@ -30,6 +30,10 @@
 .inbox-line-header{padding:10px 14px;font-size:12px;font-weight:600;color:var(--wa-accent);display:flex;align-items:center;gap:8px;cursor:pointer;border-bottom:1px solid var(--wa-border);letter-spacing:.03em;transition:background .1s}
 .inbox-line-header:hover{background:rgba(255,255,255,.03)}
 .inbox-line-header .line-dot{width:10px;height:10px;border-radius:50%;background:#667781;flex-shrink:0;box-shadow:0 0 6px rgba(102,119,129,.35)}
+.inbox-line-header .line-dot--up{background:#25d366;box-shadow:0 0 6px rgba(37,211,102,.5)}
+.inbox-line-header .line-dot--starting{background:#fbbf24;box-shadow:0 0 6px rgba(251,191,36,.45)}
+.inbox-line-header .line-dot--down{background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.4)}
+.inbox-line-header .line-dot--unknown{background:#667781;box-shadow:0 0 6px rgba(102,119,129,.35)}
 .inbox-line-header .line-dot.off{background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.3)}
 .inbox-line-header .line-dot--unread{background:#25d366;box-shadow:0 0 8px rgba(37,211,102,.5);animation:inbox-pulse-dot 2s ease-in-out infinite}
 @keyframes inbox-pulse-dot{0%,100%{box-shadow:0 0 4px rgba(37,211,102,.4)}50%{box-shadow:0 0 12px rgba(37,211,102,.8)}}

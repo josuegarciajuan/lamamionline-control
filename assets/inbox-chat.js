@@ -590,6 +590,15 @@
             var lineLastTs = line.line_last_ts || '';
             var lineUnread = line.line_total_unread || 0;
             var lineTime = formatLineTime(lineLastTs);
+            var healthStatus = line.health_status || 'unknown';
+            var healthLabels = {
+                up: 'Activa',
+                starting: 'Conectando',
+                down: 'Caída',
+                unknown: 'Sin comprobar'
+            };
+            if (!healthLabels[healthStatus]) healthStatus = 'unknown';
+            var statusLabel = healthLabels[healthStatus];
 
             var st = _lineThreads[lid] || { collapsed: true };
 
@@ -604,8 +613,8 @@
                 }
             }
 
-            // Punto verde solo si hay no leídas; gris si no.
-            var dotClass = lineUnread > 0 ? ' line-dot line-dot--unread' : ' line-dot';
+            // El punto representa la conexión de WhatsApp; unread va solo en su badge.
+            var dotClass = ' line-dot line-dot--' + healthStatus;
 
             var markBtn = '';
             if (lineUnread > 0) {
@@ -615,7 +624,7 @@
 
             h += '<div class="inbox-line-group' + (st.collapsed ? ' collapsed' : '') + '" data-line-id="' + escAttr(lid) + '">';
             h += '<div class="inbox-line-header" onclick="InboxChat.toggleLine(\'' + escAttr(lid) + '\')">';
-            h += '<span class="' + dotClass + '"></span>';
+            h += '<span class="' + dotClass + '" role="img" title="Estado de WhatsApp: ' + escAttr(statusLabel) + '" aria-label="Estado de WhatsApp: ' + escAttr(statusLabel) + '"></span>';
             h += '<span class="inbox-line-name">' + esc(lname) + '</span>';
             if (lineTime) h += '<span class="inbox-line-time">' + esc(lineTime) + '</span>';
             h += '<span class="inbox-line-meta">' + esc(lphone) + ' · ' + tcount + '</span>';

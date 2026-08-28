@@ -38,7 +38,7 @@ $openOn = !empty($settings['opener_enabled']);
 // ── Versiones para cache busters ──
 $_chatCssV = is_file(__DIR__ . '/assets/inbox-chat.css') ? filemtime(__DIR__ . '/assets/inbox-chat.css') : time();
 $_chatJsV  = is_file(__DIR__ . '/assets/inbox-chat.js')  ? filemtime(__DIR__ . '/assets/inbox-chat.js')  : time();
-$_forceV   = '20260827_02'; // chat ligero, long-poll en tiempo real y envío optimista
+$_forceV   = '20260828_01'; // estado real de conexión en el listado de líneas
 
 ?><!doctype html>
 <html lang="es">

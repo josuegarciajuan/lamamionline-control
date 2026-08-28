@@ -253,6 +253,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'lines') {
             'line_name'         => trim((string)($line['nombre'] ?? '')),
             'line_phone'        => comercial_only_digits((string)($line['tfono'] ?? '')),
             'waha_port'         => trim((string)($line['waha_port'] ?? '')),
+            'health_status'     => trim((string)(($line['comercial_state'] ?? array())['health_status'] ?? 'unknown')),
             'thread_count'      => count($threads),
             'line_last_ts'      => $lineLastTs,
             'line_total_unread' => $lineUnread,
