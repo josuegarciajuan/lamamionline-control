@@ -4746,7 +4746,7 @@ function comercial_send_hot_notification_whatsapp($ownerPhone, $message) {
     );
 
     foreach ($lines as $line) {
-        if (trim((string)($line['waha_port'] ?? '')) === '') continue;
+        if (whatsapp_transport_for($line) !== 'evolution' && trim((string)($line['waha_port'] ?? '')) === '') continue;
         // No usar la línea personal del dueño (654464023) como emisor: no puede
         // auto-enviarse un WhatsApp a sí misma y siempre fallaría.
         if (comercial_only_digits((string)($line['tfono'] ?? '')) === '654464023') continue;
@@ -4996,7 +4996,7 @@ function comercial_line_is_available($line, $settings = null) {
         ? $line['comercial_state']
         : comercial_get_line_state((string)($line['id'] ?? ''));
 
-    if (trim((string)($line['waha_port'] ?? '')) === '') return false;
+    if (whatsapp_transport_for($line) !== 'evolution' && trim((string)($line['waha_port'] ?? '')) === '') return false;
     if (in_array((string)($state['health_status'] ?? 'unknown'), array('down', 'starting'), true)) return false;
     if ((string)$state['status'] === 'paused') {
         $cooldownUntilTs = strtotime((string)$state['cooldown_until']);
@@ -6265,9 +6265,37 @@ function comercial_line_health_css_class($healthStatus) {
     }
 }
 
+function comercial_evolution_health_from_response($response) {
+    $response = is_array($response) ? $response : array();
+    $data = is_array($response['data'] ?? null) ? $response['data'] : array();
+    $sessionStatus = strtoupper(trim((string)($data['state'] ?? '')));
+    $httpCode = (int)($response['http_code'] ?? 0);
+    $healthStatus = 'down';
+    $errorText = trim((string)($response['error'] ?? ''));
+
+    if (!empty($response['ok']) && $httpCode >= 200 && $httpCode < 300) {
+        if ($sessionStatus === 'OPEN') {
+            $healthStatus = 'up';
+            $errorText = '';
+        } elseif ($sessionStatus === 'CONNECTING') {
+            $healthStatus = 'starting';
+            $errorText = 'La instancia Evolution está conectando.';
+        } elseif ($sessionStatus !== '') {
+            $errorText = 'La instancia Evolution está en estado ' . $sessionStatus . '.';
+        } else {
+            $errorText = 'Evolution no devolvió un estado de conexión.';
+        }
+    } elseif ($errorText === '') {
+        $errorText = $httpCode > 0 ? ('Evolution HTTP ' . $httpCode) : 'Evolution API no respondió correctamente.';
+    }
+
+    return array('health_status' => $healthStatus, 'http_code' => $httpCode, 'session_status' => $sessionStatus, 'error' => $errorText);
+}
+
 function comercial_check_line_health($line, $force = false) {
     $line = is_array($line) ? $line : array();
     $lineId = trim((string)($line['id'] ?? ''));
+    $transport = whatsapp_transport_for($line);
     $port = trim((string)($line['waha_port'] ?? ''));
     $state = $lineId !== '' ? comercial_get_line_state($lineId) : comercial_normalize_line_state(array());
 
@@ -6275,7 +6303,7 @@ function comercial_check_line_health($line, $force = false) {
         return array('checked' => false, 'line_id' => '', 'health_status' => 'unknown', 'message' => 'Línea sin identificador.');
     }
 
-    if ($port === '') {
+    if ($transport !== 'evolution' && $port === '') {
         $patch = array(
             'line_id' => $lineId,
             'health_status' => 'unknown',
@@ -6310,32 +6338,41 @@ function comercial_check_line_health($line, $force = false) {
         );
     }
 
-    $settings = comercial_get_settings();
-    $sessionName = trim((string)($settings['waha_session'] ?? 'default'));
-    if ($sessionName === '') $sessionName = 'default';
-    $response = comercial_waha_get_json($settings, $port, 'api/sessions/' . rawurlencode($sessionName));
-    $decoded = json_decode((string)($response['body'] ?? ''), true);
-    $sessionStatus = strtoupper(trim((string)($decoded['status'] ?? '')));
-    $httpCode = (int)($response['http_code'] ?? 0);
-    $httpOk = !empty($response['ok']) && in_array($httpCode, array(200, 201), true);
-
-    $healthStatus = 'down';
-    $errorText = '';
-
-    if ($httpOk) {
-        if ($sessionStatus === '' || $sessionStatus === 'WORKING') {
-            $healthStatus = 'up';
-        } elseif ($sessionStatus === 'STARTING') {
-            $healthStatus = 'starting';
-            $errorText = 'La sesión WAHA está arrancando.';
-        } else {
-            $healthStatus = 'down';
-            $errorText = 'La sesión WAHA está en estado ' . $sessionStatus . '.';
-        }
+    if ($transport === 'evolution') {
+        $evo = evolution_client_for_row($line);
+        $evolutionHealth = comercial_evolution_health_from_response($evo->getStatus());
+        $healthStatus = $evolutionHealth['health_status'];
+        $sessionStatus = $evolutionHealth['session_status'];
+        $httpCode = $evolutionHealth['http_code'];
+        $errorText = $evolutionHealth['error'];
     } else {
-        $errorText = trim((string)($response['error'] ?? ''));
-        if ($errorText === '') {
-            $errorText = $httpCode > 0 ? ('HTTP ' . $httpCode) : 'WAHA no respondió correctamente.';
+        $settings = comercial_get_settings();
+        $sessionName = trim((string)($settings['waha_session'] ?? 'default'));
+        if ($sessionName === '') $sessionName = 'default';
+        $response = comercial_waha_get_json($settings, $port, 'api/sessions/' . rawurlencode($sessionName));
+        $decoded = json_decode((string)($response['body'] ?? ''), true);
+        $sessionStatus = strtoupper(trim((string)($decoded['status'] ?? '')));
+        $httpCode = (int)($response['http_code'] ?? 0);
+        $httpOk = !empty($response['ok']) && in_array($httpCode, array(200, 201), true);
+
+        $healthStatus = 'down';
+        $errorText = '';
+
+        if ($httpOk) {
+            if ($sessionStatus === '' || $sessionStatus === 'WORKING') {
+                $healthStatus = 'up';
+            } elseif ($sessionStatus === 'STARTING') {
+                $healthStatus = 'starting';
+                $errorText = 'La sesión WAHA está arrancando.';
+            } else {
+                $healthStatus = 'down';
+                $errorText = 'La sesión WAHA está en estado ' . $sessionStatus . '.';
+            }
+        } else {
+            $errorText = trim((string)($response['error'] ?? ''));
+            if ($errorText === '') {
+                $errorText = $httpCode > 0 ? ('HTTP ' . $httpCode) : 'WAHA no respondió correctamente.';
+            }
         }
     }
 
@@ -6386,7 +6423,7 @@ function comercial_check_line_health($line, $force = false) {
 function comercial_refresh_lines_health($force = false) {
     $results = array();
     foreach (comercial_list_lines() as $line) {
-        if (trim((string)($line['waha_port'] ?? '')) === '') continue;
+        if (whatsapp_transport_for($line) !== 'evolution' && trim((string)($line['waha_port'] ?? '')) === '') continue;
         $results[] = comercial_check_line_health($line, $force);
     }
     return $results;
@@ -6402,7 +6439,7 @@ function comercial_send_text_via_line($line, $targetPhone, $text, $process = nul
     $chatId = comercial_to_chat_id(comercial_normalize_phone_spain($targetPhone));
     $linePhone = comercial_only_digits((string)($line['tfono'] ?? ''));
 
-    if ($port === '' || $chatId === '' || trim((string)$text) === '') {
+    if (($port === '' && whatsapp_transport_for($line) !== 'evolution') || $chatId === '' || trim((string)$text) === '') {
         return array('ok' => false, 'http_code' => 0, 'error' => 'Datos insuficientes para enviar', 'startTyping' => null, 'sendText' => null, 'stopTyping' => null);
     }
 

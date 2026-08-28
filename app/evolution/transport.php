@@ -8,7 +8,7 @@
  * el mismo patrón y así poder elegir el backend por línea.
  *
  * Las líneas SIEMPRE quedan vinculadas a ambos backends (2 QR); este selector
- * decide cuál responde a los mensajes. Los ESTADOS siempre van por WAHA.
+ * decide cuál responde a los mensajes. La salud se consulta en el backend activo.
  */
 
 declare(strict_types=1);
