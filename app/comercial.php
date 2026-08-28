@@ -6429,6 +6429,31 @@ function comercial_refresh_lines_health($force = false) {
     return $results;
 }
 
+/**
+ * Extrae el message_id de un envío Evolution (sendText/sendMedia) para poder
+ * pre-reclamarlo y evitar falsos human_taken en el sondeo de respuestas nativas.
+ * Evolution suele devolverlo en data.key.id; se cubren varias formas por robustez.
+ * @param array<mixed> $send Respuesta de EvolutionApi::call()
+ */
+function comercial_evolution_sent_message_id($send) {
+    if (!is_array($send)) return '';
+    $data = $send['data'] ?? null;
+    if (!is_array($data)) return '';
+    foreach (array('key', 'messageId', 'message', 'id') as $k) {
+        if (!isset($data[$k])) continue;
+        if ($k === 'key') {
+            $v = $data['key'];
+            if (is_array($v) && !empty($v['id']) && is_string($v['id'])) return trim($v['id']);
+            continue;
+        }
+        if (is_string($data[$k]) && $data[$k] !== '') return trim($data[$k]);
+        if (is_array($data[$k]) && isset($data[$k]['id']) && is_string($data[$k]['id']) && $data[$k]['id'] !== '') {
+            return trim($data[$k]['id']);
+        }
+    }
+    return '';
+}
+
 function comercial_send_text_via_line($line, $targetPhone, $text, $process = null, $fast = false) {
     if (function_exists('comercial_humanize_outbound_message')) {
         $text = comercial_humanize_outbound_message((string)$text);
@@ -6466,6 +6491,16 @@ function comercial_send_text_via_line($line, $targetPhone, $text, $process = nul
         $sendError = trim((string)($send['error'] ?? ''));
         if (!$okSend && $sendError === '') {
             $sendError = 'Evolution sendText failed';
+        }
+        // Pre-reclamar el message_id del envío del bot para que el sondeo de
+        // respuestas nativas (comercial_sync_native_replies_evolution) NO lo
+        // confunda con una respuesta humana (falso human_taken). Reutilizamos el
+        // mismo mecanismo de deduplicación que usa el propio sondeo.
+        if ($okSend) {
+            $evoSentId = comercial_evolution_sent_message_id($send);
+            if ($evoSentId !== '') {
+                comercial_webhook_claim_message($evoSentId);
+            }
         }
     } else {
         $preDelay = $fast ? 0 : comercial_random_between((int)$settings['typing_pre_min_sec'], (int)$settings['typing_pre_max_sec']);
