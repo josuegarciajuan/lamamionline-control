@@ -625,7 +625,10 @@
             h += '<div class="inbox-line-group' + (st.collapsed ? ' collapsed' : '') + '" data-line-id="' + escAttr(lid) + '">';
             h += '<div class="inbox-line-header" onclick="InboxChat.toggleLine(\'' + escAttr(lid) + '\')">';
             h += '<span class="' + dotClass + '" role="img" title="Estado de WhatsApp: ' + escAttr(statusLabel) + '" aria-label="Estado de WhatsApp: ' + escAttr(statusLabel) + '"></span>';
+            h += '<span class="inbox-line-title">';
             h += '<span class="inbox-line-name">' + esc(lname) + '</span>';
+            h += '<span class="inbox-line-engine">(<em>' + (line.transport === 'evolution' ? 'evo' : 'waha') + '</em>)</span>';
+            h += '</span>';
             if (lineTime) h += '<span class="inbox-line-time">' + esc(lineTime) + '</span>';
             h += '<span class="inbox-line-meta">' + esc(lphone) + ' · ' + tcount + '</span>';
             if (lineUnread > 0) h += '<span class="inbox-line-badge-unread">' + lineUnread + '</span>';

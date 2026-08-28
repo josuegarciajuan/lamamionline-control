@@ -1771,7 +1771,7 @@ function loadLines() {
                 var st = l.health_status || '?';
                 var statusIcon = {'WORKING':'🟢 ONLINE','STARTING':'🟡 CONECTANDO','SCAN_QR':'📱 QR PENDIENTE','starting':'🟡 ARRANCANDO','FAILED':'🔴 FALLIDA','STOPPED':'⏸️ PARADA','down':'🔴 CAÍDA','pending':'⚪ PENDIENTE','unknown':'⚪ DESCONOCIDO'}[st] || ('⚪ '+(st||'?'));
                 var phoneDisp = l.health_phone ? l.health_phone : (l.last9||l.phone);
-                html += '<tr><td><strong>'+escHtml(l.label)+'</strong></td><td class="mono">'+escHtml(phoneDisp)+'</td><td>'+l.port+'</td><td>'+statusIcon+'</td>';
+                html += '<tr><td><strong>'+escHtml(l.label)+'</strong> <em style="font-size:.75em;font-style:italic;color:var(--text-muted);opacity:.75">('+(l.transport==='evolution'?'evo':'waha')+')</em></td><td class="mono">'+escHtml(phoneDisp)+'</td><td>'+l.port+'</td><td>'+statusIcon+'</td>';
                 html += '<td style="white-space:nowrap">';
                 if (st === 'WORKING') {
                     html += '<span style="color:var(--ok);font-size:.8rem;margin-right:6px">✅ Conectada</span>';

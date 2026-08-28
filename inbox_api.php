@@ -261,6 +261,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'lines') {
             'line_name'         => trim((string)($line['nombre'] ?? '')),
             'line_phone'        => comercial_only_digits((string)($line['tfono'] ?? '')),
             'waha_port'         => trim((string)($line['waha_port'] ?? '')),
+            'transport'         => function_exists('whatsapp_transport_for') ? whatsapp_transport_for($line) : 'waha',
             'health_status'     => $healthStatus,
             'thread_count'      => count($threads),
             'line_last_ts'      => $lineLastTs,

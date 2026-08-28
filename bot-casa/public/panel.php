@@ -1054,6 +1054,43 @@ function getThreadConversation(\WasapBot\Core\Config $config, string $threadId):
 }
 
 /**
+ * Normaliza un transporte de línea a "waha" o "evolution" (default: waha).
+ * Espejo local de whatsapp_transport_normalize (panel.php no carga el bootstrap del CRM).
+ */
+function normalizePanelTransport(mixed $value): string
+{
+    $t = strtolower(trim((string) $value));
+    return $t === 'evolution' ? 'evolution' : 'waha';
+}
+
+/**
+ * Look up the configured motor (transport) from telefonos.json for a given last9.
+ * Returns 'waha' or 'evolution'. Defaults to 'waha' when no match.
+ */
+function getLineTransport(string $last9): string
+{
+    static $telefonosCache = null;
+    if ($telefonosCache === null) {
+        $telefonosCache = getTelefonosLines();
+    }
+
+    if ($last9 === '') {
+        return 'waha';
+    }
+
+    foreach ($telefonosCache as $t) {
+        $tDigits = preg_replace('/[^0-9]/', '', (string) ($t['tfono'] ?? ''));
+        if ($tDigits !== '' && strlen($tDigits) >= 9) {
+            $tLast9 = substr($tDigits, -9);
+            if ($tLast9 === $last9) {
+                return normalizePanelTransport($t['transport'] ?? 'waha');
+            }
+        }
+    }
+    return 'waha';
+}
+
+/**
  * Load all lines from telefonos.json (CRM phone registry).
  * Returns every entry that has a phone number, regardless of 'uso'.
  *
@@ -1112,6 +1149,7 @@ function getTelefonosLines(): array
             'waha_port' => (string) ($t['waha_port'] ?? ''),
             'waha'      => (string) ($t['waha'] ?? ''),
             'notas'     => (string) ($t['notas'] ?? ''),
+            'transport' => normalizePanelTransport($t['transport'] ?? 'waha'),
         ];
     }
 
@@ -1400,13 +1438,16 @@ function renderRoutingLines(array $lines): string
 
         // Descripción: lookup notas from telefonos.json (same field Telegram lead uses)
         $descripcion = getLineDescription($last9);
+        // Motor configurado de la línea (waha|evolution)
+        $engine = getLineTransport($last9) === 'evolution' ? 'evo' : 'waha';
+        $engineHtml = '<em style="font-size:.72em;font-style:italic;color:var(--text-muted);opacity:.8">(' . $engine . ')</em>';
 
         $html .= <<<ROW
         <tr class="routing-row" data-port="{$port}" data-last9="{$last9}">
             <td><input type="text" name="routing[lines][{$idx}][last9]" value="{$last9}" placeholder="Últimos 9 dígitos" class="input-cell"></td>
             <td><input type="number" name="routing[lines][{$idx}][port]" value="{$port}" placeholder="3000" class="input-cell" style="width:80px"></td>
             <td><input type="text" name="routing[lines][{$idx}][label]" value="{$label}" placeholder="linea_3000" class="input-cell"></td>
-            <td class="descripcion-cell" title="{$descripcion}">{$descripcion}</td>
+            <td class="descripcion-cell" title="{$descripcion}">{$descripcion} {$engineHtml}</td>
             <td>
                 <select name="routing[lines][{$idx}][ai_provider]" class="input-cell" style="width:110px">
                     <option value="openai" {$openaiSel}>OpenAI</option>
@@ -3751,6 +3792,7 @@ function loadTelefonosIntoSelector() {
                 var label = line.nombre + ' · ' + line.tfono;
                 if (line.uso) label += ' (' + line.uso + ')';
                 if (line.waha_port) label += ' — Puerto ' + line.waha_port;
+                label += ' (' + (line.transport === 'evolution' ? 'evo' : 'waha') + ')';
                 var opt = document.createElement('option');
                 opt.value = i;
                 opt.textContent = label;

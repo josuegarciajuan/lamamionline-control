@@ -37,7 +37,10 @@
 .inbox-line-header .line-dot.off{background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.3)}
 .inbox-line-header .line-dot--unread{background:#25d366;box-shadow:0 0 8px rgba(37,211,102,.5);animation:inbox-pulse-dot 2s ease-in-out infinite}
 @keyframes inbox-pulse-dot{0%,100%{box-shadow:0 0 4px rgba(37,211,102,.4)}50%{box-shadow:0 0 12px rgba(37,211,102,.8)}}
-.inbox-line-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--wa-text)}
+.inbox-line-title{flex:1;min-width:0;display:flex;align-items:baseline;gap:4px}
+.inbox-line-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--wa-text)}
+.inbox-line-engine{font-size:10px;font-weight:400;color:#64748b;flex-shrink:0;white-space:nowrap;letter-spacing:0}
+.inbox-line-engine em{font-style:italic}
 .inbox-line-time{font-size:10px;color:#667781;white-space:nowrap;flex-shrink:0}
 .inbox-line-meta{font-size:10px;color:#64748b;white-space:nowrap;flex-shrink:0}
 .inbox-line-badge-unread{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#25d366;color:#000;font-size:11px;font-weight:700;flex-shrink:0;margin-left:2px}

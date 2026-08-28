@@ -449,7 +449,8 @@ var ChatOperator = (function() {
             html += '<div class="line-row' + (isExpanded ? ' expanded' : '') + '" onclick="ChatOperator.toggleLine(\'' + esc(last9) + '\')">' +
                 '<span class="line-dot ' + dotClass + '"></span>' +
                 '<div class="line-info">' +
-                    '<div class="line-name">' + esc(label) +
+                    '<div class="line-name">' +
+                        '<span class="line-label">' + esc(label) + '<span class="line-engine">(' + (line.transport === 'evolution' ? 'evo' : 'waha') + ')</span></span>' +
                         (lineTime ? '<span class="line-time">' + esc(lineTime) + '</span>' : '') +
                     '</div>' +
                     '<div class="line-phone">' + esc(formatPhone(phone)) + '</div>' +

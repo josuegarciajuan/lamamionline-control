@@ -126,6 +126,39 @@ function loadTelefonosData(): array {
 }
 
 /**
+ * Normaliza un transporte de línea a "waha" o "evolution" (default: waha).
+ * Espejo local de whatsapp_transport_normalize (bot-casa no carga el bootstrap del CRM).
+ */
+function normalizeTransport(mixed $value): string
+{
+    $t = strtolower(trim((string) $value));
+    return $t === 'evolution' ? 'evolution' : 'waha';
+}
+
+/**
+ * Load telefonos.json and build a lookup map: last9 → transport (waha|evolution).
+ * @return array<string, string>
+ */
+function loadTelefonosTransportMap(): array
+{
+    static $map = null;
+    if ($map !== null) return $map;
+
+    $decoded = loadTelefonosData();
+    $map = [];
+    foreach ($decoded as $t) {
+        if (!is_array($t)) continue;
+        $tfono = trim((string)($t['tfono'] ?? ''));
+        if ($tfono === '') continue;
+        $digits = preg_replace('/[^0-9]/', '', $tfono);
+        if ($digits === '' || strlen($digits) < 9) continue;
+        $last9 = substr($digits, -9);
+        $map[$last9] = normalizeTransport($t['transport'] ?? 'waha');
+    }
+    return $map;
+}
+
+/**
  * Load telefonos.json and build a lookup map: last9 → descripcion (notas or nombre).
  * @return array<string, string>
  */
@@ -162,8 +195,16 @@ function enrichLinesWithDescripcion(array $lines): array {
     if ($notasMap === null) {
         $notasMap = loadTelefonosNotas();
     }
+    static $transportMap = null;
+    if ($transportMap === null) {
+        $transportMap = loadTelefonosTransportMap();
+    }
     foreach ($lines as &$line) {
         $last9 = (string)($line['last9'] ?? '');
+        // Motor de la línea: transport de telefonos.json (waha|evolution)
+        $line['transport'] = ($last9 !== '' && isset($transportMap[$last9]))
+            ? $transportMap[$last9]
+            : normalizeTransport($line['transport'] ?? 'waha');
         if ($last9 !== '' && isset($notasMap[$last9])) {
             $line['descripcion'] = $notasMap[$last9];
         } elseif (($line['label'] ?? '') !== '') {
