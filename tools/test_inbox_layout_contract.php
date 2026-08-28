@@ -17,7 +17,7 @@ $assertions = array(
     'La cabecera de conversación distribuye sus acciones en móvil' => strpos($css, '.inbox-chat-header-actions{flex:1 1 100%;flex-wrap:wrap;justify-content:flex-end}') !== false,
     'Las acciones de tarjetas pueden envolver en móvil' => strpos($css, '.agent-card-actions{flex-wrap:wrap}') !== false,
     'Los filtros del panel se desplazan en tablet' => strpos($css, '.inbox-agent-view .agent-quick-filters{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}') !== false,
-    'La API expone unknown cuando la salud supera cinco minutos' => strpos($api, '$lastHealthCheckTs + 300') !== false && strpos($api, "'health_status'     => \$healthStatus") !== false,
+    'La API conserva la salud persistida durante el intervalo de una hora' => strpos($api, '$lastHealthCheckTs === false') !== false && strpos($api, '$lastHealthCheckTs + 300') === false && strpos($api, "'health_status'     => \$healthStatus") !== false,
     'La UI renderiza el punto según health_status y no según unread' => strpos($js, "line.health_status || 'unknown'") !== false && strpos($js, "line-dot line-dot--' + healthStatus") !== false,
     'La UI conserva la etiqueta accesible del estado de línea' => strpos($js, 'statusLabel') !== false && strpos($js, 'aria-label="Estado de WhatsApp:') !== false,
 );

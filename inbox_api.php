@@ -252,7 +252,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'lines') {
         $healthStatus = trim((string)($lineState['health_status'] ?? 'unknown'));
         $lastHealthCheckAt = trim((string)($lineState['last_health_check_at'] ?? ''));
         $lastHealthCheckTs = $lastHealthCheckAt !== '' ? strtotime($lastHealthCheckAt) : false;
-        if ($lastHealthCheckTs === false || ($lastHealthCheckTs + 300) < time()) {
+        if ($lastHealthCheckTs === false) {
             $healthStatus = 'unknown';
         }
 
