@@ -50,6 +50,12 @@ function _cfg_path(string $key, string $default = ''): string
 $sessionMemoryFile = _cfg_path('files.session_memory', 'public/data/session_memory.ndjson');
 $leadsFile         = _cfg_path('files.leads', 'public/data/leads.ndjson');
 $outcomesFile      = $phpBotRoot . '/' . (_cfg('files.conversation_outcomes', 'public/data/conversation_outcomes.ndjson'));
+// Admin (user 1) opera con su memoria/leads per-user cuando existe (alineado
+// con webhook/chat y aprendizaje). En modo legacy se usa la ruta del config raíz.
+if (is_dir($phpBotRoot . '/data/users/1')) {
+    $sessionMemoryFile = $phpBotRoot . '/data/users/1/session_memory.ndjson';
+    $leadsFile         = $phpBotRoot . '/data/users/1/leads.ndjson';
+}
 $inactivityHours   = (int) _cfg('cron.classify.inactivity_hours', 3);
 $mareadorMinMsgs   = (int) _cfg('cron.classify.mareador_min_messages', 15);
 $deadMaxMsgs       = (int) _cfg('cron.classify.dead_max_messages', 5);

@@ -39,6 +39,11 @@ $sessionMemoryFile = (string) _cfg('files.session_memory',
 if (!str_starts_with($sessionMemoryFile, '/')) {
     $sessionMemoryFile = $phpBotRoot . '/' . ltrim($sessionMemoryFile, '/');
 }
+// Admin (user 1) opera con su memoria per-user cuando existe (alineado con
+// webhook/chat). En modo legacy se usa la ruta del config raíz.
+if (is_dir($phpBotRoot . '/data/users/1')) {
+    $sessionMemoryFile = $phpBotRoot . '/data/users/1/session_memory.ndjson';
+}
 
 $staleThresholdMin = (int) _cfg('pending.stale_threshold_minutes', 10);
 $dryRun = in_array('--dry-run', $argv ?? [], true);
