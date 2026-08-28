@@ -4219,7 +4219,7 @@ setInterval(function() {
     };
 })();
 </script>
-<script src="assets/chat.js?v=20260826_2"></script>
+<script src="assets/chat.js?v=20260828_1"></script>
 
 </body>
 </html>

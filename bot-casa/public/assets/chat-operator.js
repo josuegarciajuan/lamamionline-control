@@ -98,6 +98,20 @@ var ChatOperator = (function() {
         } catch(e) { return ''; }
     }
 
+    // List timestamps: time for today, full date + time otherwise
+    function formatListTime(ts) {
+        if (!ts) return '';
+        try {
+            var d = new Date(ts);
+            if (isNaN(d.getTime())) return '';
+            var timePart = d.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+            if (d.toDateString() === new Date().toDateString()) {
+                return timePart; // hoy → "11:42"
+            }
+            return d.toLocaleDateString('es-ES', {day:'2-digit', month:'2-digit', year:'numeric'}) + ' ' + timePart; // "28/08/2026 15:50"
+        } catch(e) { return ''; }
+    }
+
     function formatDate(ts) {
         if (!ts) return '';
         try {
@@ -444,7 +458,7 @@ var ChatOperator = (function() {
                 var cts = convsForLine[ci].last_ts || '';
                 if (cts > lineLastTs) lineLastTs = cts;
             }
-            var lineTime = formatTime(lineLastTs);
+            var lineTime = formatListTime(lineLastTs);
 
             html += '<div class="line-row' + (isExpanded ? ' expanded' : '') + '" onclick="ChatOperator.toggleLine(\'' + esc(last9) + '\')">' +
                 '<span class="line-dot ' + dotClass + '"></span>' +
@@ -472,7 +486,7 @@ var ChatOperator = (function() {
                     var convName = formatPhone(c.phone || '');
                     var preview = c.last_msg || c.first_msg || '';
                     if (preview.length > 40) preview = preview.slice(0, 40) + '...';
-                    var time = formatTime(c.last_ts);
+                    var time = formatListTime(c.last_ts);
                     var isPaused = state.convPause[c.thread_id];
                     var displayTime = time || '--:--';
 
