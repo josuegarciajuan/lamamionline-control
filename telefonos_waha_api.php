@@ -141,13 +141,6 @@ function telefonos_waha_dispatch_inner(): void
         if ($action === 'evo_status') {
             $r = $client->getStatus();
             $state = strtoupper((string)($r['data']['state'] ?? ''));
-            // Self-heal del webhook: si está conectado pero no tiene webhook, re-configurar
-            if ($r['ok'] && $state === 'OPEN') {
-                $wh = $client->getWebhook();
-                if (!$wh['ok'] || empty($wh['data']['url'] ?? '')) {
-                    evolution_ensure_webhook($row);
-                }
-            }
             $label = match ($state) {
                 'OPEN' => 'Conectado',
                 'CONNECTING' => 'Esperando QR / conectando',

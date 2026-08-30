@@ -95,7 +95,7 @@ class EvolutionApi
         curl_close($ch);
 
         if ($raw === false || $raw === '') {
-            return ['ok' => false, 'http_code' => $httpCode, 'data' => null, 'error' => $error ?: 'Empty response'];
+            return ['ok' => false, 'http_code' => $httpCode, 'data' => null, 'error' => $this->safeError($error ?: 'Empty response')];
         }
 
         $decoded = json_decode($raw, true);
@@ -105,8 +105,29 @@ class EvolutionApi
             'ok' => $httpCode >= 200 && $httpCode < 300,
             'http_code' => $httpCode,
             'data' => $data,
-            'error' => ($httpCode >= 200 && $httpCode < 300) ? null : ($data['message'] ?? $data['error'] ?? "HTTP $httpCode"),
+            'error' => ($httpCode >= 200 && $httpCode < 300) ? null : $this->safeError($data['message'] ?? $data['error'] ?? "HTTP $httpCode"),
         ];
+    }
+
+    /** Keep diagnostics useful without leaking an unbounded/API response. */
+    private function safeError(mixed $value): string
+    {
+        if (is_array($value) || is_object($value)) {
+            $value = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+        $value = trim((string) $value);
+        if (function_exists('mb_check_encoding') && !mb_check_encoding($value, 'UTF-8')) {
+            $value = function_exists('iconv') ? (string)iconv('UTF-8', 'UTF-8//IGNORE', $value) : '';
+        }
+        if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+            return mb_strlen($value, 'UTF-8') > 500 ? mb_substr($value, 0, 497, 'UTF-8') . '...' : $value;
+        }
+        if (strlen($value) <= 500) return $value;
+        $prefix = substr($value, 0, 497);
+        while ($prefix !== '' && preg_match('//u', $prefix) !== 1) {
+            $prefix = substr($prefix, 0, -1);
+        }
+        return $prefix . '...';
     }
 
     /* ─────────────────────────── INSTANCIAS/SESIÓN ─────────────────────────── */
