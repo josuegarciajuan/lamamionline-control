@@ -4750,11 +4750,7 @@ function comercial_send_hot_notification_whatsapp($ownerPhone, $message) {
         // No usar la línea personal del dueño (654464023) como emisor: no puede
         // auto-enviarse un WhatsApp a sí misma y siempre fallaría.
         if (comercial_only_digits((string)($line['tfono'] ?? '')) === '654464023') continue;
-        $state = isset($line['comercial_state']) ? $line['comercial_state'] : array();
-        $status = trim((string)($state['status'] ?? 'active'));
-        $health = trim((string)($state['health_status'] ?? ''));
-        if ($status === 'paused') continue;
-        if ($health === 'down') continue;
+        if (!comercial_line_state_is_sendable($line)) continue;
 
         $send = comercial_send_text_via_line($line, $ownerPhone, $message, $processMeta);
         if (!empty($send['ok'])) return true;
@@ -4999,8 +4995,25 @@ function comercial_line_is_available($line, $settings = null) {
     if (strtolower(trim((string)($line['uso'] ?? ''))) === 'inactivo') return false;
     if (whatsapp_transport_for($line) !== 'evolution' && trim((string)($line['waha_port'] ?? '')) === '') return false;
     if (in_array((string)($state['health_status'] ?? 'unknown'), array('down', 'starting'), true)) return false;
-    if ((string)$state['status'] === 'paused') return false;
+    if (comercial_line_pause_is_active($state)) return false;
     return true;
+}
+
+function comercial_line_pause_is_active($state, $now = null) {
+    $state = is_array($state) ? $state : array();
+    if ((string)($state['status'] ?? '') !== 'paused') return false;
+    $cooldown = strtotime((string)($state['cooldown_until'] ?? ''));
+    if (!$cooldown) return true;
+    $now = $now === null ? time() : (int)$now;
+    return $cooldown > $now;
+}
+
+function comercial_line_state_is_sendable($line, $now = null) {
+    $line = is_array($line) ? $line : array();
+    if (strtolower(trim((string)($line['uso'] ?? ''))) === 'inactivo') return false;
+    $state = is_array($line['comercial_state'] ?? null) ? $line['comercial_state'] : array();
+    if (in_array((string)($state['health_status'] ?? 'unknown'), array('down', 'starting'), true)) return false;
+    return !comercial_line_pause_is_active($state, $now);
 }
 
 function comercial_pick_line_for_process($process) {

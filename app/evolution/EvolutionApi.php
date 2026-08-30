@@ -116,7 +116,18 @@ class EvolutionApi
             $value = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
         $value = trim((string) $value);
-        return strlen($value) > 500 ? substr($value, 0, 497) . '...' : $value;
+        if (function_exists('mb_check_encoding') && !mb_check_encoding($value, 'UTF-8')) {
+            $value = function_exists('iconv') ? (string)iconv('UTF-8', 'UTF-8//IGNORE', $value) : '';
+        }
+        if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+            return mb_strlen($value, 'UTF-8') > 500 ? mb_substr($value, 0, 497, 'UTF-8') . '...' : $value;
+        }
+        if (strlen($value) <= 500) return $value;
+        $prefix = substr($value, 0, 497);
+        while ($prefix !== '' && preg_match('//u', $prefix) !== 1) {
+            $prefix = substr($prefix, 0, -1);
+        }
+        return $prefix . '...';
     }
 
     /* ─────────────────────────── INSTANCIAS/SESIÓN ─────────────────────────── */

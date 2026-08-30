@@ -3398,7 +3398,8 @@ function aviso_ops_line_states() {
     foreach ((array)comercial_list_lines() as $line) {
         if (!is_array($line)) continue;
         if (trim((string)($line['id'] ?? '')) === '') continue;
-        if (trim((string)($line['waha_port'] ?? '')) === '') continue;
+        if (strtolower(trim((string)($line['uso'] ?? ''))) === 'inactivo') continue;
+        if (whatsapp_transport_for($line) !== 'evolution' && trim((string)($line['waha_port'] ?? '')) === '') continue;
         $lines[] = $line;
     }
     return $lines;

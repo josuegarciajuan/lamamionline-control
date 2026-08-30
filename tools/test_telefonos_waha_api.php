@@ -4,8 +4,36 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/app/auth.php';
 require_once dirname(__DIR__) . '/app/telefonos_waha_service.php';
+require_once dirname(__DIR__) . '/app/evolution/EvolutionApi.php';
+require_once dirname(__DIR__) . '/app/comercial.php';
 
 $failures = 0;
+
+twa_test_assert(function_exists('comercial_line_pause_is_active'), 'existe helper de cooldown de pausa');
+twa_test_assert(
+    !function_exists('comercial_line_pause_is_active') || !comercial_line_pause_is_active(['status' => 'paused', 'cooldown_until' => '2026-08-30 10:00:00'], strtotime('2026-08-31 10:00:00')),
+    'una pausa cuyo cooldown expiró permite recuperación'
+);
+twa_test_assert(
+    function_exists('comercial_line_pause_is_active') && comercial_line_pause_is_active(['status' => 'paused', 'cooldown_until' => '2026-09-01 10:00:00'], strtotime('2026-08-31 10:00:00')),
+    'una pausa vigente continúa bloqueada'
+);
+twa_test_assert(function_exists('comercial_line_state_is_sendable'), 'existe helper común de elegibilidad de avisos');
+foreach ([
+    ['uso' => 'INACTIVO', 'comercial_state' => ['health_status' => 'up', 'status' => 'active']],
+    ['uso' => 'comercial', 'comercial_state' => ['health_status' => 'down', 'status' => 'active']],
+    ['uso' => 'comercial', 'comercial_state' => ['health_status' => 'starting', 'status' => 'active']],
+    ['uso' => 'comercial', 'comercial_state' => ['health_status' => 'up', 'status' => 'paused', 'cooldown_until' => '']],
+] as $blockedLine) {
+    twa_test_assert(!function_exists('comercial_line_state_is_sendable') || !comercial_line_state_is_sendable($blockedLine, strtotime('2026-08-31 10:00:00')), 'línea no elegible no se usa como aviso');
+}
+$apiReflection = new ReflectionClass(EvolutionApi::class);
+$safeError = $apiReflection->getMethod('safeError');
+$safeError->setAccessible(true);
+$utf8Diagnostic = str_repeat('á', 300);
+$safeErrorValue = $safeError->invoke(new EvolutionApi(), $utf8Diagnostic);
+twa_test_assert(mb_check_encoding($safeErrorValue, 'UTF-8'), 'safeError conserva UTF-8 válido al truncar');
+twa_test_assert(mb_strlen($safeErrorValue, 'UTF-8') <= 500, 'safeError limita diagnóstico por caracteres');
 
 function twa_test_assert(bool $condition, string $label): void
 {
@@ -283,6 +311,7 @@ $root = dirname(__DIR__);
 $apiSource = (string)file_get_contents($root . '/telefonos_waha_api.php');
 $viewsSource = (string)file_get_contents($root . '/app/views.php');
 $commercialSource = (string)file_get_contents($root . '/app/comercial.php');
+$avisosSource = (string)file_get_contents($root . '/app/avisos.php');
 $actionsSource = (string)file_get_contents($root . '/app/actions.php');
 $publicistaSource = (string)file_get_contents($root . '/app/publicista.php');
 twa_test_assert(strpos($apiSource, 'auth_can_manage_telefonos()') !== false, 'dispatch comprueba permiso de teléfonos');
@@ -298,6 +327,8 @@ $evoStatusBlock = ($evoStatusBlockStart !== false && $evoStatusBlockEnd !== fals
     : '';
 twa_test_assert(strpos($evoStatusBlock, 'evolution_ensure_webhook') === false, 'consultar estado Evolution no crea instancia ni genera QR');
 twa_test_assert(substr_count($publicistaSource, "strtolower(\$uso) === 'inactivo'") >= 2, 'automatizaciones de estados excluyen uso=inactivo');
+twa_test_assert(strpos($avisosSource, "strtolower(trim((string)(\$line['uso'] ?? ''))) === 'inactivo'") !== false, 'avisos operativos excluyen uso=inactivo');
+twa_test_assert(strpos($avisosSource, "whatsapp_transport_for(\$line) !== 'evolution'") !== false, 'avisos operativos incluyen Evolution sin puerto WAHA');
 
 foreach ([
     [$viewsSource, 'save_telefono'], [$viewsSource, 'delete_telefono'],
