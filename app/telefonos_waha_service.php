@@ -181,6 +181,11 @@ function telefonos_waha_send_info(array $response): array
     return ['ok' => true, 'reason' => 'ok'];
 }
 
+function telefonos_waha_usage_is_inactive(array $row): bool
+{
+    return strtolower(trim((string)($row['uso'] ?? ''))) === 'inactivo';
+}
+
 function telefonos_waha_webhook_for_row(array $row): string
 {
     return match (strtolower(trim((string)($row['uso'] ?? '')))) {
@@ -237,6 +242,7 @@ function telefonos_waha_identify(
     $candidates = [];
     foreach ($rows as $row) {
         if (!is_array($row) || (string)($row['id'] ?? '') === (string)($target['id'] ?? '')) continue;
+        if (telefonos_waha_usage_is_inactive($row)) continue;
         $storedPhone = telefonos_waha_normalize_phone((string)($row['tfono'] ?? ''));
         if ($storedPhone !== null && hash_equals($targetPhone, $storedPhone)) continue;
         try {

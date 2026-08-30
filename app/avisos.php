@@ -93,6 +93,7 @@ function avisos_comercial_sender_lines() {
     foreach ((array)comercial_list_lines() as $line) {
         if (!is_array($line)) continue;
         if (trim((string)($line['id'] ?? '')) === '') continue;
+        if (function_exists('telefonos_waha_usage_is_inactive') && telefonos_waha_usage_is_inactive($line)) continue;
         if (whatsapp_transport_for($line) !== 'evolution' && trim((string)($line['waha_port'] ?? '')) === '') continue;
         if (!comercial_line_is_available($line)) continue;
         $out[] = $line;

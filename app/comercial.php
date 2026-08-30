@@ -4996,12 +4996,10 @@ function comercial_line_is_available($line, $settings = null) {
         ? $line['comercial_state']
         : comercial_get_line_state((string)($line['id'] ?? ''));
 
+    if (strtolower(trim((string)($line['uso'] ?? ''))) === 'inactivo') return false;
     if (whatsapp_transport_for($line) !== 'evolution' && trim((string)($line['waha_port'] ?? '')) === '') return false;
     if (in_array((string)($state['health_status'] ?? 'unknown'), array('down', 'starting'), true)) return false;
-    if ((string)$state['status'] === 'paused') {
-        $cooldownUntilTs = strtotime((string)$state['cooldown_until']);
-        if ($cooldownUntilTs > time()) return false;
-    }
+    if ((string)$state['status'] === 'paused') return false;
     return true;
 }
 

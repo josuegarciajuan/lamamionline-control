@@ -95,7 +95,7 @@ class EvolutionApi
         curl_close($ch);
 
         if ($raw === false || $raw === '') {
-            return ['ok' => false, 'http_code' => $httpCode, 'data' => null, 'error' => $error ?: 'Empty response'];
+            return ['ok' => false, 'http_code' => $httpCode, 'data' => null, 'error' => $this->safeError($error ?: 'Empty response')];
         }
 
         $decoded = json_decode($raw, true);
@@ -105,8 +105,18 @@ class EvolutionApi
             'ok' => $httpCode >= 200 && $httpCode < 300,
             'http_code' => $httpCode,
             'data' => $data,
-            'error' => ($httpCode >= 200 && $httpCode < 300) ? null : ($data['message'] ?? $data['error'] ?? "HTTP $httpCode"),
+            'error' => ($httpCode >= 200 && $httpCode < 300) ? null : $this->safeError($data['message'] ?? $data['error'] ?? "HTTP $httpCode"),
         ];
+    }
+
+    /** Keep diagnostics useful without leaking an unbounded/API response. */
+    private function safeError(mixed $value): string
+    {
+        if (is_array($value) || is_object($value)) {
+            $value = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+        $value = trim((string) $value);
+        return strlen($value) > 500 ? substr($value, 0, 497) . '...' : $value;
     }
 
     /* ─────────────────────────── INSTANCIAS/SESIÓN ─────────────────────────── */

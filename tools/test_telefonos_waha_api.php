@@ -91,6 +91,7 @@ $rows = [
     ['id' => 'same-phone', 'nombre' => 'Duplicada', 'tfono' => '600111222', 'waha_port' => '3010', 'waha' => 'duplicate', 'uso' => 'comercial'],
     ['id' => 'same-identity', 'nombre' => 'Misma sesión', 'tfono' => '699999999', 'waha_port' => '3002', 'waha' => 'target-session', 'uso' => 'comercial'],
     ['id' => 'bad-port', 'nombre' => 'Puerto inválido', 'tfono' => '611111111', 'waha_port' => '3020', 'waha' => 'ignored', 'uso' => 'comercial'],
+    ['id' => 'inactive', 'nombre' => 'Inactiva', 'tfono' => '611222333', 'waha_port' => '3005', 'waha' => 'inactive', 'uso' => 'INACTIVO'],
 ];
 
 $personalConfig = telefonos_waha_line_config($rows[2], $commercialSettings, $personalSettings);
@@ -135,6 +136,7 @@ twa_test_same([
     'status:source-b',
     'send:source-b:34600111222:Hola Destino (+34 600 111 222), ya sé quién eres',
 ], $events, 'health y envío son inmediatos, deterministas y con texto exacto');
+twa_test_assert(!in_array('status:inactive', $events, true), 'uso=inactivo no participa como emisor');
 
 $eventCount = count($events);
 $deduplicated = telefonos_waha_identify(
@@ -282,12 +284,20 @@ $apiSource = (string)file_get_contents($root . '/telefonos_waha_api.php');
 $viewsSource = (string)file_get_contents($root . '/app/views.php');
 $commercialSource = (string)file_get_contents($root . '/app/comercial.php');
 $actionsSource = (string)file_get_contents($root . '/app/actions.php');
+$publicistaSource = (string)file_get_contents($root . '/app/publicista.php');
 twa_test_assert(strpos($apiSource, 'auth_can_manage_telefonos()') !== false, 'dispatch comprueba permiso de teléfonos');
 twa_test_assert(strpos($apiSource, 'auth_can_manage_telefonos()') < strpos($apiSource, "storage_read('telefonos.json')"), '403 ocurre antes de lookup');
 twa_test_assert(strpos($apiSource, 'catch (Throwable $e)') !== false, 'dispatch captura Throwable');
 twa_test_assert(strpos($viewsSource, 'Legacy WAHA script') === false, 'UI no conserva JS legado comentado');
 twa_test_assert(strpos($viewsSource, 'identifyResult[id] = "Enviado desde "') !== false && strpos($viewsSource, 'result.textContent = identifyResult[id]') !== false, 'UI muestra éxito seguro incluso deduplicado');
 twa_test_assert(strpos($viewsSource, 'body:postBody("restart", "telefono_id", id)') !== false, 'UI reinicia por POST y telefono_id');
+$evoStatusBlockStart = strpos($apiSource, "if (\$action === 'evo_status')");
+$evoStatusBlockEnd = strpos($apiSource, "if (\$action === 'evo_qr')", $evoStatusBlockStart === false ? 0 : $evoStatusBlockStart);
+$evoStatusBlock = ($evoStatusBlockStart !== false && $evoStatusBlockEnd !== false)
+    ? substr($apiSource, $evoStatusBlockStart, $evoStatusBlockEnd - $evoStatusBlockStart)
+    : '';
+twa_test_assert(strpos($evoStatusBlock, 'evolution_ensure_webhook') === false, 'consultar estado Evolution no crea instancia ni genera QR');
+twa_test_assert(substr_count($publicistaSource, "strtolower(\$uso) === 'inactivo'") >= 2, 'automatizaciones de estados excluyen uso=inactivo');
 
 foreach ([
     [$viewsSource, 'save_telefono'], [$viewsSource, 'delete_telefono'],

@@ -12574,6 +12574,7 @@ function publicista_estados_wasap_get_bot_casa_lines() {
     foreach ((array)$telefonos as $t) {
         $uso = trim((string)($t['uso'] ?? ''));
         $wahaPort = trim((string)($t['waha_port'] ?? ''));
+        if (strtolower($uso) === 'inactivo') continue;
         if ($uso === 'bot casa' && $wahaPort !== '') {
             $lines[] = array(
                 'id' => trim((string)($t['id'] ?? '')),
@@ -13453,6 +13454,7 @@ function publicista_afiliados_get_lines() {
     foreach ((array)$telefonos as $t) {
         $uso = trim((string)($t['uso'] ?? ''));
         $wahaPort = trim((string)($t['waha_port'] ?? ''));
+        if (strtolower($uso) === 'inactivo') continue;
         if ($wahaPort === '') continue;
         if (!in_array($uso, $usos, true)) continue;
         $lines[] = array(
