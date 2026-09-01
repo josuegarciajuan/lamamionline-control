@@ -16,6 +16,7 @@ declare(strict_types=1);
 $phpBotRoot = dirname(__DIR__);
 require_once $phpBotRoot . '/src/Core/ConfigInterface.php';
 require_once $phpBotRoot . '/src/Core/Config.php';
+require_once $phpBotRoot . '/src/BotInterface.php';
 require_once $phpBotRoot . '/src/Bot.php';
 
 $cronType = $argv[1] ?? '';

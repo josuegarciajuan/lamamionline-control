@@ -141,13 +141,17 @@ final readonly class RoutingGate implements PipelineStageInterface
             $ctx['waha_session']  = $wahaSession;
 
             // ── Transporte por línea: waha | evolution ─────────────────
+            // Fuente de verdad: telefonos.json (campo `transport` por línea).
+            // Fallback al entry de routing.lines si telefonos.json no lo define.
             $transport = 'waha';
             $evoInstance = '';
-            if (is_array($entry)) {
-                $t = strtolower(trim((string) ($entry['transport'] ?? '')));
+            $lineRecord = $receiverLast9 !== '' ? $this->lookupLineByLast9($receiverLast9) : null;
+            $transportSource = is_array($lineRecord) ? $lineRecord : $entry;
+            if (is_array($transportSource)) {
+                $t = strtolower(trim((string) ($transportSource['transport'] ?? '')));
                 if ($t === 'evolution') {
                     $transport = 'evolution';
-                    $evoInstance = trim((string) ($entry['evo_instance'] ?? ''));
+                    $evoInstance = trim((string) ($transportSource['evo_instance'] ?? ''));
                 }
             }
             $ctx['transport'] = $transport;
@@ -175,6 +179,66 @@ final readonly class RoutingGate implements PipelineStageInterface
         $digits = (string) preg_replace('/[^0-9]/', '', $value);
 
         return $digits;
+    }
+
+    /**
+     * Look up a phone line record from telefonos.json by its last 9 digits.
+     *
+     * The telefonos.json registry is the source of truth for the per-line
+     * `transport` (waha|evolution) and `evo_instance` fields. Returns the raw
+     * record or null when the line is not found or the file is unreachable.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function lookupLineByLast9(string $last9): ?array
+    {
+        $configDir = $this->config->getConfigDir();
+        $candidates = [
+            $configDir . '/../../data/telefonos.json',
+            $configDir . '/../data/telefonos.json',
+            $configDir . '/data/telefonos.json',
+        ];
+
+        $raw = null;
+        foreach ($candidates as $path) {
+            $real = @realpath($path);
+            if ($real !== false && file_exists($real)) {
+                $contents = @file_get_contents($real);
+                if ($contents !== false) {
+                    $raw = $contents;
+                    break;
+                }
+            }
+        }
+
+        if ($raw === null) {
+            return null;
+        }
+
+        try {
+            $lines = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+
+        if (!is_array($lines)) {
+            return null;
+        }
+
+        foreach ($lines as $line) {
+            if (!is_array($line)) {
+                continue;
+            }
+            $digits = (string) preg_replace('/[^0-9]/', '', (string) ($line['tfono'] ?? ''));
+            if ($digits !== '' && strlen($digits) >= 9) {
+                $lineLast9 = substr($digits, -9);
+                if ($lineLast9 === $last9) {
+                    return $line;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
