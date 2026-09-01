@@ -31,6 +31,10 @@ foreach ($argv as $i => $arg) {
 
 // ── Single-user mode (worker) ────────────────────────────────
 // cron_runner.php <type> --user=<id> [--days=N]  → runs the cron for ONE user.
+// Se ejecuta como subproceso por cada usuario desde el modo multi-usuario.
+// El cron se incluye A NIVEL TOP-LEVEL (no dentro de una función) para que las
+// variables que declara (p.ej. $cfgLockFile) queden en scope global y las
+// funciones internas (acquire_process_lock) puedan leerlas con `global`.
 if (in_array('--user', $argv, true) || array_any($argv, static fn (string $a): bool => str_starts_with($a, '--user='))) {
     $userId = 0;
     foreach ($argv as $arg) {
@@ -46,7 +50,57 @@ if (in_array('--user', $argv, true) || array_any($argv, static fn (string $a): b
     require_once $phpBotRoot . '/src/Core/Config.php';
     require_once $phpBotRoot . '/src/BotInterface.php';
     require_once $phpBotRoot . '/src/Bot.php';
-    runCron($phpBotRoot, $userId, $cronType, $extraArgs);
+
+    $configDir = \WasapBot\Bot::resolveUserConfigDir($phpBotRoot, $userId);
+    $config = new \WasapBot\Core\Config($configDir, $phpBotRoot);
+
+    // Override data paths for this user (misma lógica que el runner multi-user)
+    if ($userId > 0) {
+        $userDataDir = $phpBotRoot . '/data/users/' . $userId;
+        if (is_dir($userDataDir)) {
+            $fileKeys = [
+                'files.session_memory', 'files.leads', 'files.reminders',
+                'files.playbook', 'files.wa_raw_payload', 'files.bot_log',
+                'bot.mode_file', 'files.followups_log',
+                'cron.followup.leads_file', 'cron.followup.followups_log_file',
+                'cron.reminder.reminders_file',
+            ];
+            foreach ($fileKeys as $key) {
+                $val = $config->get($key, '');
+                if (is_string($val) && $val !== '') {
+                    $resolved = \WasapBot\Bot::resolveUserDataPath($phpBotRoot, $userId, $val);
+                    $config->set($key, $resolved);
+                }
+            }
+            $lockKeys = ['cron.followup.lock_file', 'cron.reminder.lock_file'];
+            foreach ($lockKeys as $lockKey) {
+                $val = $config->get($lockKey, '');
+                if (is_string($val) && $val !== '') {
+                    $resolved = \WasapBot\Bot::resolveUserDataPath($phpBotRoot, $userId, $val);
+                    $config->set($lockKey, $resolved);
+                }
+            }
+        }
+    }
+
+    $cronFiles = [
+        'followup'  => 'lead_followup.php',
+        'reminder'  => 'reminder.php',
+        'learn'     => 'learn.php',
+        'classify'  => 'classify_outcomes.php',
+    ];
+    $cronFile = $phpBotRoot . '/cron/' . $cronFiles[$cronType];
+    if (!file_exists($cronFile)) {
+        fwrite(STDERR, "[cron_runner] Cron file not found: {$cronFile}\n");
+        exit(2);
+    }
+
+    // Inyectar el config del usuario para que el cron lo detecte y ejecutarlo
+    // en scope global (nivel top-level), no dentro de una función.
+    $GLOBALS['_cron_runner_config'] = $config;
+    $GLOBALS['_cron_runner_user_id'] = $userId;
+
+    require $cronFile;
     exit(0);
 }
 
@@ -55,11 +109,15 @@ $usersFile = $phpBotRoot . '/data/users.json';
 if (!file_exists($usersFile)) {
     // Legacy mode: just run the cron for admin
     echo "[cron_runner] Legacy mode — running {$cronType} for root config\n";
-    require_once $phpBotRoot . '/src/Core/ConfigInterface.php';
-    require_once $phpBotRoot . '/src/Core/Config.php';
-    require_once $phpBotRoot . '/src/BotInterface.php';
-    require_once $phpBotRoot . '/src/Bot.php';
-    runCron($phpBotRoot, 0, $cronType, $extraArgs);
+    $cmd = sprintf(
+        '%s %s %s --user=1%s 2>&1',
+        escapeshellarg((string) (PHP_BINARY ?: 'php')),
+        escapeshellarg(__FILE__),
+        escapeshellarg($cronType),
+        $extraArgs
+    );
+    echo shell_exec($cmd) ?: 'OK';
+    echo "\n";
     exit(0);
 }
 
@@ -104,69 +162,3 @@ foreach ($usersData['users'] as $user) {
 
 echo "[cron_runner] Done\n";
 
-// ─────────────────────────────────────────────────────────
-
-function runCron(string $rootDir, int $userId, string $type, string $extraArgs = ''): void
-{
-    $configDir = \WasapBot\Bot::resolveUserConfigDir($rootDir, $userId);
-    $config = new \WasapBot\Core\Config($configDir, $rootDir);
-
-    // Override data paths for this user if multi-user mode
-    if ($userId > 0) {
-        $userDataDir = $rootDir . '/data/users/' . $userId;
-        if (is_dir($userDataDir)) {
-            $fileKeys = [
-                'files.session_memory', 'files.leads', 'files.reminders',
-                'files.playbook', 'files.wa_raw_payload', 'files.bot_log',
-                'bot.mode_file', 'files.followups_log',
-                'cron.followup.leads_file', 'cron.followup.followups_log_file',
-                'cron.reminder.reminders_file',
-            ];
-            foreach ($fileKeys as $key) {
-                $val = $config->get($key, '');
-                if (is_string($val) && $val !== '') {
-                    $resolved = \WasapBot\Bot::resolveUserDataPath($rootDir, $userId, $val);
-                    $config->set($key, $resolved);
-                }
-            }
-            // Override lock files
-            $lockKeys = ['cron.followup.lock_file', 'cron.reminder.lock_file'];
-            foreach ($lockKeys as $lockKey) {
-                $val = $config->get($lockKey, '');
-                if (is_string($val) && $val !== '') {
-                    $resolved = \WasapBot\Bot::resolveUserDataPath($rootDir, $userId, $val);
-                    $config->set($lockKey, $resolved);
-                }
-            }
-        }
-    }
-
-    // Parse --days for learn
-    if ($type === 'learn' && $extraArgs !== '') {
-        if (preg_match('/--days=(\d+)/', $extraArgs, $m)) {
-            $extraArgs = ' --days=' . (int) $m[1];
-        }
-    }
-
-    $cronFiles = [
-        'followup'  => 'lead_followup.php',
-        'reminder'  => 'reminder.php',
-        'learn'     => 'learn.php',
-        'classify'  => 'classify_outcomes.php',
-    ];
-
-    $cronFile = $rootDir . '/cron/' . $cronFiles[$type];
-    if (!file_exists($cronFile)) {
-        throw new \RuntimeException("Cron file not found: {$cronFile}");
-    }
-
-    // Run the cron with the pre-configured Config
-    // We use a trick: set a global that the cron will detect
-    $GLOBALS['_cron_runner_config'] = $config;
-    $GLOBALS['_cron_runner_user_id'] = $userId;
-
-    ob_start();
-    require $cronFile;
-    $output = ob_get_clean();
-    if ($output) echo " → " . trim(str_replace("\n", " ", $output));
-}
