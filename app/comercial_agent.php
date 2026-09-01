@@ -208,7 +208,7 @@ function comercial_agent_build_system_prompt(string $processSlug, string $mode, 
         if ($libres > 0) {
             $occLine = "Ahora mismo hay {$enCasa} de {$capacidad} plazas ocupadas (quedan {$libres} libres). Como hay hueco, sé más directa y empuja a cerrar para copar el aforo.";
         } else {
-            $occLine = "Ahora mismo hay {$enCasa} de {$capacidad} plazas ocupadas (casa completa). Enseña las fotos igual y mantén el buen rollo; dile que le avisarás en unos días cuando quede libre.";
+            $occLine = "Ahora mismo hay {$enCasa} de {$capacidad} plazas ocupadas (casa completa). Mantén el buen rollo; si la clienta pide verlas, dile que se las mandas (el sistema añade las fotos) y que le avisarás en unos días cuando quede libre. No las ofrezcas por iniciativa propia.";
         }
         $sections[] = "═══ OCUPACIÓN DE LA CASA (EN TIEMPO REAL) ═══\n" . $occLine;
     }

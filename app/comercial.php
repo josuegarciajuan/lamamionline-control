@@ -1940,6 +1940,7 @@ function comercial_normalize_thread($row) {
         'manual_panel_negocio' => '',
         'manual_panel_at' => '',
         'sender_lid' => '',
+        'plaza_photos_sent_at' => '',
     );
     $out = array_merge($defaults, $row);
     $out['human_taken'] = !empty($out['human_taken']) ? 1 : 0;
@@ -2868,23 +2869,29 @@ function plaza_room_photos_save(array $rows): void {
 }
 
 /**
- * Detecta si procede enviar fotos: el cliente las pide o el bot las ofrece.
+ * Detecta si procede enviar fotos de las habitaciones.
+ * SOLO cuando la clienta las pide explícitamente (texto entrante del interlocutor).
+ * Se ignora la respuesta del bot ($replyText) para no auto-disparar el envío
+ * cuando la IA menciona "fotos"/"habitación" por su cuenta.
  */
 function comercial_plaza_wants_photos(string $inboundText, string $replyText): bool {
-    $haystack = comercial_mb_strtolower_safe(trim($inboundText . ' ' . $replyText));
+    $haystack = comercial_mb_strtolower_safe(trim((string)$inboundText));
     if ($haystack === '') return false;
     // Normalizar acentos/ñ para matchear con independencia de tildes
     $accents = array('á'=>'a','à'=>'a','ä'=>'a','â'=>'a','é'=>'e','è'=>'e','ë'=>'e','ê'=>'e','í'=>'i','ì'=>'i','ï'=>'i','î'=>'i','ó'=>'o','ò'=>'o','ö'=>'o','ô'=>'o','ú'=>'u','ù'=>'u','ü'=>'u','û'=>'u','ñ'=>'n');
     $haystack = strtr($haystack, $accents);
-    return (bool) preg_match('/(fotos?|fotitos?|ensen|mandam|habitacion|habitaciones|verla|verlo|verlas|a ver|ver las|quiero ver|como es|como son|mostr|muestr)/u', $haystack);
+    return (bool) preg_match('/(fotos?|fotitos?|ensen|mandam|envi|verla|verlas|verlo|ver las|ver la casa|ver la habitacion|quiero ver|muestr|mostr|como es la habitacion|como son las habitaciones|como es la casa)/u', $haystack);
 }
 
 /**
  * Inyecta los enlaces de fotos de habitaciones en la respuesta automática
  * de la rama Plaza. Es determinista: el LLM no inventa URLs.
+ * Solo inyecta cuando la clienta las pide y aún no se han enviado fotos
+ * en esta conversación (guard una vez por hilo).
  */
-function comercial_plaza_inject_room_photos(string $processSlug, string $replyText, string $inboundText): string {
+function comercial_plaza_inject_room_photos(string $processSlug, string $replyText, string $inboundText, array $thread = array()): string {
     if (trim($processSlug) !== 'plaza') return $replyText;
+    if (!empty($thread['plaza_photos_sent_at'])) return $replyText; // ya se enviaron fotos en esta conversación
     if (comercial_mb_stripos_safe($replyText, 'compartir.site') !== false) return $replyText; // ya lleva fotos
 
     $photos = plaza_room_photos_get();
@@ -2898,7 +2905,7 @@ function comercial_plaza_inject_room_photos(string $processSlug, string $replyTe
     }
     if (empty($urls)) return $replyText;
 
-    $urls = array_slice($urls, 0, 4); // máximo 4 fotos por mensaje
+    $urls = array_slice($urls, 0, 3); // máximo 3 fotos por envío
 
     $replyText = rtrim($replyText);
     $replyText .= "\n\n" . implode("\n", $urls);
@@ -3049,7 +3056,7 @@ function comercial_agent_generate_reply_wrapper($thread, $processSlug, $text) {
             }
         }
 
-        return comercial_plaza_inject_room_photos($processSlug, $reply, $text);
+        return comercial_plaza_inject_room_photos($processSlug, $reply, $text, $thread);
     }
 
     comercial_event_append('reply_llm_failed', array(
@@ -6601,9 +6608,16 @@ function comercial_send_thread_message($thread, $text, $options = array()) {
     // automáticos (greeting, responded, qualified, very_hot, fallback) porque todos
     // terminan en esta función. Antes solo se inyectaba en el wrapper LLM y el path
     // very_hot (generador legacy) se quedaba sin enlaces. El guard interno de
-    // comercial_plaza_inject_room_photos evita duplicar si el texto ya lleva URLs.
+    // comercial_plaza_inject_room_photos evita duplicar si el texto ya lleva URLs
+    // y solo envía si la clienta las pidió y aún no se enviaron en esta conversación.
     if ($isAuto && trim((string)($thread['process_slug'] ?? '')) === 'plaza') {
-        $text = comercial_plaza_inject_room_photos('plaza', $text, (string)($thread['last_inbound_text'] ?? ''));
+        $text = comercial_plaza_inject_room_photos('plaza', $text, (string)($thread['last_inbound_text'] ?? ''), $thread);
+        // Marcar que ya se enviaron fotos en este hilo para no repetirlas en turnos siguientes.
+        // El flag se persiste al hacer comercial_upsert_thread más abajo; si el envío falla
+        // por completo (early return con sentCount 0) no se persiste y se reintenta.
+        if (str_contains($text, 'compartir.site')) {
+            $thread['plaza_photos_sent_at'] = now_datetime();
+        }
     }
 
     $messages = $isAuto ? comercial_split_image_messages($text) : array($text);

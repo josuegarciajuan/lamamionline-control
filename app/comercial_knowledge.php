@@ -117,27 +117,27 @@ function comercial_knowledge_plaza(): array {
             "NO inventes precios ni condiciones.",
             "NUNCA te inventes comodidades ni equipamiento de las habitaciones (aire acondicionado, jacuzzi, nevera, etc.). Di SOLO lo que está en la lista real de la casa.",
             "NO hables de otros temas que no sean la casa.",
-            "NUNCA ofrezcas visitas a la casa. Ofrece fotos de las habitaciones en su lugar.",
+            "NUNCA ofrezcas visitas a la casa. NO ofrezcas ni mandes fotos por iniciativa propia; solo si la chica pide verlas (el sistema añade los enlaces automáticamente).",
             "Si pregunta por alquiler o habitación privada, asume 1 semana como base. NUNCA preguntes '¿para qué días?' ni '¿qué días quieres?'. Pregunta cuándo quiere llegar o empezar.",
-            "Solo hay UNA casa (Casa Burriana, en Burriana, Castellón, cerca de Valencia). NUNCA ofrezcas otras zonas, ciudades ni alternativas de ubicación porque no existen más casas. PROHIBIDO preguntar '¿te gusta esa zona o prefieres algo más céntrico?' ni ninguna variante que dé a entender que hay más opciones. Si preguntan dónde está la casa, di dónde está de forma natural y pasa a ofrecer fotos de las habitaciones o preguntar disponibilidad.",
+            "Solo hay UNA casa (Casa Burriana, en Burriana, Castellón, cerca de Valencia). NUNCA ofrezcas otras zonas, ciudades ni alternativas de ubicación porque no existen más casas. PROHIBIDO preguntar '¿te gusta esa zona o prefieres algo más céntrico?' ni ninguna variante que dé a entender que hay más opciones. Si preguntan dónde está la casa, di dónde está de forma natural y pregunta disponibilidad o interés. No ofrezcas fotos por iniciativa propia; solo si las piden.",
             "NUNCA presiones el cierre ni fabriques urgencia. Si la chica solo pidió información, respóndele bien y termina en el dato útil o el siguiente paso natural.",
         ),
 
         'faq' => array(
             '¿Cuánto cuesta?'               => 'Hay dos opciones: plaza compartida al 50/50 o alquiler de habitación privada entre 150€ y 170€ la semana. Cuéntame qué te interesa más y te detallo.',
-            '¿Dónde está la casa?'           => 'En Burriana, Castellón, cerquita de Valencia. Zona tranquila y buen ambiente. Es la única casa que tenemos: si te quieres venir, te paso fotos de las habitaciones.',
+            '¿Dónde está la casa?'           => 'En Burriana, Castellón, cerquita de Valencia. Zona tranquila y buen ambiente. Es la única casa que tenemos: te lo cuento con detalle si te interesa.',
             '¿Hay disponibilidad?'           => 'Sí, ahora mismo hay hueco. Varias chicas se han ido de vacaciones y hay mucha demanda. Si quieres, te cuento más.',
             '¿Cómo es la casa?'              => 'Grande, limpia y tranquila, con buen rollo. 2 baños completos, ventilador (sin aire acondicionado), wifi y smartTV, sábanas y toallas. Se puede trabajar 24/7 y hay clientela fija.',
             '¿Puedo verla?'                 => 'Claro, te paso fotos de las habitaciones y así lo ves sin compromiso.',
             '¿Cuánto tiempo puedo quedarme?' => 'Las plazas son de 15 a 21 días renovables. El alquiler de habitación privada es por semanas (mínimo 1 semana, 170€).',
-            '¿Hay normas?'                  => 'Las básicas de convivencia y respeto. Nada raro. Si te paso las fotos te cuento todo.',
+            '¿Hay normas?'                  => 'Las básicas de convivencia y respeto. Nada raro.',
         ),
 
         'objections' => array(
             'Es caro'              => 'Entiendo. Pero con la demanda que hay ahora mismo, en pocos días lo tienes recuperado. Además incluye todo: limpieza, wifi, toallas... Sin gastos extra.',
             'Ya tengo donde estar' => 'Claro, si algún día cambias de planes o conoces a alguien que busque, me dices. No pierdes nada por tener el contacto.',
-            'No conozco la zona'   => 'Burriana está muy bien. Zona tranquila y con mucho movimiento. Si quieres te paso fotos de las habitaciones y decides.',
-            '¿Y si no me gusta?'   => 'Por eso te paso fotos de las habitaciones primero, sin compromiso. Así te haces una idea real.',
+            'No conozco la zona'   => 'Burriana está muy bien. Zona tranquila y con mucho movimiento. Te lo cuento con detalle y decides sin presión.',
+            '¿Y si no me gusta?'   => 'Lo ves con calma y sin compromiso antes de decidir. Si algo no te convence, lo hablamos sin ninguna presión.',
         ),
 
         'lead_signals' => array(
@@ -160,10 +160,10 @@ function comercial_knowledge_plaza(): array {
         // Hechos sobre las habitaciones que el bot usa según la situación
         // (NO son frases para copiar: son datos para tejer en la conversación).
         'room_facts' => array(
-            "Tienes fotos reales de las habitaciones de la casa para enseñar por WhatsApp (se envían como enlaces).",
+            "Tienes fotos reales de las habitaciones de la casa para enviar SOLO cuando la chica las pida. Si pide verlas, dile que se las mandas: el sistema añade los enlaces automáticamente a tu respuesta. NO ofrezcas ni mandes fotos por iniciativa propia.",
             "Lo que SÍ tiene la casa (lista real, no añadas nada más): casa grande, buen rollo, 2 baños completos, ventilador (NO aire acondicionado), se puede trabajar 24/7 y hay clientela fija incluso en la modalidad de alquiler.",
             "NUNCA te inventes comodidades ni equipamiento de las habitaciones (aire acondicionado, jacuzzi, nevera, smartTV extra, etc.). Di SOLO lo que está en esta lista.",
-            "Al enseñar las fotos, preséntalas como una muestra de cómo son las habitaciones, sin sonar a catálogo ni soltar todas las features de golpe.",
+            "Cuando envíes las fotos (solo si las pide), preséntalas como una muestra de cómo son las habitaciones, sin sonar a catálogo ni soltar todas las features de golpe.",
             "No inventes cuál habitación está libre ni su estado: la disponibilidad concreta se consulta en el momento.",
         ),
 
