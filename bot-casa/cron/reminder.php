@@ -39,14 +39,20 @@ function _resolve_path(string $base, string $relative): string
     if ($resolved === false) {
         throw new \RuntimeException("Cannot resolve base: {$base}");
     }
-    $fullPath = $resolved . '/' . ltrim($relative, '/');
-    $normalized = realpath($fullPath);
+    // Soporta rutas absolutas ya resueltas (p.ej. data/users/{id}/...): si la
+    // ruta es absoluta, usarla directamente en lugar de concatenar sobre base.
+    if ($relative !== '' && str_starts_with($relative, '/')) {
+        $abs = $relative;
+    } else {
+        $abs = $resolved . '/' . ltrim($relative, '/');
+    }
+    $normalized = realpath($abs);
     if ($normalized === false) {
-        $parent = realpath(dirname($fullPath));
+        $parent = realpath(dirname($abs));
         if ($parent === false || !str_starts_with($parent, $resolved)) {
             throw new \RuntimeException("Path traversal blocked: {$relative}");
         }
-        return $fullPath;
+        return $abs;
     }
     if (!str_starts_with($normalized, $resolved)) {
         throw new \RuntimeException("Path traversal blocked: {$relative}");
