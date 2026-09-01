@@ -14,10 +14,6 @@
 declare(strict_types=1);
 
 $phpBotRoot = dirname(__DIR__);
-require_once $phpBotRoot . '/src/Core/ConfigInterface.php';
-require_once $phpBotRoot . '/src/Core/Config.php';
-require_once $phpBotRoot . '/src/BotInterface.php';
-require_once $phpBotRoot . '/src/Bot.php';
 
 $cronType = $argv[1] ?? '';
 if (!in_array($cronType, ['followup', 'reminder', 'learn', 'classify'], true)) {
@@ -25,12 +21,45 @@ if (!in_array($cronType, ['followup', 'reminder', 'learn', 'classify'], true)) {
     exit(1);
 }
 
+// Extra args to forward to the per-user worker (e.g. --days=7 for learn)
+$extraArgs = '';
+foreach ($argv as $i => $arg) {
+    if ($i >= 2) {
+        $extraArgs .= ' ' . escapeshellarg($arg);
+    }
+}
+
+// ── Single-user mode (worker) ────────────────────────────────
+// cron_runner.php <type> --user=<id> [--days=N]  → runs the cron for ONE user.
+if (in_array('--user', $argv, true) || array_any($argv, static fn (string $a): bool => str_starts_with($a, '--user='))) {
+    $userId = 0;
+    foreach ($argv as $arg) {
+        if (str_starts_with((string) $arg, '--user=')) {
+            $userId = (int) substr((string) $arg, 7);
+        }
+    }
+    if ($userId <= 0) {
+        fwrite(STDERR, "[cron_runner] Invalid --user id\n");
+        exit(2);
+    }
+    require_once $phpBotRoot . '/src/Core/ConfigInterface.php';
+    require_once $phpBotRoot . '/src/Core/Config.php';
+    require_once $phpBotRoot . '/src/BotInterface.php';
+    require_once $phpBotRoot . '/src/Bot.php';
+    runCron($phpBotRoot, $userId, $cronType, $extraArgs);
+    exit(0);
+}
+
 // Get all active users
 $usersFile = $phpBotRoot . '/data/users.json';
 if (!file_exists($usersFile)) {
     // Legacy mode: just run the cron for admin
     echo "[cron_runner] Legacy mode — running {$cronType} for root config\n";
-    runCron($phpBotRoot, 0, $cronType);
+    require_once $phpBotRoot . '/src/Core/ConfigInterface.php';
+    require_once $phpBotRoot . '/src/Core/Config.php';
+    require_once $phpBotRoot . '/src/BotInterface.php';
+    require_once $phpBotRoot . '/src/Bot.php';
+    runCron($phpBotRoot, 0, $cronType, $extraArgs);
     exit(0);
 }
 
@@ -42,6 +71,9 @@ if (!is_array($usersData) || empty($usersData['users'])) {
 
 echo "[cron_runner] Starting {$cronType} for " . count($usersData['users']) . " users\n";
 
+$phpBinary = (string) (PHP_BINARY ?: 'php');
+$script = __FILE__;
+
 foreach ($usersData['users'] as $user) {
     $userId = (int) ($user['id'] ?? 0);
     $active = (bool) ($user['active'] ?? true);
@@ -50,19 +82,31 @@ foreach ($usersData['users'] as $user) {
     $username = (string) ($user['username'] ?? "user_{$userId}");
     echo "[cron_runner] User {$userId} ({$username}): ";
 
-    try {
-        runCron($phpBotRoot, $userId, $cronType);
-        echo "OK\n";
-    } catch (\Throwable $e) {
-        echo "ERROR: " . $e->getMessage() . "\n";
+    // Aislamiento por usuario: cada cron se ejecuta en un subproceso PHP
+    // separado. Los archivos cron declaran funciones top-level y NO pueden
+    // incluirse varias veces en el mismo proceso (declaración duplicada).
+    $cmd = sprintf(
+        '%s %s %s --user=%d%s 2>&1',
+        escapeshellarg($phpBinary),
+        escapeshellarg($script),
+        escapeshellarg($cronType),
+        $userId,
+        $extraArgs
+    );
+    $output = shell_exec($cmd);
+    if ($output === null) {
+        echo "ERROR: no se pudo ejecutar\n";
+        continue;
     }
+    $trimmed = trim($output);
+    echo ($trimmed !== '' ? $trimmed : 'OK') . "\n";
 }
 
 echo "[cron_runner] Done\n";
 
 // ─────────────────────────────────────────────────────────
 
-function runCron(string $rootDir, int $userId, string $type): void
+function runCron(string $rootDir, int $userId, string $type, string $extraArgs = ''): void
 {
     $configDir = \WasapBot\Bot::resolveUserConfigDir($rootDir, $userId);
     $config = new \WasapBot\Core\Config($configDir, $rootDir);
@@ -97,16 +141,11 @@ function runCron(string $rootDir, int $userId, string $type): void
         }
     }
 
-    // Run the appropriate cron
-    $extraArgs = '';
-    if ($type === 'learn') {
-        $days = 7;
-        for ($i = 2; $i < count($GLOBALS['argv'] ?? []); $i++) {
-            if (str_starts_with($GLOBALS['argv'][$i], '--days=')) {
-                $days = (int) substr($GLOBALS['argv'][$i], 7);
-            }
+    // Parse --days for learn
+    if ($type === 'learn' && $extraArgs !== '') {
+        if (preg_match('/--days=(\d+)/', $extraArgs, $m)) {
+            $extraArgs = ' --days=' . (int) $m[1];
         }
-        $extraArgs = " --days={$days}";
     }
 
     $cronFiles = [
