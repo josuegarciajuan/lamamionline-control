@@ -4562,11 +4562,11 @@ function comercial_send_hot_summary_to_owner($thread, $inboundText, $messageId =
     $suggestions = comercial_generate_hot_suggestions($thread, $processSlug, $inboundText);
 
     // Construir mensaje
-    // Dual-send: primary (654464023) recibe el texto original; secondary (641993776)
-    // recibe el mismo aviso parafraseado por LLM, ~15-25s después (antiban).
+    // Dual-send: primary (654464023) recibe el texto original; los secondary
+    // reciben el mismo aviso parafraseado por LLM, ~15-25s después (antiban).
     $ownerPhones = function_exists('avisos_owner_notification_phones')
         ? avisos_owner_notification_phones()
-        : array('primary' => '654464023', 'secondary' => array('641993776'));
+        : array('primary' => '654464023', 'secondary' => array());
 
     $msg = "🔥 *CONVERSACIÓN MUY CALIENTE*\n\n";
     $lineInfo = $linePhone;
@@ -4649,11 +4649,11 @@ function comercial_send_intervention_notification_to_owner($thread, $inboundText
     }
     $conversationSummary = !empty($summaryLines) ? implode("\n", array_slice($summaryLines, -6)) : '(sin historial)';
 
-    // Dual-send: primary (654464023) recibe el texto original; secondary (641993776)
-    // recibe el mismo aviso parafraseado por LLM, ~15-25s después (antiban).
+    // Dual-send: primary (654464023) recibe el texto original; los secondary
+    // reciben el mismo aviso parafraseado por LLM, ~15-25s después (antiban).
     $ownerPhones = function_exists('avisos_owner_notification_phones')
         ? avisos_owner_notification_phones()
-        : array('primary' => '654464023', 'secondary' => array('641993776'));
+        : array('primary' => '654464023', 'secondary' => array());
 
     $msg = "🚨 *INTERVENCIÓN INMEDIATA — CONTESTA YA*\n\n";
     $msg .= "Solo falta cerrar el trato, te necesito en esta conversación.\n\n";
