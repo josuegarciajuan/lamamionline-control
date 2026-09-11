@@ -242,7 +242,7 @@ function avisos_sender_retry_rounds() {
 }
 
 function avisos_target_phones() {
-    $raw = aviso_cfg('whatsapp_target_phones', "654464023\n641993776");
+    $raw = aviso_cfg('whatsapp_target_phones', "654464023");
 
     if (is_array($raw)) {
         $items = $raw;
@@ -266,7 +266,7 @@ function avisos_target_phones() {
  * Destinos de las notificaciones informativas al dueño.
  * Devuelve ['primary' => teléfono, 'secondary' => [teléfonos]].
  * - primary: 654464023 (si está configurado; si no, el primero de la lista).
- * - secondary: el resto de whatsapp_target_phones + SIEMPRE 641993776 (dedup).
+ * - secondary: el resto de whatsapp_target_phones (dedup).
  * El secondary recibe el mismo aviso parafraseado por LLM y con ~20s de espera
  * para no levantar sospechas de spam/baneo en WhatsApp.
  */
@@ -276,7 +276,7 @@ function avisos_owner_notification_phones() {
     $secondary = array();
 
     if (empty($targets)) {
-        return array('primary' => $primary, 'secondary' => array('641993776'));
+        return array('primary' => $primary, 'secondary' => array());
     }
 
     if (in_array($primary, $targets, true)) {
@@ -295,10 +295,6 @@ function avisos_owner_notification_phones() {
         $p = trim((string)$p);
         if ($p === '' || $p === $primary) continue;
         if (!in_array($p, $secondary, true)) $secondary[] = $p;
-    }
-
-    if (!in_array('641993776', $secondary, true) && '641993776' !== $primary) {
-        $secondary[] = '641993776';
     }
 
     return array('primary' => $primary, 'secondary' => array_values($secondary));
@@ -1598,8 +1594,8 @@ function aviso_send_whatsapp($aviso) {
     $secondaryByPhone = array_flip($ownerPhones['secondary']);
     $paraphrasedText = null;
 
-    // El secondary garantizado (641993776) recibe el aviso aunque en la config
-    // solo esté el primary. No se reenvía si ya consta enviado con éxito.
+    // Los secondary configurados reciben el aviso aunque no estén en la lista
+    // pendiente. No se reenvía si ya consta enviado con éxito.
     if (trim((string)($aviso['whatsapp_last_result'] ?? '')) !== 'sent') {
         foreach ($ownerPhones['secondary'] as $sp) {
             if ($sp === '' || in_array($sp, $phones, true)) continue;

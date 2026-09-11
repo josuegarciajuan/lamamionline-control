@@ -1010,7 +1010,7 @@ function render_publicista_afiliados_page() {
 
     echo '<div class="field full">';
     echo '<label>Destinos broadcast (un teléfono por línea)</label>';
-    echo '<textarea name="destinos" rows="4" style="margin-top:8px;width:100%;max-width:420px;" placeholder="654464023&#10;641993776">' . e(implode("\n", $config['destinos'])) . '</textarea>';
+    echo '<textarea name="destinos" rows="4" style="margin-top:8px;width:100%;max-width:420px;" placeholder="654464023">' . e(implode("\n", $config['destinos'])) . '</textarea>';
     echo '</div>';
 
     echo '<div class="field full">';

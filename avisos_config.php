@@ -225,7 +225,7 @@ return array(
 
     // Teléfonos destino que recibirán los avisos. Puede ser string con saltos
     // de línea/comas o array si luego se sobreescribe desde settings.json.
-    'whatsapp_target_phones' => "654464023\n641993776",
+    'whatsapp_target_phones' => "654464023",
 
     // Perfil de ruido para decidir qué avisos se mandan por WhatsApp:
     // - conservador: manda alta/media/baja
