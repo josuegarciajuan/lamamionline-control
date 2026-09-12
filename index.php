@@ -40,7 +40,7 @@ if ($lite && !is_logged_in()) {
 
 // Modo Lite: recordar última sección visitada para restaurar al reabrir la app
 // Usa cookie de sesión (se borra al cerrar el navegador) + settings.json (persiste en DB)
-if ($lite && is_logged_in() && $page !== 'login' && $page !== 'logout') {
+if ($lite && is_logged_in() && $page !== 'login' && $page !== 'logout' && $page !== 'voztest') {
     $settings = settings_get();
     $liteLastPage = $settings['lite_last_page'] ?? null;
     $liteLastTab  = $settings['lite_last_tab'] ?? null;
@@ -291,6 +291,10 @@ $_swV       = filemtime(__DIR__ . '/sw.js');
 
                     case 'autotube':
                         render_autotube_page();
+                        break;
+
+                    case 'voztest':
+                        render_voice_test_page();
                         break;
 
                     default:

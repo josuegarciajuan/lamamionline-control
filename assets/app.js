@@ -4048,6 +4048,82 @@ function initYoutubePlayer() {
         var isRecording = false;
         var _nativeActive = !!SpeechRecognitionCtor;   // whether native is currently the active mode
         var _nativeDisabled = false;                    // native permanently disabled after hard error
+        var _vzFallbackStarted = false;                 // guard: una sola caída a MediaRecorder por pulsación
+        var _vzNativeWatchdog = null;                   // nativo arranca pero nunca devuelve texto
+        var _vzNativeGotResult = false;                 // nativo produjo transcripción
+        var _vzNativeManualStop = false;                // el usuario volvió a pulsar el mic para parar
+        var _vzLastRawTranscript = '';                  // última transcripción cruda (para LLM)
+        var _vzInArtificial = false;                    // grabación+Whisper activa (ignora eventos nativos tardíos)
+        // En el WebView del coche SpeechRecognition existe y arranca, pero no transcribe.
+        // Persistimos el fallo para ir directo a grabación+Whisper en siguientes cargas.
+        try {
+            if (window.localStorage && localStorage.getItem('vzNativeSRFailed') === '1') _nativeDisabled = true;
+        } catch (ignore) {}
+
+        function vzDebug(step, detail) {
+            if (typeof window._voiceDebug === 'function') {
+                try { window._voiceDebug('yt_mic:' + step, detail); } catch (e) {}
+            }
+        }
+        function vzMarkNativeFailed(reason) {
+            if (!_nativeDisabled) {
+                _nativeDisabled = true;
+                try { if (window.localStorage) localStorage.setItem('vzNativeSRFailed', '1'); } catch (ignore) {}
+                vzDebug('native_failed', reason);
+            }
+        }
+        function vzEnsureCandidatesBar() {
+            var bar = document.getElementById('vzVoiceCandidates');
+            if (bar) return bar;
+            var host = searchInput.parentNode;
+            if (!host || !host.parentNode) return null;
+            bar = document.createElement('div');
+            bar.id = 'vzVoiceCandidates';
+            bar.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:4px 2px 0;width:100%;';
+            host.parentNode.insertBefore(bar, host.nextSibling);
+            return bar;
+        }
+        function vzShowCandidates(list) {
+            var bar = vzEnsureCandidatesBar();
+            if (!bar) return;
+            bar.innerHTML = '';
+            if (!list || list.length < 2) return;
+            list.forEach(function (text) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = '\uD83D\uDD0E ' + text;
+                b.style.cssText = 'border:1px solid rgba(147,197,253,.5);background:rgba(59,130,246,.16);color:#dbeafe;border-radius:999px;padding:6px 10px;font-size:12px;cursor:pointer;touch-action:manipulation;';
+                b.addEventListener('click', function () {
+                    searchInput.value = text;
+                    bar.innerHTML = '';
+                    YTPlayer.search(text);
+                });
+                bar.appendChild(b);
+            });
+            vzDebug('candidates', list.join(' | ').substr(0, 120));
+        }
+        // Corrección LLM con candidatos (fallback silencioso: devuelve el texto crudo).
+        function vzAutocorrect(raw, onDone) {
+            if (!raw) { if (onDone) onDone(raw, []); return; }
+            var fd = new FormData();
+            fd.append('action', 'voice_autocorrect');
+            fd.append('text', raw);
+            fd.append('context', 'reproductor YouTube coche');
+            fetch('index.php', {
+                method: 'POST', body: fd, credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(function (r) { return r.json().catch(function () { return {}; }); })
+            .then(function (j) {
+                if (j && j.ok && j.best) {
+                    vzDebug('autocorrect', 'source=' + j.source + ' best=' + String(j.best).substr(0, 60));
+                    if (onDone) onDone(String(j.best), j.candidates || []);
+                } else if (onDone) {
+                    onDone(raw, []);
+                }
+            })
+            .catch(function () { if (onDone) onDone(raw, []); });
+        }
 
         // ── Silence detection (artificial mode) ───────────────────────
         var _silenceCheckInterval = null;
@@ -4150,11 +4226,18 @@ function initYoutubePlayer() {
             }
         }
 
-        // ── Execute search with transcript ──
+        // ── Execute search with transcript (corregido por LLM si hay candidatos) ──
         function searchWithTranscript(transcript) {
             if (!transcript) return;
+            _vzLastRawTranscript = transcript;
             searchInput.value = transcript;
-            YTPlayer.search(transcript);
+            vzAutocorrect(transcript, function (best, candidates) {
+                var finalText = (best || transcript).trim();
+                if (!finalText) return;
+                searchInput.value = finalText;
+                vzShowCandidates(candidates);
+                YTPlayer.search(finalText);
+            });
         }
 
         // ── Voice recognition timeout ──────────────────────────────────
@@ -4192,13 +4275,34 @@ function initYoutubePlayer() {
 
             recognition.onstart = function () {
                 isRecording = true;
+                _vzNativeGotResult = false;
+                _vzFallbackStarted = false;
                 setMicState('recording');
                 SfxPlayer.micOn();
                 lastInterim = '';
+                vzDebug('native_onstart', 'lang=' + recognition.lang);
                 _startVoiceTimeout();
+                // Watchdog: en el coche arranca (onstart) pero nunca transcribe.
+                if (_vzNativeWatchdog) clearTimeout(_vzNativeWatchdog);
+                _vzNativeWatchdog = setTimeout(function () {
+                    if (_vzNativeGotResult || !isRecording) return;
+                    vzDebug('native_watchdog', 'sin resultado en 4s -> fallback');
+                    vzMarkNativeFailed('timeout_sin_resultado');
+                    try { recognition.abort(); } catch (ignore) {}
+                    isRecording = false;
+                    setMicState('');
+                    SfxPlayer.micOff();
+                    _clearVoiceTimeout();
+                    if (!_vzFallbackStarted) {
+                        _vzFallbackStarted = true;
+                        startArtificialRecording();
+                    }
+                }, 4000);
             };
 
             recognition.onresult = function (event) {
+                _vzNativeGotResult = true;
+                if (_vzNativeWatchdog) { clearTimeout(_vzNativeWatchdog); _vzNativeWatchdog = null; }
                 _clearVoiceTimeout();
                 var finalTranscript = '';
                 var interimTranscript = '';
@@ -4222,28 +4326,47 @@ function initYoutubePlayer() {
 
             recognition.onend = function () {
                 _clearVoiceTimeout();
+                if (_vzNativeWatchdog) { clearTimeout(_vzNativeWatchdog); _vzNativeWatchdog = null; }
+                if (_vzInArtificial) return;   // ya estamos grabando: no pisar el estado
                 isRecording = false;
                 setMicState('');
                 SfxPlayer.micOff();
                 var text = searchInput.value.trim();
-                if (text) {
-                    YTPlayer.search(text);
+                if (_vzNativeGotResult && text) {
+                    vzDebug('native_done', 'text=' + text.substr(0, 60));
+                    searchWithTranscript(text);
+                } else if (!_vzNativeManualStop && !_vzFallbackStarted) {
+                    // Terminó sin texto (aborted/no-speech/silencio) -> grabación+Whisper
+                    vzDebug('native_no_text', 'fallback a MediaRecorder');
+                    _vzFallbackStarted = true;
+                    startArtificialRecording();
                 }
+                _vzNativeManualStop = false;
             };
 
             recognition.onerror = function (event) {
                 _clearVoiceTimeout();
+                if (_vzNativeWatchdog) { clearTimeout(_vzNativeWatchdog); _vzNativeWatchdog = null; }
+                if (_vzInArtificial) return;   // ya estamos grabando: no pisar el estado
                 isRecording = false;
                 setMicState('');
                 SfxPlayer.micOff();
                 console.warn('Voice search SpeechRecognition error:', event.error);
+                vzDebug('native_error', 'error=' + event.error + ' message=' + (event.message || ''));
+                if (_vzNativeManualStop) { _vzNativeManualStop = false; return; }
 
-                // Only permanently disable native for hard (non-recoverable) errors.
-                // Transient errors (no-speech, aborted, network) → keep native available.
+                // Errores no recuperables: nativo inútil en este dispositivo.
                 var hardErrors = ['not-allowed', 'service-not-allowed', 'audio-capture'];
                 if (hardErrors.indexOf(event.error) !== -1) {
-                    console.log('SpeechRecognition hard error (' + event.error + '), disabling native permanently');
-                    _nativeDisabled = true;
+                    vzMarkNativeFailed(event.error);
+                }
+                // Cualquier error sin texto (incluido aborted/no-speech/network)
+                // cae a grabación+Whisper para que el botón no se quede en nada.
+                if (!_vzFallbackStarted) {
+                    _vzFallbackStarted = true;
+                    setTimeout(function () {
+                        if (!isRecording) startArtificialRecording();
+                    }, 60);
                 }
             };
         }
@@ -4255,14 +4378,22 @@ function initYoutubePlayer() {
                 return;
             }
 
+            if (typeof window.MediaRecorder === 'undefined') {
+                alert('Este navegador no soporta grabacion de audio (MediaRecorder).');
+                return;
+            }
+
+            _vzInArtificial = true;
+            vzDebug('artificial_start', 'getUserMedia');
+
             navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
                 audioChunks = [];
 
                 var mimeType = 'audio/webm;codecs=opus';
-                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                if (MediaRecorder.isTypeSupported && !MediaRecorder.isTypeSupported(mimeType)) {
                     mimeType = 'audio/webm';
                 }
-                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                if (MediaRecorder.isTypeSupported && !MediaRecorder.isTypeSupported(mimeType)) {
                     mimeType = 'audio/mp4';
                 }
 
@@ -4276,6 +4407,7 @@ function initYoutubePlayer() {
 
                 mediaRecorder.onstop = function () {
                     SfxPlayer.micOff();
+                    _vzInArtificial = false;
                     // Stop all tracks
                     stream.getTracks().forEach(function (t) { t.stop(); });
                     _clearSilenceDetection();
@@ -4323,7 +4455,9 @@ function initYoutubePlayer() {
                 _startSilenceDetection(stream);
 
             }).catch(function (err) {
+                _vzInArtificial = false;
                 console.error('getUserMedia error:', err);
+                vzDebug('artificial_getusermedia_fail', (err && err.name ? err.name : '') + ' ' + (err && err.message ? err.message : ''));
                 alert('No se pudo acceder al microfono. Verifica los permisos.');
             });
         }
@@ -4341,13 +4475,22 @@ function initYoutubePlayer() {
         var nativeClick = function () {
             if (!recognition) return;
             if (isRecording) {
-                recognition.stop();
+                _vzNativeManualStop = true;
+                try { recognition.stop(); } catch (ignore) {}
                 return;
             }
+            _vzFallbackStarted = false;
             try {
                 recognition.start();
+                vzDebug('native_start', 'requested');
             } catch (e) {
                 console.warn('SpeechRecognition start failed:', e);
+                vzDebug('native_start_fail', e && e.message ? e.message : String(e));
+                vzMarkNativeFailed('start_exception');
+                if (!_vzFallbackStarted) {
+                    _vzFallbackStarted = true;
+                    startArtificialRecording();
+                }
             }
         };
 
@@ -4360,11 +4503,14 @@ function initYoutubePlayer() {
         };
 
         var unifiedClick = function () {
+            _vzFallbackStarted = false;
+            _vzNativeManualStop = false;
             // If native is available and not permanently disabled, try native first
             if (_nativeActive && !_nativeDisabled && recognition) {
                 nativeClick();
             } else {
                 artificialClick();
+                if (_nativeDisabled) vzDebug('artificial_used', 'nativeDisabled persistido');
             }
         };
 

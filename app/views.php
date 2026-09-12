@@ -13430,6 +13430,21 @@ function render_youtube_player_lite($playParam, $playlists, $channels, $history,
     }
     echo '>';
 
+    // ═══ BARRA DE SALIDA + DIAGNÓSTICO DE VOZ (Lite) ═══════════════════
+    // Aislada y con handlers inline: no depende de app.js ni de lite.css,
+    // para ser alcanzable aunque el resto de botones del reproductor fallen.
+    echo '<style>
+.vz-lite-fs-bar{position:fixed;top:4px;left:6px;z-index:2147483000;display:flex;gap:6px;align-items:center;pointer-events:none}
+.vz-lite-fs-btn{pointer-events:auto;touch-action:manipulation;user-select:none;-webkit-user-select:none;cursor:pointer;min-height:34px;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:rgba(6,12,22,.82);color:#e5eefc;font-size:13px;font-weight:700;line-height:1;letter-spacing:.02em;box-shadow:0 2px 8px rgba(0,0,0,.55);backdrop-filter:blur(4px)}
+.vz-lite-fs-btn:active{transform:translateY(1px);background:rgba(20,32,52,.95)}
+.vz-lite-test-btn{border-color:rgba(16,185,129,.6);color:#6ee7b7}
+body:not(.josue-yt-fs) .vz-lite-fs-bar{display:none}
+</style>';
+    echo '<div class="vz-lite-fs-bar" id="vzLiteFsBar">';
+    echo '<button type="button" class="vz-lite-fs-btn" id="vzLiteExitBtn" title="Salir a los menús" onclick="document.body.classList.remove(\'josue-yt-fs\');document.body.classList.remove(\'yt-fs-video\');">&#9776; MENÚ</button>';
+    echo '<button type="button" class="vz-lite-fs-btn vz-lite-test-btn" id="vzLiteTestBtn" title="Diagnóstico de voz" onclick="window.location.href=\'index.php?lite=1&amp;page=voztest\'">&#127908; TEST VOZ</button>';
+    echo '</div>';
+
     // ═══ CASSETTE DECK BODY: Marco bakelita ════════════════════════════
     echo '<div class="yt-radio-body">';
 
@@ -14089,6 +14104,330 @@ function _render_audio_proxy_alert() {
     echo '</p>';
     echo '</div>';
     echo '</section>';
+}
+
+/**
+ * Página de diagnóstico de voz (Lite/coche y escritorio).
+ * Autocontenida: no depende de app.js ni de lite.css para poder validar el
+ * hardware de audio aunque el resto del reproductor tenga fallos.
+ * Ruta: index.php?lite=1&page=voztest
+ */
+function render_voice_test_page() {
+    $playerUrl = 'index.php?lite=1&page=josue&tab=reproductor';
+    ?>
+<section class="vz-test">
+<style>
+.vz-test{max-width:1100px;margin:0 auto;padding:12px 14px 40px;color:#dbe7f7;font-size:14px}
+.vz-test h1{font-size:18px;margin:6px 0 4px;color:#fff}
+.vz-test .vz-note{color:#93a4bd;margin:0 0 12px}
+.vz-test .vz-back{display:inline-block;margin-bottom:10px;color:#6ee7b7;text-decoration:none;font-weight:700}
+.vz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px}
+.vz-card{background:rgba(17,26,43,.85);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:12px}
+.vz-card h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#8fb0da;margin:0 0 8px}
+.vz-btn{appearance:none;cursor:pointer;touch-action:manipulation;min-height:42px;padding:8px 14px;margin:2px 4px 6px 0;border-radius:8px;border:1px solid rgba(110,231,183,.5);background:rgba(16,185,129,.14);color:#a7f3d0;font-size:14px;font-weight:700}
+.vz-btn:active{transform:translateY(1px)}
+.vz-btn[disabled]{opacity:.45;cursor:not-allowed}
+.vz-btn-alt{border-color:rgba(147,197,253,.5);background:rgba(59,130,246,.14);color:#bfdbfe}
+.vz-meter{height:16px;border-radius:8px;background:rgba(255,255,255,.08);overflow:hidden;margin:8px 0 4px}
+.vz-meter-fill{height:100%;width:0%;background:linear-gradient(90deg,#10b981,#f59e0b,#ef4444);transition:width .05s linear}
+.vz-kv{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;color:#bcd0ea}
+.vz-out{margin:8px 0 0;padding:8px;border-radius:8px;background:rgba(0,0,0,.35);min-height:20px;max-height:260px;overflow:auto}
+.vz-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.vz-chip{border:1px solid rgba(147,197,253,.5);background:rgba(59,130,246,.16);color:#dbeafe;border-radius:999px;padding:8px 12px;font-size:13px;cursor:pointer}
+.vz-ok{color:#6ee7b7}.vz-bad{color:#fca5a5}.vz-warn{color:#fcd34d}
+</style>
+
+<a class="vz-back" href="<?= e($playerUrl) ?>">&larr; Volver al reproductor</a>
+<h1>&#127908; Diagnóstico de voz</h1>
+<p class="vz-note">Comprueba si este dispositivo captura audio y qué APIs de voz funcionan. Pulsa los botones en orden (1&rarr;5) y, si algo falla, <strong>Enviar informe</strong> para leerlo en el servidor.</p>
+
+<div class="vz-grid">
+    <div class="vz-card">
+        <h2>1 &middot; Capacidades</h2>
+        <pre class="vz-kv" id="vzCaps">Calculando...</pre>
+        <button type="button" class="vz-btn vz-btn-alt" id="vzReportBtn">Enviar informe</button>
+        <span class="vz-kv" id="vzReportOut"></span>
+    </div>
+
+    <div class="vz-card">
+        <h2>2 &middot; Permiso + nivel de micrófono</h2>
+        <button type="button" class="vz-btn" id="vzPermBtn">Pedir permiso de micrófono</button>
+        <div class="vz-meter"><div class="vz-meter-fill" id="vzMeterFill"></div></div>
+        <div class="vz-kv" id="vzLevel">nivel: 0 (habla y comprueba que sube)</div>
+        <pre class="vz-out vz-kv" id="vzPermInfo">Sin permiso todavía.</pre>
+        <pre class="vz-out vz-kv" id="vzDevices"></pre>
+    </div>
+
+    <div class="vz-card">
+        <h2>3 &middot; Grabación (MediaRecorder)</h2>
+        <button type="button" class="vz-btn" id="vzRecBtn" disabled>Grabar 6 s</button>
+        <pre class="vz-out vz-kv" id="vzRecInfo">Primero concede permiso (paso 2).</pre>
+        <audio id="vzPlayback" controls style="width:100%;margin-top:6px"></audio>
+    </div>
+
+    <div class="vz-card">
+        <h2>4 &middot; Transcribir (Whisper) + corregir (LLM)</h2>
+        <button type="button" class="vz-btn" id="vzTrBtn" disabled>Transcribir última grabación</button>
+        <button type="button" class="vz-btn vz-btn-alt" id="vzCorrBtn" disabled>Corregir + candidatos</button>
+        <pre class="vz-out vz-kv" id="vzTrOut">Graba primero (paso 3).</pre>
+        <div class="vz-chips" id="vzChips"></div>
+    </div>
+
+    <div class="vz-card">
+        <h2>5 &middot; SpeechRecognition nativo</h2>
+        <button type="button" class="vz-btn" id="vzSrBtn">Probar 5 s (habla)</button>
+        <pre class="vz-out vz-kv" id="vzSrOut">Pendiente.</pre>
+    </div>
+</div>
+
+<pre class="vz-out vz-kv" id="vzLog" style="margin-top:12px"></pre>
+
+<script>
+(function () {
+    var $ = function (id) { return document.getElementById(id); };
+    var ENDPOINT = window.location.pathname + window.location.search;
+    var micStream = null;
+    var audioCtx = null;
+    var lastBlob = null;
+    var lastTranscript = '';
+    var reportLines = [];
+
+    function log(msg, cls) {
+        var t = new Date().toISOString().substr(11, 12);
+        var line = '[' + t + '] ' + msg;
+        console.log('[VOZTEST]', msg);
+        reportLines.push(line);
+        var el = $('vzLog');
+        if (el) el.textContent = reportLines.slice(-200).join('\n');
+    }
+    function setText(id, txt, cls) {
+        var el = $(id);
+        if (!el) return;
+        el.textContent = txt;
+        if (cls) el.className = 'vz-out vz-kv ' + cls;
+    }
+    function postForm(action, fields) {
+        var fd = new FormData();
+        fd.append('action', action);
+        Object.keys(fields || {}).forEach(function (k) { fd.append(k, fields[k]); });
+        return fetch(ENDPOINT, { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json().catch(function () { return {}; }); });
+    }
+    function report(step, detail) {
+        log('report ' + step + ': ' + detail);
+        return postForm('debug_voice', { step: 'voztest:' + step, detail: String(detail).substr(0, 400) });
+    }
+
+    // ── 1. Capacidades ───────────────────────────────────────────
+    var caps = {
+        ua: navigator.userAgent,
+        protocol: location.protocol,
+        host: location.hostname,
+        secureContext: !!window.isSecureContext,
+        speechRecognition: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
+        mediaDevices: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+        mediaRecorder: (typeof window.MediaRecorder !== 'undefined'),
+        audioContext: !!(window.AudioContext || window.webkitAudioContext)
+    };
+    $('vzCaps').textContent =
+        'secureContext: ' + caps.secureContext + '\n' +
+        'protocol: ' + caps.protocol + ' (' + caps.host + ')\n' +
+        'SpeechRecognition: ' + caps.speechRecognition + '\n' +
+        'getUserMedia: ' + caps.mediaDevices + '\n' +
+        'MediaRecorder: ' + caps.mediaRecorder + '\n' +
+        'AudioContext: ' + caps.audioContext + '\n' +
+        'UA: ' + caps.ua;
+    log('caps ' + JSON.stringify(caps).substr(0, 300));
+
+    // ── Permisos declarados (si la API existe) ───────────────────
+    if (navigator.permissions && navigator.permissions.query) {
+        try {
+            navigator.permissions.query({ name: 'microphone' }).then(function (st) {
+                log('permissions.microphone=' + st.state);
+            }).catch(function () { log('permissions.query(microphone) no soportado'); });
+        } catch (e) { log('permissions.query lanzó excepción'); }
+    }
+
+    // ── 2. Permiso + medidor ─────────────────────────────────────
+    function startMeter(stream) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        audioCtx = new AC();
+        var src = audioCtx.createMediaStreamSource(stream);
+        var analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        src.connect(analyser);
+        var buf = new Uint8Array(analyser.fftSize);
+        (function tick() {
+            analyser.getByteTimeDomainData(buf);
+            var sum = 0;
+            for (var i = 0; i < buf.length; i++) { var v = (buf[i] - 128) / 128; sum += v * v; }
+            var rms = Math.sqrt(sum / buf.length);
+            var pct = Math.min(100, Math.round(rms * 260));
+            var fill = $('vzMeterFill');
+            if (fill) fill.style.width = pct + '%';
+            var lvl = $('vzLevel');
+            if (lvl) lvl.textContent = 'nivel: ' + pct + '% (habla y comprueba que sube)';
+            requestAnimationFrame(tick);
+        })();
+    }
+    $('vzPermBtn').addEventListener('click', function () {
+        if (!caps.mediaDevices) { setText('vzPermInfo', 'getUserMedia NO disponible', 'vz-bad'); return; }
+        setText('vzPermInfo', 'Pidiendo permiso...');
+        navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(function (stream) {
+            micStream = stream;
+            var track = stream.getAudioTracks()[0];
+            var settings = (track && track.getSettings) ? track.getSettings() : {};
+            var info = 'PERMISO CONCEDIDO\n' +
+                'track: ' + (track ? track.label : '(sin label)') + '\n' +
+                'enabled: ' + (track ? track.enabled : '?') + '\n' +
+                'settings: ' + JSON.stringify(settings);
+            setText('vzPermInfo', info, 'vz-ok');
+            $('vzRecBtn').disabled = false;
+            report('perm', 'OK ' + JSON.stringify(settings));
+            startMeter(stream);
+            if (navigator.mediaDevices.enumerateDevices) {
+                navigator.mediaDevices.enumerateDevices().then(function (list) {
+                    var inputs = list.filter(function (d) { return d.kind === 'audioinput'; });
+                    var txt = inputs.map(function (d, i) { return (i + 1) + '. ' + (d.label || '(label oculto)'); }).join('\n');
+                    $('vzDevices').textContent = 'Entradas de audio: ' + inputs.length + '\n' + txt;
+                    report('devices', inputs.length + ' inputs: ' + txt.substr(0, 250));
+                });
+            }
+        }).catch(function (err) {
+            setText('vzPermInfo', 'PERMISO DENEGADO / ERROR: ' + (err && err.name ? err.name : '') + ' — ' + (err && err.message ? err.message : err), 'vz-bad');
+            report('perm_fail', (err && err.name ? err.name : '') + ' ' + (err && err.message ? err.message : ''));
+        });
+    });
+
+    // ── 3. Grabación ─────────────────────────────────────────────
+    $('vzRecBtn').addEventListener('click', function () {
+        if (!micStream || typeof window.MediaRecorder === 'undefined') {
+            setText('vzRecInfo', 'Sin stream de micrófono o sin MediaRecorder', 'vz-bad');
+            return;
+        }
+        var mime = 'audio/webm;codecs=opus';
+        if (window.MediaRecorder.isTypeSupported && !MediaRecorder.isTypeSupported(mime)) mime = 'audio/webm';
+        if (window.MediaRecorder.isTypeSupported && !MediaRecorder.isTypeSupported(mime)) mime = '';
+        var chunks = [];
+        var rec;
+        try {
+            rec = mime ? new MediaRecorder(micStream, { mimeType: mime }) : new MediaRecorder(micStream);
+        } catch (e) {
+            setText('vzRecInfo', 'No se pudo crear MediaRecorder: ' + e.message, 'vz-bad');
+            report('rec_fail', e.message); return;
+        }
+        rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) chunks.push(ev.data); };
+        rec.onstop = function () {
+            var type = rec.mimeType || mime || 'audio/webm';
+            lastBlob = new Blob(chunks, { type: type });
+            var url = URL.createObjectURL(lastBlob);
+            $('vzPlayback').src = url;
+            setText('vzRecInfo', 'GRABADO: ' + lastBlob.size + ' bytes, tipo ' + type + '\nPulsa play en el reproductor para oírte.', lastBlob.size > 0 ? 'vz-ok' : 'vz-bad');
+            $('vzTrBtn').disabled = lastBlob.size === 0;
+            report('rec', 'size=' + lastBlob.size + ' type=' + type);
+        };
+        rec.start();
+        setText('vzRecInfo', 'Grabando 6 segundos... habla ahora.');
+        log('rec start mime=' + (mime || '(default)'));
+        setTimeout(function () { try { rec.stop(); } catch (e) {} }, 6000);
+    });
+
+    // ── 4. Whisper + LLM ─────────────────────────────────────────
+    $('vzTrBtn').addEventListener('click', function () {
+        if (!lastBlob) return;
+        setText('vzTrOut', 'Enviando a Whisper...');
+        var fd = new FormData();
+        fd.append('action', 'youtube_voice_search');
+        fd.append('audio', lastBlob, 'audio.webm');
+        fetch(ENDPOINT, { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json().catch(function () { return {}; }); })
+            .then(function (j) {
+                if (j && j.ok && j.transcript) {
+                    lastTranscript = j.transcript;
+                    setText('vzTrOut', 'WHISPER OK:\n' + j.transcript, 'vz-ok');
+                    $('vzCorrBtn').disabled = false;
+                    report('whisper', 'OK: ' + j.transcript);
+                } else {
+                    setText('vzTrOut', 'WHISPER FALLÓ:\n' + JSON.stringify(j), 'vz-bad');
+                    report('whisper_fail', JSON.stringify(j).substr(0, 300));
+                }
+            }).catch(function (e) {
+                setText('vzTrOut', 'WHISPER error de red: ' + e.message, 'vz-bad');
+                report('whisper_net', e.message);
+            });
+    });
+
+    $('vzCorrBtn').addEventListener('click', function () {
+        if (!lastTranscript) return;
+        setText('vzTrOut', 'Corrigiendo con LLM...');
+        var fd = new FormData();
+        fd.append('action', 'voice_autocorrect');
+        fd.append('text', lastTranscript);
+        fd.append('context', 'reproductor YouTube coche');
+        fetch(ENDPOINT, { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json().catch(function () { return {}; }); })
+            .then(function (j) {
+                if (!j || !j.ok) { setText('vzTrOut', 'LLM FALLÓ: ' + JSON.stringify(j), 'vz-bad'); return; }
+                setText('vzTrOut', 'CRUDO: ' + (j.raw || lastTranscript) + '\nMEJOR: ' + j.best + '\nfuente: ' + j.source, j.source === 'llm' ? 'vz-ok' : 'vz-warn');
+                var chips = $('vzChips');
+                chips.innerHTML = '';
+                (j.candidates || []).forEach(function (c) {
+                    var b = document.createElement('button');
+                    b.type = 'button'; b.className = 'vz-chip'; b.textContent = '🔎 ' + c;
+                    b.addEventListener('click', function () {
+                        report('candidate', c);
+                        window.location.href = '<?= e($playerUrl) ?>&play=' + encodeURIComponent(c);
+                    });
+                    chips.appendChild(b);
+                });
+                report('llm', 'raw=' + (j.raw || '') + ' | best=' + j.best + ' | source=' + j.source);
+            }).catch(function (e) { setText('vzTrOut', 'LLM error de red: ' + e.message, 'vz-bad'); });
+    });
+
+    // ── 5. SpeechRecognition nativo ──────────────────────────────
+    $('vzSrBtn').addEventListener('click', function () {
+        var Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!Ctor) { setText('vzSrOut', 'SpeechRecognition NO disponible en este WebView', 'vz-bad'); report('sr', 'unavailable'); return; }
+        var events = [];
+        var t0 = Date.now();
+        var got = false;
+        var rec;
+        try { rec = new Ctor(); } catch (e) { setText('vzSrOut', 'No se pudo crear: ' + e.message, 'vz-bad'); return; }
+        rec.lang = 'es-ES'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 3;
+        function stamp(name, extra) { events.push('+' + (Date.now() - t0) + 'ms ' + name + (extra ? ' ' + extra : '')); }
+        rec.onstart = function () { stamp('onstart'); };
+        rec.onaudiostart = function () { stamp('onaudiostart'); };
+        rec.onspeechstart = function () { stamp('onspeechstart'); };
+        rec.onresult = function (e) {
+            got = true;
+            var txt = '';
+            for (var i = e.resultIndex; i < e.results.length; i++) txt += e.results[i][0].transcript;
+            stamp('onresult', '"' + txt + '"');
+            setText('vzSrOut', events.join('\n'), 'vz-ok');
+        };
+        rec.onerror = function (e) { stamp('onerror', e.error + (e.message ? ' (' + e.message + ')' : '')); };
+        rec.onend = function () {
+            stamp('onend');
+            setText('vzSrOut', events.join('\n') + (got ? '\n\n=> SÍ captó voz' : '\n\n=> NO captó voz (nativo inútil)'), got ? 'vz-ok' : 'vz-bad');
+            report('sr', events.join(' | '));
+        };
+        setText('vzSrOut', 'Escuchando 5 s... habla ahora.');
+        try { rec.start(); } catch (e) { setText('vzSrOut', 'recognition.start() falló: ' + e.message, 'vz-bad'); }
+        setTimeout(function () { try { rec.stop(); } catch (e) {} }, 5000);
+    });
+
+    // ── Informe ──────────────────────────────────────────────────
+    $('vzReportBtn').addEventListener('click', function () {
+        var detail = 'caps=' + JSON.stringify(caps) + ' || log=' + reportLines.slice(-30).join(' || ');
+        report('resumen', detail);
+        $('vzReportOut').textContent = 'Enviado.';
+        setTimeout(function () { $('vzReportOut').textContent = ''; }, 3000);
+    });
+})();
+</script>
+</section>
+    <?php
 }
 
 function publicista_field_clienta_picker($name, $label, $clientas, $selected = '') {
