@@ -124,8 +124,9 @@ if ($lite) {
 
 // ── Anti-cache versiones automáticas (filemtime = cambiar al tocar el archivo) ──
 $_liteCssV  = filemtime(__DIR__ . '/assets/lite.css');
-$_appJsV    = filemtime(__DIR__ . '/assets/app.js') . '-20260912_01';
+$_appJsV    = filemtime(__DIR__ . '/assets/app.js') . '-20260912_02';
 $_gpsRadarJsV = filemtime(__DIR__ . '/assets/gps-radar.js');
+$_liteDiagJsV = filemtime(__DIR__ . '/assets/lite-diag.js');
 $_styleCssV = filemtime(__DIR__ . '/assets/style.css') . '-20260828_01';
 $_tokensCssV= filemtime(__DIR__ . '/assets/tokens.css');
 $_themeCssV = filemtime(__DIR__ . '/assets/theme.css');
@@ -307,6 +308,9 @@ $_swV       = filemtime(__DIR__ . '/sw.js');
 <?php endif; ?>
 <script src="assets/app.js?v=<?= $_appJsV ?>"></script>
 <script src="assets/gps-radar.js?v=<?= $_gpsRadarJsV ?>"></script>
+<?php if ($lite): ?>
+<script src="assets/lite-diag.js?v=<?= $_liteDiagJsV ?>"></script>
+<?php endif; ?>
 <script>
 // Fuerza el handler del boton +Lista (belt-and-suspenders: el onclick HTML puede fallar por CSP/caché)
 // En modo lite: el modal PHP #addPlModalLite ya tiene su propio handler inline (addEventListener).

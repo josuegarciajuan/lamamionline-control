@@ -13438,11 +13438,13 @@ function render_youtube_player_lite($playParam, $playlists, $channels, $history,
 .vz-lite-fs-btn{pointer-events:auto;touch-action:manipulation;user-select:none;-webkit-user-select:none;cursor:pointer;min-height:34px;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:rgba(6,12,22,.82);color:#e5eefc;font-size:13px;font-weight:700;line-height:1;letter-spacing:.02em;box-shadow:0 2px 8px rgba(0,0,0,.55);backdrop-filter:blur(4px)}
 .vz-lite-fs-btn:active{transform:translateY(1px);background:rgba(20,32,52,.95)}
 .vz-lite-test-btn{border-color:rgba(16,185,129,.6);color:#6ee7b7}
+.vz-lite-diag-btn{border-color:rgba(245,158,11,.65);color:#fbbf24}
 .vz-lite-fs-bar.vz-bar-exited{top:auto;bottom:44px}
 </style>';
     echo '<div class="vz-lite-fs-bar" id="vzLiteFsBar">';
     echo '<button type="button" class="vz-lite-fs-btn" id="vzLiteExitBtn" title="Salir a los menús" onclick="document.body.classList.remove(\'josue-yt-fs\');document.body.classList.remove(\'yt-fs-video\');var b=document.getElementById(\'vzLiteFsBar\');if(b)b.classList.add(\'vz-bar-exited\');">&#9776; MENÚ</button>';
     echo '<button type="button" class="vz-lite-fs-btn vz-lite-test-btn" id="vzLiteTestBtn" title="Diagnóstico de voz" onclick="window.location.href=\'index.php?lite=1&amp;page=voztest\'">&#127908; TEST VOZ</button>';
+    echo '<button type="button" class="vz-lite-fs-btn vz-lite-diag-btn" id="vzDiagBtn" title="Diagnóstico de interfaz" onclick="if(window.LiteDiag){window.LiteDiag.open();}else{document.body.insertAdjacentHTML(\'beforeend\',\'<div style=&quot;position:fixed;top:52px;left:6px;z-index:2147483600;background:#111;color:#fbbf24;padding:8px;font:700 14px monospace;border:2px solid #fbbf24;border-radius:6px&quot;>DIAG no cargado: recarga la app</div>\');}">&#128295; DIAG</button>';
     echo '</div>';
 
     // ═══ CASSETTE DECK BODY: Marco bakelita ════════════════════════════
