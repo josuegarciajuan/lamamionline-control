@@ -6631,11 +6631,6 @@ function action_voice_autocorrect() {
         $passthrough('llm_no_config');
     }
 
-    $cfg = voice_ai_config();
-    if (empty($cfg['configured']) || empty($cfg['api_key'])) {
-        $passthrough('llm_no_config');
-    }
-
     $context = trim((string)request_post('context'));
     $prompt = "Eres un corrector de dictado por voz en español. El usuario tiene problemas de "
         . "pronunciación y el texto puede venir mal transcrito. Devuelve EXACTAMENTE un JSON válido, "
@@ -6647,8 +6642,45 @@ function action_voice_autocorrect() {
         $prompt .= "\nContexto de la pantalla: " . $context;
     }
 
+    // ── Proveedores a intentar (el de settings puede quedarse sin crédito) ──
+    $providers = array();
+    $primary = voice_ai_config();
+    if (!empty($primary['configured']) && !empty($primary['api_key'])) {
+        $providers[] = $primary;
+    }
+    // Fallback DeepSeek: clave ya configurada para Publicista o bot-casa.
+    $dsKey = '';
+    $dsModel = 'deepseek-v4-pro';
+    $s = storage_read('settings.json');
+    $dsKey = trim((string)($s['publicista_copy_api_key'] ?? ''));
+    if ($dsKey === '') {
+        $bcPath = __DIR__ . '/../bot-casa/config.local.json';
+        if (is_file($bcPath)) {
+            $bc = json_decode((string)@file_get_contents($bcPath), true);
+            if (is_array($bc) && !empty($bc['deepseek']['api_key'])) {
+                $dsKey = trim((string)$bc['deepseek']['api_key']);
+            }
+            if (is_array($bc) && !empty($bc['deepseek']['chat_model'])) {
+                $dsModel = trim((string)$bc['deepseek']['chat_model']);
+            }
+        }
+    }
+    $primaryIsDeepseek = (!empty($primary['provider']) && $primary['provider'] === 'deepseek');
+    if ($dsKey !== '' && !$primaryIsDeepseek) {
+        $providers[] = array(
+            'api_key' => $dsKey,
+            'model' => $dsModel,
+            'provider' => 'deepseek',
+            'chat_url' => 'https://api.deepseek.com/chat/completions',
+            'configured' => true,
+        );
+    }
+    if (empty($providers)) {
+        $passthrough('llm_no_config');
+    }
+
     $payload = array(
-        'model' => $cfg['model'],
+        'model' => '',
         'temperature' => 0.0,
         'messages' => array(
             array('role' => 'system', 'content' => $prompt),
@@ -6656,31 +6688,42 @@ function action_voice_autocorrect() {
         ),
     );
 
-    $ch = curl_init($cfg['chat_url']);
-    curl_setopt_array($ch, array(
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => array(
-            'Authorization: Bearer ' . $cfg['api_key'],
-            'Content-Type: application/json',
-        ),
-        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 8,
-        CURLOPT_CONNECTTIMEOUT => 4,
-    ));
-    $response = curl_exec($ch);
-    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlError = curl_error($ch);
-    curl_close($ch);
+    $content = '';
+    $usedProvider = '';
+    $lastHttp = 0;
+    foreach ($providers as $cfg) {
+        $payload['model'] = $cfg['model'];
+        $ch = curl_init($cfg['chat_url']);
+        curl_setopt_array($ch, array(
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => array(
+                'Authorization: Bearer ' . $cfg['api_key'],
+                'Content-Type: application/json',
+            ),
+            CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 8,
+            CURLOPT_CONNECTTIMEOUT => 4,
+        ));
+        $response = curl_exec($ch);
+        $lastHttp = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
 
-    if ($curlError !== '' || $httpCode !== 200 || !is_string($response) || $response === '') {
-        $passthrough('llm_error');
+        if ($curlError !== '' || $lastHttp !== 200 || !is_string($response) || $response === '') {
+            continue; // probar el siguiente proveedor
+        }
+
+        $decoded = json_decode($response, true);
+        $content = trim((string)($decoded['choices'][0]['message']['content'] ?? ''));
+        if ($content !== '') {
+            $usedProvider = (string)($cfg['provider'] ?? '');
+            break;
+        }
     }
 
-    $decoded = json_decode($response, true);
-    $content = trim((string)($decoded['choices'][0]['message']['content'] ?? ''));
     if ($content === '') {
-        $passthrough('llm_empty');
+        $passthrough('llm_error_http' . $lastHttp);
     }
     // Quitar vallas markdown si el modelo las añade.
     $content = preg_replace('/^```(?:json)?\s*|\s*```$/m', '', $content);
@@ -6711,7 +6754,7 @@ function action_voice_autocorrect() {
 
     echo json_encode(array(
         'ok' => true, 'best' => $best, 'candidates' => $candidates,
-        'raw' => $text, 'source' => 'llm',
+        'raw' => $text, 'source' => 'llm', 'provider' => $usedProvider,
     ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
