@@ -55,6 +55,69 @@ final class DeviceLockTest extends TestCase
         self::assertSame(hash('sha256', 'raw-token'), DeviceLock::hashToken('raw-token'));
     }
 
+    public function test_fingerprint_from_signals_is_stable_and_ignores_volatile_keys(): void
+    {
+        $signals = [
+            'ua' => 'Mobile',
+            'platform' => 'Linux armv81',
+            'langs' => ['es-ES', 'es'],
+            'hw' => 8,
+            'mem' => 8,
+            'screen' => [393, 873, 24, 2.75],
+            'tz' => 'Europe/Madrid',
+            'canvas' => 'abc',
+            'webgl' => 'Adreno 610',
+            'audio' => 'volatile-123',
+            'timestamp' => '123456',
+        ];
+
+        $first = DeviceLock::fingerprintFromSignals($signals);
+        $second = DeviceLock::fingerprintFromSignals($signals);
+        self::assertNotNull($first);
+        self::assertSame($first, $second, 'Mismas señales => mismo fingerprint');
+
+        // Claves volátiles añadidas no alteran el resultado.
+        $withVolatile = $signals;
+        $withVolatile['audio'] = 'otra-cosa-distinta';
+        $withVolatile['extra'] = 'x';
+        self::assertSame($first, DeviceLock::fingerprintFromSignals($withVolatile));
+
+        // Una señal estable que cambia sí altera el fingerprint.
+        $changed = $signals;
+        $changed['webgl'] = 'Mali-G52';
+        self::assertNotSame($first, DeviceLock::fingerprintFromSignals($changed));
+    }
+
+    public function test_fingerprint_from_signals_needs_enough_data(): void
+    {
+        self::assertNull(DeviceLock::fingerprintFromSignals(['ua' => 'x']));
+        self::assertNull(DeviceLock::fingerprintFromSignals([]));
+    }
+
+    public function test_register_http_path_derives_fingerprint_from_signals(): void
+    {
+        $lock = $this->lock();
+        $signals = [
+            'ua' => 'Mobile',
+            'platform' => 'Linux armv81',
+            'langs' => ['es-ES'],
+            'hw' => 8,
+            'mem' => 8,
+            'screen' => [393, 873, 24, 2.75],
+            'tz' => 'Europe/Madrid',
+            'canvas' => 'abc',
+            'webgl' => 'Adreno 610',
+        ];
+
+        // fingerprintInput=null => se deriva de las señales
+        $result = $lock->registerWith('inbox', null, $signals);
+        self::assertTrue($result['authorized']);
+
+        $expected = DeviceLock::fingerprintFromSignals($signals);
+        self::assertNotNull($expected);
+        self::assertSame($expected, $lock->snapshot()['candidates'][0]['fingerprint']);
+    }
+
     public function test_observe_register_records_candidate_and_never_blocks(): void
     {
         $lock = $this->lock();

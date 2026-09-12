@@ -167,6 +167,48 @@ final class DeviceLock
     }
 
     /**
+     * Deriva el fingerprint en servidor a partir de señales estables.
+     * Solo se incluyen componentes deterministas (sin audio ni medidas
+     * variables) para que el mismo dispositivo dé siempre el mismo hash.
+     *
+     * @param array<int|string,mixed> $signals
+     */
+    public static function fingerprintFromSignals(array $signals): ?string
+    {
+        $keys = [
+            'ua', 'platform', 'lang', 'langs', 'hw', 'mem', 'touch',
+            'screen', 'tz', 'canvas', 'webgl',
+            'ch_model', 'ch_platform', 'ch_platform_version', 'ch_arch', 'ch_bitness',
+        ];
+
+        $parts = [];
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $signals)) {
+                continue;
+            }
+            $value = $signals[$key];
+            if (is_array($value)) {
+                $flattened = [];
+                foreach ($value as $item) {
+                    if (is_scalar($item)) {
+                        $flattened[] = (string)$item;
+                    }
+                }
+                $value = implode(',', $flattened);
+            }
+            if (!is_scalar($value)) {
+                continue;
+            }
+            $parts[] = $key . '=' . (string)$value;
+        }
+
+        if (count($parts) < 4) {
+            return null;
+        }
+        return hash('sha256', implode('|', $parts));
+    }
+
+    /**
      * @param array<string,mixed> $state
      * @return int|null índice del dispositivo autorizado
      */
@@ -269,7 +311,9 @@ final class DeviceLock
     public function register(string $app): array
     {
         $body = self::readJsonBody();
-        return $this->registerWith($app, $body['fingerprint'] ?? null, self::asArray($body['signals'] ?? null));
+        // El fingerprint SIEMPRE se deriva en servidor a partir de las señales:
+        // así no se puede reutilizar un hash conocido sin las señales reales.
+        return $this->registerWith($app, null, self::asArray($body['signals'] ?? null));
     }
 
     /**
@@ -281,6 +325,9 @@ final class DeviceLock
     public function registerWith(string $app, mixed $fingerprintInput, array $signals = []): array
     {
         $fingerprint = self::normalizeFingerprint($fingerprintInput);
+        if ($fingerprint === null) {
+            $fingerprint = self::fingerprintFromSignals($signals);
+        }
         if ($fingerprint === null) {
             return ['ok' => false, 'error' => 'bad_fingerprint', 'authorized' => false, 'enforce' => false];
         }
@@ -531,30 +578,51 @@ final class DeviceLock
 (function(){
 var APP=__APP__,DENIED=__DENIED__,EP=__EP__;
 function hex(buf){try{return Array.prototype.map.call(new Uint8Array(buf),function(b){return ('00'+b.toString(16)).slice(-2);}).join('');}catch(e){return '';}}
-function sha256(str){
+function sha256(str){try{if(window.crypto&&crypto.subtle&&window.TextEncoder){return crypto.subtle.digest('SHA-256',new TextEncoder().encode(str)).then(hex);}}catch(e){}return Promise.resolve('');}
+function canvasHash(cb){
+  var done=false;
+  function finish(v){if(!done){done=true;cb(v);}}
   try{
-    if(window.crypto&&crypto.subtle&&window.TextEncoder){
-      return crypto.subtle.digest('SHA-256',new TextEncoder().encode(str)).then(hex);
-    }
-  }catch(e){}
-  var h=5381,i;for(i=0;i<str.length;i++){h=((h<<5)+h+str.charCodeAt(i))|0;}
-  var s=('00000000'+(h>>>0).toString(16)).slice(-8);return Promise.resolve((s+s+s+s+s+s+s+s));
+    var c=document.createElement('canvas');c.width=240;c.height=60;
+    var x=c.getContext('2d');if(!x){finish('');return;}
+    x.textBaseline='alphabetic';x.font='16px sans-serif';
+    x.fillStyle='#f60';x.fillRect(0,0,240,60);
+    x.fillStyle='#069';x.fillText('DeviceLock-2026',4,24);
+    x.strokeStyle='rgba(0,0,0,.6)';x.arc(80,30,18,0,Math.PI*2);x.stroke();
+    x.fillStyle='rgba(255,255,255,.5)';x.fillRect(120,10,90,20);
+    var url=c.toDataURL();
+    sha256(url).then(function(h){finish(h||'');});
+  }catch(e){finish('');}
 }
-function canvasSig(){try{var c=document.createElement('canvas');c.width=220;c.height=40;var x=c.getContext('2d');if(!x)return '';x.textBaseline='top';x.font='14px Arial';x.fillStyle='#f60';x.fillRect(0,0,220,40);x.fillStyle='#069';x.fillText('dlk-'+navigator.language,2,2);x.strokeStyle='rgba(0,0,0,.5)';x.arc(60,20,15,0,Math.PI*2);x.stroke();return c.toDataURL();}catch(e){return '';}}
 function webglSig(){try{var c=document.createElement('canvas');var gl=c.getContext('webgl')||c.getContext('experimental-webgl');if(!gl)return '';var d=gl.getExtension('WEBGL_debug_renderer_info');var v=d?gl.getParameter(d.UNMASKED_VENDOR_WEBGL):'';var r=d?gl.getParameter(d.UNMASKED_RENDERER_WEBGL):'';return String(v)+'~'+String(r);}catch(e){return '';}}
-function audioSig(){return new Promise(function(res){try{var AC=window.AudioContext||window.webkitAudioContext;if(!AC){res('');return;}var ctx=new AC();var o=ctx.createOscillator();var comp=ctx.createDynamicsCompressor();o.type='triangle';o.frequency.value=10000;o.connect(comp);comp.connect(ctx.destination);o.start(0);setTimeout(function(){try{o.stop();}catch(e){}var s=String(ctx.sampleRate)+'|'+String(comp.reduction||'')+'|'+String(ctx.baseLatency||'');try{ctx.close();}catch(e){}res(s);},35);}catch(e){res('');}});}
 function tz(){try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(e){return '';}}
-function post(fp,signals){try{fetch(EP,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-DLK-App':APP},body:JSON.stringify({fingerprint:fp,signals:signals,app:APP})}).then(function(r){return r.json();}).then(function(d){if(!d)return;if(d.authorized&&DENIED){location.reload();}else if(!d.authorized&&!DENIED&&d.enforce){location.reload();}}).catch(function(){});}catch(e){}}
-function run(){
-  var n=navigator,s=screen;
-  var base=['ua:'+n.userAgent,'plat:'+String(n.platform||''),'lang:'+String(n.language||''),'langs:'+String((n.languages||[]).join(',')),'hw:'+String(n.hardwareConcurrency||''),'mem:'+String(n.deviceMemory||''),'touch:'+String(n.maxTouchPoints||''),'scr:'+[s.width,s.height,s.availWidth,s.availHeight,s.colorDepth,window.devicePixelRatio||1].join('x'),'tz:'+tz(),'canvas:'+canvasSig(),'webgl:'+webglSig()];
-  audioSig().then(function(a){
-    base.push('audio:'+a);
-    var signals={ua:n.userAgent,platform:String(n.platform||''),tz:tz(),screen:[s.width,s.height,s.colorDepth],hw:n.hardwareConcurrency||0,mem:n.deviceMemory||0,webgl:webglSig()};
-    sha256(base.join('|')).then(function(fp){post(fp,signals);});
+function hints(){try{if(navigator.userAgentData&&navigator.userAgentData.getHighEntropyValues){return navigator.userAgentData.getHighEntropyValues(['model','platform','platformVersion','architecture','bitness']).then(function(h){return {model:h.model||'',platform:h.platform||'',platformVersion:h.platformVersion||'',architecture:h.architecture||'',bitness:h.bitness||''};}).catch(function(){return {};});}}catch(e){}return Promise.resolve({});}
+function post(signals){try{fetch(EP,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-DLK-App':APP},body:JSON.stringify({signals:signals,app:APP})}).then(function(r){return r.json();}).then(function(d){if(!d)return;if(d.authorized&&DENIED){location.reload();}else if(!d.authorized&&!DENIED&&d.enforce){location.reload();}}).catch(function(){});}catch(e){}}
+canvasHash(function(ch){
+  hints().then(function(h){
+    var n=navigator,s=screen;
+    var dims=[s.width,s.height].sort(function(a,b){return a-b;});
+    var signals={
+      ua:n.userAgent,
+      platform:String(n.platform||''),
+      lang:String(n.language||''),
+      langs:(n.languages||[]).slice(0,5),
+      hw:n.hardwareConcurrency||0,
+      mem:n.deviceMemory||0,
+      touch:n.maxTouchPoints||0,
+      screen:[dims[0],dims[1],s.colorDepth,window.devicePixelRatio||1],
+      tz:tz(),
+      canvas:ch,
+      webgl:webglSig(),
+      ch_model:String(h.model||''),
+      ch_platform:String(h.platform||''),
+      ch_platform_version:String(h.platformVersion||''),
+      ch_arch:String(h.architecture||''),
+      ch_bitness:String(h.bitness||'')
+    };
+    post(signals);
   });
-}
-run();
+});
 })();
 JS;
 
