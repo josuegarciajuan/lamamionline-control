@@ -7285,6 +7285,9 @@ if (window._rutasMapData && window._rutasMapData.points && window._rutasMapData.
         liteCloseSidebar();
         liteClosePanel('presintoniasPanel');
         liteClosePanel('radiosPanel');
+        // Mover el overlay a <body> (fuera del overflow del reproductor)
+        // para que el hit-testing de position:fixed funcione en Chrome 95.
+        liteEnsureOverlay();
         var overlay = document.getElementById('gpsOverlay');
         if (overlay) {
             overlay.classList.add('open');
@@ -7356,12 +7359,13 @@ if (window._rutasMapData && window._rutasMapData.points && window._rutasMapData.
     // Crear overlay si no existe (solo en lite, lazy)
     var _sidebarsMoved = false;
     function liteEnsureOverlay() {
-        // Mover sidebars fuera del overflow container del reproductor para
+        // Mover overlays fuera del overflow container del reproductor para
         // evitar que el overflow-y:auto del #youtubeReproductor interfiera
         // con el hit-testing de position:fixed en Chrome 95 WebView.
+        // Incluye #gpsOverlay (mismo bug que sufrían los sidebars).
         if (!_sidebarsMoved && document.body.classList.contains('is-lite')) {
             _sidebarsMoved = true;
-            ['ytRadioSidebar', 'presintoniasPanel', 'radiosPanel'].forEach(function(id) {
+            ['ytRadioSidebar', 'presintoniasPanel', 'radiosPanel', 'gpsOverlay'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el && el.parentNode !== document.body) {
                     document.body.appendChild(el);
