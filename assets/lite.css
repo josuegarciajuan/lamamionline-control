@@ -8740,14 +8740,22 @@ body.josue-yt-fs .youtube-reproductor {
   width: 100%;
   height: 100%;
   height: 100dvh;
-  z-index: 99900;
+  /* Nivel body: por encima de .youtube-reproductor (z-index 99999) */
+  z-index: 100010;
   pointer-events: none;
+  /* Cerrado = invisible e inerte para hit-testing (evita que hijos con
+     pointer-events:auto, como el canvas del radar, tapen la UI inferior).
+     El delay deja terminar la animación de cierre del panel. */
+  visibility: hidden;
+  transition: visibility 0s linear 0.3s;
   display: flex;
   align-items: stretch;
   justify-content: stretch;
 }
 .yt-gps-overlay.open {
   pointer-events: auto;
+  visibility: visible;
+  transition: visibility 0s;
 }
 
 /* Backdrop — semi-transparent dark layer, fades in */
@@ -8940,6 +8948,11 @@ body.josue-yt-fs .youtube-reproductor {
   z-index: 10;
   border-radius: 50%;
   box-shadow: none;
+  /* Solo intercepta toques (long-press torpedo) cuando el overlay está abierto.
+     Cerrado NO debe tapar los botones de debajo. */
+  pointer-events: none;
+}
+.yt-gps-overlay.open .yt-gps-radar-map #gpsRadarCanvas {
   pointer-events: auto;
 }
 
