@@ -18,6 +18,9 @@ function handle_get_actions() {
         case 'touch_gps':
             action_touch_gps();
             break;
+        case 'lite_diag':
+            action_lite_diag();
+            break;
         case 'export_gpx':
             action_export_gpx();
             break;
@@ -86,6 +89,53 @@ function action_touch_gps() {
 
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(array('ok' => true));
+    exit;
+}
+
+// ── Lite DIAG: recibir informe de diagnóstico visual del dispositivo coche ───
+function action_lite_diag() {
+    header('Content-Type: application/json; charset=utf-8');
+    $raw = (string)($_GET['data'] ?? '');
+    if ($raw === '') {
+        echo json_encode(array('ok' => false, 'error' => 'Sin datos'));
+        exit;
+    }
+    if (strlen($raw) > 12000) {
+        echo json_encode(array('ok' => false, 'error' => 'Informe demasiado grande'));
+        exit;
+    }
+    // Tolerar '+' convertido en espacio por algún proxy
+    $decoded = base64_decode(strtr($raw, ' ', '+'), true);
+    if ($decoded === false) {
+        echo json_encode(array('ok' => false, 'error' => 'Base64 inválido'));
+        exit;
+    }
+    $report = json_decode($decoded, true);
+    if (!is_array($report)) {
+        echo json_encode(array('ok' => false, 'error' => 'JSON inválido'));
+        exit;
+    }
+    $entry = array(
+        'received_at' => date('c'),
+        'user'        => $_SESSION['username'] ?? 'unknown',
+        'ua'          => substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 300),
+        'report'      => $report,
+    );
+    $file = __DIR__ . '/../data/lite_diag_report.json';
+    $dir  = dirname($file);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    $written = @file_put_contents(
+        $file,
+        json_encode($entry, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT),
+        LOCK_EX
+    );
+    if ($written === false) {
+        echo json_encode(array('ok' => false, 'error' => 'No se pudo escribir en el servidor'));
+        exit;
+    }
+    echo json_encode(array('ok' => true, 'saved_bytes' => $written));
     exit;
 }
 

@@ -7357,6 +7357,10 @@ if (window._rutasMapData && window._rutasMapData.points && window._rutasMapData.
     // The iframe may not exist yet, so retry on first user interaction.
     if (document.body.classList.contains('is-lite')) {
         _syncVideoOverlay();
+        // Mover la barra superior (MENÚ/TEST VOZ/DIAG) fuera del overflow
+        // del reproductor al arrancar: en Chrome 95 el hit-testing de
+        // position:fixed dentro de un contenedor con overflow falla.
+        liteEnsureOverlay();
     }
 
     // ☀️ Restaurar sunlight mode desde localStorage (solo Lite)
@@ -7511,7 +7515,7 @@ if (window._rutasMapData && window._rutasMapData.points && window._rutasMapData.
         // Incluye #gpsOverlay (mismo bug que sufrían los sidebars).
         if (!_sidebarsMoved && document.body.classList.contains('is-lite')) {
             _sidebarsMoved = true;
-            ['ytRadioSidebar', 'presintoniasPanel', 'radiosPanel', 'gpsOverlay'].forEach(function(id) {
+            ['ytRadioSidebar', 'presintoniasPanel', 'radiosPanel', 'gpsOverlay', 'vzLiteFsBar'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el && el.parentNode !== document.body) {
                     document.body.appendChild(el);
