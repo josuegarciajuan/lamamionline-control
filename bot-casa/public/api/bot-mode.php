@@ -11,6 +11,12 @@ declare(strict_types=1);
 
 define('WASAPBOT_ROOT', dirname(__DIR__, 2));
 
+$__dlkGuard = dirname(__DIR__) . '/_device_guard.php';
+if (is_file($__dlkGuard)) {
+    require_once $__dlkGuard;
+    botcasa_device_guard();
+}
+
 // ── Autoload ──
 spl_autoload_register(function (string $class): void {
     $prefix = 'WasapBot\\';

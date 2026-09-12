@@ -16,6 +16,10 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/app/bootstrap.php';
 require_once __DIR__ . '/app/comercial_agenda.php';
+require_once __DIR__ . '/app/device_lock.php';
+
+// ── Candado de dispositivos: 404 + expulsión para no autorizados ──
+device_lock_gate('inbox');
 
 // ── Auto-auth (mismo patrón que SuperWasap) ──
 auth_auto_login_from_whitelist();
@@ -57,6 +61,7 @@ $_forceV   = '20260828_03'; // salud fresca y barra superior equilibrada + motor
 <link rel="stylesheet" href="assets/tokens.css?v=<?= filemtime(__DIR__ . '/assets/tokens.css') ?>">
 <link rel="stylesheet" href="assets/inbox-chat.css?v=<?= $_chatCssV ?>-<?= $_forceV ?>">
 <title>Inbox</title>
+<?= device_lock_bootstrap_script('inbox') ?>
 <style>
 /* Reset standalone — WhatsApp dark theme */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}

@@ -41,6 +41,9 @@ if (file_exists($vendorAutoload)) {
     });
 }
 
+require_once __DIR__ . '/_device_guard.php';
+botcasa_device_guard();
+
 // ─────────────────────────────────────────────────────────────────────
 //  Demo host auto-login
 //  When accessed via demo.casawasap.com, auto-authenticate as the
