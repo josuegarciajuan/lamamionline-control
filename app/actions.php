@@ -6691,10 +6691,11 @@ function action_voice_autocorrect() {
     $content = '';
     $usedProvider = '';
     $lastHttp = 0;
+    $lastErr = '';
+    $tried = array();
     foreach ($providers as $cfg) {
         $payload['model'] = $cfg['model'];
-        $ch = curl_init($cfg['chat_url']);
-        curl_setopt_array($ch, array(
+        $opts = array(
             CURLOPT_POST => true,
             CURLOPT_HTTPHEADER => array(
                 'Authorization: Bearer ' . $cfg['api_key'],
@@ -6702,15 +6703,24 @@ function action_voice_autocorrect() {
             ),
             CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 8,
-            CURLOPT_CONNECTTIMEOUT => 4,
-        ));
+            // Fallback DeepSeek exige algo más de margen que OpenAI en FPM.
+            CURLOPT_TIMEOUT => 12,
+            CURLOPT_CONNECTTIMEOUT => 6,
+        );
+        // Forzar IPv4: algunos entornos FPM sin ruta IPv6 fallan con curl error 7.
+        if (defined('CURL_IPRESOLVE_V4')) {
+            $opts[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+        }
+        $ch = curl_init($cfg['chat_url']);
+        curl_setopt_array($ch, $opts);
         $response = curl_exec($ch);
         $lastHttp = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
+        $lastErr = (string)curl_error($ch);
         curl_close($ch);
 
-        if ($curlError !== '' || $lastHttp !== 200 || !is_string($response) || $response === '') {
+        $tried[] = (string)($cfg['provider'] ?? '?') . ':' . $lastHttp . ($lastErr !== '' ? ':' . substr($lastErr, 0, 40) : '');
+
+        if ($lastErr !== '' || $lastHttp !== 200 || !is_string($response) || $response === '') {
             continue; // probar el siguiente proveedor
         }
 
@@ -6723,7 +6733,7 @@ function action_voice_autocorrect() {
     }
 
     if ($content === '') {
-        $passthrough('llm_error_http' . $lastHttp);
+        $passthrough('llm_error_' . implode(',', $tried));
     }
     // Quitar vallas markdown si el modelo las añade.
     $content = preg_replace('/^```(?:json)?\s*|\s*```$/m', '', $content);
