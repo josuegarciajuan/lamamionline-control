@@ -734,6 +734,9 @@ function handle_post_actions() {
         case 'youtube_voice_search':
             action_youtube_voice_search();
             break;
+        case 'voice_autocorrect':
+            action_voice_autocorrect();
+            break;
     }
 }
 
@@ -6597,6 +6600,120 @@ function action_youtube_voice_search() {
     $transcript = trim((string)($decoded['text'] ?? ''));
 
     _youtube_json_response(array('ok' => true, 'transcript' => $transcript));
+}
+
+/**
+ * Corrección de dictado por LLM con candidatos.
+ * Recibe 'text' (transcripción cruda, p.ej. de Whisper) y un 'context' opcional.
+ * Devuelve { ok, best, candidates[] }. Si no hay LLM configurado o falla,
+ * devuelve el texto original como único candidato (passthrough), sin romper.
+ */
+function action_voice_autocorrect() {
+    @ini_set('display_errors', '0');
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+
+    $text = trim((string)request_post('text'));
+    if ($text === '') {
+        echo json_encode(array('ok' => false, 'error' => 'texto_vacio', 'best' => '', 'candidates' => array()), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $passthrough = function ($reason) use ($text) {
+        echo json_encode(array(
+            'ok' => true, 'best' => $text, 'candidates' => array($text),
+            'raw' => $text, 'source' => 'passthrough', 'reason' => $reason,
+        ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    };
+
+    if (!function_exists('voice_ai_config') || !function_exists('curl_init')) {
+        $passthrough('llm_no_config');
+    }
+
+    $cfg = voice_ai_config();
+    if (empty($cfg['configured']) || empty($cfg['api_key'])) {
+        $passthrough('llm_no_config');
+    }
+
+    $context = trim((string)request_post('context'));
+    $prompt = "Eres un corrector de dictado por voz en español. El usuario tiene problemas de "
+        . "pronunciación y el texto puede venir mal transcrito. Devuelve EXACTAMENTE un JSON válido, "
+        . "sin markdown, con esta forma: {\"best\":\"...\",\"candidates\":[\"...\",\"...\"]}. "
+        . "Reglas: corrige por fonética y contexto sin cambiar el significado; 'best' es la interpretación "
+        . "más probable; 'candidates' son hasta 3 alternativas plausibles e incluyen 'best' como primera; "
+        . "no añadas explicaciones; si el texto ya es correcto, best=texto y candidates=[texto].";
+    if ($context !== '') {
+        $prompt .= "\nContexto de la pantalla: " . $context;
+    }
+
+    $payload = array(
+        'model' => $cfg['model'],
+        'temperature' => 0.0,
+        'messages' => array(
+            array('role' => 'system', 'content' => $prompt),
+            array('role' => 'user', 'content' => $text),
+        ),
+    );
+
+    $ch = curl_init($cfg['chat_url']);
+    curl_setopt_array($ch, array(
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => array(
+            'Authorization: Bearer ' . $cfg['api_key'],
+            'Content-Type: application/json',
+        ),
+        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 8,
+        CURLOPT_CONNECTTIMEOUT => 4,
+    ));
+    $response = curl_exec($ch);
+    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlError !== '' || $httpCode !== 200 || !is_string($response) || $response === '') {
+        $passthrough('llm_error');
+    }
+
+    $decoded = json_decode($response, true);
+    $content = trim((string)($decoded['choices'][0]['message']['content'] ?? ''));
+    if ($content === '') {
+        $passthrough('llm_empty');
+    }
+    // Quitar vallas markdown si el modelo las añade.
+    $content = preg_replace('/^```(?:json)?\s*|\s*```$/m', '', $content);
+    $parsed = json_decode($content, true);
+
+    $best = $text;
+    $candidates = array($text);
+    if (is_array($parsed)) {
+        $b = trim((string)($parsed['best'] ?? ''));
+        if ($b !== '') $best = $b;
+        $cand = array();
+        if (isset($parsed['candidates']) && is_array($parsed['candidates'])) {
+            foreach ($parsed['candidates'] as $c) {
+                $c = trim((string)$c);
+                if ($c !== '' && !in_array($c, $cand, true)) $cand[] = $c;
+            }
+        }
+        if (empty($cand)) $cand[] = $best;
+        if (!in_array($best, $cand, true)) array_unshift($cand, $best);
+        $candidates = array_slice($cand, 0, 4);
+    } else {
+        $plain = trim((string)$content);
+        if ($plain !== '') {
+            $best = $plain;
+            $candidates = array($plain);
+        }
+    }
+
+    echo json_encode(array(
+        'ok' => true, 'best' => $best, 'candidates' => $candidates,
+        'raw' => $text, 'source' => 'llm',
+    ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
 }
 
 /**
