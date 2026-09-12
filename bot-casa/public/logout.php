@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/_device_guard.php';
+botcasa_device_guard();
+
 /**
  * logout.php — Cierra la sesión del usuario y redirige al login.
  */

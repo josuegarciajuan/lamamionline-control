@@ -11,6 +11,9 @@ declare(strict_types=1);
 
 define('WASAPBOT_ROOT', dirname(__DIR__));
 
+require_once __DIR__ . '/_device_guard.php';
+botcasa_device_guard();
+
 // ── Autoload ──
 $vendorAutoload = WASAPBOT_ROOT . '/vendor/autoload.php';
 if (file_exists($vendorAutoload)) {
@@ -117,6 +120,7 @@ header('Referrer-Policy: no-referrer');
 <link rel="manifest" href="chat-manifest.json?v=<?php echo $version; ?>">
 <link rel="stylesheet" href="assets/chat-operator.css?v=<?php echo $version; ?>">
 <title>SuperWasap</title>
+<?php echo botcasa_device_bootstrap_script(); ?>
 <style>
 /* ── Bot Toggle Bar (top of sidebar header area, always visible) ── */
 .bot-control-bar {

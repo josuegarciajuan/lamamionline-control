@@ -18,6 +18,9 @@ declare(strict_types=1);
 
 define('WASAPBOT_ROOT', dirname(__DIR__));
 
+require_once __DIR__ . '/_device_guard.php';
+botcasa_device_guard();
+
 spl_autoload_register(function (string $class): void {
     $prefix = 'WasapBot\\';
     $prefixLen = strlen($prefix);
@@ -487,6 +490,7 @@ $isDirectAccess = (strpos($_SERVER['HTTP_HOST'] ?? '', 'casawasap.com') !== fals
 <link rel="apple-touch-icon" href="https://casawasap.com/img/hero-casawasap.png">
 <?php endif; ?>
 <title>bot-casa — <?php echo $clientName; ?></title>
+<?php echo botcasa_device_bootstrap_script(); ?>
 <link rel="stylesheet" href="assets/style.css?v=20260825_2">
 <link rel="stylesheet" href="assets/chat.css?v=20260629_1">
 <link rel="stylesheet" href="assets/tutorial.css?v=20260825_4">

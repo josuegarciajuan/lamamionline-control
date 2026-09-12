@@ -16,6 +16,10 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/app/bootstrap.php';
 require_once __DIR__ . '/app/comercial_agenda.php';
+require_once __DIR__ . '/app/device_lock.php';
+
+// ── Candado de dispositivos ──
+device_lock_gate('inbox');
 
 auth_auto_login_from_whitelist();
 

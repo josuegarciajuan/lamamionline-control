@@ -6,6 +6,12 @@ use WasapBot\Core\OnboardingState;
 
 define('WASAPBOT_ROOT', dirname(__DIR__, 2));
 
+$__dlkGuard = dirname(__DIR__) . '/_device_guard.php';
+if (is_file($__dlkGuard)) {
+    require_once $__dlkGuard;
+    botcasa_device_guard();
+}
+
 require_once WASAPBOT_ROOT . '/src/Core/OnboardingState.php';
 
 if (session_status() === PHP_SESSION_NONE) {

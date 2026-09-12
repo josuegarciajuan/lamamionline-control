@@ -12,6 +12,9 @@ declare(strict_types=1);
 // ── Bootstrap mínimo ──
 define('WASAPBOT_ROOT', dirname(__DIR__));
 
+require_once __DIR__ . '/_device_guard.php';
+botcasa_device_guard();
+
 spl_autoload_register(function (string $class): void {
     $prefix = 'WasapBot\\';
     $prefixLen = strlen($prefix);
@@ -120,6 +123,7 @@ header('X-Permitted-Cross-Domain-Policies: none');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>casawasap.com — Acceso</title>
+<?php echo botcasa_device_bootstrap_script(); ?>
 <style>
 :root {
     --bg: #050510;
