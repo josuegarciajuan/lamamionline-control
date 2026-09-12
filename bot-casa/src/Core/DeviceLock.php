@@ -99,8 +99,15 @@ final class DeviceLock
         if (@file_put_contents($tmp, self::PREFIX . $json, LOCK_EX) === false) {
             return false;
         }
-        @chmod($tmp, 0660);
-        return @rename($tmp, $this->stateFile);
+        // Lectura/escritura para el usuario web y para el CLI (root):
+        // el directorio data/ ya es 0777, así que 0666 no amplía la exposición.
+        @chmod($tmp, 0666);
+        if (!@rename($tmp, $this->stateFile)) {
+            @unlink($tmp);
+            return false;
+        }
+        @chmod($this->stateFile, 0666);
+        return true;
     }
 
     public function mode(): string
